@@ -1,0 +1,272 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Loader2, Save } from "lucide-react";
+import Link from "next/link";
+import { use } from "react";
+
+interface UserData {
+  id: string;
+  slack_name: string;
+  slack_email: string;
+  job_title: string | null;
+  department: string | null;
+  manager_id: string | null;
+  level_id: string | null;
+  hire_date: string | null;
+  role: string;
+}
+
+export default function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [allUsers, setAllUsers] = useState<{ id: string; slack_name: string }[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string; grade: string | null; job_family_name: string }[]>([]);
+
+  const [jobTitle, setJobTitle] = useState("");
+  const [department, setDepartment] = useState("");
+  const [managerId, setManagerId] = useState<string>("");
+  const [levelId, setLevelId] = useState<string>("");
+  const [hireDate, setHireDate] = useState("");
+  const [role, setRole] = useState("user");
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        // Load the user
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role")
+          .eq("id", id)
+          .single();
+
+        if (userError || !userData) {
+          setError("User not found");
+          return;
+        }
+
+        setUser(userData);
+        setJobTitle(userData.job_title || "");
+        setDepartment(userData.department || "");
+        setManagerId(userData.manager_id || "");
+        setLevelId(userData.level_id || "");
+        setHireDate(userData.hire_date || "");
+        setRole(userData.role || "user");
+
+        // Load all users for manager selection
+        const { data: usersData } = await supabase
+          .from("users")
+          .select("id, slack_name")
+          .neq("id", id)
+          .order("slack_name");
+        setAllUsers(usersData || []);
+
+        // Load levels with job family names
+        const { data: levelsData } = await supabase
+          .from("levels")
+          .select("id, name, grade, job_family:job_families(name)")
+          .order("name");
+        setLevels(
+          (levelsData || []).map((l: any) => ({
+            id: l.id,
+            name: l.name,
+            grade: l.grade,
+            job_family_name: l.job_family?.name || "",
+          }))
+        );
+      } catch (err) {
+        setError("Failed to load user data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [id]);
+
+  async function handleSave() {
+    if (!user) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({
+          job_title: jobTitle || null,
+          department: department || null,
+          manager_id: managerId || null,
+          level_id: levelId || null,
+          hire_date: hireDate || null,
+          role,
+        })
+        .eq("id", id);
+
+      if (updateError) {
+        setError(updateError.message);
+        return;
+      }
+
+      router.push(`/dashboard/team/${id}`);
+      router.refresh();
+    } catch (err) {
+      setError("Failed to update user");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <h1 className="text-2xl font-bold text-foreground mb-2">User Not Found</h1>
+        <Button asChild>
+          <Link href="/dashboard/team">Back to Team</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href={`/dashboard/team/${id}`}>
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Edit Profile</h1>
+          <p className="text-muted-foreground">{user.slack_name} ({user.slack_email})</p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg border border-destructive/20">
+          {error}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Role & Organizational Info</CardTitle>
+          <CardDescription>Update the employee&apos;s role, position, and reporting line</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="role">System Role</Label>
+            <Select value={role} onValueChange={setRole}>
+              <SelectTrigger id="role">
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user">User</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="hr">HR</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="jobTitle">Job Title</Label>
+            <Input
+              id="jobTitle"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="e.g. Senior Software Engineer"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="department">Department</Label>
+            <Input
+              id="department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              placeholder="e.g. Engineering"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="manager">Manager</Label>
+            <Select value={managerId} onValueChange={setManagerId}>
+              <SelectTrigger id="manager">
+                <SelectValue placeholder="Select manager" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No Manager</SelectItem>
+                {allUsers.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.slack_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="level">Job Level</Label>
+            <Select value={levelId} onValueChange={setLevelId}>
+              <SelectTrigger id="level">
+                <SelectValue placeholder="Select level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No Level</SelectItem>
+                {levels.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>
+                    {l.job_family_name ? `${l.job_family_name} — ` : ""}{l.name}{l.grade ? ` (${l.grade})` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="hireDate">Hire Date</Label>
+            <Input
+              id="hireDate"
+              type="date"
+              value={hireDate}
+              onChange={(e) => setHireDate(e.target.value)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" asChild>
+          <Link href={`/dashboard/team/${id}`}>Cancel</Link>
+        </Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+          Save Changes
+        </Button>
+      </div>
+    </div>
+  );
+}
