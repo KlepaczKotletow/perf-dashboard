@@ -94,7 +94,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   }
 
   // Build the Add to Slack URL with state parameter
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL!).replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   const scopes =

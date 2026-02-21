@@ -3,7 +3,7 @@ import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star } from "lucid
 import Link from "next/link";
 
 export default function Home() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zhfvxfvmdlpdfgxrwtdn.supabase.co";
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zhfvxfvmdlpdfgxrwtdn.supabase.co").replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
@@ -27,6 +27,12 @@ export default function Home() {
             <span className="font-semibold tracking-tight">Perf</span>
           </Link>
           <div className="flex items-center gap-3">
+            <Link
+              href="/pricing"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Pricing
+            </Link>
             <a
               href={signInWithSlackUrl}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
