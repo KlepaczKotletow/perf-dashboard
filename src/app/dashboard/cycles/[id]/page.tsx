@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { isManagerOrAbove } from "@/lib/roles";
 import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
+import { CycleQuestions } from "./cycle-questions";
 
 async function getCycle(id: string) {
   const supabase = await createServerSupabaseClient();
@@ -67,6 +68,32 @@ async function getWorkspaceUsers() {
   return data || [];
 }
 
+async function getCycleQuestions(cycleId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("cycle_questions")
+    .select(`
+      id, question_type, competency_id, prompt, sort_order, required,
+      competency:competencies(id, name, category)
+    `)
+    .eq("cycle_id", cycleId)
+    .order("sort_order");
+  return (data || []).map((q: any) => ({
+    ...q,
+    competency: Array.isArray(q.competency) ? q.competency[0] || null : q.competency,
+  }));
+}
+
+async function getAllCompetencies() {
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("competencies")
+    .select("id, name, category, description")
+    .order("category")
+    .order("name");
+  return data || [];
+}
+
 const statusColors: Record<string, string> = {
   draft: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
   active: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
@@ -108,11 +135,13 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     await supabase2.rpc("progress_cycle_phases", { p_cycle_id: id });
   }
 
-  const [employees, allUsers, phases, assignments] = await Promise.all([
+  const [employees, allUsers, phases, assignments, cycleQuestions, allCompetencies] = await Promise.all([
     getCycleEmployees(id),
     getWorkspaceUsers(),
     getCyclePhases(id),
     getReviewAssignments(id),
+    getCycleQuestions(id),
+    getAllCompetencies(),
   ]);
   
   const completedCount = employees.filter((e: any) => e.status === "completed").length;
@@ -281,6 +310,14 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       )}
+
+      {/* Review Questions Configuration */}
+      <CycleQuestions
+        cycleId={id}
+        isDraft={cycle.status === "draft"}
+        questions={cycleQuestions}
+        allCompetencies={allCompetencies}
+      />
 
       {/* Review Assignments */}
       {assignments.length > 0 && (
