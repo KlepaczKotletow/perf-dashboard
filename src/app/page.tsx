@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight, Check } from "lucide-react";
+import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight, Check, X, Clock, FileX, Brain } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 
@@ -49,7 +49,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* Header — dark, anchors into hero */}
+      {/* Header — dark, with anchor nav */}
       <header className="border-b border-white/[0.08] backdrop-blur-md bg-[oklch(0.11_0.014_30)]/92 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -59,9 +59,15 @@ export default function Home() {
             <span className="font-semibold tracking-tight text-white">Perf</span>
           </Link>
           <div className="flex items-center gap-3">
+            <a
+              href="#features"
+              className="hidden sm:inline text-sm text-white/55 hover:text-white transition-colors"
+            >
+              Features
+            </a>
             <Link
-              href="/pricing"
-              className="text-sm text-white/55 hover:text-white transition-colors"
+              href="#pricing"
+              className="hidden sm:inline text-sm text-white/55 hover:text-white transition-colors"
             >
               Pricing
             </Link>
@@ -93,23 +99,28 @@ export default function Home() {
                 Built for Slack-first teams
               </div>
 
+              {/* Clear product description */}
+              <p className="text-sm font-medium text-primary tracking-wide mb-4">
+                Performance management that lives in Slack
+              </p>
+
               <h1 className="text-5xl sm:text-[60px] lg:text-[64px] font-bold tracking-tight text-white leading-[1.05]">
-                Performance<br />
-                reviews{" "}
+                Reviews{" "}
                 <span className="text-primary">people</span>
                 <br />actually complete
               </h1>
 
-              <p className="mt-6 text-lg text-white/55 leading-relaxed max-w-[420px]">
-                Run 360 reviews, track competencies, and give continuous feedback —
-                all from where your team already works.
+              <p className="mt-6 text-lg text-white/55 leading-relaxed max-w-[440px]">
+                Perf is a Slack-native platform for 360 reviews, continuous feedback,
+                and competency tracking. Your team fills in reviews right from Slack DMs —
+                you get a real-time dashboard with analytics and calibration.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start gap-3 mt-10">
                 <Button size="lg" className="h-12 px-7 text-sm font-semibold" asChild>
                   <a href={addToSlackUrl}>
                     <Slack className="h-4 w-4 mr-2" />
-                    Add to Slack
+                    Add to Slack — free
                   </a>
                 </Button>
                 <Button
@@ -123,18 +134,15 @@ export default function Home() {
               </div>
 
               <p className="mt-8 text-xs text-white/30 tracking-wide">
-                Free to start · No credit card required · Installs in 60 seconds
+                Free for up to 10 people · No credit card · Installs in 60 seconds
               </p>
             </div>
 
-            {/* Right: mockup — desktop only, bleeds into next section */}
+            {/* Right: mockup — desktop only */}
             <div className="hidden lg:block relative pt-10">
-              {/* Coral ambient glow */}
               <div className="absolute -inset-6 bg-primary/[0.08] blur-3xl rounded-full -z-10 pointer-events-none" />
 
-              {/* Browser frame — no bottom rounded corners, bleeds into How it Works */}
               <div className="rounded-t-2xl border border-white/[0.10] border-b-0 overflow-hidden shadow-2xl shadow-black/50">
-                {/* Browser chrome — dark */}
                 <div className="bg-[oklch(0.17_0.016_30)] border-b border-white/[0.08] px-4 py-3 flex items-center gap-3">
                   <div className="flex gap-1.5">
                     <div className="h-3 w-3 rounded-full bg-white/20" />
@@ -146,10 +154,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* App shell — light bg so existing mockup renders correctly */}
                 <div className="bg-white">
                   <div className="flex h-[340px] sm:h-[380px] overflow-hidden">
-                    {/* Sidebar */}
                     <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
                       <div className="px-2 py-1.5 mb-1">
                         <div className="flex items-center gap-2">
@@ -180,7 +186,6 @@ export default function Home() {
                       ))}
                     </div>
 
-                    {/* Main content */}
                     <div className="flex-1 p-5 sm:p-6 overflow-hidden">
                       <div className="flex items-center justify-between mb-5">
                         <div>
@@ -193,12 +198,10 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Progress bar */}
                       <div className="h-1.5 bg-muted rounded-full mb-6 overflow-hidden">
                         <div className="h-full bg-primary rounded-full" style={{ width: "73%" }} />
                       </div>
 
-                      {/* Competency grid */}
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-3">Avg. competency scores</p>
                       <div className="grid grid-cols-3 gap-3">
                         {[
@@ -216,7 +219,6 @@ export default function Home() {
                         ))}
                       </div>
 
-                      {/* Review assignments */}
                       <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2 mt-5">Recent assignments</p>
                       <div className="space-y-1.5">
                         {[
@@ -248,8 +250,163 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it Works — light, breather after dark hero */}
-      <section className="max-w-5xl mx-auto px-6 py-28">
+      {/* Problem section — why reviews are broken */}
+      <section className="bg-background py-24">
+        <div className="max-w-5xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              Performance reviews are broken
+            </h2>
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
+              Most teams know reviews matter. But the tools make them painful enough that people just... don&apos;t do them.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid sm:grid-cols-3 gap-6">
+            {[
+              {
+                icon: FileX,
+                problem: "Low completion",
+                detail: "Reviews live in tools nobody opens. Completion rates hover around 40% — and the responses you do get are rushed.",
+              },
+              {
+                icon: Clock,
+                problem: "Weeks of busywork",
+                detail: "Managers chase responses in DMs, build spreadsheets by hand, and spend hours in calibration meetings with stale data.",
+              },
+              {
+                icon: Brain,
+                problem: "No context",
+                detail: "By the time the review cycle starts, the actual work is months old. Feedback is generic because nobody remembers the details.",
+              },
+            ].map((item, i) => (
+              <ScrollReveal key={item.problem} delay={i * 80}>
+                <div className="p-6 rounded-2xl border border-border bg-card">
+                  <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center mb-4">
+                    <item.icon className="h-5 w-5 text-destructive" />
+                  </div>
+                  <h3 className="font-semibold text-foreground mb-2">{item.problem}</h3>
+                  <p className="text-[13px] leading-relaxed text-muted-foreground">{item.detail}</p>
+                </div>
+              </ScrollReveal>
+            ))}
+          </div>
+
+          <ScrollReveal className="text-center mt-14">
+            <p className="text-lg font-semibold text-foreground">
+              Perf fixes this by meeting your team where they already work — <span className="text-primary">Slack</span>.
+            </p>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Slack mockup — show what Perf looks like inside Slack */}
+      <section className="bg-[oklch(0.13_0.014_30)] py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
+              Works inside Slack
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+              Reviews happen in DMs, not another app
+            </h2>
+            <p className="mt-3 text-white/50 max-w-lg mx-auto text-[15px]">
+              Perf sends review requests as Slack DMs. Your team responds right there — no new logins, no new tabs, no friction.
+            </p>
+          </ScrollReveal>
+
+          <ScrollReveal className="max-w-2xl mx-auto">
+            {/* Slack-style mockup */}
+            <div className="rounded-2xl border border-white/[0.10] bg-white overflow-hidden shadow-2xl shadow-black/30">
+              {/* Slack header bar */}
+              <div className="bg-[oklch(0.25_0.02_280)] px-5 py-3 flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
+                    <span className="text-white text-[8px] font-bold">P</span>
+                  </div>
+                  <span className="text-white text-sm font-semibold">Perf</span>
+                </div>
+                <span className="text-white/40 text-xs">app</span>
+              </div>
+
+              {/* Conversation area */}
+              <div className="p-5 space-y-5 bg-white">
+                {/* Bot message — review request */}
+                <div className="flex gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-white text-xs font-bold">P</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-sm font-bold text-foreground">Perf</span>
+                      <span className="text-[11px] text-muted-foreground">10:32 AM</span>
+                    </div>
+                    <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
+                      <p className="text-sm text-foreground leading-relaxed">
+                        Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
+                      </p>
+                      <div className="mt-3 p-3 rounded-lg bg-background border border-border/60">
+                        <p className="text-xs text-muted-foreground mb-1">Competency: <span className="font-medium text-foreground">Collaboration</span></p>
+                        <p className="text-xs text-muted-foreground">Rating: 1 (Needs improvement) → 5 (Exceptional)</p>
+                      </div>
+                      <p className="text-sm text-foreground mt-3 leading-relaxed">
+                        Reply with a rating (1-5) and a brief comment, or click below to open the full review form.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <div className="px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium">
+                          Open review form
+                        </div>
+                        <div className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium">
+                          Remind me later
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* User reply */}
+                <div className="flex gap-3">
+                  <div className="h-9 w-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+                    <span className="text-chart-2 text-xs font-bold">S</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-sm font-bold text-foreground">Sarah Chen</span>
+                      <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">
+                      4 — Alex has been great at cross-team coordination this quarter, especially on the platform migration. He proactively looped in the right stakeholders.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bot confirmation */}
+                <div className="flex gap-3">
+                  <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-white text-xs font-bold">P</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="text-sm font-bold text-foreground">Perf</span>
+                      <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                    </div>
+                    <p className="text-sm text-foreground leading-relaxed">
+                      Got it! Collaboration rated <span className="font-semibold text-primary">4/5</span> for Alex Johnson. You have <span className="font-semibold">2 more competencies</span> to rate. Want to continue?
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-center mt-6 text-sm text-white/40">
+              Reviews take less than 2 minutes per person — right inside Slack.
+            </p>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* How it Works — light */}
+      <section id="how-it-works" className="max-w-5xl mx-auto px-6 py-28">
         <ScrollReveal className="text-center mb-14">
           <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
             How it works
@@ -261,7 +418,6 @@ export default function Home() {
         </ScrollReveal>
 
         <div className="relative">
-          {/* Connector line — desktop only */}
           <div className="hidden lg:block absolute top-[38px] left-[calc(16.66%+24px)] right-[calc(16.66%+24px)] h-px bg-primary/25" aria-hidden="true" />
 
           <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
@@ -288,7 +444,6 @@ export default function Home() {
               <ScrollReveal key={item.step} delay={i * 120}>
                 <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
                   <div className="relative mb-5">
-                    {/* Step number — coral at low opacity */}
                     <span className="absolute -top-3 -left-3 text-[56px] font-black leading-none text-foreground/[0.06] select-none pointer-events-none">
                       {item.step}
                     </span>
@@ -305,7 +460,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Dashboard Mockup — mobile only (lg: it lives in hero right column) */}
+      {/* Dashboard Mockup — mobile only */}
       <section className="max-w-5xl mx-auto px-6 pb-24 lg:hidden">
         <ScrollReveal className="text-center mb-12">
           <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
@@ -321,7 +476,6 @@ export default function Home() {
           <div className="absolute inset-x-12 top-8 bottom-0 bg-primary/[0.10] blur-3xl rounded-full -z-10 pointer-events-none" />
 
           <div className="rounded-2xl border border-border/70 overflow-hidden shadow-xl shadow-black/[0.06] bg-card">
-            {/* Browser chrome */}
             <div className="bg-muted/60 border-b border-border px-4 py-3 flex items-center gap-3">
               <div className="flex gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-red-400/70" />
@@ -333,9 +487,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* App shell */}
             <div className="flex h-[340px] sm:h-[400px] overflow-hidden">
-              {/* Sidebar */}
               <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
                 <div className="px-2 py-1.5 mb-1">
                   <div className="flex items-center gap-2">
@@ -366,7 +518,6 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Main content */}
               <div className="flex-1 p-5 sm:p-6 overflow-hidden">
                 <div className="flex items-center justify-between mb-5">
                   <div>
@@ -378,11 +529,9 @@ export default function Home() {
                     <p className="text-lg font-bold text-primary">73%</p>
                   </div>
                 </div>
-
                 <div className="h-1.5 bg-muted rounded-full mb-6 overflow-hidden">
                   <div className="h-full bg-primary rounded-full" style={{ width: "73%" }} />
                 </div>
-
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-3">Avg. competency scores</p>
                 <div className="grid grid-cols-3 gap-3">
                   {[
@@ -399,7 +548,6 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-
                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2 mt-5">Recent assignments</p>
                 <div className="space-y-1.5">
                   {[
@@ -427,8 +575,8 @@ export default function Home() {
         </ScrollReveal>
       </section>
 
-      {/* Features — dark section, bold text layout */}
-      <section className="bg-[oklch(0.13_0.014_30)] py-28">
+      {/* Features — dark section */}
+      <section id="features" className="bg-[oklch(0.13_0.014_30)] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-12">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
@@ -439,7 +587,6 @@ export default function Home() {
             </h2>
           </ScrollReveal>
 
-          {/* Two large hero features */}
           <div className="grid sm:grid-cols-2 gap-px bg-white/[0.06] rounded-2xl overflow-hidden mb-px">
             {heroFeatures.map((f) => (
               <ScrollReveal key={f.title}>
@@ -452,7 +599,6 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Four smaller features */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.06] rounded-b-2xl overflow-hidden">
             {gridFeatures.map((f, i) => (
               <ScrollReveal key={f.title} delay={i * 60}>
@@ -525,14 +671,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats strip — medium dark */}
+      {/* Stats strip — meaningful metrics */}
       <section className="bg-[oklch(0.16_0.016_30)] py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid sm:grid-cols-3 gap-10 text-center">
             {[
-              { metric: "< 2 min", label: "Average time to complete a review via Slack" },
-              { metric: "100%", label: "Workspace data isolation with row-level security" },
-              { metric: "Real-time", label: "Analytics, calibration, and 9-box talent grids" },
+              { metric: "95%+", label: "Average review completion rate with Perf" },
+              { metric: "< 2 min", label: "Time to complete a peer review via Slack" },
+              { metric: "1 day", label: "From install to first live review cycle" },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="text-4xl font-black text-primary">{stat.metric}</p>
@@ -543,8 +689,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing — light, functional */}
-      <section className="bg-background border-t border-border/30">
+      {/* Pricing — light, with CTA buttons */}
+      <section id="pricing" className="bg-background border-t border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-24">
           <ScrollReveal className="text-center mb-12">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
@@ -574,6 +720,12 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
+                <Button variant="outline" className="mt-6 w-full" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Get started free
+                  </a>
+                </Button>
               </div>
             </ScrollReveal>
 
@@ -600,9 +752,12 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/pricing" className="mt-6 inline-flex items-center gap-1 text-[13px] text-primary font-semibold hover:text-primary/80 transition-colors">
-                  See full pricing <ArrowRight className="h-3.5 w-3.5" />
-                </Link>
+                <Button className="mt-6 w-full" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Start with Pro
+                  </a>
+                </Button>
               </div>
             </ScrollReveal>
           </div>
@@ -633,7 +788,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer — continuous dark band with CTA */}
+      {/* Footer */}
       <footer className="bg-[oklch(0.11_0.014_30)] border-t border-white/[0.06]">
         <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
