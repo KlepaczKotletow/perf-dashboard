@@ -20,8 +20,8 @@ export function ScrollReveal({ children, delay = 0, className, scale = false }: 
 
     // Respect prefers-reduced-motion
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setVisible(true)
-      return
+      const id = setTimeout(() => setVisible(true), 0)
+      return () => clearTimeout(id)
     }
 
     const observer = new IntersectionObserver(
