@@ -1,5 +1,5 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
@@ -10,29 +10,29 @@ import {
   ArrowRight,
   CalendarClock,
   ClipboardCheck,
-  Crosshair,
   Target,
+  CheckCircle2,
+  Circle,
+  Slack,
+  GitBranch,
+  Layers,
+  Rocket,
 } from "lucide-react";
-import { isManagerOrAbove } from "@/lib/roles";
+import { isManagerOrAbove, canManageUsers } from "@/lib/roles";
 
 async function getStats(workspaceId: string | undefined) {
   const supabase = await createServerSupabaseClient();
 
-  const baseReviews = supabase.from("review_cycles").select("*", { count: "exact", head: true });
-  const baseFeedback = supabase.from("continuous_feedback").select("*", { count: "exact", head: true });
-  const baseUsers = supabase.from("users").select("*", { count: "exact", head: true });
-  const baseActive = supabase.from("review_cycles").select("*", { count: "exact", head: true }).eq("status", "active");
-
-  const [reviewsRes, feedbackRes, usersRes, activeReviewsRes] = await Promise.all([
-    workspaceId ? baseReviews.eq("workspace_id", workspaceId) : baseReviews,
-    workspaceId ? baseFeedback.eq("workspace_id", workspaceId) : baseFeedback,
-    workspaceId ? baseUsers.eq("workspace_id", workspaceId) : baseUsers,
-    workspaceId ? baseActive.eq("workspace_id", workspaceId) : baseActive,
+  const [reviewsRes, feedbackRes, usersRes, activeRes] = await Promise.all([
+    supabase.from("review_assignments").select("*", { count: "exact", head: true }),
+    supabase.from("continuous_feedback").select("*", { count: "exact", head: true }),
+    supabase.from("users").select("*", { count: "exact", head: true }),
+    supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active"),
   ]);
 
   return {
     totalReviews: reviewsRes.count || 0,
-    activeReviews: activeReviewsRes.count || 0,
+    activeCycles: activeRes.count || 0,
     totalFeedback: feedbackRes.count || 0,
     totalUsers: usersRes.count || 0,
   };
@@ -51,23 +51,93 @@ async function getActiveCycles(workspaceId: string | undefined) {
   return data || [];
 }
 
+async function getSetupStatus(workspaceId: string | undefined) {
+  if (!workspaceId) return { users: 0, competencies: 0, cycles: 0, hasManagers: false };
+  const supabase = await createServerSupabaseClient();
+
+  const [usersRes, compRes, cyclesRes, managersRes] = await Promise.all([
+    supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("competencies").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("manager_id", "is", null),
+  ]);
+
+  return {
+    users: usersRes.count || 0,
+    competencies: compRes.count || 0,
+    cycles: cyclesRes.count || 0,
+    hasManagers: (managersRes.count || 0) > 0,
+  };
+}
+
 export default async function DashboardPage() {
   const workspace = await getUserWorkspace();
   const stats = await getStats(workspace?.workspaceId);
   const activeCycles = await getActiveCycles(workspace?.workspaceId);
+  const setup = await getSetupStatus(workspace?.workspaceId);
   const isManager = isManagerOrAbove(workspace?.role);
+  const isAdmin = canManageUsers(workspace?.role);
 
   const firstName = workspace?.name?.split(" ")[0] || "there";
 
+  // Determine if we should show onboarding vs normal dashboard
+  const setupComplete = setup.users >= 2 && setup.competencies > 0 && setup.cycles > 0;
+  const showOnboarding = isAdmin && !setupComplete;
+
+  const steps = [
+    {
+      id: "sync",
+      label: "Sync your team",
+      description: "Import members from your Slack workspace",
+      href: "/dashboard/team",
+      icon: Slack,
+      done: setup.users >= 2,
+    },
+    {
+      id: "org",
+      label: "Set up org structure",
+      description: "Assign managers, departments, and job levels to each team member",
+      href: "/dashboard/team",
+      icon: GitBranch,
+      done: setup.hasManagers,
+    },
+    {
+      id: "competencies",
+      label: "Define competencies",
+      description: "Create the skills and behaviors your org values",
+      href: "/dashboard/competencies",
+      icon: Target,
+      done: setup.competencies > 0,
+    },
+    {
+      id: "matrix",
+      label: "Map competencies to levels",
+      description: "Set expected proficiency per role in the competency matrix",
+      href: "/dashboard/competencies/matrix",
+      icon: Layers,
+      done: setup.competencies > 0 && setup.hasManagers,
+    },
+    {
+      id: "cycle",
+      label: "Launch your first review cycle",
+      description: "Create a performance review cycle and notify your team",
+      href: "/dashboard/cycles/new",
+      icon: Rocket,
+      done: setup.cycles > 0,
+    },
+  ];
+
+  const completedSteps = steps.filter((s) => s.done).length;
+
   const metrics = [
     {
-      label: "Active Reviews",
-      value: stats.activeReviews,
+      label: "Active Cycles",
+      value: stats.activeCycles,
       icon: TrendingUp,
       color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
     },
     {
-      label: "Total Reviews",
+      label: "Review Assignments",
       value: stats.totalReviews,
       icon: FileText,
       color: "text-primary bg-primary/[0.08]",
@@ -88,7 +158,6 @@ export default async function DashboardPage() {
 
   const quickLinks = [
     { href: "/dashboard/my-reviews", label: "My Reviews", icon: ClipboardCheck, description: "View your performance reviews and pending actions" },
-    { href: "/dashboard/goals", label: "Goals", icon: Crosshair, description: "Track and manage your goals" },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, description: "See feedback you've given and received" },
     ...(isManager
       ? [
@@ -106,9 +175,65 @@ export default async function DashboardPage() {
           Hey {firstName}
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Here&apos;s what&apos;s happening in your workspace.
+          {showOnboarding
+            ? "Let's get your workspace set up. Follow the steps below to start running reviews."
+            : "Here's what's happening in your workspace."}
         </p>
       </div>
+
+      {/* Onboarding Checklist (for admins with incomplete setup) */}
+      {showOnboarding && (
+        <Card className="border-primary/20 bg-primary/[0.02]">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Setup Checklist</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {completedSteps} of {steps.length} steps complete
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                {steps.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`h-1.5 w-6 rounded-full transition-colors ${
+                      s.done ? "bg-primary" : "bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              {steps.map((step) => (
+                <Link
+                  key={step.id}
+                  href={step.href}
+                  className={`group flex items-center gap-3 p-3 rounded-lg transition-all ${
+                    step.done
+                      ? "opacity-60"
+                      : "hover:bg-primary/[0.04] hover:shadow-sm"
+                  }`}
+                >
+                  {step.done ? (
+                    <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-muted-foreground/40 shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${step.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      {step.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{step.description}</p>
+                  </div>
+                  {!step.done && (
+                    <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-primary transition-colors shrink-0" />
+                  )}
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Metrics */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Send, Star } from "lucide-react";
+import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target } from "lucide-react";
 import Link from "next/link";
 
 interface CompetencyRating {
@@ -18,6 +18,13 @@ interface CompetencyRating {
   expected_level: number | null;
   rating: number | null;
   comment: string;
+}
+
+interface TextResponse {
+  questionId: string;
+  prompt: string;
+  required: boolean;
+  response: string;
 }
 
 export default function ReviewFormPage({
@@ -33,9 +40,11 @@ export default function ReviewFormPage({
   const [assignment, setAssignment] = useState<any>(null);
   const [employee, setEmployee] = useState<any>(null);
   const [competencies, setCompetencies] = useState<CompetencyRating[]>([]);
+  const [textResponses, setTextResponses] = useState<TextResponse[]>([]);
   const [overallComment, setOverallComment] = useState("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [hasCycleQuestions, setHasCycleQuestions] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -87,52 +96,114 @@ export default function ReviewFormPage({
 
         if (existingResponses && existingResponses.length > 0) {
           setAlreadySubmitted(true);
+          return; // No need to load questions
         }
 
-        // Load competencies for this employee's level
-        const levelId = assignmentData.employee?.level_id;
-        let competencyData: CompetencyRating[] = [];
+        // ==========================================
+        // Load questions from cycle_questions FIRST
+        // ==========================================
+        const { data: cycleQs } = await supabase
+          .from("cycle_questions")
+          .select(`
+            id, question_type, competency_id, prompt, sort_order, required,
+            competency:competencies(id, name, category)
+          `)
+          .eq("cycle_id", cycleId)
+          .order("sort_order");
 
-        if (levelId) {
-          // Get level_competencies with expected levels
-          const { data: levelComps } = await supabase
-            .from("level_competencies")
-            .select(`
-              expected_level,
-              competency:competencies!level_competencies_competency_id_fkey(id, name, category)
-            `)
-            .eq("level_id", levelId);
+        if (cycleQs && cycleQs.length > 0) {
+          setHasCycleQuestions(true);
 
-          if (levelComps && levelComps.length > 0) {
-            competencyData = levelComps.map((lc: any) => ({
-              competency_id: lc.competency.id,
-              name: lc.competency.name,
-              category: lc.competency.category,
-              expected_level: lc.expected_level,
+          // Competency questions from cycle config
+          const compRatings: CompetencyRating[] = [];
+          const txtResponses: TextResponse[] = [];
+
+          // If employee has a level, fetch expected_levels for enrichment
+          const levelId = assignmentData.employee?.level_id;
+          let expectedMap: Record<string, number> = {};
+          if (levelId) {
+            const { data: levelComps } = await supabase
+              .from("level_competencies")
+              .select("competency_id, expected_level")
+              .eq("level_id", levelId);
+            if (levelComps) {
+              for (const lc of levelComps) {
+                expectedMap[lc.competency_id] = lc.expected_level;
+              }
+            }
+          }
+
+          for (const q of cycleQs) {
+            if (q.question_type === "competency" && q.competency) {
+              const comp = q.competency as any;
+              compRatings.push({
+                competency_id: comp.id,
+                name: comp.name,
+                category: comp.category,
+                expected_level: expectedMap[comp.id] ?? null,
+                rating: null,
+                comment: "",
+              });
+            } else if (q.question_type === "text") {
+              txtResponses.push({
+                questionId: q.id,
+                prompt: q.prompt || "Additional comments",
+                required: q.required,
+                response: "",
+              });
+            }
+          }
+
+          setCompetencies(compRatings);
+          setTextResponses(txtResponses);
+        } else {
+          // ==========================================
+          // FALLBACK: Legacy behavior (no cycle_questions configured)
+          // Load from level_competencies or all competencies
+          // ==========================================
+          setHasCycleQuestions(false);
+          const levelId = assignmentData.employee?.level_id;
+          let competencyData: CompetencyRating[] = [];
+
+          if (levelId) {
+            const { data: levelComps } = await supabase
+              .from("level_competencies")
+              .select(`
+                expected_level,
+                competency:competencies!level_competencies_competency_id_fkey(id, name, category)
+              `)
+              .eq("level_id", levelId);
+
+            if (levelComps && levelComps.length > 0) {
+              competencyData = levelComps.map((lc: any) => ({
+                competency_id: lc.competency.id,
+                name: lc.competency.name,
+                category: lc.competency.category,
+                expected_level: lc.expected_level,
+                rating: null,
+                comment: "",
+              }));
+            }
+          }
+
+          if (competencyData.length === 0) {
+            const { data: allComps } = await supabase
+              .from("competencies")
+              .select("id, name, category")
+              .order("category, name");
+
+            competencyData = (allComps || []).map((c: any) => ({
+              competency_id: c.id,
+              name: c.name,
+              category: c.category,
+              expected_level: null,
               rating: null,
               comment: "",
             }));
           }
+
+          setCompetencies(competencyData);
         }
-
-        // If no level-specific competencies, fall back to all workspace competencies
-        if (competencyData.length === 0) {
-          const { data: allComps } = await supabase
-            .from("competencies")
-            .select("id, name, category")
-            .order("category, name");
-
-          competencyData = (allComps || []).map((c: any) => ({
-            competency_id: c.id,
-            name: c.name,
-            category: c.category,
-            expected_level: null,
-            rating: null,
-            comment: "",
-          }));
-        }
-
-        setCompetencies(competencyData);
       } catch (err) {
         setError("Failed to load review data");
       } finally {
@@ -140,7 +211,7 @@ export default function ReviewFormPage({
       }
     }
     load();
-  }, [assignmentId]);
+  }, [assignmentId, cycleId]);
 
   function setRating(compIdx: number, rating: number) {
     setCompetencies((prev) => {
@@ -158,6 +229,14 @@ export default function ReviewFormPage({
     });
   }
 
+  function setTextResponse(idx: number, response: string) {
+    setTextResponses((prev) => {
+      const updated = [...prev];
+      updated[idx] = { ...updated[idx], response };
+      return updated;
+    });
+  }
+
   // Determine reviewer role
   function getReviewerRole(): string {
     if (!currentUser || !assignment) return "peer";
@@ -168,38 +247,64 @@ export default function ReviewFormPage({
 
   async function handleSubmit() {
     if (!currentUser?.id || !assignment) return;
+
+    // Validate required text questions
+    for (const tq of textResponses) {
+      if (tq.required && !tq.response.trim()) {
+        setError(`Please answer: "${tq.prompt}"`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
       const reviewerRole = getReviewerRole();
+      const responses: any[] = [];
 
-      // Insert review_responses for each competency
-      const responses = competencies
-        .filter((c) => c.rating !== null)
-        .map((c) => ({
-          assignment_id: assignmentId,
-          reviewer_id: currentUser.id,
-          reviewer_role: reviewerRole,
-          competency_id: c.competency_id,
-          rating: c.rating,
-          comment: c.comment || null,
-        }));
+      // Competency responses
+      for (const c of competencies) {
+        if (c.rating !== null) {
+          responses.push({
+            assignment_id: assignmentId,
+            reviewer_id: currentUser.id,
+            reviewer_role: reviewerRole,
+            competency_id: c.competency_id,
+            rating: c.rating,
+            comment: c.comment || null,
+          });
+        }
+      }
 
-      // Add overall comment as a response without competency
-      if (overallComment.trim()) {
+      // Text question responses (stored with competency_id = null)
+      for (const tq of textResponses) {
+        if (tq.response.trim()) {
+          responses.push({
+            assignment_id: assignmentId,
+            reviewer_id: currentUser.id,
+            reviewer_role: reviewerRole,
+            competency_id: null,
+            rating: null,
+            comment: `[${tq.prompt}] ${tq.response}`,
+          });
+        }
+      }
+
+      // Overall comment (non-cycle-questions fallback field)
+      if (overallComment.trim() && !hasCycleQuestions) {
         responses.push({
           assignment_id: assignmentId,
           reviewer_id: currentUser.id,
           reviewer_role: reviewerRole,
-          competency_id: null as any,
-          rating: null as any,
+          competency_id: null,
+          rating: null,
           comment: overallComment,
         });
       }
 
       if (responses.length === 0) {
-        setError("Please rate at least one competency");
+        setError("Please rate at least one competency or answer at least one question");
         setSubmitting(false);
         return;
       }
@@ -214,7 +319,7 @@ export default function ReviewFormPage({
         return;
       }
 
-      // Update assignment status if this is the manager review
+      // Update assignment status
       if (reviewerRole === "manager") {
         const ratedComps = competencies.filter((c) => c.rating !== null);
         const avgRating = ratedComps.length > 0
@@ -229,7 +334,6 @@ export default function ReviewFormPage({
           })
           .eq("id", assignmentId);
       } else {
-        // Mark in_progress if still pending
         await supabase
           .from("review_assignments")
           .update({ status: "in_progress" })
@@ -245,6 +349,10 @@ export default function ReviewFormPage({
       setSubmitting(false);
     }
   }
+
+  // ====================================
+  // RENDER
+  // ====================================
 
   if (loading) {
     return (
@@ -279,7 +387,6 @@ export default function ReviewFormPage({
     );
   }
 
-  // Gather categories
   const categories = [...new Set(competencies.map((c) => c.category || "General"))];
 
   return (
@@ -291,9 +398,9 @@ export default function ReviewFormPage({
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Submit Review</h1>
-          <p className="text-muted-foreground">
-            Reviewing as <Badge variant="outline">{getReviewerRole()}</Badge>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Submit Review</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Reviewing as <Badge variant="outline" className="ml-1">{getReviewerRole()}</Badge>
           </p>
         </div>
       </div>
@@ -306,7 +413,7 @@ export default function ReviewFormPage({
 
       {/* Employee Info Card */}
       {employee && (
-        <Card>
+        <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-lg">{employee.slack_name}</CardTitle>
             <CardDescription>
@@ -326,104 +433,144 @@ export default function ReviewFormPage({
       )}
 
       {/* Rating Scale Legend */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center justify-center gap-6 text-sm">
-            <span className="text-muted-foreground font-medium">Rating Scale:</span>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <span key={n} className="flex items-center gap-1">
-                <span className="font-bold">{n}</span>
-                <span className="text-muted-foreground">
-                  {["Below", "Developing", "Meets", "Exceeds", "Outstanding"][n - 1]}
+      {competencies.length > 0 && (
+        <Card className="border-border/60">
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center justify-center gap-6 text-sm">
+              <span className="text-muted-foreground font-medium">Rating Scale:</span>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <span key={n} className="flex items-center gap-1">
+                  <span className="font-bold">{n}</span>
+                  <span className="text-muted-foreground">
+                    {["Below", "Developing", "Meets", "Exceeds", "Outstanding"][n - 1]}
+                  </span>
                 </span>
-              </span>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Competency Ratings by Category */}
-      {categories.map((category) => (
-        <Card key={category}>
-          <CardHeader>
-            <CardTitle className="text-lg">{category}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {competencies
-              .filter((c) => (c.category || "General") === category)
-              .map((comp) => {
-                const compIdx = competencies.indexOf(comp);
-                return (
-                  <div key={comp.competency_id} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm font-medium">{comp.name}</Label>
-                      {comp.expected_level && (
-                        <Badge variant="secondary" className="text-xs">
-                          Expected: {comp.expected_level}/5
-                        </Badge>
-                      )}
-                    </div>
-                    {/* Star Rating */}
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <button
-                          key={star}
-                          type="button"
-                          onClick={() => setRating(compIdx, star)}
-                          className="focus:outline-none transition-colors"
-                        >
-                          <Star
-                            className={`h-7 w-7 ${
-                              comp.rating && star <= comp.rating
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-muted-foreground/30 hover:text-yellow-300"
-                            }`}
-                          />
-                        </button>
-                      ))}
-                      {comp.rating && (
-                        <span className="ml-2 text-sm text-muted-foreground">
-                          {comp.rating}/5
-                        </span>
-                      )}
-                    </div>
-                    {/* Comment */}
-                    <Textarea
-                      placeholder={`Optional comment for ${comp.name}...`}
-                      value={comp.comment}
-                      onChange={(e) => setComment(compIdx, e.target.value)}
-                      className="min-h-[60px]"
-                    />
-                  </div>
-                );
-              })}
-          </CardContent>
-        </Card>
-      ))}
-
-      {competencies.length === 0 && (
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            No competencies defined for this employee&apos;s level. Please set up the competency matrix first.
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Overall Comment */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Overall Comments</CardTitle>
-          <CardDescription>Provide any additional feedback or observations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            placeholder="Share your overall assessment, strengths, areas for improvement..."
-            value={overallComment}
-            onChange={(e) => setOverallComment(e.target.value)}
-            className="min-h-[120px]"
-          />
-        </CardContent>
-      </Card>
+      {/* Competency Ratings by Category */}
+      {competencies.length > 0 && (
+        <>
+          {categories.map((category) => (
+            <Card key={category} className="border-border/60">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Target className="h-4 w-4 text-primary" />
+                  {category}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {competencies
+                  .filter((c) => (c.category || "General") === category)
+                  .map((comp) => {
+                    const compIdx = competencies.indexOf(comp);
+                    return (
+                      <div key={comp.competency_id} className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">{comp.name}</Label>
+                          {comp.expected_level && (
+                            <Badge variant="secondary" className="text-xs">
+                              Expected: {comp.expected_level}/5
+                            </Badge>
+                          )}
+                        </div>
+                        {/* Star Rating */}
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(compIdx, star)}
+                              className="focus:outline-none transition-colors"
+                            >
+                              <Star
+                                className={`h-7 w-7 ${
+                                  comp.rating && star <= comp.rating
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "text-muted-foreground/30 hover:text-yellow-300"
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          {comp.rating && (
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              {comp.rating}/5
+                            </span>
+                          )}
+                        </div>
+                        {/* Comment */}
+                        <Textarea
+                          placeholder={`Optional comment for ${comp.name}...`}
+                          value={comp.comment}
+                          onChange={(e) => setComment(compIdx, e.target.value)}
+                          className="min-h-[60px]"
+                        />
+                      </div>
+                    );
+                  })}
+              </CardContent>
+            </Card>
+          ))}
+        </>
+      )}
+
+      {/* Text Questions (from cycle_questions) */}
+      {textResponses.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              Open-Ended Questions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {textResponses.map((tq, idx) => (
+              <div key={tq.questionId} className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {tq.prompt}
+                  {tq.required && <span className="text-destructive ml-0.5">*</span>}
+                </Label>
+                <Textarea
+                  placeholder="Your response..."
+                  value={tq.response}
+                  onChange={(e) => setTextResponse(idx, e.target.value)}
+                  className="min-h-[100px]"
+                />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No questions configured at all */}
+      {competencies.length === 0 && textResponses.length === 0 && (
+        <Card className="border-border/60">
+          <CardContent className="pt-6 text-center text-muted-foreground">
+            No review questions configured for this cycle. Please ask an admin to set up competencies or review questions.
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Overall Comment (fallback for cycles without cycle_questions) */}
+      {!hasCycleQuestions && (
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle className="text-lg">Overall Comments</CardTitle>
+            <CardDescription>Provide any additional feedback or observations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="Share your overall assessment, strengths, areas for improvement..."
+              value={overallComment}
+              onChange={(e) => setOverallComment(e.target.value)}
+              className="min-h-[120px]"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit */}
       <div className="flex justify-end gap-3 pb-8">

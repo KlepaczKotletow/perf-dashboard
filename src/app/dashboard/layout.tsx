@@ -3,14 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
   FileText,
-  Settings,
   Users,
   MessageSquare,
   BarChart3,
   CalendarClock,
   Target,
   CreditCard,
-  Crosshair,
   Briefcase,
   ClipboardCheck,
   UsersRound,
@@ -45,7 +43,6 @@ export default async function DashboardLayout({
       items: [
         { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/my-reviews", label: "My Reviews", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/goals", label: "Goals", icon: Crosshair, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
       ],
     },
@@ -68,7 +65,6 @@ export default async function DashboardLayout({
     {
       label: "Settings",
       items: [
-        { href: "/dashboard/templates", label: "Templates", icon: Settings, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/admin/job-families", label: "Job Families", icon: Briefcase, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],

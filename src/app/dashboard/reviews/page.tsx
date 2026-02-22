@@ -6,31 +6,43 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ReviewsFilter } from "./reviews-filter";
 import { Suspense } from "react";
+import { FileText } from "lucide-react";
 
-async function getReviews(status?: string, search?: string) {
+const statusConfig: Record<string, { label: string; badge: string }> = {
+  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
+  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
+  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
+};
+
+async function getReviewAssignments(status?: string, search?: string) {
   const supabase = await createServerSupabaseClient();
   let query = supabase
-    .from("review_cycles")
-    .select("*, employee:users!review_cycles_employee_id_fkey(slack_name)")
+    .from("review_assignments")
+    .select(`
+      id, status, overall_rating, created_at, updated_at,
+      employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title, department),
+      manager:users!review_assignments_manager_id_fkey(id, slack_name),
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date)
+    `)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(100);
 
   if (status && status !== "all") {
     query = query.eq("status", status);
   }
 
   const { data } = await query;
-  
   let results = data || [];
-  
-  // Client-side search filter (would be better with full-text search in production)
+
   if (search) {
-    const searchLower = search.toLowerCase();
-    results = results.filter((r: any) => 
-      r.employee?.slack_name?.toLowerCase().includes(searchLower)
+    const s = search.toLowerCase();
+    results = results.filter((r: any) =>
+      r.employee?.slack_name?.toLowerCase().includes(s) ||
+      r.manager?.slack_name?.toLowerCase().includes(s) ||
+      r.cycle?.name?.toLowerCase().includes(s)
     );
   }
-  
+
   return results;
 }
 
@@ -40,77 +52,101 @@ export default async function ReviewsPage({
   searchParams: Promise<{ status?: string; search?: string }>;
 }) {
   const params = await searchParams;
-  const reviews = await getReviews(params.status, params.search);
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      active: "default",
-      completed: "secondary",
-      pending: "outline",
-      cancelled: "destructive",
-    };
-    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
-  };
+  const assignments = await getReviewAssignments(params.status, params.search);
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Review Cycles</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">Manage 360-degree performance reviews</p>
-        </div>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Review Assignments</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          All performance review assignments from active and past cycles
+        </p>
       </div>
 
       <Suspense fallback={<div>Loading filters...</div>}>
         <ReviewsFilter />
       </Suspense>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Reviews</CardTitle>
-          <CardDescription>Review cycles and their current status</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {reviews.length === 0 ? (
-            <p className="text-center text-slate-600 dark:text-slate-400 py-8">
-              No reviews yet. Start a review cycle from Slack using <code>/review start</code>
+      {assignments.length === 0 ? (
+        <Card className="border-border/60">
+          <CardContent className="py-16 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No review assignments yet</p>
+            <p className="text-sm text-muted-foreground">
+              Assignments are created when a performance cycle is launched.
             </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reviews.map((review) => (
-                  <TableRow key={review.id}>
-                    <TableCell className="font-medium">
-                      {(review.employee as any)?.slack_name || "Unknown"}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(review.status)}</TableCell>
-                    <TableCell>
-                      {review.start_date ? format(new Date(review.start_date), "MMM d, yyyy") : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {review.due_date ? format(new Date(review.due_date), "MMM d, yyyy") : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/dashboard/reviews/${review.id}`} className="text-blue-600 hover:underline">
-                        View
-                      </Link>
-                    </TableCell>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-border/60">
+          <CardContent className="pt-4">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Reviewer</TableHead>
+                    <TableHead>Cycle</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead className="text-right">Updated</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {assignments.map((a: any) => {
+                    const config = statusConfig[a.status] || statusConfig.pending;
+                    return (
+                      <TableRow key={a.id}>
+                        <TableCell>
+                          <Link
+                            href={`/dashboard/team/${a.employee?.id}`}
+                            className="hover:text-primary transition-colors"
+                          >
+                            <p className="text-sm font-medium">{a.employee?.slack_name || "Unknown"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {a.employee?.department || a.employee?.job_title || ""}
+                            </p>
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {a.manager?.slack_name || "Unassigned"}
+                        </TableCell>
+                        <TableCell>
+                          {a.cycle ? (
+                            <Link
+                              href={`/dashboard/cycles/${a.cycle.id}`}
+                              className="text-sm hover:text-primary transition-colors"
+                            >
+                              {a.cycle.name}
+                            </Link>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`text-[11px] font-medium ${config.badge}`}>
+                            {config.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm font-medium">
+                          {a.overall_rating ? `${a.overall_rating}/5` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {a.updated_at
+                            ? format(new Date(a.updated_at), "MMM d, yyyy")
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

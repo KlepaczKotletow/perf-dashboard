@@ -71,13 +71,20 @@ export default async function CyclesPage() {
               <CalendarClock className="h-5 w-5 text-muted-foreground" />
             </div>
             <p className="text-sm font-medium text-foreground mb-1">No cycles yet</p>
-            <p className="text-sm text-muted-foreground mb-5">Create your first performance cycle to start.</p>
-            <Button size="sm" asChild>
-              <Link href="/dashboard/cycles/new">
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Create Cycle
-              </Link>
-            </Button>
+            <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+              Before creating a cycle, make sure you&apos;ve synced your team, assigned managers, and set up competencies.
+            </p>
+            <div className="flex items-center gap-3 justify-center">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/competencies">Check Competencies</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/dashboard/cycles/new">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Create Cycle
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       ) : (

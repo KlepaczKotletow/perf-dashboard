@@ -12,7 +12,7 @@ import { notFound } from "next/navigation";
 
 async function getEmployeeDetails(id: string) {
   const supabase = await createServerSupabaseClient();
-  
+
   // Get user info with org hierarchy
   const { data: user, error } = await supabase
     .from("users")
@@ -26,42 +26,41 @@ async function getEmployeeDetails(id: string) {
 
   if (error || !user) return null;
 
-  // Get reviews where they are the employee
-  const { data: reviewsAsEmployee } = await supabase
-    .from("review_cycles")
+  // Get review assignments where this person is the employee
+  const { data: reviewAssignments } = await supabase
+    .from("review_assignments")
     .select(`
-      id,
-      status,
-      start_date,
-      due_date,
-      created_at,
-      creator:users!review_cycles_created_by_fkey(slack_name)
+      id, status, overall_rating, created_at, updated_at,
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date),
+      manager:users!review_assignments_manager_id_fkey(slack_name)
     `)
     .eq("employee_id", id)
     .order("created_at", { ascending: false });
 
-  // Get feedback they received via their review cycles
-  const reviewIds = reviewsAsEmployee?.map(r => r.id) || [];
-  let feedbackReceived: any[] = [];
-  if (reviewIds.length > 0) {
+  // Get review responses for this employee's assignments (to calculate skill averages)
+  const assignmentIds = (reviewAssignments || []).map((a: any) => a.id);
+  let reviewResponses: any[] = [];
+  if (assignmentIds.length > 0) {
     const { data } = await supabase
-      .from("feedback")
+      .from("review_responses")
       .select(`
-        id,
-        question_id,
-        question_text,
-        response,
-        rating,
-        created_at,
-        participant:participants!feedback_participant_id_fkey(
-          reviewer:users!participants_reviewer_id_fkey(slack_name)
-        )
+        id, rating, comment, reviewer_role,
+        competency:competencies!review_responses_competency_id_fkey(name, category)
       `)
-      .in("review_cycle_id", reviewIds)
-      .order("created_at", { ascending: false })
-      .limit(20);
-    feedbackReceived = data || [];
+      .in("assignment_id", assignmentIds);
+    reviewResponses = data || [];
   }
+
+  // Get continuous feedback received
+  const { data: continuousFeedback } = await supabase
+    .from("continuous_feedback")
+    .select(`
+      id, message, feedback_type, is_anonymous, created_at,
+      from_user:users!continuous_feedback_from_user_id_fkey(slack_name)
+    `)
+    .eq("to_user_id", id)
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   // Get direct reports
   const { data: directReports } = await supabase
@@ -70,48 +69,34 @@ async function getEmployeeDetails(id: string) {
     .eq("manager_id", id)
     .order("slack_name");
 
-  // Get continuous feedback received
-  const { data: continuousFeedbackReceived } = await supabase
-    .from("continuous_feedback")
-    .select(`
-      id,
-      message,
-      feedback_type,
-      is_anonymous,
-      created_at,
-      from_user:users!continuous_feedback_from_user_id_fkey(slack_name)
-    `)
-    .eq("to_user_id", id)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
-  // Calculate average ratings per skill from feedback
-  const ratingsBySkill: Record<string, { name: string; ratings: number[] }> = {};
-  feedbackReceived.forEach((f: any) => {
-    if (f.rating && f.question_text) {
-      if (!ratingsBySkill[f.question_id]) {
-        ratingsBySkill[f.question_id] = { name: f.question_text, ratings: [] };
+  // Calculate skill averages from review responses
+  const ratingsBySkill: Record<string, { name: string; category: string | null; ratings: number[] }> = {};
+  reviewResponses.forEach((r: any) => {
+    if (r.rating && r.competency?.name) {
+      const key = r.competency.name;
+      if (!ratingsBySkill[key]) {
+        ratingsBySkill[key] = { name: r.competency.name, category: r.competency.category, ratings: [] };
       }
-      ratingsBySkill[f.question_id].ratings.push(f.rating);
+      ratingsBySkill[key].ratings.push(r.rating);
     }
   });
 
-  const skillAverages = Object.values(ratingsBySkill).map(s => ({
+  const skillAverages = Object.values(ratingsBySkill).map((s) => ({
     name: s.name,
+    category: s.category,
     avg: (s.ratings.reduce((a, b) => a + b, 0) / s.ratings.length).toFixed(1),
     count: s.ratings.length,
   }));
 
-  const allRatings = feedbackReceived.filter((f: any) => f.rating).map((f: any) => f.rating as number);
+  const allRatings = reviewResponses.filter((r: any) => r.rating).map((r: any) => r.rating as number);
   const overallAvg = allRatings.length > 0
     ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1)
     : null;
 
   return {
     user,
-    reviewsAsEmployee: reviewsAsEmployee || [],
-    feedbackReceived,
-    continuousFeedbackReceived: continuousFeedbackReceived || [],
+    reviewAssignments: reviewAssignments || [],
+    continuousFeedback: continuousFeedback || [],
     directReports: directReports || [],
     skillAverages,
     overallAvg,
@@ -131,74 +116,75 @@ export default async function EmployeeProfilePage({
     notFound();
   }
 
-  const { user, reviewsAsEmployee, feedbackReceived, continuousFeedbackReceived, directReports, skillAverages, overallAvg } = data;
+  const { user, reviewAssignments, continuousFeedback, directReports, skillAverages, overallAvg } = data;
   const canEdit = isHROrAbove(workspace?.role);
 
   const getInitials = (name: string | null) => {
     if (!name) return "?";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      active: "default",
-      completed: "secondary",
-      pending: "outline",
-      cancelled: "destructive",
-    };
-    return <Badge variant={variants[status] || "outline"}>{status}</Badge>;
+  const statusConfig: Record<string, { label: string; badge: string }> = {
+    pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
+    in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
+    completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
+  };
+
+  const feedbackTypeBadge: Record<string, string> = {
+    praise: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    constructive: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+    general: "bg-muted text-muted-foreground",
   };
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start gap-6">
-        <Button variant="outline" size="icon" asChild>
+      <div className="flex items-start gap-5">
+        <Button variant="ghost" size="icon" className="shrink-0 mt-1" asChild>
           <Link href="/dashboard/team">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <Avatar className="h-20 w-20">
-          <AvatarFallback className="text-2xl">{getInitials(user.slack_name)}</AvatarFallback>
+        <Avatar className="h-16 w-16 shrink-0">
+          <AvatarFallback className="text-xl bg-primary/[0.08] text-primary font-medium">
+            {getInitials(user.slack_name)}
+          </AvatarFallback>
         </Avatar>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground truncate">
               {user.slack_name || "Unknown"}
             </h1>
             {canEdit && (
-              <Button variant="outline" size="sm" asChild>
+              <Button variant="outline" size="sm" className="text-xs shrink-0" asChild>
                 <Link href={`/dashboard/team/${id}/edit`}>
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Edit Profile
+                  <Pencil className="h-3 w-3 mr-1.5" />
+                  Edit
                 </Link>
               </Button>
             )}
           </div>
           {user.job_title && (
-            <p className="text-lg text-muted-foreground">{user.job_title}</p>
+            <p className="text-sm text-muted-foreground mt-0.5">{user.job_title}</p>
           )}
-          <div className="flex flex-wrap items-center gap-3 mt-2 text-slate-600 dark:text-slate-400">
+          <div className="flex flex-wrap items-center gap-2 mt-2">
             {user.slack_email && (
-              <span className="flex items-center gap-1 text-sm">
-                <Mail className="h-4 w-4" />
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Mail className="h-3 w-3" />
                 {user.slack_email}
               </span>
             )}
-            <Badge variant="outline">{user.role || "user"}</Badge>
-            {user.department && <Badge variant="secondary">{user.department}</Badge>}
+            <Badge variant="outline" className="text-[10px]">{user.role || "user"}</Badge>
+            {user.department && <Badge variant="secondary" className="text-[10px]">{user.department}</Badge>}
             {user.level && (
-              <Badge variant="secondary">
-                {user.level.name}{user.level.grade ? ` (${user.level.grade})` : ""}
+              <Badge variant="secondary" className="text-[10px]">
+                {(user.level as any)?.job_family?.name ? `${(user.level as any).job_family.name} — ` : ""}
+                {(user.level as any)?.name}
+                {(user.level as any)?.grade ? ` (${(user.level as any).grade})` : ""}
               </Badge>
             )}
             {user.manager?.slack_name && (
-              <span className="text-sm">
+              <span className="text-xs text-muted-foreground">
                 Reports to{" "}
                 <Link href={`/dashboard/team/${user.manager.id}`} className="text-primary hover:underline">
                   {user.manager.slack_name}
@@ -209,69 +195,85 @@ export default async function EmployeeProfilePage({
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overall Rating</CardTitle>
-            <Star className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {overallAvg ? `${overallAvg}/5` : "N/A"}
+      {/* Stats */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-border/60">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Rating</p>
+                <p className="text-2xl font-semibold mt-1 text-foreground">{overallAvg ? `${overallAvg}/5` : "N/A"}</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
+                <Star className="h-5 w-5" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        {skillAverages.slice(0, 3).map((skill) => (
-          <Card key={skill.name}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium truncate">{skill.name}</CardTitle>
-              <Star className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{skill.avg}/5</div>
-              <p className="text-xs text-muted-foreground">{skill.count} ratings</p>
-            </CardContent>
-          </Card>
-        ))}
-        {skillAverages.length === 0 && (
-          <>
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground text-sm">No skill data yet</CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground text-sm">No skill data yet</CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground text-sm">No skill data yet</CardContent>
-            </Card>
-          </>
-        )}
+        <Card className="border-border/60">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reviews</p>
+                <p className="text-2xl font-semibold mt-1 text-foreground">{reviewAssignments.length}</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-primary bg-primary/[0.08]">
+                <FileText className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Feedback</p>
+                <p className="text-2xl font-semibold mt-1 text-foreground">{continuousFeedback.length}</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/60">
+          <CardContent className="pt-5 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Competencies</p>
+                <p className="text-2xl font-semibold mt-1 text-foreground">{skillAverages.length}</p>
+              </div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">
+                <Star className="h-5 w-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Direct Reports */}
       {directReports.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Direct Reports ({directReports.length})</CardTitle>
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Direct Reports ({directReports.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               {directReports.map((report: any) => (
                 <Link
                   key={report.id}
                   href={`/dashboard/team/${report.id}`}
-                  className="flex items-center gap-2 p-2 rounded-lg border hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/60 hover:border-border hover:shadow-sm transition-all text-sm"
                 >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs">{getInitials(report.slack_name)}</AvatarFallback>
+                  <Avatar className="h-6 w-6">
+                    <AvatarFallback className="text-[10px] bg-primary/[0.08] text-primary">
+                      {getInitials(report.slack_name)}
+                    </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <span className="text-sm font-medium">{report.slack_name}</span>
-                    {report.job_title && (
-                      <span className="block text-xs text-muted-foreground">{report.job_title}</span>
-                    )}
-                  </div>
+                  <span className="font-medium text-foreground">{report.slack_name}</span>
+                  {report.job_title && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline">{report.job_title}</span>
+                  )}
                 </Link>
               ))}
             </div>
@@ -279,86 +281,82 @@ export default async function EmployeeProfilePage({
         </Card>
       )}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Review History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Review History
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />
+              Performance Reviews
             </CardTitle>
-            <CardDescription>360 reviews for this employee</CardDescription>
+            <CardDescription>From structured performance cycles</CardDescription>
           </CardHeader>
           <CardContent>
-            {reviewsAsEmployee.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No reviews yet</p>
+            {reviewAssignments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No reviews assigned yet. Reviews appear when a cycle is launched.
+              </p>
             ) : (
-              <div className="space-y-3">
-                {reviewsAsEmployee.map((review: any) => (
-                  <div key={review.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">
-                        Created by {review.creator?.slack_name || "Unknown"}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        {format(new Date(review.created_at), "MMM d, yyyy")}
-                      </p>
+              <div className="space-y-2">
+                {reviewAssignments.map((a: any) => {
+                  const config = statusConfig[a.status] || statusConfig.pending;
+                  return (
+                    <div key={a.id} className="flex items-center justify-between p-3 rounded-lg border border-border/60">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {a.cycle?.name || "Unknown Cycle"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Manager: {a.manager?.slack_name || "Unassigned"}
+                          {a.cycle?.start_date && (
+                            <> &middot; {format(new Date(a.cycle.start_date), "MMM yyyy")}</>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {a.overall_rating && (
+                          <span className="text-sm font-semibold text-foreground">{a.overall_rating}/5</span>
+                        )}
+                        <Badge className={`text-[10px] font-medium ${config.badge}`}>
+                          {config.label}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {getStatusBadge(review.status)}
-                      <Link href={`/dashboard/reviews/${review.id}`} className="text-blue-600 text-sm hover:underline">
-                        View
-                      </Link>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Recent Feedback */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
+        {/* Continuous Feedback */}
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
               Recent Feedback
             </CardTitle>
-            <CardDescription>Latest feedback received</CardDescription>
+            <CardDescription>Anytime feedback from colleagues</CardDescription>
           </CardHeader>
           <CardContent>
-            {feedbackReceived.length === 0 && continuousFeedbackReceived.length === 0 ? (
-              <p className="text-sm text-slate-500 text-center py-4">No feedback yet</p>
+            {continuousFeedback.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No feedback received yet. Feedback is sent via /feedback in Slack.
+              </p>
             ) : (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {feedbackReceived.slice(0, 5).map((f: any) => (
-                  <div key={f.id} className="border-b border-slate-200 dark:border-slate-800 pb-3 last:border-0">
-                    <div className="flex justify-between items-start">
-                      <p className="text-sm font-medium">{f.participant?.reviewer?.slack_name || "Anonymous"}</p>
-                      <p className="text-xs text-slate-500">
-                        {f.created_at ? format(new Date(f.created_at), "MMM d, yyyy") : "-"}
-                      </p>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">{f.question_text}</p>
-                    {f.rating ? (
-                      <span className="inline-block mt-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-xs">
-                        Rating: {f.rating}/5
-                      </span>
-                    ) : (
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{f.response}</p>
-                    )}
-                  </div>
-                ))}
-                {continuousFeedbackReceived.slice(0, 5).map((f: any) => (
-                  <div key={f.id} className="border-b border-slate-200 dark:border-slate-800 pb-3 last:border-0">
-                    <div className="flex justify-between items-start">
-                      <p className="text-sm font-medium">
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {continuousFeedback.map((f: any) => (
+                  <div key={f.id} className="p-3 rounded-lg border border-border/60">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium text-foreground">
                         {f.is_anonymous ? "Anonymous" : f.from_user?.slack_name || "Unknown"}
-                      </p>
-                      <Badge variant="outline" className="text-xs">{f.feedback_type}</Badge>
+                      </span>
+                      <Badge className={`text-[10px] ${feedbackTypeBadge[f.feedback_type] || feedbackTypeBadge.general}`}>
+                        {f.feedback_type}
+                      </Badge>
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{f.message}</p>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-sm text-muted-foreground">{f.message}</p>
+                    <p className="text-[11px] text-muted-foreground/60 mt-1.5">
                       {format(new Date(f.created_at), "MMM d, yyyy")}
                     </p>
                   </div>
@@ -368,6 +366,46 @@ export default async function EmployeeProfilePage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Competency Ratings */}
+      {skillAverages.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Star className="h-4 w-4 text-primary" />
+              Competency Ratings
+            </CardTitle>
+            <CardDescription>Aggregated from all review responses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {skillAverages.map((skill) => (
+                <div key={skill.name} className="flex items-center justify-between p-3 rounded-lg border border-border/60">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{skill.name}</p>
+                    {skill.category && (
+                      <p className="text-[11px] text-muted-foreground">{skill.category}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`h-3.5 w-3.5 ${
+                          s <= Math.round(parseFloat(skill.avg))
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted-foreground/20"
+                        }`}
+                      />
+                    ))}
+                    <span className="text-xs font-medium text-foreground ml-1">{skill.avg}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

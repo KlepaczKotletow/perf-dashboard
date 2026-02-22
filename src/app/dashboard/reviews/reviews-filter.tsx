@@ -56,10 +56,9 @@ export function ReviewsFilter() {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All Statuses</SelectItem>
-          <SelectItem value="active">Active</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="in_progress">In Progress</SelectItem>
           <SelectItem value="completed">Completed</SelectItem>
-          <SelectItem value="cancelled">Cancelled</SelectItem>
         </SelectContent>
       </Select>
 
