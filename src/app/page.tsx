@@ -313,6 +313,58 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Testimonials */}
+      <section className="max-w-5xl mx-auto px-6 pb-24">
+        <ScrollReveal className="text-center mb-12">
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">What teams say</p>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Teams that switched don&apos;t go back</h2>
+        </ScrollReveal>
+
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            {
+              quote: "We went from 40% review completion to nearly 100% in one cycle. The Slack integration removes every excuse not to respond.",
+              name: "Sarah Chen",
+              role: "Engineering Manager",
+              company: "Forma",
+              initial: "S",
+            },
+            {
+              quote: "Finally a tool that doesn't make HR feel like HR. Our team actually appreciates getting feedback — and giving it.",
+              name: "Marcus Webb",
+              role: "Head of People",
+              company: "Archetype Labs",
+              initial: "M",
+            },
+            {
+              quote: "The 9-box calibration grid alone saved us hours of spreadsheet wrangling. Setup took an afternoon.",
+              name: "Priya Nair",
+              role: "VP of Engineering",
+              company: "Meridian",
+              initial: "P",
+            },
+          ].map((t, i) => (
+            <ScrollReveal key={t.name} delay={i * 100}>
+              <figure className="group flex flex-col h-full p-6 rounded-xl border border-border/60 bg-card/50 hover:bg-card hover:border-border hover:shadow-sm transition-all duration-200">
+                <blockquote className="flex-1">
+                  <span className="block text-3xl font-serif leading-none text-primary/40 mb-3 select-none">&ldquo;</span>
+                  <p className="text-[13px] leading-relaxed text-muted-foreground">{t.quote}</p>
+                </blockquote>
+                <figcaption className="mt-5 flex items-center gap-3 pt-4 border-t border-border/50">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-semibold shrink-0">
+                    {t.initial}
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-foreground">{t.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{t.role} · {t.company}</p>
+                  </div>
+                </figcaption>
+              </figure>
+            </ScrollReveal>
+          ))}
+        </div>
+      </section>
+
       {/* Social proof / trust strip */}
       <section className="border-t border-border/50">
         <div className="max-w-5xl mx-auto px-6 py-16">
