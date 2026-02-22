@@ -418,24 +418,25 @@ export default function Home() {
         </ScrollReveal>
 
         <div className="relative">
-          <div className="hidden lg:block absolute top-[38px] left-[calc(16.66%+24px)] right-[calc(16.66%+24px)] h-px bg-primary/25" aria-hidden="true" />
+          {/* Connector line through icon centers */}
+          <div className="hidden lg:block absolute top-[27px] left-[calc(16.66%+34px)] right-[calc(16.66%+34px)] h-px bg-border" aria-hidden="true" />
 
           <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
             {[
               {
-                step: "01",
+                step: 1,
                 icon: Slack,
                 title: "Add Perf to Slack",
                 description: "Click 'Add to Slack' and authorize Perf in your workspace. Takes under 60 seconds.",
               },
               {
-                step: "02",
+                step: 2,
                 icon: Users,
                 title: "Set up your team",
                 description: "Perf syncs your Slack members automatically. Assign managers and define reporting lines.",
               },
               {
-                step: "03",
+                step: 3,
                 icon: BarChart3,
                 title: "Launch your first cycle",
                 description: "Pick a template, set a deadline, and Perf handles assignments, reminders, and collection.",
@@ -444,12 +445,12 @@ export default function Home() {
               <ScrollReveal key={item.step} delay={i * 120}>
                 <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
                   <div className="relative mb-5">
-                    <span className="absolute -top-3 -left-3 text-[56px] font-black leading-none text-foreground/[0.06] select-none pointer-events-none">
+                    <div className="h-14 w-14 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center">
+                      <item.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
                       {item.step}
                     </span>
-                    <div className="h-12 w-12 rounded-xl bg-white border border-border shadow-sm flex items-center justify-center relative z-10">
-                      <item.icon className="h-5 w-5 text-primary" />
-                    </div>
                   </div>
                   <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
                   <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
