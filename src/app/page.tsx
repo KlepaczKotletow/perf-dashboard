@@ -137,6 +137,131 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Product Mockup */}
+      <section className="max-w-5xl mx-auto px-6 pb-28">
+        <ScrollReveal className="text-center mb-12">
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">The dashboard</p>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Everything in one place</h2>
+          <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
+            Track cycles, calibrate scores, and explore team performance — all from a clean, focused interface.
+          </p>
+        </ScrollReveal>
+
+        {/* Browser frame */}
+        <ScrollReveal scale className="relative">
+          {/* Glow behind frame */}
+          <div className="absolute inset-x-12 top-8 bottom-0 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+          <div className="rounded-2xl border border-border/70 overflow-hidden shadow-xl shadow-black/[0.06] bg-card">
+            {/* Browser chrome */}
+            <div className="bg-muted/60 border-b border-border px-4 py-3 flex items-center gap-3">
+              <div className="flex gap-1.5">
+                <div className="h-3 w-3 rounded-full bg-red-400/70" />
+                <div className="h-3 w-3 rounded-full bg-yellow-400/70" />
+                <div className="h-3 w-3 rounded-full bg-green-400/70" />
+              </div>
+              <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
+                app.perf.team/dashboard/cycles
+              </div>
+            </div>
+
+            {/* App shell */}
+            <div className="flex h-[340px] sm:h-[400px] overflow-hidden">
+              {/* Sidebar */}
+              <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
+                <div className="px-2 py-1.5 mb-1">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
+                      <span className="text-primary-foreground text-[9px] font-bold">P</span>
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">Perf</span>
+                  </div>
+                </div>
+                {[
+                  { label: "Overview", active: false },
+                  { label: "Cycles", active: true },
+                  { label: "My Reviews", active: false },
+                  { label: "Goals", active: false },
+                  { label: "Team", active: false },
+                  { label: "Analytics", active: false },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={`px-2.5 py-1.5 rounded-md text-[12px] ${
+                      item.active
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+
+              {/* Main content */}
+              <div className="flex-1 p-5 sm:p-6 overflow-hidden">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Active cycle</p>
+                    <h3 className="text-sm font-semibold text-foreground mt-0.5">Q1 2025 Performance Review</h3>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] text-muted-foreground">Completion</p>
+                    <p className="text-lg font-bold text-primary">73%</p>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="h-1.5 bg-muted rounded-full mb-6 overflow-hidden">
+                  <div className="h-full bg-primary rounded-full" style={{ width: "73%" }} />
+                </div>
+
+                {/* Competency grid */}
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-3">Avg. competency scores</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: "Leadership", score: 4.2, pct: 84, color: "bg-primary" },
+                    { label: "Execution", score: 3.8, pct: 76, color: "bg-chart-2" },
+                    { label: "Collaboration", score: 4.5, pct: 90, color: "bg-chart-3" },
+                  ].map((c) => (
+                    <div key={c.label} className="bg-muted/40 rounded-xl p-3">
+                      <p className="text-[11px] text-muted-foreground mb-1">{c.label}</p>
+                      <p className="text-base font-bold text-foreground">{c.score}</p>
+                      <div className="h-1 bg-border rounded-full mt-2 overflow-hidden">
+                        <div className={`h-full rounded-full ${c.color}`} style={{ width: `${c.pct}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Review assignments */}
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2 mt-5">Recent assignments</p>
+                <div className="space-y-1.5">
+                  {[
+                    { name: "Alex Johnson", status: "Submitted", dot: "bg-green-500" },
+                    { name: "Maria Garcia", status: "In progress", dot: "bg-yellow-500" },
+                    { name: "Chris Lee", status: "Pending", dot: "bg-border" },
+                  ].map((r) => (
+                    <div key={r.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
+                          {r.name[0]}
+                        </div>
+                        <span className="text-[12px] text-foreground">{r.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`h-1.5 w-1.5 rounded-full ${r.dot}`} />
+                        <span className="text-[11px] text-muted-foreground">{r.status}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </ScrollReveal>
+      </section>
+
       {/* Feature grid */}
       <section className="max-w-5xl mx-auto px-6 pb-24">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
