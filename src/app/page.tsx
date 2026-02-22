@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight } from "lucide-react";
+import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight, Check } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 
@@ -389,6 +389,70 @@ export default function Home() {
                 <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Teaser */}
+      <section className="border-t border-border/50 bg-muted/20">
+        <div className="max-w-5xl mx-auto px-6 py-20">
+          <ScrollReveal className="text-center mb-12">
+            <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">Pricing</p>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">Simple, transparent pricing</h2>
+            <p className="mt-3 text-muted-foreground text-[15px]">Start free. Upgrade when your team is ready.</p>
+          </ScrollReveal>
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Free tier */}
+            <ScrollReveal delay={0}>
+              <div className="flex flex-col h-full p-6 rounded-xl border border-border/60 bg-card">
+                <p className="text-sm font-semibold text-foreground mb-1">Free</p>
+                <p className="text-3xl font-bold text-foreground mb-1">$0</p>
+                <p className="text-[12px] text-muted-foreground mb-5">Forever, no credit card</p>
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "Up to 10 team members",
+                    "Slack /feedback command",
+                    "Basic analytics",
+                    "1 active review cycle",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Pro tier */}
+            <ScrollReveal delay={100}>
+              <div className="flex flex-col h-full p-6 rounded-xl border border-primary/30 bg-card shadow-sm shadow-primary/[0.06] relative">
+                <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wider">
+                  Popular
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-1">Pro</p>
+                <p className="text-3xl font-bold text-foreground mb-1">$8<span className="text-base font-normal text-muted-foreground">/user/mo</span></p>
+                <p className="text-[12px] text-muted-foreground mb-5">Billed monthly or annually</p>
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "Unlimited team members",
+                    "360° review cycles",
+                    "Competency frameworks",
+                    "9-box calibration grid",
+                    "Advanced analytics",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/pricing" className="mt-6 inline-flex items-center gap-1 text-[13px] text-primary font-medium hover:underline">
+                  See full pricing <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
