@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star } from "lucide-react";
+import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 
 export default function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zhfvxfvmdlpdfgxrwtdn.supabase.co").replace(/\/+$/, '');
@@ -78,6 +79,61 @@ export default function Home() {
               </a>
             </Button>
           </div>
+        </div>
+      </section>
+
+      {/* How it Works */}
+      <section className="max-w-5xl mx-auto px-6 pb-24">
+        <ScrollReveal className="text-center mb-14">
+          <p className="text-xs font-semibold tracking-widest uppercase text-primary mb-3">How it works</p>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
+          <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
+            No lengthy onboarding. No training required. Just add Perf to Slack and you&apos;re set.
+          </p>
+        </ScrollReveal>
+
+        <div className="relative">
+          {/* Connector line — desktop only */}
+          <div className="hidden lg:block absolute top-[38px] left-[calc(16.66%+24px)] right-[calc(16.66%+24px)] h-px bg-border" aria-hidden="true" />
+
+          <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
+            {[
+              {
+                step: "01",
+                icon: Slack,
+                title: "Add Perf to Slack",
+                description: "Click 'Add to Slack' and authorize Perf in your workspace. Takes under 60 seconds.",
+              },
+              {
+                step: "02",
+                icon: Users,
+                title: "Set up your team",
+                description: "Perf syncs your Slack members automatically. Assign managers and define reporting lines.",
+              },
+              {
+                step: "03",
+                icon: BarChart3,
+                title: "Launch your first cycle",
+                description: "Pick a template, set a deadline, and Perf handles assignments, reminders, and collection.",
+              },
+            ].map((item, i) => (
+              <ScrollReveal key={item.step} delay={i * 120}>
+                <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
+                  <div className="relative mb-5">
+                    {/* Step number — decorative background */}
+                    <span className="absolute -top-3 -left-3 text-[56px] font-black leading-none text-foreground/[0.04] select-none pointer-events-none">
+                      {item.step}
+                    </span>
+                    <div className="h-12 w-12 rounded-xl bg-primary/[0.08] border border-primary/[0.12] flex items-center justify-center relative z-10">
+                      <item.icon className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
+                </li>
+              </ScrollReveal>
+            ))}
+          </ol>
         </div>
       </section>
 
