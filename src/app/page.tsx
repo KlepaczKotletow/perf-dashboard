@@ -289,7 +289,7 @@ export default function Home() {
                 <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
                   <div className="relative mb-5">
                     {/* Step number — coral at low opacity */}
-                    <span className="absolute -top-3 -left-3 text-[56px] font-black leading-none text-primary/[0.12] select-none pointer-events-none">
+                    <span className="absolute -top-3 -left-3 text-[56px] font-black leading-none text-foreground/[0.06] select-none pointer-events-none">
                       {item.step}
                     </span>
                     <div className="h-12 w-12 rounded-xl bg-white border border-border shadow-sm flex items-center justify-center relative z-10">
