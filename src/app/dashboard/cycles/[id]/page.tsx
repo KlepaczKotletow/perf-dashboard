@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { ArrowLeft, Users, Calendar, Clock, CheckCircle2, AlertCircle, Target, ArrowRight } from "lucide-react";
+import { ArrowLeft, Users, Calendar, Clock, CheckCircle2, AlertCircle, Target, ArrowRight, ArrowUpCircle } from "lucide-react";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 import { isManagerOrAbove } from "@/lib/roles";
@@ -41,7 +41,8 @@ async function getReviewAssignments(cycleId: string) {
     .select(`
       *,
       employee:users!review_assignments_employee_id_fkey(id, slack_name, department),
-      manager:users!review_assignments_manager_id_fkey(slack_name)
+      manager:users!review_assignments_manager_id_fkey(slack_name),
+      reviewer:users!review_assignments_reviewer_id_fkey(slack_name)
     `)
     .eq("cycle_id", cycleId);
   return data || [];
@@ -319,16 +320,16 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         allCompetencies={allCompetencies}
       />
 
-      {/* Review Assignments */}
-      {assignments.length > 0 && (
+      {/* Review Assignments (Standard: self + manager) */}
+      {assignments.filter((a: any) => a.assignment_type !== "upward").length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Review Assignments</CardTitle>
-            <CardDescription>Individual review progress per employee</CardDescription>
+            <CardDescription>Self-assessment and manager review progress per employee</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {assignments.map((assignment: any) => (
+              {assignments.filter((a: any) => a.assignment_type !== "upward").map((assignment: any) => (
                 <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
                   <div>
                     <p className="font-medium">{assignment.employee?.slack_name || "Unknown"}</p>
@@ -351,6 +352,50 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
                           Submit Review
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upward Feedback Assignments */}
+      {assignments.filter((a: any) => a.assignment_type === "upward").length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ArrowUpCircle className="h-5 w-5 text-primary" />
+              Upward Feedback
+            </CardTitle>
+            <CardDescription>Direct reports reviewing their managers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {assignments.filter((a: any) => a.assignment_type === "upward").map((assignment: any) => (
+                <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
+                  <div>
+                    <p className="font-medium">
+                      {assignment.reviewer?.slack_name || "Unknown"} <span className="text-muted-foreground font-normal">&rarr;</span> {assignment.employee?.slack_name || "Unknown"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {assignment.reviewer?.slack_name} provides feedback on {assignment.employee?.slack_name}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {assignment.overall_rating && (
+                      <span className="text-sm font-bold">{assignment.overall_rating}/5</span>
+                    )}
+                    <Badge className={employeeStatusColors[assignment.status] || employeeStatusColors.pending}>
+                      {assignment.status === "in_progress" ? "In Progress" : assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
+                    </Badge>
+                    {assignment.status !== "completed" && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
+                          Submit Upward Feedback
                         </Link>
                       </Button>
                     )}

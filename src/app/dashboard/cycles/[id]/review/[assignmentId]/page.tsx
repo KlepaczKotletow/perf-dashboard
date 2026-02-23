@@ -240,6 +240,7 @@ export default function ReviewFormPage({
   // Determine reviewer role
   function getReviewerRole(): string {
     if (!currentUser || !assignment) return "peer";
+    if (assignment.assignment_type === "upward" && currentUser.id === assignment.reviewer_id) return "upward";
     if (currentUser.id === assignment.employee_id) return "self";
     if (currentUser.id === assignment.manager_id) return "manager";
     return "peer";
@@ -320,7 +321,7 @@ export default function ReviewFormPage({
       }
 
       // Update assignment status
-      if (reviewerRole === "manager") {
+      if (reviewerRole === "manager" || reviewerRole === "upward") {
         const ratedComps = competencies.filter((c) => c.rating !== null);
         const avgRating = ratedComps.length > 0
           ? ratedComps.reduce((sum, c) => sum + (c.rating || 0), 0) / ratedComps.length
@@ -398,7 +399,9 @@ export default function ReviewFormPage({
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Submit Review</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {getReviewerRole() === "upward" ? "Submit Upward Feedback" : "Submit Review"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Reviewing as <Badge variant="outline" className="ml-1">{getReviewerRole()}</Badge>
           </p>

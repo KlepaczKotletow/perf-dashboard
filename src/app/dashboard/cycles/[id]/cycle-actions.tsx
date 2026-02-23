@@ -81,11 +81,12 @@ export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
 
       if (usersError) throw usersError;
 
-      // 3. Create review_assignments for each employee
+      // 3. Create standard review_assignments for each employee (self + manager review)
       const assignments = (users || []).map((u: any) => ({
         cycle_id: cycle.id,
         employee_id: u.id,
         manager_id: u.manager_id || null,
+        assignment_type: "standard",
         status: "pending",
       }));
 
@@ -94,6 +95,26 @@ export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
           .from("review_assignments")
           .insert(assignments);
         if (assignError) throw assignError;
+      }
+
+      // 3b. Create upward review assignments (direct reports review their managers)
+      const enrolledIds = new Set(employeeIds);
+      const upwardAssignments = (users || [])
+        .filter((u: any) => u.manager_id && enrolledIds.has(u.manager_id))
+        .map((u: any) => ({
+          cycle_id: cycle.id,
+          employee_id: u.manager_id,  // manager being reviewed
+          reviewer_id: u.id,           // direct report doing the review
+          manager_id: null,
+          assignment_type: "upward",
+          status: "pending",
+        }));
+
+      if (upwardAssignments.length > 0) {
+        const { error: upwardError } = await supabase
+          .from("review_assignments")
+          .insert(upwardAssignments);
+        if (upwardError) throw upwardError;
       }
 
       // 4. Activate the first phase if any exist
