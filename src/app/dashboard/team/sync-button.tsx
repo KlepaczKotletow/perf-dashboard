@@ -7,7 +7,7 @@ import { createBrowserClient } from "@supabase/ssr";
 
 export function SyncButton({ workspaceId }: { workspaceId?: string }) {
   const [syncing, setSyncing] = useState(false);
-  const [result, setResult] = useState<{ created: number; updated: number } | null>(null);
+  const [result, setResult] = useState<{ created: number; updated: number; linked?: number } | null>(null);
 
   async function handleSync() {
     if (!workspaceId || syncing) return;
@@ -27,7 +27,7 @@ export function SyncButton({ workspaceId }: { workspaceId?: string }) {
         console.error("Sync error:", error);
         alert("Sync failed. Please try again.");
       } else if (data?.success) {
-        setResult({ created: data.created, updated: data.updated });
+        setResult({ created: data.created, updated: data.updated, linked: data.linked || 0 });
         // Refresh the page to show new members
         setTimeout(() => window.location.reload(), 1500);
       }
@@ -55,7 +55,7 @@ export function SyncButton({ workspaceId }: { workspaceId?: string }) {
       ) : result ? (
         <>
           <Check className="h-3.5 w-3.5 text-green-500" />
-          +{result.created} new, {result.updated} updated
+          +{result.created} new, {result.updated} updated{result.linked ? `, ${result.linked} linked` : ""}
         </>
       ) : (
         <>
