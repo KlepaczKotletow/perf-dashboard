@@ -9,16 +9,40 @@ import { Users, Upload } from "lucide-react";
 
 async function getUsers() {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+
+  // Fetch users with level info (avoid self-join which causes PostgREST 400)
+  const { data, error } = await supabase
     .from("users")
     .select(`
       *,
-      manager:users!users_manager_id_fkey(slack_name),
       level:levels!users_level_id_fkey(name, grade, job_family:job_families(name))
     `)
     .order("department", { ascending: true })
     .order("slack_name", { ascending: true });
-  return data || [];
+
+  if (error) {
+    console.error("getUsers error:", error);
+    // Fallback: fetch without any joins
+    const { data: simple } = await supabase
+      .from("users")
+      .select("*")
+      .order("department", { ascending: true })
+      .order("slack_name", { ascending: true });
+    const users = simple || [];
+    const userMap = new Map(users.map((u: any) => [u.id, u]));
+    return users.map((u: any) => ({
+      ...u,
+      manager: u.manager_id ? { slack_name: userMap.get(u.manager_id)?.slack_name || null } : null,
+      level: null,
+    }));
+  }
+
+  // Resolve manager names from the same user array (avoids PostgREST self-join)
+  const userMap = new Map((data || []).map((u: any) => [u.id, u]));
+  return (data || []).map((u: any) => ({
+    ...u,
+    manager: u.manager_id ? { slack_name: userMap.get(u.manager_id)?.slack_name || null } : null,
+  }));
 }
 
 async function getSubscription() {
