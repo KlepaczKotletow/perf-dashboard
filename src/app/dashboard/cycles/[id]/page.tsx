@@ -102,16 +102,16 @@ const statusColors: Record<string, string> = {
   closed: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
 };
 
-const employeeStatusColors: Record<string, string> = {
-  pending: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
-  in_progress: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
-  completed: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
+const assignmentStatusConfig: Record<string, { label: string; className: string }> = {
+  pending: { label: "Pending", className: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
+  in_progress: { label: "In Progress", className: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
+  completed: { label: "Completed", className: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
 };
 
 export default async function CycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspace = await getUserWorkspace();
-  
+
   if (!isManagerOrAbove(workspace?.role)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -125,7 +125,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   }
 
   const cycle = await getCycle(id);
-  
+
   if (!cycle) {
     notFound();
   }
@@ -144,17 +144,19 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     getCycleQuestions(id),
     getAllCompetencies(),
   ]);
-  
+
   const completedCount = employees.filter((e: any) => e.status === "completed").length;
-  const inProgressCount = employees.filter((e: any) => e.status === "in_progress").length;
-  const pendingCount = employees.filter((e: any) => e.status === "pending").length;
   const completionRate = employees.length > 0 ? Math.round((completedCount / employees.length) * 100) : 0;
+  const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");
+  const upwardAssignments = assignments.filter((a: any) => a.assignment_type === "upward");
+  const calibratedCount = standardAssignments.filter((a: any) => a.final_grade).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <Button variant="ghost" size="icon" className="mt-0.5" asChild>
             <Link href="/dashboard/cycles">
               <ArrowLeft className="h-4 w-4" />
             </Link>
@@ -165,159 +167,118 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
               <Badge className={`text-[11px] font-medium ${statusColors[cycle.status]}`}>
                 {cycle.status.charAt(0).toUpperCase() + cycle.status.slice(1)}
               </Badge>
+              {cycle.grades_released && (
+                <Badge className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
+                  Grades Released
+                </Badge>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {cycle.description || "No description"}
-            </p>
+            {cycle.description && (
+              <p className="text-sm text-muted-foreground mt-1">{cycle.description}</p>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {cycle.grades_released && (
-            <Badge className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
-              Grades Released
-            </Badge>
-          )}
-          <Button variant="outline" asChild>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" asChild>
             <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
           </Button>
           <CycleActions cycle={cycle} employeeCount={employees.length} userRole={workspace?.role || undefined} />
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Users className="h-5 w-5 text-primary" />
+      {/* Overview Card — stats + progress + timeline combined */}
+      <Card className="border-border/60">
+        <CardContent className="pt-5 pb-5">
+          {/* Stats row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Users className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{employees.length}</p>
-                <p className="text-sm text-muted-foreground">Employees</p>
+                <p className="text-xl font-bold text-foreground leading-none">{employees.length}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Employees</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-400/10 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{completedCount}</p>
-                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-xl font-bold text-foreground leading-none">{completedCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
-                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-400/10 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{pendingCount + inProgressCount}</p>
-                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-xl font-bold text-foreground leading-none">{employees.length - completedCount}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Clock className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{completionRate}%</p>
-                <p className="text-sm text-muted-foreground">Completion</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Progress Bar */}
-      {employees.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full bg-muted rounded-full h-4 overflow-hidden">
-              <div 
-                className="bg-primary h-4 transition-all duration-500" 
-                style={{ width: `${completionRate}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-sm text-muted-foreground mt-2">
-              <span>{completedCount} of {employees.length} reviews completed</span>
-              <span>{completionRate}%</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Calibration Progress */}
-      {assignments.filter((a: any) => a.assignment_type === "standard").length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
-                  <Target className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+            {standardAssignments.length > 0 && (
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-lg bg-violet-50 dark:bg-violet-400/10 flex items-center justify-center shrink-0">
+                  <Target className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">Calibration Progress</p>
-                  <p className="text-xs text-muted-foreground">
-                    {assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length} of{" "}
-                    {assignments.filter((a: any) => a.assignment_type === "standard").length} assignments calibrated
+                  <p className="text-xl font-bold text-foreground leading-none">
+                    {calibratedCount}/{standardAssignments.length}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Calibrated</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-violet-500 rounded-full transition-all duration-500"
-                    style={{
-                      width: `${
-                        assignments.filter((a: any) => a.assignment_type === "standard").length > 0
-                          ? (assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length /
-                              assignments.filter((a: any) => a.assignment_type === "standard").length) *
-                            100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <span className="text-sm font-medium text-foreground">
-                  {assignments.filter((a: any) => a.assignment_type === "standard").length > 0
-                    ? Math.round(
-                        (assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length /
-                          assignments.filter((a: any) => a.assignment_type === "standard").length) *
-                          100
-                      )
-                    : 0}
-                  %
-                </span>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          {employees.length > 0 && (
+            <div className="mb-5">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                <span>Review progress</span>
+                <span className="font-medium text-foreground">{completionRate}%</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${completionRate}%` }}
+                />
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+
+          {/* Timeline dates */}
+          <div className="flex items-center gap-6 text-sm border-t border-border pt-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">Start:</span>
+              <span className="font-medium text-foreground">{format(new Date(cycle.start_date), "MMM d, yyyy")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">End:</span>
+              <span className="font-medium text-foreground">{format(new Date(cycle.end_date), "MMM d, yyyy")}</span>
+            </div>
+            {cycle.review_deadline && (
+              <div className="flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Deadline:</span>
+                <span className="font-medium text-foreground">{format(new Date(cycle.review_deadline), "MMM d, yyyy")}</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Phases Timeline */}
       {phases.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
               Review Phases
             </CardTitle>
-            <CardDescription>Structured review workflow with deadlines</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="relative">
@@ -327,34 +288,30 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                 const phaseEnd = new Date(phase.end_date);
                 const isActive = now >= phaseStart && now <= phaseEnd;
                 const isCompleted = phase.status === "completed" || now > phaseEnd;
-                const isPending = !isActive && !isCompleted;
 
                 return (
-                  <div key={phase.id} className="flex items-start gap-4 mb-4 last:mb-0">
-                    {/* Timeline dot */}
+                  <div key={phase.id} className="flex items-start gap-3 mb-3 last:mb-0">
                     <div className="flex flex-col items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${
                         isActive
                           ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
                           : isCompleted
-                          ? "bg-green-500 text-white"
+                          ? "bg-emerald-500 text-white"
                           : "bg-muted text-muted-foreground"
                       }`}>
                         {isCompleted ? "✓" : idx + 1}
                       </div>
                       {idx < phases.length - 1 && (
-                        <div className={`w-0.5 h-8 ${isCompleted ? "bg-green-500" : "bg-muted"}`} />
+                        <div className={`w-0.5 h-6 ${isCompleted ? "bg-emerald-500" : "bg-muted"}`} />
                       )}
                     </div>
-                    {/* Phase content */}
-                    <div className={`flex-1 pb-2 ${isActive ? "" : "opacity-70"}`}>
+                    <div className={`flex-1 ${isActive ? "" : "opacity-60"}`}>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{phase.name}</span>
-                        {isActive && <Badge className="bg-primary/20 text-primary">Current</Badge>}
-                        {isCompleted && <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">Done</Badge>}
+                        <span className="text-sm font-medium">{phase.name}</span>
+                        {isActive && <Badge className="text-[10px] bg-primary/10 text-primary">Current</Badge>}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {format(phaseStart, "MMM d")} <ArrowRight className="inline h-3 w-3" /> {format(phaseEnd, "MMM d, yyyy")}
+                      <p className="text-xs text-muted-foreground">
+                        {format(phaseStart, "MMM d")} — {format(phaseEnd, "MMM d, yyyy")}
                       </p>
                     </div>
                   </div>
@@ -374,169 +331,156 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
       />
 
       {/* Review Assignments (Standard: self + manager) */}
-      {assignments.filter((a: any) => a.assignment_type !== "upward").length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Review Assignments</CardTitle>
-            <CardDescription>Self-assessment and manager review progress per employee</CardDescription>
+      {standardAssignments.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">Review Assignments</CardTitle>
+            <CardDescription className="text-xs">
+              Self-assessment and manager review progress per employee
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {assignments.filter((a: any) => a.assignment_type !== "upward").map((assignment: any) => (
-                <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <p className="font-medium">{assignment.employee?.slack_name || "Unknown"}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Manager: {assignment.manager?.slack_name || "Unassigned"}
-                      {assignment.employee?.department && ` · ${assignment.employee.department}`}
-                    </p>
+            <div className="divide-y divide-border">
+              {standardAssignments.map((assignment: any) => {
+                const config = assignmentStatusConfig[assignment.status] || assignmentStatusConfig.pending;
+                return (
+                  <div key={assignment.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {assignment.employee?.slack_name || "Unknown"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Manager: {assignment.manager?.slack_name || "Unassigned"}
+                        {assignment.employee?.department && ` · ${assignment.employee.department}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {assignment.overall_rating && (
+                        <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
+                      )}
+                      {assignment.final_grade && (
+                        <Badge variant="outline" className="text-[10px]">{assignment.final_grade}</Badge>
+                      )}
+                      <Badge className={`text-[10px] font-medium ${config.className}`}>
+                        {config.label}
+                      </Badge>
+                      {assignment.status !== "completed" && (
+                        <Button variant="outline" size="xs" asChild>
+                          <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
+                            Submit Review
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {assignment.overall_rating && (
-                      <span className="text-sm font-bold">{assignment.overall_rating}/5</span>
-                    )}
-                    {assignment.final_grade && (
-                      <Badge variant="outline">{assignment.final_grade}</Badge>
-                    )}
-                    <Badge className={employeeStatusColors[assignment.status] || employeeStatusColors.pending}>
-                      {assignment.status === "in_progress" ? "In Progress" : assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-                    </Badge>
-                    {assignment.status !== "completed" && (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
-                          Submit Review
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
       {/* Upward Feedback Assignments */}
-      {assignments.filter((a: any) => a.assignment_type === "upward").length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <ArrowUpCircle className="h-5 w-5 text-primary" />
+      {upwardAssignments.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <ArrowUpCircle className="h-4 w-4 text-primary" />
               Upward Feedback
             </CardTitle>
-            <CardDescription>Direct reports reviewing their managers</CardDescription>
+            <CardDescription className="text-xs">Direct reports reviewing their managers</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {assignments.filter((a: any) => a.assignment_type === "upward").map((assignment: any) => (
-                <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <p className="font-medium">
-                      {assignment.reviewer?.slack_name || "Unknown"} <span className="text-muted-foreground font-normal">&rarr;</span> {assignment.employee?.slack_name || "Unknown"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {assignment.reviewer?.slack_name} provides feedback on {assignment.employee?.slack_name}
-                    </p>
+            <div className="divide-y divide-border">
+              {upwardAssignments.map((assignment: any) => {
+                const config = assignmentStatusConfig[assignment.status] || assignmentStatusConfig.pending;
+                return (
+                  <div key={assignment.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {assignment.reviewer?.slack_name || "Unknown"}
+                        <span className="text-muted-foreground font-normal mx-1.5">&rarr;</span>
+                        {assignment.employee?.slack_name || "Unknown"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {assignment.reviewer?.slack_name} provides feedback on {assignment.employee?.slack_name}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {assignment.overall_rating && (
+                        <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
+                      )}
+                      <Badge className={`text-[10px] font-medium ${config.className}`}>
+                        {config.label}
+                      </Badge>
+                      {assignment.status !== "completed" && (
+                        <Button variant="outline" size="xs" asChild>
+                          <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
+                            Submit Feedback
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    {assignment.overall_rating && (
-                      <span className="text-sm font-bold">{assignment.overall_rating}/5</span>
-                    )}
-                    <Badge className={employeeStatusColors[assignment.status] || employeeStatusColors.pending}>
-                      {assignment.status === "in_progress" ? "In Progress" : assignment.status.charAt(0).toUpperCase() + assignment.status.slice(1)}
-                    </Badge>
-                    {assignment.status !== "completed" && (
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
-                          Submit Upward Feedback
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Timeline Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Start Date</p>
-                <p className="font-medium">{format(new Date(cycle.start_date), "MMMM d, yyyy")}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">End Date</p>
-                <p className="font-medium">{format(new Date(cycle.end_date), "MMMM d, yyyy")}</p>
-              </div>
-            </div>
-            {cycle.review_deadline && (
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Review Deadline</p>
-                  <p className="font-medium">{format(new Date(cycle.review_deadline), "MMMM d, yyyy")}</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Add Employees Form (only for draft cycles) */}
       {cycle.status === "draft" && (
-        <AddEmployeesForm 
-          cycleId={id} 
-          allUsers={allUsers} 
-          existingEmployeeIds={employees.map((e: any) => e.employee?.id)} 
+        <AddEmployeesForm
+          cycleId={id}
+          allUsers={allUsers}
+          existingEmployeeIds={employees.map((e: any) => e.employee?.id)}
         />
       )}
 
       {/* Employees List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Employees in Cycle</CardTitle>
-          <CardDescription>
-            {employees.length} employee{employees.length !== 1 ? "s" : ""} included in this review cycle
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {employees.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-              <p>No employees added to this cycle yet.</p>
-              {cycle.status === "draft" && (
-                <p className="text-sm mt-2">Use the form above to add employees.</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {employees.map((emp: any) => (
-                <div key={emp.id} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <p className="font-medium">{emp.employee?.slack_name || "Unknown"}</p>
-                    <p className="text-sm text-muted-foreground">{emp.employee?.slack_email}</p>
+      {employees.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold">Employees in Cycle</CardTitle>
+            <CardDescription className="text-xs">
+              {employees.length} employee{employees.length !== 1 ? "s" : ""} included
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-border">
+              {employees.map((emp: any) => {
+                const config = assignmentStatusConfig[emp.status] || assignmentStatusConfig.pending;
+                return (
+                  <div key={emp.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{emp.employee?.slack_name || "Unknown"}</p>
+                      <p className="text-xs text-muted-foreground">{emp.employee?.slack_email}</p>
+                    </div>
+                    <Badge className={`text-[10px] font-medium ${config.className}`}>
+                      {config.label}
+                    </Badge>
                   </div>
-                  <Badge className={employeeStatusColors[emp.status]}>
-                    {emp.status === "in_progress" ? "In Progress" : emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
-                  </Badge>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
+
+      {employees.length === 0 && (
+        <Card className="border-border/60">
+          <CardContent className="py-12 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No employees yet</p>
+            <p className="text-sm text-muted-foreground">
+              {cycle.status === "draft" ? "Use the form above to add employees to this cycle." : "No employees were added to this cycle."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -86,12 +86,25 @@ export default function ReviewFormPage({
         setAssignment(assignmentData);
         setEmployee(assignmentData.employee);
 
-        // Check if already submitted
+        // Determine what reviewer role the current user would have
+        let currentReviewerRole = "peer";
+        if (assignmentData.assignment_type === "upward" && appUserId === assignmentData.reviewer_id) {
+          currentReviewerRole = "upward";
+        } else if (appUserId === assignmentData.employee_id) {
+          currentReviewerRole = "self";
+        } else if (appUserId === assignmentData.manager_id) {
+          currentReviewerRole = "manager";
+        }
+
+        // Check if already submitted FOR THIS SPECIFIC ROLE
+        // (A user can be both employee and manager on the same assignment,
+        //  so we must check per-role, not just per-reviewer)
         const { data: existingResponses } = await supabase
           .from("review_responses")
           .select("id")
           .eq("assignment_id", assignmentId)
           .eq("reviewer_id", appUserId)
+          .eq("reviewer_role", currentReviewerRole)
           .limit(1);
 
         if (existingResponses && existingResponses.length > 0) {
