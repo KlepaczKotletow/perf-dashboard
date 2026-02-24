@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Users, Calendar, Clock, CheckCircle2, AlertCircle, Target, ArrowRight, ArrowUpCircle } from "lucide-react";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
-import { isManagerOrAbove } from "@/lib/roles";
+import { isManagerOrAbove, isHROrAbove, canAccessCalibration } from "@/lib/roles";
 import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
@@ -171,11 +171,16 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {cycle.grades_released && (
+            <Badge className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
+              Grades Released
+            </Badge>
+          )}
           <Button variant="outline" asChild>
             <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
           </Button>
-          <CycleActions cycle={cycle} employeeCount={employees.length} />
+          <CycleActions cycle={cycle} employeeCount={employees.length} userRole={workspace?.role || undefined} />
         </div>
       </div>
 
@@ -251,6 +256,54 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             <div className="flex justify-between text-sm text-muted-foreground mt-2">
               <span>{completedCount} of {employees.length} reviews completed</span>
               <span>{completionRate}%</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Calibration Progress */}
+      {assignments.filter((a: any) => a.assignment_type === "standard").length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                  <Target className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Calibration Progress</p>
+                  <p className="text-xs text-muted-foreground">
+                    {assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length} of{" "}
+                    {assignments.filter((a: any) => a.assignment_type === "standard").length} assignments calibrated
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-32 h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-violet-500 rounded-full transition-all duration-500"
+                    style={{
+                      width: `${
+                        assignments.filter((a: any) => a.assignment_type === "standard").length > 0
+                          ? (assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length /
+                              assignments.filter((a: any) => a.assignment_type === "standard").length) *
+                            100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <span className="text-sm font-medium text-foreground">
+                  {assignments.filter((a: any) => a.assignment_type === "standard").length > 0
+                    ? Math.round(
+                        (assignments.filter((a: any) => a.assignment_type === "standard" && a.final_grade).length /
+                          assignments.filter((a: any) => a.assignment_type === "standard").length) *
+                          100
+                      )
+                    : 0}
+                  %
+                </span>
+              </div>
             </div>
           </CardContent>
         </Card>

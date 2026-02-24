@@ -3,14 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ClipboardCheck, Star, FileText, ArrowRight, MessageSquare } from "lucide-react";
-import { format } from "date-fns";
-
-const statusConfig: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-};
+import { ClipboardCheck, Star, FileText, ArrowRight, Clock, CheckCircle2, AlertCircle, Eye, EyeOff, Medal } from "lucide-react";
 
 export default async function MyReviewsPage() {
   const workspace = await getUserWorkspace();
@@ -30,14 +23,15 @@ export default async function MyReviewsPage() {
     .from("review_assignments")
     .select(`
       *,
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date),
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
       manager:users!review_assignments_manager_id_fkey(slack_name)
     `)
     .eq("employee_id", userId)
+    .eq("assignment_type", "standard")
     .order("created_at", { ascending: false });
 
-  // 2. Get review assignments where I need to review someone else (pending reviews to give)
-  const { data: pendingReviews } = await supabase
+  // 2. Get review assignments where I need to review someone else (as manager)
+  const { data: managerReviews } = await supabase
     .from("review_assignments")
     .select(`
       *,
@@ -45,112 +39,200 @@ export default async function MyReviewsPage() {
       cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
     `)
     .eq("manager_id", userId)
+    .eq("assignment_type", "standard")
     .in("status", ["pending", "in_progress"])
     .order("created_at", { ascending: false });
 
-  // 3. Get my level and competency expectations
-  const { data: myUser } = await supabase
-    .from("users")
+  // 3. Get upward review assignments where I need to review my manager
+  const { data: upwardReviews } = await supabase
+    .from("review_assignments")
     .select(`
-      level_id,
-      level:levels!users_level_id_fkey(name, grade, job_family:job_families(name))
+      *,
+      employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
     `)
-    .eq("id", userId)
-    .single();
+    .eq("reviewer_id", userId)
+    .eq("assignment_type", "upward")
+    .in("status", ["pending", "in_progress"])
+    .order("created_at", { ascending: false });
 
-  let competencyExpectations: any[] = [];
-  if (myUser?.level_id) {
-    const { data: levelComps } = await supabase
-      .from("level_competencies")
-      .select(`
-        expected_level,
-        competency:competencies!level_competencies_competency_id_fkey(name, category)
-      `)
-      .eq("level_id", myUser.level_id)
-      .order("expected_level", { ascending: false });
+  // 4. Check which of my assignments I've submitted self-reviews for
+  const myAssignmentIds = (myAssignments || []).map((a: any) => a.id);
+  let mySubmissions: Record<string, Set<string>> = {};
+  if (myAssignmentIds.length > 0) {
+    const { data: myResponses } = await supabase
+      .from("review_responses")
+      .select("id, assignment_id, reviewer_role")
+      .eq("reviewer_id", userId)
+      .in("assignment_id", myAssignmentIds);
 
-    competencyExpectations = levelComps || [];
+    (myResponses || []).forEach((r: any) => {
+      if (!mySubmissions[r.assignment_id]) {
+        mySubmissions[r.assignment_id] = new Set();
+      }
+      mySubmissions[r.assignment_id].add(r.reviewer_role);
+    });
   }
 
-  // 4. Get recent continuous feedback I received
-  const { data: recentFeedback } = await supabase
-    .from("continuous_feedback")
-    .select(`
-      id, message, feedback_type, is_anonymous, created_at,
-      from_user:users!continuous_feedback_from_user_id_fkey(slack_name)
-    `)
-    .eq("to_user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  // Build smart status for each of my assignments
+  const enrichedAssignments = (myAssignments || []).map((a: any) => {
+    const selfSubmitted = mySubmissions[a.id]?.has("self") || false;
+    const gradesReleased = a.cycle?.grades_released || false;
 
-  // Stats
-  const completedAssignments = (myAssignments || []).filter((a: any) => a.status === "completed").length;
-  const activeAssignments = (myAssignments || []).filter((a: any) => a.status !== "completed").length;
-  const pendingCount = (pendingReviews || []).length;
+    let smartStatus: { label: string; description: string; variant: string; icon: string };
+
+    if (a.status === "pending" && !selfSubmitted) {
+      smartStatus = {
+        label: "Self-Review Required",
+        description: "Complete your self-assessment to get started",
+        variant: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
+        icon: "alert",
+      };
+    } else if ((a.status === "in_progress" || a.status === "pending") && selfSubmitted) {
+      smartStatus = {
+        label: "Self-Review Submitted",
+        description: "Waiting for your manager to complete their review",
+        variant: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
+        icon: "clock",
+      };
+    } else if (a.status === "completed" && !gradesReleased) {
+      smartStatus = {
+        label: "Review Complete",
+        description: "Your review is complete. Results will be shared after calibration.",
+        variant: "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10",
+        icon: "eyeoff",
+      };
+    } else if (a.status === "completed" && gradesReleased) {
+      smartStatus = {
+        label: "Results Available",
+        description: "Your performance results have been released",
+        variant: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
+        icon: "check",
+      };
+    } else {
+      smartStatus = {
+        label: a.status === "in_progress" ? "In Progress" : a.status.charAt(0).toUpperCase() + a.status.slice(1),
+        description: "",
+        variant: "text-muted-foreground bg-muted",
+        icon: "clock",
+      };
+    }
+
+    return {
+      ...a,
+      selfSubmitted,
+      gradesReleased,
+      smartStatus,
+    };
+  });
+
+  // Separate action-required items
+  const actionRequired = enrichedAssignments.filter(
+    (a: any) => !a.selfSubmitted && a.status !== "completed"
+  );
+  const allManagerReviews = managerReviews || [];
+  const allUpwardReviews = upwardReviews || [];
+  const hasActions = actionRequired.length > 0 || allManagerReviews.length > 0 || allUpwardReviews.length > 0;
+
+  const StatusIcon = ({ icon }: { icon: string }) => {
+    switch (icon) {
+      case "alert":
+        return <AlertCircle className="h-4 w-4" />;
+      case "clock":
+        return <Clock className="h-4 w-4" />;
+      case "eyeoff":
+        return <EyeOff className="h-4 w-4" />;
+      case "check":
+        return <CheckCircle2 className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Reviews</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Your performance reviews, pending actions, and competency expectations
+          Your performance reviews and pending actions
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { label: "Completed", value: completedAssignments, icon: ClipboardCheck, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-          { label: "Pending", value: activeAssignments, icon: FileText, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-          { label: "To Review", value: pendingCount, icon: ArrowRight, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-          { label: "Competencies", value: competencyExpectations.length, icon: Star, color: "text-primary bg-primary/[0.08]" },
-        ].map((m) => (
-          <Card key={m.label} className="border-border/60">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
-                  <p className="text-2xl font-semibold mt-1 text-foreground">{m.value}</p>
-                </div>
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${m.color}`}>
-                  <m.icon className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Pending Reviews to Give (as manager) */}
-      {pendingReviews && pendingReviews.length > 0 && (
-        <Card className="border-border/60">
+      {/* Action Required Section */}
+      {hasActions && (
+        <Card className="border-amber-200/60 bg-amber-50/30 dark:border-amber-400/10 dark:bg-amber-400/[0.02]">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4 text-amber-500" />
-              Reviews You Need to Complete
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              Action Required
             </CardTitle>
-            <CardDescription>These employees are waiting for your review</CardDescription>
+            <CardDescription>
+              {actionRequired.length + allManagerReviews.length + allUpwardReviews.length} item{actionRequired.length + allManagerReviews.length + allUpwardReviews.length !== 1 ? "s" : ""} need your attention
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {pendingReviews.map((review: any) => (
-                <div key={review.id} className="flex items-center justify-between p-3 rounded-lg border border-border/60">
+              {/* Self-reviews needed */}
+              {actionRequired.map((a: any) => (
+                <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/60">
                   <div>
-                    <p className="text-sm font-medium text-foreground">{review.employee?.slack_name || "Unknown"}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-amber-500" />
+                      <p className="text-sm font-medium text-foreground">Submit Self-Review</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                      {a.cycle?.name || "Unknown cycle"}
+                    </p>
+                  </div>
+                  <Button size="sm" className="text-xs" asChild>
+                    <Link href={`/dashboard/cycles/${a.cycle?.id}`}>
+                      Start <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              ))}
+
+              {/* Manager reviews needed */}
+              {allManagerReviews.map((review: any) => (
+                <div key={review.id} className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/60">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-sky-500" />
+                      <p className="text-sm font-medium text-foreground">
+                        Review {review.employee?.slack_name || "Unknown"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 ml-6">
                       {review.employee?.job_title || "No title"} &middot; {review.cycle?.name || "Unknown cycle"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={`text-[10px] font-medium ${(statusConfig[review.status] || statusConfig.pending).badge}`}>
-                      {(statusConfig[review.status] || statusConfig.pending).label}
-                    </Badge>
-                    <Button size="sm" className="text-xs" asChild>
-                      <Link href={`/dashboard/cycles/${review.cycle?.id}`}>
-                        Review <ArrowRight className="h-3 w-3 ml-1" />
-                      </Link>
-                    </Button>
+                  <Button size="sm" className="text-xs" asChild>
+                    <Link href={`/dashboard/cycles/${review.cycle?.id}`}>
+                      Review <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              ))}
+
+              {/* Upward reviews needed */}
+              {allUpwardReviews.map((review: any) => (
+                <div key={review.id} className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/60">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Star className="h-4 w-4 text-violet-500" />
+                      <p className="text-sm font-medium text-foreground">
+                        Upward Feedback for {review.employee?.slack_name || "Unknown"}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                      {review.cycle?.name || "Unknown cycle"}
+                    </p>
                   </div>
+                  <Button size="sm" className="text-xs" asChild>
+                    <Link href={`/dashboard/cycles/${review.cycle?.id}`}>
+                      Review <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -161,34 +243,65 @@ export default async function MyReviewsPage() {
       {/* My Performance Reviews (about me) */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Performance Cycle Reviews</CardTitle>
+          <CardTitle className="text-base">My Performance Reviews</CardTitle>
           <CardDescription>Reviews from structured performance cycles</CardDescription>
         </CardHeader>
         <CardContent>
-          {(!myAssignments || myAssignments.length === 0) ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
+          {enrichedAssignments.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
               No reviews assigned yet. Your manager will assign reviews during a performance cycle.
             </p>
           ) : (
-            <div className="space-y-2">
-              {myAssignments.map((assignment: any) => (
-                <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border border-border/60">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{assignment.cycle?.name || "Unknown Cycle"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Manager: {assignment.manager?.slack_name || "Unassigned"}
-                      {assignment.cycle?.start_date && (
-                        <> &middot; {format(new Date(assignment.cycle.start_date), "MMM yyyy")}</>
+            <div className="space-y-3">
+              {enrichedAssignments.map((a: any) => (
+                <div
+                  key={a.id}
+                  className={`p-4 rounded-xl border transition-all ${
+                    a.smartStatus.icon === "check"
+                      ? "border-emerald-200/60 bg-emerald-50/20 dark:border-emerald-400/10 dark:bg-emerald-400/[0.02]"
+                      : "border-border/60"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm font-medium text-foreground">
+                          {a.cycle?.name || "Unknown Cycle"}
+                        </h3>
+                        <Badge className={`text-[10px] font-medium ${a.smartStatus.variant}`}>
+                          <StatusIcon icon={a.smartStatus.icon} />
+                          <span className="ml-1">{a.smartStatus.label}</span>
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Manager: {a.manager?.slack_name || "Unassigned"}
+                      </p>
+                      {a.smartStatus.description && (
+                        <p className="text-xs text-muted-foreground/80 mt-1">
+                          {a.smartStatus.description}
+                        </p>
                       )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {assignment.overall_rating && (
-                      <span className="text-sm font-semibold text-foreground">{assignment.overall_rating}/5</span>
+                    </div>
+
+                    {/* Show rating + grade only when grades are released */}
+                    {a.gradesReleased && a.status === "completed" && (
+                      <div className="flex items-center gap-3 shrink-0">
+                        {a.overall_rating && (
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                            <span className="text-sm font-bold text-foreground">
+                              {a.overall_rating}/5
+                            </span>
+                          </div>
+                        )}
+                        {a.final_grade && (
+                          <Badge variant="outline" className="text-xs font-medium">
+                            <Medal className="h-3 w-3 mr-1" />
+                            {a.final_grade}
+                          </Badge>
+                        )}
+                      </div>
                     )}
-                    <Badge className={`text-[10px] font-medium ${(statusConfig[assignment.status] || statusConfig.pending).badge}`}>
-                      {(statusConfig[assignment.status] || statusConfig.pending).label}
-                    </Badge>
                   </div>
                 </div>
               ))}
@@ -196,94 +309,6 @@ export default async function MyReviewsPage() {
           )}
         </CardContent>
       </Card>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Feedback */}
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              Recent Feedback
-            </CardTitle>
-            <CardDescription>Anytime feedback from colleagues</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {(!recentFeedback || recentFeedback.length === 0) ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No feedback received yet. Colleagues can send feedback via /feedback in Slack.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {recentFeedback.map((f: any) => (
-                  <div key={f.id} className="p-3 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-foreground">
-                        {f.is_anonymous ? "Anonymous" : f.from_user?.slack_name || "Unknown"}
-                      </span>
-                      <Badge variant="outline" className="text-[10px]">{f.feedback_type}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{f.message}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Competency Expectations */}
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Star className="h-4 w-4 text-primary" />
-              My Competency Expectations
-            </CardTitle>
-            <CardDescription>
-              {myUser?.level ? (
-                <>
-                  Level: {(myUser.level as any)?.job_family?.name && `${(myUser.level as any).job_family.name} — `}
-                  {(myUser.level as any)?.name}{(myUser.level as any)?.grade && ` (${(myUser.level as any).grade})`}
-                </>
-              ) : (
-                "No level assigned yet"
-              )}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {competencyExpectations.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {myUser?.level_id
-                  ? "No competencies defined for your level yet."
-                  : "Ask your admin to assign you a job level."}
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {competencyExpectations.map((lc: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between p-2 rounded-lg border border-border/60">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{lc.competency?.name}</p>
-                      {lc.competency?.category && (
-                        <p className="text-[11px] text-muted-foreground">{lc.competency.category}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((s) => (
-                        <Star
-                          key={s}
-                          className={`h-3.5 w-3.5 ${
-                            s <= lc.expected_level
-                              ? "fill-amber-400 text-amber-400"
-                              : "text-muted-foreground/20"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

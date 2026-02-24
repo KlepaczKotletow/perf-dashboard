@@ -57,7 +57,7 @@ export default async function MyTeamPage() {
       .select(`
         *,
         employee:users!review_assignments_employee_id_fkey(id, slack_name),
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, grades_released)
       `)
       .in("employee_id", reportIds)
       .order("created_at", { ascending: false });

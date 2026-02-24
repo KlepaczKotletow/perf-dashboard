@@ -67,3 +67,33 @@ export function canManageCompetencies(role: string | undefined): boolean {
 export function canRunCalibration(role: string | undefined): boolean {
   return isHROrAbove(role);
 }
+
+/**
+ * Check if a user can calibrate reviews for a specific department.
+ * HR/admin can calibrate all departments.
+ * Department heads can calibrate only their own department.
+ */
+export function canCalibrateDepartment(
+  role: string | undefined,
+  isDeptHead: boolean,
+  userDept: string | null,
+  targetDept: string | null
+): boolean {
+  if (isHROrAbove(role)) return true;
+  if (isDeptHead && userDept && userDept === targetDept) return true;
+  return false;
+}
+
+/**
+ * Check if a user can access calibration at all (HR+ or department head).
+ */
+export function canAccessCalibration(role: string | undefined, isDeptHead: boolean): boolean {
+  return isHROrAbove(role) || isDeptHead;
+}
+
+/**
+ * Check if a user can release grades (HR+ only).
+ */
+export function canReleaseGrades(role: string | undefined): boolean {
+  return isHROrAbove(role);
+}

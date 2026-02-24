@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { ArrowLeft, Star, FileText, MessageSquare, Mail, Pencil } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
-import { isHROrAbove } from "@/lib/roles";
+import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 
@@ -30,8 +30,8 @@ async function getEmployeeDetails(id: string) {
   const { data: reviewAssignments } = await supabase
     .from("review_assignments")
     .select(`
-      id, status, overall_rating, created_at, updated_at,
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date),
+      id, status, overall_rating, final_grade, created_at, updated_at,
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
       manager:users!review_assignments_manager_id_fkey(slack_name)
     `)
     .eq("employee_id", id)
@@ -118,6 +118,7 @@ export default async function EmployeeProfilePage({
 
   const { user, reviewAssignments, continuousFeedback, directReports, skillAverages, overallAvg } = data;
   const canEdit = isHROrAbove(workspace?.role);
+  const canSeeAllRatings = isManagerOrAbove(workspace?.role);
 
   const getInitials = (name: string | null) => {
     if (!name) return "?";
@@ -202,7 +203,7 @@ export default async function EmployeeProfilePage({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Overall Rating</p>
-                <p className="text-2xl font-semibold mt-1 text-foreground">{overallAvg ? `${overallAvg}/5` : "N/A"}</p>
+                <p className="text-2xl font-semibold mt-1 text-foreground">{canSeeAllRatings && overallAvg ? `${overallAvg}/5` : "N/A"}</p>
               </div>
               <div className="h-10 w-10 rounded-xl flex items-center justify-center text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
                 <Star className="h-5 w-5" />
@@ -314,8 +315,11 @@ export default async function EmployeeProfilePage({
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {a.overall_rating && (
+                        {a.overall_rating && (canSeeAllRatings || a.cycle?.grades_released) && (
                           <span className="text-sm font-semibold text-foreground">{a.overall_rating}/5</span>
+                        )}
+                        {a.final_grade && (canSeeAllRatings || a.cycle?.grades_released) && (
+                          <Badge variant="outline" className="text-[10px] font-medium">{a.final_grade}</Badge>
                         )}
                         <Badge className={`text-[10px] font-medium ${config.badge}`}>
                           {config.label}
@@ -367,8 +371,8 @@ export default async function EmployeeProfilePage({
         </Card>
       </div>
 
-      {/* Competency Ratings */}
-      {skillAverages.length > 0 && (
+      {/* Competency Ratings — only visible to managers+ */}
+      {canSeeAllRatings && skillAverages.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">

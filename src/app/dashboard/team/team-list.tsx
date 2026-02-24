@@ -16,6 +16,7 @@ interface TeamUser {
   job_title: string | null;
   department: string | null;
   role: string | null;
+  is_department_head?: boolean;
   manager: { slack_name: string } | null;
   level: { name: string; grade: string | null; job_family: { name: string } | null } | null;
 }
@@ -106,9 +107,16 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamLis
             <div className="flex-1 min-w-0 grid grid-cols-[1fr_1fr_1fr_auto] gap-4 items-center">
               {/* Name + email */}
               <Link href={`/dashboard/team/${user.id}`} className="min-w-0 group">
-                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                  {user.slack_name || "Unknown"}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                    {user.slack_name || "Unknown"}
+                  </p>
+                  {user.is_department_head && (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10 shrink-0">
+                      Dept Head
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground truncate">
                   {user.job_title || user.slack_email || "—"}
                 </p>

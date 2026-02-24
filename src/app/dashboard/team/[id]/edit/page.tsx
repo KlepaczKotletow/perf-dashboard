@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Loader2, Save } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
@@ -22,6 +23,7 @@ interface UserData {
   level_id: string | null;
   hire_date: string | null;
   role: string;
+  is_department_head: boolean;
 }
 
 export default function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +42,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   const [levelId, setLevelId] = useState<string>("");
   const [hireDate, setHireDate] = useState("");
   const [role, setRole] = useState("user");
+  const [isDeptHead, setIsDeptHead] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +56,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         // Load the user
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role")
+          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role, is_department_head")
           .eq("id", id)
           .single();
 
@@ -69,6 +72,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setLevelId(userData.level_id || "");
         setHireDate(userData.hire_date || "");
         setRole(userData.role || "user");
+        setIsDeptHead(userData.is_department_head || false);
 
         // Load all users for manager selection
         const { data: usersData } = await supabase
@@ -115,6 +119,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           level_id: levelId || null,
           hire_date: hireDate || null,
           role,
+          is_department_head: isDeptHead,
         })
         .eq("id", id);
 
@@ -190,6 +195,20 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
                 <SelectItem value="admin">Admin</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="deptHead">Department Head</Label>
+              <p className="text-xs text-muted-foreground">
+                Can calibrate performance reviews for their department
+              </p>
+            </div>
+            <Switch
+              id="deptHead"
+              checked={isDeptHead}
+              onCheckedChange={setIsDeptHead}
+            />
           </div>
 
           <div className="space-y-2">

@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2 } from "lucide-react";
+import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 interface CycleActionsProps {
@@ -28,15 +28,20 @@ interface CycleActionsProps {
     id: string;
     name: string;
     status: string;
+    grades_released?: boolean;
   };
   employeeCount: number;
+  userRole?: string;
 }
 
-export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
+export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
+  const [showReleaseDialog, setShowReleaseDialog] = useState(false);
+
+  const isHR = userRole === "hr" || userRole === "admin";
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -183,6 +188,24 @@ export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
     }
   }
 
+  async function releaseGrades() {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("performance_cycles")
+        .update({ grades_released: true, updated_at: new Date().toISOString() })
+        .eq("id", cycle.id);
+
+      if (error) throw error;
+      router.refresh();
+    } catch (err) {
+      console.error("Error releasing grades:", err);
+    } finally {
+      setLoading(false);
+      setShowReleaseDialog(false);
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -216,6 +239,15 @@ export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
               <Archive className="h-4 w-4 mr-2" />
               Close Cycle
             </DropdownMenuItem>
+          )}
+          {isHR && !cycle.grades_released && (cycle.status === "active" || cycle.status === "completed") && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setShowReleaseDialog(true)}>
+                <Medal className="h-4 w-4 mr-2" />
+                Release Grades
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem 
@@ -259,11 +291,32 @@ export function CycleActions({ cycle, employeeCount }: CycleActionsProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Release Grades Confirmation Dialog */}
+      <AlertDialog open={showReleaseDialog} onOpenChange={setShowReleaseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Release Grades to Employees?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will make all ratings and final grades visible to employees in &quot;{cycle.name}&quot;.
+              Employees will be able to see their performance ratings and calibrated grades.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={releaseGrades}>
+              <Medal className="h-4 w-4 mr-2" />
+              Release Grades
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
