@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { BarChart3, TrendingUp, Star, Users, Lock, Grid3X3, Download } from "lucide-react";
+import { BarChart3, TrendingUp, Star, Users, Lock, Grid3X3 } from "lucide-react";
 import { isManagerOrAbove } from "@/lib/roles";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,110 +9,111 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 async function getAnalyticsData() {
   const supabase = await createServerSupabaseClient();
-  
-  // Get all feedback with ratings (question-based schema)
-  const { data: feedbackData } = await supabase
-    .from("feedback")
-    .select("id, question_id, question_text, rating, created_at")
+
+  // 1. All review responses with competency info (modern system)
+  const { data: responses } = await supabase
+    .from("review_responses")
+    .select(`
+      id, rating, comment, created_at,
+      competency:competencies(name, category),
+      assignment:review_assignments!review_responses_assignment_id_fkey(
+        id, employee_id, status
+      )
+    `)
     .not("rating", "is", null);
 
-  // Group ratings by question_text to build per-skill averages
+  // 2. All review assignments for completion rate
+  const { data: assignments } = await supabase
+    .from("review_assignments")
+    .select("id, status, employee_id");
+
+  // 3. Users with department info
+  const { data: usersWithDept } = await supabase
+    .from("users")
+    .select("id, department, slack_name");
+
+  // 4. Performance cycles stats (already modern)
+  const { data: perfCycles } = await supabase
+    .from("performance_cycles")
+    .select("id, name, status");
+
+  const allResponses = responses || [];
+  const allAssignments = assignments || [];
+  const userMap = new Map((usersWithDept || []).map(u => [u.id, u]));
+
+  // --- Skill averages (by competency name) ---
   const skillRatings: Record<string, number[]> = {};
-  feedbackData?.forEach(f => {
-    if (f.rating && f.question_text) {
-      if (!skillRatings[f.question_text]) skillRatings[f.question_text] = [];
-      skillRatings[f.question_text].push(f.rating);
+  allResponses.forEach((r: any) => {
+    const compName = r.competency?.name;
+    if (r.rating && compName) {
+      if (!skillRatings[compName]) skillRatings[compName] = [];
+      skillRatings[compName].push(r.rating);
     }
   });
 
-  const skillAverages: { name: string; avg: number; count: number }[] = Object.entries(skillRatings).map(
-    ([name, ratings]) => ({
-      name,
-      avg: ratings.reduce((a, b) => a + b, 0) / ratings.length,
-      count: ratings.length,
-    })
-  );
+  const skillAverages = Object.entries(skillRatings).map(([name, ratings]) => ({
+    name,
+    avg: ratings.reduce((a, b) => a + b, 0) / ratings.length,
+    count: ratings.length,
+  }));
 
-  const allRatings = feedbackData?.filter(f => f.rating).map(f => f.rating!) || [];
-  const overallAvg = allRatings.length > 0 ? allRatings.reduce((a, b) => a + b, 0) / allRatings.length : 0;
+  // --- Overall average rating ---
+  const allRatings = allResponses.filter((r: any) => r.rating).map((r: any) => r.rating as number);
+  const overallAvg = allRatings.length > 0
+    ? allRatings.reduce((a, b) => a + b, 0) / allRatings.length
+    : 0;
 
-  // Rating distribution (1-5)
+  // --- Rating distribution (1-5) ---
   const ratingDistribution = [0, 0, 0, 0, 0];
   allRatings.forEach(r => {
     const idx = Math.min(Math.max(r - 1, 0), 4);
     ratingDistribution[idx]++;
   });
 
-  // Get review completion rate
-  const { data: participants } = await supabase
-    .from("participants")
-    .select("status");
-  
-  const total = participants?.length || 0;
-  const completed = participants?.filter(p => p.status === "completed").length || 0;
-  const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+  // --- Completion rate (from review_assignments) ---
+  const totalAssignments = allAssignments.length;
+  const completedAssignments = allAssignments.filter((a: any) => a.status === "completed").length;
+  const completionRate = totalAssignments > 0
+    ? Math.round((completedAssignments / totalAssignments) * 100)
+    : 0;
 
-  // Get feedback count by month (last 6 months)
+  // --- Monthly trend (from review_responses created_at) ---
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-  
-  const { data: recentFeedback } = await supabase
-    .from("feedback")
-    .select("created_at")
-    .gte("created_at", sixMonthsAgo.toISOString());
 
   const monthlyData: Record<string, number> = {};
-  recentFeedback?.forEach(f => {
-    if (f.created_at) {
-      const month = new Date(f.created_at).toLocaleString("default", { month: "short", year: "2-digit" });
+  allResponses.forEach((r: any) => {
+    if (r.created_at && new Date(r.created_at) >= sixMonthsAgo) {
+      const month = new Date(r.created_at).toLocaleString("default", { month: "short", year: "2-digit" });
       monthlyData[month] = (monthlyData[month] || 0) + 1;
     }
   });
 
-  // Get department-level analytics
-  const { data: usersWithDept } = await supabase
-    .from("users")
-    .select("id, department, slack_name");
-
-  const { data: reviewCycles } = await supabase
-    .from("review_cycles")
-    .select("id, employee_id, status");
-
-  // Calculate per-employee average ratings
-  const { data: allFeedback } = await supabase
-    .from("feedback")
-    .select("review_cycle_id, rating")
-    .not("rating", "is", null);
-
+  // --- Per-employee average ratings (for 9-box grid) ---
   const employeeRatings: Record<string, number[]> = {};
-  reviewCycles?.forEach(rc => {
-    if (rc.employee_id) {
-      const rcFeedback = allFeedback?.filter(f => f.review_cycle_id === rc.id) || [];
-      rcFeedback.forEach(f => {
-        if (f.rating) {
-          if (!employeeRatings[rc.employee_id!]) employeeRatings[rc.employee_id!] = [];
-          employeeRatings[rc.employee_id!].push(f.rating);
-        }
-      });
+  allResponses.forEach((r: any) => {
+    const empId = r.assignment?.employee_id;
+    if (r.rating && empId) {
+      if (!employeeRatings[empId]) employeeRatings[empId] = [];
+      employeeRatings[empId].push(r.rating);
     }
   });
 
-  // 9-box grid data: performance (avg rating) x potential (could be review count as proxy)
   const nineBoxData: { name: string; department: string; avgRating: number; reviewCount: number; id: string }[] = [];
-  usersWithDept?.forEach(u => {
-    const ratings = employeeRatings[u.id];
-    if (ratings && ratings.length > 0) {
+  Object.entries(employeeRatings).forEach(([empId, ratings]) => {
+    const user = userMap.get(empId);
+    if (user && ratings.length > 0) {
       nineBoxData.push({
-        id: u.id,
-        name: u.slack_name || "Unknown",
-        department: u.department || "Unassigned",
+        id: empId,
+        name: user.slack_name || "Unknown",
+        department: user.department || "Unassigned",
         avgRating: ratings.reduce((a, b) => a + b, 0) / ratings.length,
         reviewCount: ratings.length,
       });
     }
   });
 
-  // Department averages
+  // --- Department averages ---
   const deptAverages: Record<string, { ratings: number[]; count: number }> = {};
   nineBoxData.forEach(emp => {
     if (!deptAverages[emp.department]) deptAverages[emp.department] = { ratings: [], count: 0 };
@@ -126,11 +127,7 @@ async function getAnalyticsData() {
     employeeCount: data.count,
   })).sort((a, b) => b.avgRating - a.avgRating);
 
-  // Get performance cycles stats
-  const { data: perfCycles } = await supabase
-    .from("performance_cycles")
-    .select("id, name, status");
-
+  // --- Cycle stats (already modern) ---
   const cycleStats = {
     total: perfCycles?.length || 0,
     active: perfCycles?.filter(c => c.status === "active").length || 0,
@@ -142,13 +139,13 @@ async function getAnalyticsData() {
     overallAvg: overallAvg.toFixed(1),
     ratingDistribution,
     completionRate,
-    totalFeedback: feedbackData?.length || 0,
+    totalFeedback: allRatings.length,
     monthlyData,
     nineBoxData,
     departmentStats,
     cycleStats,
-    totalParticipants: total,
-    completedParticipants: completed,
+    totalAssignments,
+    completedAssignments,
   };
 }
 
@@ -164,7 +161,7 @@ const ratingColors: Record<number, string> = {
 function getNineBoxCell(rating: number, potential: number): { label: string; color: string } {
   const perf = rating >= 4 ? "high" : rating >= 3 ? "mid" : "low";
   const pot = potential >= 10 ? "high" : potential >= 5 ? "mid" : "low";
-  
+
   const map: Record<string, { label: string; color: string }> = {
     "high-high": { label: "Star", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
     "high-mid": { label: "High Performer", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
@@ -181,14 +178,14 @@ function getNineBoxCell(rating: number, potential: number): { label: string; col
 
 export default async function AnalyticsPage() {
   const workspace = await getUserWorkspace();
-  
+
   if (!isManagerOrAbove(workspace?.role)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Lock className="h-16 w-16 text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>
         <p className="text-muted-foreground mb-6 max-w-md">
-          Analytics are only available to managers and administrators. 
+          Analytics are only available to managers and administrators.
           Contact your workspace admin if you need access.
         </p>
         <Button asChild><Link href="/dashboard">Go to Dashboard</Link></Button>
@@ -202,8 +199,8 @@ export default async function AnalyticsPage() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Analytics</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Performance insights for {workspace?.workspaceName || "your workspace"}
           </p>
         </div>
@@ -218,7 +215,7 @@ export default async function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
-            <p className="text-xs text-muted-foreground">Average across all skills</p>
+            <p className="text-xs text-muted-foreground">Average across all competencies</p>
           </CardContent>
         </Card>
 
@@ -230,30 +227,30 @@ export default async function AnalyticsPage() {
           <CardContent>
             <div className="text-2xl font-bold">{analytics.completionRate}%</div>
             <p className="text-xs text-muted-foreground">
-              {analytics.completedParticipants}/{analytics.totalParticipants} reviews
+              {analytics.completedAssignments}/{analytics.totalAssignments} assignments
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Feedback</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Ratings</CardTitle>
             <BarChart3 className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalFeedback}</div>
-            <p className="text-xs text-muted-foreground">Rated feedback items</p>
+            <p className="text-xs text-muted-foreground">Review response ratings</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Skills Tracked</CardTitle>
+            <CardTitle className="text-sm font-medium">Competencies</CardTitle>
             <Grid3X3 className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.skillAverages.length}</div>
-            <p className="text-xs text-muted-foreground">Competency areas</p>
+            <p className="text-xs text-muted-foreground">Tracked competency areas</p>
           </CardContent>
         </Card>
 
@@ -278,7 +275,7 @@ export default async function AnalyticsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {analytics.skillAverages.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No rated feedback yet</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No rated responses yet</p>
             ) : (
               analytics.skillAverages
                 .sort((a, b) => b.avg - a.avg)
@@ -290,8 +287,8 @@ export default async function AnalyticsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="h-2 flex-1 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all" 
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
                           style={{ width: `${(skill.avg / 5) * 100}%` }}
                         />
                       </div>
@@ -307,14 +304,13 @@ export default async function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Rating Distribution</CardTitle>
-            <CardDescription>How ratings are distributed across all feedback</CardDescription>
+            <CardDescription>How ratings are distributed across all responses</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-end gap-3 h-40">
               {analytics.ratingDistribution.map((count, idx) => {
                 const maxCount = Math.max(...analytics.ratingDistribution, 1);
                 const heightPct = (count / maxCount) * 100;
-                const labels = ["1 - Poor", "2 - Fair", "3 - Good", "4 - Very Good", "5 - Excellent"];
                 return (
                   <div key={idx} className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-xs font-bold">{count}</span>
@@ -336,8 +332,8 @@ export default async function AnalyticsPage() {
         {/* Monthly Trend */}
         <Card>
           <CardHeader>
-            <CardTitle>Feedback Trend</CardTitle>
-            <CardDescription>Feedback submissions over the last 6 months</CardDescription>
+            <CardTitle>Response Trend</CardTitle>
+            <CardDescription>Review responses over the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
             {Object.keys(analytics.monthlyData).length > 0 ? (
@@ -347,9 +343,9 @@ export default async function AnalyticsPage() {
                     <span className="text-sm w-20">{month}</span>
                     <div className="flex-1 mx-4">
                       <div className="h-3 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary/70 rounded-full" 
-                          style={{ width: `${Math.min((count / Math.max(...Object.values(analytics.monthlyData))) * 100, 100)}%` }} 
+                        <div
+                          className="h-full bg-primary/70 rounded-full"
+                          style={{ width: `${Math.min((count / Math.max(...Object.values(analytics.monthlyData))) * 100, 100)}%` }}
                         />
                       </div>
                     </div>

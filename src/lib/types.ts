@@ -55,60 +55,6 @@ export interface Question {
 }
 
 // ============================================
-// Review Cycles (individual 360 reviews)
-// ============================================
-
-export interface ReviewCycle {
-  id: string
-  workspace_id: string | null
-  employee_id: string | null
-  manager_id: string | null
-  template_id: string | null
-  status: 'pending' | 'active' | 'in_progress' | 'completed' | 'cancelled'
-  due_date: string | null
-  start_date: string | null
-  completed_at: string | null
-  summary: string | null
-  created_by: string | null
-  created_at: string | null
-  updated_at: string | null
-  // Relations
-  employee?: User
-  manager?: User
-  template?: Template
-  participants?: Participant[]
-}
-
-export interface Participant {
-  id: string
-  review_cycle_id: string | null
-  reviewer_id: string | null
-  role: 'self' | 'peer' | 'manager' | 'direct_report'
-  status: 'pending' | 'in_progress' | 'completed'
-  reminder_sent_at: string | null
-  completed_at: string | null
-  created_at: string | null
-  updated_at: string | null
-  // Relations
-  reviewer?: User
-}
-
-export interface Feedback {
-  id: string
-  participant_id: string | null
-  review_cycle_id: string | null
-  question_id: string
-  question_text: string
-  response: string
-  rating: number | null
-  is_anonymous: boolean | null
-  created_at: string | null
-  updated_at: string | null
-  // Relations
-  participant?: Participant
-}
-
-// ============================================
 // Continuous Feedback (ad-hoc, via Slack)
 // ============================================
 
