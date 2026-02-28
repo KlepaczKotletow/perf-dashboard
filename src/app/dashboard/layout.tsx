@@ -12,6 +12,8 @@ import {
   Briefcase,
   ClipboardCheck,
   UsersRound,
+  ListChecks,
+  Flag,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { SignOutButton } from "./signout-button";
@@ -58,6 +60,8 @@ export default async function DashboardLayout({
       label: "Organization",
       items: [
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresAdmin: false },
+        { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresAdmin: false },
+        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/competencies", label: "Competencies", icon: Target, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresAdmin: false },
       ],

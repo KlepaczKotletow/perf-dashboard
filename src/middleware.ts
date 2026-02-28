@@ -9,64 +9,68 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            )
+            response = NextResponse.next({
+              request: {
+                headers: request.headers,
+              },
+            })
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
+      }
+    )
+
+    // Refresh session if expired
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Protect dashboard routes
+    if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
+      const loginUrl = new URL('/', request.url)
+      loginUrl.searchParams.set('signin', 'required')
+      return NextResponse.redirect(loginUrl)
     }
-  )
 
-  // Refresh session if expired
-  const { data: { user } } = await supabase.auth.getUser()
+    // Subscription enforcement for dashboard routes
+    if (request.nextUrl.pathname.startsWith('/dashboard') && user) {
+      const workspaceId = user.user_metadata?.workspace_id
 
-  // Protect dashboard routes
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
-    const loginUrl = new URL('/', request.url)
-    loginUrl.searchParams.set('signin', 'required')
-    return NextResponse.redirect(loginUrl)
-  }
+      // Allow billing page always (so admin can fix subscription)
+      const isBillingPage = request.nextUrl.pathname.startsWith('/dashboard/settings/billing')
 
-  // Subscription enforcement for dashboard routes
-  if (request.nextUrl.pathname.startsWith('/dashboard') && user) {
-    const workspaceId = user.user_metadata?.workspace_id
+      if (workspaceId && !isBillingPage) {
+        // Check subscription status
+        const { data: subscription } = await supabase
+          .from('subscriptions')
+          .select('status')
+          .eq('workspace_id', workspaceId)
+          .maybeSingle()
 
-    // Allow billing page always (so admin can fix subscription)
-    const isBillingPage = request.nextUrl.pathname.startsWith('/dashboard/settings/billing')
-    
-    if (workspaceId && !isBillingPage) {
-      // Check subscription status
-      const { data: subscription } = await supabase
-        .from('subscriptions')
-        .select('status')
-        .eq('workspace_id', workspaceId)
-        .maybeSingle()
-
-      // Only block if subscription exists AND is explicitly canceled/past_due
-      // Missing subscription = free tier (allowed)
-      if (subscription && subscription.status !== 'active' && subscription.status !== 'trialing') {
-        const billingUrl = new URL('/dashboard/settings/billing', request.url)
-        billingUrl.searchParams.set('inactive', 'true')
-        return NextResponse.redirect(billingUrl)
+        // Only block if subscription exists AND is explicitly canceled/past_due
+        // Missing subscription = free tier (allowed)
+        if (subscription && subscription.status !== 'active' && subscription.status !== 'trialing') {
+          const billingUrl = new URL('/dashboard/settings/billing', request.url)
+          billingUrl.searchParams.set('inactive', 'true')
+          return NextResponse.redirect(billingUrl)
+        }
       }
     }
+  } catch (e) {
+    console.error('Middleware error:', e)
   }
 
   return response
