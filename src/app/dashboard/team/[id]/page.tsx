@@ -13,18 +13,31 @@ import { notFound } from "next/navigation";
 async function getEmployeeDetails(id: string) {
   const supabase = await createServerSupabaseClient();
 
-  // Get user info with org hierarchy
+  // Get user info — fetch manager separately to avoid PostgREST 400:
+  // combining a self-referential join (manager:users!...) with a deeply
+  // nested join (level → job_families) in one query causes PostgREST to
+  // reject the entire request with a 400 error.
   const { data: user, error } = await supabase
     .from("users")
     .select(`
       *,
-      manager:users!users_manager_id_fkey(id, slack_name),
       level:levels!users_level_id_fkey(name, grade, job_family:job_families(name))
     `)
     .eq("id", id)
-    .single();
+    .maybeSingle();
 
   if (error || !user) return null;
+
+  // Fetch manager separately (avoids the PostgREST 400 bug above)
+  let manager: { id: string; slack_name: string } | null = null;
+  if (user.manager_id) {
+    const { data: managerData } = await supabase
+      .from("users")
+      .select("id, slack_name")
+      .eq("id", user.manager_id)
+      .maybeSingle();
+    manager = managerData;
+  }
 
   // Get review assignments where this person is the employee
   const { data: reviewAssignments } = await supabase
@@ -95,6 +108,7 @@ async function getEmployeeDetails(id: string) {
 
   return {
     user,
+    manager,
     reviewAssignments: reviewAssignments || [],
     continuousFeedback: continuousFeedback || [],
     directReports: directReports || [],
@@ -116,7 +130,7 @@ export default async function EmployeeProfilePage({
     notFound();
   }
 
-  const { user, reviewAssignments, continuousFeedback, directReports, skillAverages, overallAvg } = data;
+  const { user, manager, reviewAssignments, continuousFeedback, directReports, skillAverages, overallAvg } = data;
   const canEdit = isHROrAbove(workspace?.role);
   const canSeeAllRatings = isManagerOrAbove(workspace?.role);
 
@@ -184,11 +198,11 @@ export default async function EmployeeProfilePage({
                 {(user.level as any)?.grade ? ` (${(user.level as any).grade})` : ""}
               </Badge>
             )}
-            {user.manager?.slack_name && (
+            {manager?.slack_name && (
               <span className="text-xs text-muted-foreground">
                 Reports to{" "}
-                <Link href={`/dashboard/team/${user.manager.id}`} className="text-primary hover:underline">
-                  {user.manager.slack_name}
+                <Link href={`/dashboard/team/${manager.id}`} className="text-primary hover:underline">
+                  {manager.slack_name}
                 </Link>
               </span>
             )}
