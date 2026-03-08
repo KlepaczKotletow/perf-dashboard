@@ -13,7 +13,7 @@ async function getSubscription() {
   const { data } = await supabase
     .from("subscriptions")
     .select("*")
-    .single();
+    .maybeSingle();
   return data;
 }
 
