@@ -19,6 +19,8 @@ import {
   Rocket,
 } from "lucide-react";
 import { isManagerOrAbove, canManageUsers } from "@/lib/roles";
+import { DashboardCharts, type DashboardChartData } from "./dashboard-charts";
+import { STATUS_COLORS } from "@/components/charts/chart-utils";
 
 async function getStats(workspaceId: string | undefined) {
   const supabase = await createServerSupabaseClient();
@@ -70,11 +72,120 @@ async function getSetupStatus(workspaceId: string | undefined) {
   };
 }
 
+async function getChartData(workspaceId: string | undefined): Promise<DashboardChartData> {
+  const supabase = await createServerSupabaseClient();
+
+  // Run all queries in parallel
+  const [assignmentsRes, goalsRes, responsesRes, usersRes, cyclesRes] = await Promise.all([
+    supabase.from("review_assignments").select("id, status, cycle_id"),
+    supabase.from("goals").select("id, tracking_status, status"),
+    supabase.from("review_responses").select(`
+      id, rating, created_at,
+      assignment:review_assignments!review_responses_assignment_id_fkey(employee_id)
+    `).not("rating", "is", null),
+    supabase.from("users").select("id, department"),
+    supabase.from("performance_cycles").select("id, name, status, created_at").order("created_at", { ascending: false }),
+  ]);
+
+  const assignments = assignmentsRes.data || [];
+  const goals = goalsRes.data || [];
+  const responses = responsesRes.data || [];
+  const users = usersRes.data || [];
+  const cycles = cyclesRes.data || [];
+
+  // --- Completion rate (current active cycle vs previous) ---
+  const activeCycle = cycles.find(c => c.status === "active");
+  const completedCycles = cycles.filter(c => c.status === "completed");
+  const previousCycle = completedCycles[0] || null;
+
+  const currentCycleAssignments = activeCycle
+    ? assignments.filter(a => a.cycle_id === activeCycle.id)
+    : assignments;
+  const totalCurrent = currentCycleAssignments.length;
+  const completedCurrent = currentCycleAssignments.filter(a => a.status === "completed").length;
+  const completionRate = totalCurrent > 0 ? Math.round((completedCurrent / totalCurrent) * 100) : 0;
+
+  let completionDelta: number | null = null;
+  let previousCycleName: string | null = null;
+  if (previousCycle) {
+    previousCycleName = previousCycle.name;
+    const prevAssignments = assignments.filter(a => a.cycle_id === previousCycle.id);
+    const prevTotal = prevAssignments.length;
+    const prevCompleted = prevAssignments.filter(a => a.status === "completed").length;
+    const prevRate = prevTotal > 0 ? Math.round((prevCompleted / prevTotal) * 100) : 0;
+    completionDelta = completionRate - prevRate;
+  }
+
+  // --- Goal tracking status distribution ---
+  const activeGoals = goals.filter(g => g.status === "active" || g.status === "draft");
+  const trackingCounts: Record<string, number> = { on_track: 0, at_risk: 0, delayed: 0, achieved: 0 };
+  activeGoals.forEach((g: any) => {
+    const ts = g.tracking_status || "on_track";
+    if (ts in trackingCounts) trackingCounts[ts]++;
+  });
+  const goalDistribution = Object.entries(trackingCounts).map(([key, value]) => ({
+    name: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.label || key,
+    value,
+    color: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.fill || "#a1a1aa",
+  }));
+
+  // --- Review trend (last 6 months) ---
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const monthlyMap: Record<string, number> = {};
+  responses.forEach((r: any) => {
+    if (r.created_at && new Date(r.created_at) >= sixMonthsAgo) {
+      const d = new Date(r.created_at);
+      const key = d.toLocaleString("default", { month: "short" });
+      monthlyMap[key] = (monthlyMap[key] || 0) + 1;
+    }
+  });
+  // Ensure we have 6 months of data points
+  const reviewTrend: { name: string; value: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = d.toLocaleString("default", { month: "short" });
+    reviewTrend.push({ name: key, value: monthlyMap[key] || 0 });
+  }
+
+  // --- Department performance (avg rating) ---
+  const userDeptMap = new Map(users.map(u => [u.id, u.department]));
+  const deptRatings: Record<string, number[]> = {};
+  responses.forEach((r: any) => {
+    const empId = r.assignment?.employee_id;
+    if (empId && r.rating) {
+      const dept = userDeptMap.get(empId) || "Unassigned";
+      if (!deptRatings[dept]) deptRatings[dept] = [];
+      deptRatings[dept].push(r.rating);
+    }
+  });
+  const departmentPerformance = Object.entries(deptRatings)
+    .map(([name, ratings]) => ({
+      name,
+      value: ratings.reduce((a, b) => a + b, 0) / ratings.length,
+    }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+
+  return {
+    completionRate,
+    completionDelta,
+    previousCycleName,
+    goalDistribution,
+    reviewTrend,
+    departmentPerformance,
+  };
+}
+
 export default async function DashboardPage() {
   const workspace = await getUserWorkspace();
-  const stats = await getStats(workspace?.workspaceId);
-  const activeCycles = await getActiveCycles(workspace?.workspaceId);
-  const setup = await getSetupStatus(workspace?.workspaceId);
+  const [stats, activeCycles, setup, chartData] = await Promise.all([
+    getStats(workspace?.workspaceId),
+    getActiveCycles(workspace?.workspaceId),
+    getSetupStatus(workspace?.workspaceId),
+    getChartData(workspace?.workspaceId),
+  ]);
   const isManager = isManagerOrAbove(workspace?.role);
   const isAdmin = canManageUsers(workspace?.role);
 
@@ -253,6 +364,9 @@ export default async function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* Charts */}
+      {!showOnboarding && <DashboardCharts data={chartData} />}
 
       <div className="grid gap-6 lg:grid-cols-5">
         {/* Quick Links */}

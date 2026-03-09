@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AnalyticsCharts, type AnalyticsChartsData } from "./analytics-charts";
+import { STATUS_COLORS } from "@/components/charts/chart-utils";
 
 async function getAnalyticsData() {
   const supabase = await createServerSupabaseClient();
@@ -134,6 +136,58 @@ async function getAnalyticsData() {
     completed: perfCycles?.filter(c => c.status === "completed").length || 0,
   };
 
+  // --- Goal tracking status distribution ---
+  const { data: goalsData } = await supabase
+    .from("goals")
+    .select("id, tracking_status, status");
+  const activeGoals = (goalsData || []).filter((g: any) => g.status === "active" || g.status === "draft");
+  const trackingCounts: Record<string, number> = { on_track: 0, at_risk: 0, delayed: 0, achieved: 0 };
+  activeGoals.forEach((g: any) => {
+    const ts = g.tracking_status || "on_track";
+    if (ts in trackingCounts) trackingCounts[ts]++;
+  });
+  const goalStatusDistribution = Object.entries(trackingCounts).map(([key, value]) => ({
+    name: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.label || key,
+    value,
+    color: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.fill || "#a1a1aa",
+  }));
+
+  // --- Build chart data ---
+  const ratingColors: Record<number, string> = {
+    1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#22c55e", 5: "#10b981",
+  };
+  const chartRatingDistribution = ratingDistribution.map((count, idx) => ({
+    name: `${idx + 1}`,
+    value: count,
+    color: ratingColors[idx + 1],
+  }));
+
+  const chartCompetencyRatings = skillAverages
+    .sort((a, b) => b.avg - a.avg)
+    .map((s) => ({ name: s.name, value: s.avg }));
+
+  // Monthly trend for charts (last 6 months, ordered)
+  const chartResponseTrend: { name: string; value: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = d.toLocaleString("default", { month: "short", year: "2-digit" });
+    chartResponseTrend.push({ name: key, value: monthlyData[key] || 0 });
+  }
+
+  const chartDeptPerformance = departmentStats.map((d) => ({
+    name: d.department,
+    value: d.avgRating,
+  }));
+
+  const chartsData: AnalyticsChartsData = {
+    ratingDistribution: chartRatingDistribution,
+    competencyRatings: chartCompetencyRatings,
+    responseTrend: chartResponseTrend,
+    departmentPerformance: chartDeptPerformance,
+    goalStatusDistribution,
+  };
+
   return {
     skillAverages,
     overallAvg: overallAvg.toFixed(1),
@@ -146,16 +200,9 @@ async function getAnalyticsData() {
     cycleStats,
     totalAssignments,
     completedAssignments,
+    chartsData,
   };
 }
-
-const ratingColors: Record<number, string> = {
-  1: "bg-red-500",
-  2: "bg-orange-500",
-  3: "bg-yellow-500",
-  4: "bg-green-500",
-  5: "bg-emerald-500",
-};
 
 // 9-box grid mapping
 function getNineBoxCell(rating: number, potential: number): { label: string; color: string } {
@@ -266,127 +313,8 @@ export default async function AnalyticsPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Skill Ratings Breakdown */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Competency Ratings</CardTitle>
-            <CardDescription>Average ratings by competency area</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {analytics.skillAverages.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No rated responses yet</p>
-            ) : (
-              analytics.skillAverages
-                .sort((a, b) => b.avg - a.avg)
-                .map((skill) => (
-                  <div key={skill.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium truncate max-w-[200px]">{skill.name}</span>
-                      <span className="text-muted-foreground">{skill.count} ratings</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 flex-1 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${(skill.avg / 5) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-bold w-10 text-right">{skill.avg.toFixed(1)}</span>
-                    </div>
-                  </div>
-                ))
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Rating Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Rating Distribution</CardTitle>
-            <CardDescription>How ratings are distributed across all responses</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3 h-40">
-              {analytics.ratingDistribution.map((count, idx) => {
-                const maxCount = Math.max(...analytics.ratingDistribution, 1);
-                const heightPct = (count / maxCount) * 100;
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1">
-                    <span className="text-xs font-bold">{count}</span>
-                    <div className="w-full bg-muted rounded-t-md overflow-hidden" style={{ height: `${Math.max(heightPct, 4)}%` }}>
-                      <div className={`w-full h-full ${ratingColors[idx + 1]} rounded-t-md`} />
-                    </div>
-                    <span className="text-xs text-muted-foreground text-center">{idx + 1}</span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-2">
-              <span>Poor</span>
-              <span>Excellent</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Monthly Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Response Trend</CardTitle>
-            <CardDescription>Review responses over the last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {Object.keys(analytics.monthlyData).length > 0 ? (
-              <div className="space-y-2">
-                {Object.entries(analytics.monthlyData).map(([month, count]) => (
-                  <div key={month} className="flex items-center justify-between">
-                    <span className="text-sm w-20">{month}</span>
-                    <div className="flex-1 mx-4">
-                      <div className="h-3 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-primary/70 rounded-full"
-                          style={{ width: `${Math.min((count / Math.max(...Object.values(analytics.monthlyData))) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium w-8 text-right">{count}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No activity data yet</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Department Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Department Performance</CardTitle>
-            <CardDescription>Average ratings by department</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {analytics.departmentStats.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No department data yet</p>
-            ) : (
-              <div className="space-y-3">
-                {analytics.departmentStats.map((dept) => (
-                  <div key={dept.department} className="flex items-center justify-between">
-                    <div>
-                      <span className="font-medium">{dept.department}</span>
-                      <span className="text-xs text-muted-foreground ml-2">({dept.employeeCount} employees)</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-500" />
-                      <span className="font-bold">{dept.avgRating.toFixed(1)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {/* Charts */}
+      <AnalyticsCharts data={analytics.chartsData} />
 
       {/* 9-Box Grid */}
       {analytics.nineBoxData.length > 0 && (

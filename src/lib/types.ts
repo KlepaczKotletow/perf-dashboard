@@ -240,22 +240,33 @@ export interface ReviewResponse {
 // ============================================
 
 export type GoalStatus = 'draft' | 'active' | 'completed' | 'cancelled'
+export type GoalTrackingStatus = 'on_track' | 'at_risk' | 'delayed' | 'achieved'
+export type GoalScope = 'company' | 'team' | 'individual'
 
 export interface Goal {
   id: string
   workspace_id: string | null
   employee_id: string
   cycle_id: string | null
+  parent_id: string | null
   title: string
   description: string | null
   status: GoalStatus
   progress: number
+  weight: number
+  metric_start: number | null
+  metric_current: number | null
+  metric_target: number | null
+  metric_unit: string | null
+  tracking_status: GoalTrackingStatus
+  scope: GoalScope
   due_date: string | null
   created_at: string | null
   updated_at: string | null
   // Relations
   employee?: User
   cycle?: PerformanceCycle
+  children?: Goal[]
 }
 
 // ============================================
