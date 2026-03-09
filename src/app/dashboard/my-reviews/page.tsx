@@ -185,7 +185,7 @@ export default async function MyReviewsPage() {
                     </p>
                   </div>
                   <Button size="sm" className="text-xs" asChild>
-                    <Link href={`/dashboard/cycles/${a.cycle?.id}`}>
+                    <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
                       Start <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>
                   </Button>
@@ -207,7 +207,7 @@ export default async function MyReviewsPage() {
                     </p>
                   </div>
                   <Button size="sm" className="text-xs" asChild>
-                    <Link href={`/dashboard/cycles/${review.cycle?.id}`}>
+                    <Link href={`/dashboard/reviews/${review.id}`}>
                       Review <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>
                   </Button>
@@ -229,7 +229,7 @@ export default async function MyReviewsPage() {
                     </p>
                   </div>
                   <Button size="sm" className="text-xs" asChild>
-                    <Link href={`/dashboard/cycles/${review.cycle?.id}`}>
+                    <Link href={`/dashboard/cycles/${review.cycle?.id}/review/${review.id}`}>
                       Review <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>
                   </Button>

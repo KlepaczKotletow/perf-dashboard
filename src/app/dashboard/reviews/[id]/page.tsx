@@ -26,13 +26,12 @@ export default async function ReviewDetailPage({
 
   if (!workspace?.workspaceId || !workspace?.appUserId) notFound();
 
-  const canEdit = isManagerOrAbove(workspace.role as any);
-
   // Fetch the review assignment with full relations
   const { data: assignment } = await supabase
     .from("review_assignments")
     .select(`
       id, status, overall_rating, created_at, updated_at,
+      employee_id, manager_id,
       employee:users!review_assignments_employee_id_fkey(
         id, slack_name, job_title, department, avatar_url,
         level_id,
@@ -44,6 +43,19 @@ export default async function ReviewDetailPage({
     .eq("id", id)
     .eq("workspace_id", workspace.workspaceId)
     .single();
+
+  // Determine reviewer role and edit permission based on the assignment relationship
+  const currentUserId = workspace.appUserId;
+  const isAssignmentManager = (assignment as any)?.manager_id === currentUserId;
+  const isAssignmentEmployee = (assignment as any)?.employee_id === currentUserId;
+  const isWorkspaceManager = isManagerOrAbove(workspace.role as any);
+
+  // Can edit if: you are the assigned manager OR you're an HR/admin-level role
+  const canEdit = isAssignmentManager || (isWorkspaceManager && !isAssignmentEmployee);
+
+  // Role used when saving responses
+  const reviewerRole: "manager" | "self" =
+    isAssignmentEmployee ? "self" : "manager";
 
   if (!assignment) notFound();
 
@@ -103,11 +115,11 @@ export default async function ReviewDetailPage({
       {/* Back + header */}
       <div>
         <Link
-          href="/dashboard/reviews"
+          href={isAssignmentEmployee ? "/dashboard/my-reviews" : "/dashboard/reviews"}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          Back to reviews
+          {isAssignmentEmployee ? "Back to my reviews" : "Back to reviews"}
         </Link>
 
         <div className="flex items-start justify-between gap-4">
@@ -184,7 +196,7 @@ export default async function ReviewDetailPage({
           assignmentId={assignment.id}
           workspaceId={workspace.workspaceId}
           reviewerId={workspace.appUserId}
-          reviewerRole={canEdit ? "manager" : "self"}
+          reviewerRole={reviewerRole}
           competencyRatings={competencyRatings}
           existingOverallRating={assignment.overall_rating}
           canEdit={canEdit}
