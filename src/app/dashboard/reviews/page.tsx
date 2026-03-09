@@ -98,12 +98,9 @@ export default async function ReviewsPage({
                   {assignments.map((a: any) => {
                     const config = statusConfig[a.status] || statusConfig.pending;
                     return (
-                      <TableRow key={a.id}>
+                      <TableRow key={a.id} className="cursor-pointer group">
                         <TableCell>
-                          <Link
-                            href={`/dashboard/team/${a.employee?.id}`}
-                            className="hover:text-primary transition-colors"
-                          >
+                          <Link href={`/dashboard/reviews/${a.id}`} className="block group-hover:text-primary transition-colors">
                             <p className="text-sm font-medium">{a.employee?.slack_name || "Unknown"}</p>
                             <p className="text-xs text-muted-foreground">
                               {a.employee?.department || a.employee?.job_title || ""}

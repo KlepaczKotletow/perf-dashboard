@@ -991,10 +991,7 @@ export function CompetenciesClient({
                                   </th>
                                 );
                               })}
-                              {/* Bulk action column header */}
-                              {canEdit && (
-                                <th className="w-[50px] min-w-[50px]" />
-                              )}
+                              {/* No extra column header needed */}
                             </tr>
                           </thead>
                           <tbody>
@@ -1005,17 +1002,48 @@ export function CompetenciesClient({
                                   className="border-b last:border-0 hover:bg-muted/20 transition-colors group/row"
                                 >
                                   <td className="py-2 px-3">
-                                    <span className="text-xs font-medium">
-                                      {comp.name}
-                                    </span>
-                                    {comp.is_core && (
-                                      <Badge
-                                        variant="outline"
-                                        className="ml-1.5 text-[9px] px-1 py-0 h-3.5 border-primary/30 text-primary"
-                                      >
-                                        Core
-                                      </Badge>
-                                    )}
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-xs font-medium">
+                                        {comp.name}
+                                      </span>
+                                      {comp.is_core && (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] px-1 py-0 h-3.5 border-primary/30 text-primary"
+                                        >
+                                          Core
+                                        </Badge>
+                                      )}
+                                      {canEdit && (
+                                        <div className="relative ml-1">
+                                          <button
+                                            onClick={() =>
+                                              setBulkRowPicker(
+                                                bulkRowPicker === comp.id
+                                                  ? null
+                                                  : comp.id
+                                              )
+                                            }
+                                            disabled={bulkLoading}
+                                            className="opacity-0 group-hover/row:opacity-100 transition-opacity text-[9px] text-primary hover:text-primary/80 font-medium whitespace-nowrap"
+                                            title="Set all levels for this competency"
+                                          >
+                                            Set all →
+                                          </button>
+                                          {bulkRowPicker === comp.id && (
+                                            <InlinePicker
+                                              onSelect={(v) =>
+                                                bulkSetRow(comp.id, v)
+                                              }
+                                              onClose={() =>
+                                                setBulkRowPicker(null)
+                                              }
+                                              showClear
+                                            />
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                   {filteredLevels.map((level: any) => {
                                     const entry =
@@ -1040,36 +1068,7 @@ export function CompetenciesClient({
                                       </td>
                                     );
                                   })}
-                                  {/* Bulk-set row button */}
-                                  {canEdit && (
-                                    <td className="text-center py-1.5 px-1 relative">
-                                      <button
-                                        onClick={() =>
-                                          setBulkRowPicker(
-                                            bulkRowPicker === comp.id
-                                              ? null
-                                              : comp.id
-                                          )
-                                        }
-                                        disabled={bulkLoading}
-                                        className="opacity-0 group-hover/row:opacity-100 transition-opacity text-[9px] text-primary hover:text-primary/80 font-medium whitespace-nowrap"
-                                        title="Set all levels for this competency"
-                                      >
-                                        Set all →
-                                      </button>
-                                      {bulkRowPicker === comp.id && (
-                                        <InlinePicker
-                                          onSelect={(v) =>
-                                            bulkSetRow(comp.id, v)
-                                          }
-                                          onClose={() =>
-                                            setBulkRowPicker(null)
-                                          }
-                                          showClear
-                                        />
-                                      )}
-                                    </td>
-                                  )}
+                                  {/* "Set all" is now inline in the competency name cell */}
                                 </tr>
                               );
                             })}

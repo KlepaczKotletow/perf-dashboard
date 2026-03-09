@@ -27,11 +27,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+
+const CATEGORY_OPTIONS = [
+  { value: "Core", label: "Core" },
+  { value: "Technical", label: "Technical" },
+  { value: "Leadership", label: "Leadership" },
+  { value: "Communication", label: "Communication" },
+  { value: "Collaboration", label: "Collaboration" },
+  { value: "Problem Solving", label: "Problem Solving" },
+];
 
 interface CompetencyActionsProps {
   competency: {
@@ -39,6 +55,7 @@ interface CompetencyActionsProps {
     name: string;
     description: string | null;
     category: string | null;
+    is_core: boolean;
   };
 }
 
@@ -50,6 +67,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
   const [editName, setEditName] = useState(competency.name);
   const [editDescription, setEditDescription] = useState(competency.description || "");
   const [editCategory, setEditCategory] = useState(competency.category || "");
+  const [editIsCore, setEditIsCore] = useState(competency.is_core);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,6 +83,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
           name: editName,
           description: editDescription || null,
           category: editCategory || null,
+          is_core: editIsCore,
           updated_at: new Date().toISOString(),
         })
         .eq("id", competency.id);
@@ -114,7 +133,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
             <Pencil className="h-4 w-4 mr-2" />
             Edit
           </DropdownMenuItem>
-          <DropdownMenuItem 
+          <DropdownMenuItem
             onClick={() => setShowDeleteDialog(true)}
             className="text-destructive focus:text-destructive"
           >
@@ -136,20 +155,27 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name</Label>
-              <Input
+              <input
                 id="edit-name"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-category">Category</Label>
-              <Input
-                id="edit-category"
-                value={editCategory}
-                onChange={(e) => setEditCategory(e.target.value)}
-                placeholder="e.g., Core, Technical, Leadership"
-              />
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger id="edit-category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description</Label>
@@ -157,8 +183,19 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
                 id="edit-description"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="How should reviewers evaluate this competency?"
                 rows={3}
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="edit-is-core"
+                checked={editIsCore}
+                onCheckedChange={(v) => setEditIsCore(v === true)}
+              />
+              <Label htmlFor="edit-is-core" className="text-sm text-muted-foreground cursor-pointer">
+                Core competency — applies to all roles by default
+              </Label>
             </div>
           </div>
           <DialogFooter>
@@ -179,13 +216,13 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Competency?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete &quot;{competency.name}&quot;. 
-              This action cannot be undone.
+              This will permanently delete &quot;{competency.name}&quot; and remove it
+              from all job levels and review responses. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
