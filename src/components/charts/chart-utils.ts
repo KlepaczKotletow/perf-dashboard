@@ -26,7 +26,7 @@ export const STATUS_COLORS = {
  * Falls back to a static palette when running on the server or if the var is missing.
  */
 export function getChartColor(index: number): string {
-  const FALLBACK = ["#b45c3a", "#4ade80", "#d4a24e", "#a855f7", "#38bdf8"];
+  const FALLBACK = ["#FF8811", "#9DD9D2", "#F4D06F", "#a855f7", "#5ab0aa"];
 
   if (typeof window === "undefined") return FALLBACK[index % FALLBACK.length];
 
