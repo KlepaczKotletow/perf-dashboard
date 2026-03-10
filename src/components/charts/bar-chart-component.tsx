@@ -38,11 +38,12 @@ export function AppBarChart({
   valueFormatter = (v) => String(v),
   className = "",
 }: AppBarChartProps) {
-  const [primaryColor, setPrimaryColor] = useState("#b45c3a");
+  // Use a mounted flag so getChartColor (which reads CSS variables) only runs
+  // on the client. Empty dependency array ensures the effect runs exactly once.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    setPrimaryColor(getChartColor(0));
-  }, []);
+  const primaryColor = mounted ? getChartColor(0) : "#b45c3a";
 
   if (data.length === 0) {
     return (

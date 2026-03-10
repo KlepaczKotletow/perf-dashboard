@@ -6,15 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } from "lucide-react";
 import { isManagerOrAbove } from "@/lib/roles";
-
-const statusConfig: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-  draft: { label: "Draft", badge: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10" },
-  active: { label: "Active", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  cancelled: { label: "Cancelled", badge: "text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-400/10" },
-};
+import { getAssignmentStatus } from "@/lib/status";
 
 export default async function MyTeamPage() {
   const workspace = await getUserWorkspace();
@@ -79,7 +71,10 @@ export default async function MyTeamPage() {
   // Build aggregated view per employee
   const employeeSummaries = (directReports || []).map((emp: any) => {
     const assignments = reviewAssignments.filter((a: any) => a.employee_id === emp.id);
-    const pendingReviews = assignments.filter((a: any) => a.status !== "completed").length;
+    // Only count pending reviews from *active* cycles — completed cycles are no longer actionable
+    const pendingReviews = assignments.filter(
+      (a: any) => a.status !== "completed" && a.cycle?.status === "active"
+    ).length;
     const completedReviews = assignments.filter((a: any) => a.status === "completed").length;
     const latestRating = assignments.find((a: any) => a.overall_rating)?.overall_rating;
 
@@ -237,17 +232,17 @@ export default async function MyTeamPage() {
         </CardContent>
       </Card>
 
-      {/* Pending Review Assignments for your team */}
-      {reviewAssignments.filter((a: any) => a.status !== "completed").length > 0 && (
+      {/* Pending Review Assignments for your team — active cycles only */}
+      {reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active").length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Pending Team Reviews</CardTitle>
-            <CardDescription>Outstanding reviews for your direct reports</CardDescription>
+            <CardDescription>Outstanding reviews for your direct reports in active cycles</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {reviewAssignments
-                .filter((a: any) => a.status !== "completed")
+                .filter((a: any) => a.status !== "completed" && a.cycle?.status === "active")
                 .map((assignment: any) => (
                   <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
                     <div>
@@ -257,8 +252,8 @@ export default async function MyTeamPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge className={`text-[11px] font-medium ${(statusConfig[assignment.status] || statusConfig.pending).badge}`}>
-                        {(statusConfig[assignment.status] || statusConfig.pending).label}
+                      <Badge className={`text-[11px] font-medium ${getAssignmentStatus(assignment.status).badge}`}>
+                        {getAssignmentStatus(assignment.status).label}
                       </Badge>
                       <Button size="sm" asChild>
                         <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>

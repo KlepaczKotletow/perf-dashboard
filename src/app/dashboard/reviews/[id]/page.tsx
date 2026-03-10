@@ -8,12 +8,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft, User2, Calendar, Layers } from "lucide-react";
 import { ReviewDetailClient, type CompetencyRating } from "./review-detail-client";
-
-const statusConfig: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-};
+import { getAssignmentStatus } from "@/lib/status";
 
 export default async function ReviewDetailPage({
   params,
@@ -68,7 +63,7 @@ export default async function ReviewDetailPage({
       ? supabase
           .from("level_competencies")
           .select(`
-            id, expected_level,
+            id, expected_level, behavioral_indicators,
             competency:competencies(id, name, description, category, is_core)
           `)
           .eq("level_id", levelId)
@@ -99,6 +94,7 @@ export default async function ReviewDetailPage({
         competencyDescription: comp.description,
         category: comp.category,
         expectedLevel: lc.expected_level,
+        behavioralIndicators: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
         existingResponseId: existing?.id ?? null,
         currentRating: existing?.rating ?? null,
         currentComment: existing?.comment ?? null,
@@ -108,7 +104,7 @@ export default async function ReviewDetailPage({
   const level = employee?.level as any;
   const cycle = assignment.cycle as any;
   const manager = assignment.manager as any;
-  const statusCfg = statusConfig[assignment.status] || statusConfig.pending;
+  const statusCfg = getAssignmentStatus(assignment.status);
 
   return (
     <div className="space-y-6 max-w-3xl">

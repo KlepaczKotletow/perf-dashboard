@@ -1,8 +1,14 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import GoalsClient from "./goals-client";
+import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 
-async function getGoals(workspaceId: string | undefined) {
+async function getGoals(
+  workspaceId: string | undefined,
+  role: string | undefined,
+  currentUserId: string | null
+) {
   const supabase = await createServerSupabaseClient();
+
   let query = supabase
     .from("goals")
     .select(`
@@ -18,7 +24,38 @@ async function getGoals(workspaceId: string | undefined) {
     query = query.eq("workspace_id", workspaceId);
   }
 
-  const { data } = await query;
+  // HR / Admin — unrestricted
+  if (isHROrAbove(role)) {
+    const { data } = await query;
+    return data || [];
+  }
+
+  if (!currentUserId) {
+    // Unauthenticated — only public company-level goals
+    const { data } = await query.eq("scope", "company");
+    return data || [];
+  }
+
+  if (isManagerOrAbove(role)) {
+    // Manager — company goals + team goals + individual goals for self and direct reports
+    const { data: reports } = await supabase
+      .from("users")
+      .select("id")
+      .eq("manager_id", currentUserId);
+
+    const allIds = [currentUserId, ...((reports || []).map((r: any) => r.id))];
+    const idsStr = allIds.join(",");
+
+    const { data } = await query.or(
+      `scope.eq.company,scope.eq.team,employee_id.in.(${idsStr})`
+    );
+    return data || [];
+  }
+
+  // Employee — company goals + their own individual goals
+  const { data } = await query.or(
+    `scope.eq.company,employee_id.eq.${currentUserId}`
+  );
   return data || [];
 }
 
@@ -39,10 +76,13 @@ async function getCycles(workspaceId: string | undefined) {
 
 export default async function GoalsPage() {
   const workspace = await getUserWorkspace();
+  const role = workspace?.role;
+  const currentUserId = workspace?.appUserId ?? null;
+
   const [goals, cycles] = await Promise.all([
-    getGoals(workspace?.workspaceId),
+    getGoals(workspace?.workspaceId, role, currentUserId),
     getCycles(workspace?.workspaceId),
   ]);
 
-  return <GoalsClient goals={goals} cycles={cycles} />;
+  return <GoalsClient goals={goals} cycles={cycles} role={role} />;
 }

@@ -7,12 +7,7 @@ import { format } from "date-fns";
 import { ReviewsFilter } from "./reviews-filter";
 import { Suspense } from "react";
 import { FileText } from "lucide-react";
-
-const statusConfig: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-};
+import { getAssignmentStatus } from "@/lib/status";
 
 async function getReviewAssignments(status?: string, search?: string) {
   const supabase = await createServerSupabaseClient();
@@ -96,7 +91,7 @@ export default async function ReviewsPage({
                 </TableHeader>
                 <TableBody>
                   {assignments.map((a: any) => {
-                    const config = statusConfig[a.status] || statusConfig.pending;
+                    const config = getAssignmentStatus(a.status);
                     return (
                       <TableRow key={a.id} className="cursor-pointer group">
                         <TableCell>

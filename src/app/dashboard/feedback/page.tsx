@@ -1,15 +1,22 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { FeedbackFilter } from "./feedback-filter";
 import { Suspense } from "react";
 import { Star, MessageSquare, ArrowRight } from "lucide-react";
+import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 
 interface FeedbackFilters {
   source?: string;
   type?: string;
   search?: string;
+}
+
+/** null means "no restriction" (HR/admin). An array (possibly empty) means "only these IDs". */
+interface FeedbackScope {
+  assignmentIds: string[] | null; // restrict review_responses by assignment_id
+  userIds: string[] | null;       // restrict continuous_feedback by to_user_id
 }
 
 const roleConfig: Record<string, { label: string; className: string }> = {
@@ -25,11 +32,63 @@ const feedbackTypeConfig: Record<string, { label: string; className: string }> =
   general: { label: "General", className: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10" },
 };
 
-async function getReviewFeedback(filters: FeedbackFilters) {
+async function getScope(
+  role: string | undefined,
+  currentUserId: string | null
+): Promise<FeedbackScope> {
+  // HR / Admin — unrestricted
+  if (isHROrAbove(role)) {
+    return { assignmentIds: null, userIds: null };
+  }
+
   const supabase = await createServerSupabaseClient();
 
-  // Query the modern review_responses table (replaces legacy feedback table)
-  const { data } = await supabase
+  if (!currentUserId) {
+    return { assignmentIds: [], userIds: [] };
+  }
+
+  // Manager — direct reports + self
+  if (isManagerOrAbove(role)) {
+    const { data: reports } = await supabase
+      .from("users")
+      .select("id")
+      .eq("manager_id", currentUserId);
+
+    const allUserIds = [
+      currentUserId,
+      ...((reports || []).map((r: any) => r.id)),
+    ];
+
+    const { data: assignments } = await supabase
+      .from("review_assignments")
+      .select("id")
+      .in("employee_id", allUserIds);
+
+    return {
+      assignmentIds: (assignments || []).map((a: any) => a.id),
+      userIds: allUserIds,
+    };
+  }
+
+  // Employee — themselves only (feedback received)
+  const { data: myAssignments } = await supabase
+    .from("review_assignments")
+    .select("id")
+    .eq("employee_id", currentUserId);
+
+  return {
+    assignmentIds: (myAssignments || []).map((a: any) => a.id),
+    userIds: [currentUserId],
+  };
+}
+
+async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope) {
+  // If scope is an empty array we know there's nothing to return
+  if (scope.assignmentIds !== null && scope.assignmentIds.length === 0) return [];
+
+  const supabase = await createServerSupabaseClient();
+
+  let query = supabase
     .from("review_responses")
     .select(`
       id, reviewer_role, rating, comment, created_at,
@@ -44,6 +103,11 @@ async function getReviewFeedback(filters: FeedbackFilters) {
     .order("created_at", { ascending: false })
     .limit(100);
 
+  if (scope.assignmentIds !== null) {
+    query = query.in("assignment_id", scope.assignmentIds);
+  }
+
+  const { data } = await query;
   let results = data || [];
 
   if (filters.search) {
@@ -60,7 +124,10 @@ async function getReviewFeedback(filters: FeedbackFilters) {
   return results;
 }
 
-async function getContinuousFeedback(filters: FeedbackFilters) {
+async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackScope) {
+  // If scope is an empty array we know there's nothing to return
+  if (scope.userIds !== null && scope.userIds.length === 0) return [];
+
   const supabase = await createServerSupabaseClient();
 
   let query = supabase
@@ -68,6 +135,10 @@ async function getContinuousFeedback(filters: FeedbackFilters) {
     .select("*, from_user:users!continuous_feedback_from_user_id_fkey(slack_name), to_user:users!continuous_feedback_to_user_id_fkey(slack_name)")
     .order("created_at", { ascending: false })
     .limit(50);
+
+  if (scope.userIds !== null) {
+    query = query.in("to_user_id", scope.userIds);
+  }
 
   if (filters.type && filters.type !== "all") {
     query = query.eq("feedback_type", filters.type);
@@ -112,13 +183,24 @@ export default async function FeedbackPage({
   searchParams: Promise<{ source?: string; type?: string; search?: string }>;
 }) {
   const params = await searchParams;
+  const workspace = await getUserWorkspace();
+  const role = workspace?.role;
+  const currentUserId = workspace?.appUserId ?? null;
+
+  const scope = await getScope(role, currentUserId);
+
+  const pageDescription = isHROrAbove(role)
+    ? "All review ratings and continuous feedback across the organisation"
+    : isManagerOrAbove(role)
+    ? "Review ratings and continuous feedback for you and your direct reports"
+    : "Review ratings and feedback you have received";
 
   const showReview = !params.source || params.source === "all" || params.source === "review";
   const showContinuous = !params.source || params.source === "all" || params.source === "continuous";
 
   const [reviewFeedback, continuousFeedback] = await Promise.all([
-    showReview ? getReviewFeedback(params) : Promise.resolve([]),
-    showContinuous ? getContinuousFeedback(params) : Promise.resolve([]),
+    showReview ? getReviewFeedback(params, scope) : Promise.resolve([]),
+    showContinuous ? getContinuousFeedback(params, scope) : Promise.resolve([]),
   ]);
 
   const hasNoFeedback = reviewFeedback.length === 0 && continuousFeedback.length === 0;
@@ -127,9 +209,7 @@ export default async function FeedbackPage({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Feedback</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Review ratings and continuous feedback from your team
-        </p>
+        <p className="text-sm text-muted-foreground mt-1">{pageDescription}</p>
       </div>
 
       <Suspense fallback={<div className="h-10" />}>

@@ -7,7 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, CheckCircle2, ChevronUp, Info } from "lucide-react";
+import { BehaviorsPanel } from "@/components/behaviors-panel";
 
 const PROFICIENCY_LABELS: Record<number, string> = {
   1: "Basic",
@@ -39,6 +50,7 @@ export interface CompetencyRating {
   competencyDescription: string | null;
   category: string | null;
   expectedLevel: number | null;
+  behavioralIndicators: string[];
   existingResponseId: string | null;
   currentRating: number | null;
   currentComment: string | null;
@@ -77,6 +89,7 @@ export function ReviewDetailClient({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -220,6 +233,10 @@ export function ReviewDetailClient({
                             {comp.competencyDescription}
                           </p>
                         )}
+                        <BehaviorsPanel
+                          behaviors={comp.behavioralIndicators}
+                          expectedLevel={comp.expectedLevel}
+                        />
                       </div>
                       {comp.expectedLevel && (
                         <div className="shrink-0 text-right">
@@ -323,15 +340,41 @@ export function ReviewDetailClient({
             </Button>
             <Button
               size="sm"
-              onClick={() => handleSave(true)}
+              onClick={() => setShowSubmitDialog(true)}
               disabled={saving || !allRated || status === "completed"}
             >
-              {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
               {status === "completed" ? "Completed" : "Submit review"}
             </Button>
           </div>
         </div>
       )}
+
+      {/* Submit confirmation dialog */}
+      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit this review?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Once submitted, all ratings will be locked and the review will be marked as complete.
+              The overall rating will be calculated from your {totalCount} competency rating{totalCount !== 1 ? "s" : ""}.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSubmitDialog(false);
+                handleSave(true);
+              }}
+              disabled={saving}
+            >
+              {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+              Submit review
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

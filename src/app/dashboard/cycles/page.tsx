@@ -3,9 +3,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Plus, CalendarClock, Lock, Users, Clock, ArrowRight } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, CalendarClock, Lock, Users, Clock, ArrowRight, CheckCircle2 } from "lucide-react";
+import { format, differenceInDays, isFuture } from "date-fns";
 import { isManagerOrAbove } from "@/lib/roles";
+import { getCycleStatus } from "@/lib/status";
 
 async function getPerformanceCycles() {
   const supabase = await createServerSupabaseClient();
@@ -14,18 +15,13 @@ async function getPerformanceCycles() {
     .select(`
       *,
       creator:users!performance_cycles_created_by_fkey(slack_name),
-      employees:performance_cycle_employees(count)
+      employees:performance_cycle_employees(count),
+      assignments:review_assignments(status)
     `)
     .order("created_at", { ascending: false });
   return data || [];
 }
 
-const statusConfig: Record<string, { dot: string; label: string; badge: string }> = {
-  draft: { dot: "bg-zinc-400", label: "Draft", badge: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10" },
-  active: { dot: "bg-emerald-500", label: "Active", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-  completed: { dot: "bg-sky-500", label: "Completed", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  closed: { dot: "bg-zinc-400", label: "Closed", badge: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10" },
-};
 
 export default async function CyclesPage() {
   const workspace = await getUserWorkspace();
@@ -90,8 +86,33 @@ export default async function CyclesPage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           {cycles.map((cycle: any) => {
-            const config = statusConfig[cycle.status] || statusConfig.draft;
+            const config = getCycleStatus(cycle.status);
             const employeeCount = cycle.employees?.[0]?.count || 0;
+
+            // Completion stats from assignments
+            const allAssignments: any[] = cycle.assignments || [];
+            const totalAssignments = allAssignments.length;
+            const completedAssignments = allAssignments.filter((a: any) => a.status === "completed").length;
+            const completionPct = totalAssignments > 0
+              ? Math.round((completedAssignments / totalAssignments) * 100)
+              : null;
+
+            // Deadline countdown (only for active cycles)
+            const isActive = cycle.status === "active";
+            const endDate = cycle.end_date ? new Date(cycle.end_date) : null;
+            const daysLeft = endDate && isActive ? differenceInDays(endDate, new Date()) : null;
+            const deadlineLabel =
+              daysLeft === null ? null
+              : daysLeft < 0 ? "Overdue"
+              : daysLeft === 0 ? "Due today"
+              : daysLeft === 1 ? "1 day left"
+              : `${daysLeft} days left`;
+            const deadlineColor =
+              daysLeft === null ? ""
+              : daysLeft <= 3 ? "text-red-600 dark:text-red-400"
+              : daysLeft <= 7 ? "text-amber-600 dark:text-amber-400"
+              : "text-muted-foreground";
+
             return (
               <Link
                 key={cycle.id}
@@ -108,11 +129,13 @@ export default async function CyclesPage() {
                         {config.label}
                       </Badge>
                     </div>
+
                     {cycle.description && (
                       <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
                         {cycle.description}
                       </p>
                     )}
+
                     <div className="space-y-1.5 text-xs text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Users className="h-3 w-3" />
@@ -121,10 +144,44 @@ export default async function CyclesPage() {
                       <div className="flex items-center gap-2">
                         <Clock className="h-3 w-3" />
                         <span>
-                          {format(new Date(cycle.start_date), "MMM d")} — {format(new Date(cycle.end_date), "MMM d, yyyy")}
+                          {cycle.start_date && format(new Date(cycle.start_date), "MMM d")}
+                          {" — "}
+                          {endDate && format(endDate, "MMM d, yyyy")}
                         </span>
                       </div>
+                      {deadlineLabel && (
+                        <div className={`flex items-center gap-2 font-medium ${deadlineColor}`}>
+                          <CalendarClock className="h-3 w-3" />
+                          <span>{deadlineLabel}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Completion progress bar */}
+                    {completionPct !== null && (
+                      <div className="mt-3 space-y-1">
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>{completedAssignments}/{totalAssignments} reviews</span>
+                          </div>
+                          <span className="font-medium">{completionPct}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              completionPct === 100
+                                ? "bg-emerald-500"
+                                : completionPct >= 60
+                                ? "bg-sky-500"
+                                : "bg-amber-500"
+                            }`}
+                            style={{ width: `${completionPct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-1 mt-3 text-xs text-muted-foreground/50 group-hover:text-primary/60 transition-colors">
                       <span>View details</span>
                       <ArrowRight className="h-3 w-3" />

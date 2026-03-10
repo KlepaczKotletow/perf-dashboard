@@ -33,11 +33,17 @@ export function AppLineChart({
   valueFormatter = (v) => String(v),
   className = "",
 }: AppLineChartProps) {
-  const [colors, setColors] = useState<string[]>([]);
+  // Use a mounted flag instead of depending on the dataKeys array reference.
+  // dataKeys defaults to a new ["value"] array on every render, so putting it
+  // in the useEffect dependency array causes an infinite re-render loop
+  // (React error #185 / "Maximum update depth exceeded").
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    setColors(dataKeys.map((_, i) => getChartColor(i)));
-  }, [dataKeys]);
+  // On the server / before hydration use a neutral fallback colour.
+  const colors = mounted
+    ? dataKeys.map((_, i) => getChartColor(i))
+    : dataKeys.map(() => "#888");
 
   if (data.length === 0) {
     return (

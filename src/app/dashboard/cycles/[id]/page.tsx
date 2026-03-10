@@ -3,10 +3,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { ArrowLeft, Users, Calendar, Clock, CheckCircle2, AlertCircle, Target, ArrowRight, ArrowUpCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Users,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  Target,
+  ArrowUpCircle,
+  TriangleAlert,
+  Circle,
+  ExternalLink,
+  TrendingUp,
+} from "lucide-react";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 import { isManagerOrAbove, isHROrAbove, canAccessCalibration } from "@/lib/roles";
+import { getCycleStatus } from "@/lib/status";
 import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
@@ -95,18 +108,6 @@ async function getAllCompetencies() {
   return data || [];
 }
 
-const statusColors: Record<string, string> = {
-  draft: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
-  active: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
-  completed: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
-  closed: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
-};
-
-const assignmentStatusConfig: Record<string, { label: string; className: string }> = {
-  pending: { label: "Pending", className: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", className: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", className: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-};
 
 export default async function CycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -145,15 +146,35 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     getAllCompetencies(),
   ]);
 
-  const completedCount = employees.filter((e: any) => e.status === "completed").length;
-  const completionRate = employees.length > 0 ? Math.round((completedCount / employees.length) * 100) : 0;
   const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");
   const upwardAssignments = assignments.filter((a: any) => a.assignment_type === "upward");
   const calibratedCount = standardAssignments.filter((a: any) => a.final_grade).length;
 
+  // ── New computed values ────────────────────────────────────────────────────
+  // Self-review done = status is "in_progress" OR "completed"
+  const selfDoneCount = standardAssignments.filter(
+    (a: any) => a.status === "in_progress" || a.status === "completed"
+  ).length;
+  // Manager review done = status is "completed" only
+  const managerDoneCount = standardAssignments.filter(
+    (a: any) => a.status === "completed"
+  ).length;
+
+  // Deadline urgency (milliseconds → days)
+  const daysUntilDeadline = cycle.review_deadline
+    ? Math.ceil((new Date(cycle.review_deadline).getTime() - Date.now()) / 86400000)
+    : null;
+  const isDeadlineUrgent = daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
+  const isDeadlineOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
+
+  // Progress bar tracks manager review completion (true signal of cycle health)
+  const managerCompletionRate = standardAssignments.length > 0
+    ? Math.round((managerDoneCount / standardAssignments.length) * 100)
+    : 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <Button variant="ghost" size="icon" className="mt-0.5" asChild>
@@ -164,8 +185,8 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">{cycle.name}</h1>
-              <Badge className={`text-[11px] font-medium ${statusColors[cycle.status]}`}>
-                {cycle.status.charAt(0).toUpperCase() + cycle.status.slice(1)}
+              <Badge className={`text-[11px] font-medium ${getCycleStatus(cycle.status).badge}`}>
+                {getCycleStatus(cycle.status).label}
               </Badge>
               {cycle.grades_released && (
                 <Badge className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
@@ -186,11 +207,28 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      {/* Overview Card — stats + progress + timeline combined */}
+      {/* ── Urgency Banner (active cycles only) ───────────────────────────── */}
+      {cycle.status === "active" && (isDeadlineUrgent || isDeadlineOverdue) && (
+        <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium ${
+          isDeadlineOverdue
+            ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-400/10 dark:border-red-400/20 dark:text-red-400"
+            : "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-400/10 dark:border-amber-400/20 dark:text-amber-400"
+        }`}>
+          <TriangleAlert className="h-4 w-4 shrink-0" />
+          {isDeadlineOverdue
+            ? `Review deadline passed — ${Math.abs(daysUntilDeadline!)} day${Math.abs(daysUntilDeadline!) !== 1 ? "s" : ""} overdue. ${managerDoneCount} of ${standardAssignments.length} manager review${standardAssignments.length !== 1 ? "s" : ""} submitted.`
+            : `${daysUntilDeadline} day${daysUntilDeadline !== 1 ? "s" : ""} until review deadline — ${standardAssignments.length - managerDoneCount} manager review${(standardAssignments.length - managerDoneCount) !== 1 ? "s" : ""} still pending.`
+          }
+        </div>
+      )}
+
+      {/* ── Overview Card ──────────────────────────────────────────────────── */}
       <Card className="border-border/60">
         <CardContent className="pt-5 pb-5">
           {/* Stats row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+
+            {/* Employees */}
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Users className="h-4 w-4 text-primary" />
@@ -200,24 +238,34 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                 <p className="text-xs text-muted-foreground mt-0.5">Employees</p>
               </div>
             </div>
+
+            {/* Self-Reviews Done */}
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-sky-50 dark:bg-sky-400/10 flex items-center justify-center shrink-0">
+                <TrendingUp className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+              </div>
+              <div>
+                <p className="text-xl font-bold text-foreground leading-none">
+                  {selfDoneCount}/{standardAssignments.length}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Self-Reviews</p>
+              </div>
+            </div>
+
+            {/* Manager Reviews Done */}
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-lg bg-emerald-50 dark:bg-emerald-400/10 flex items-center justify-center shrink-0">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-foreground leading-none">{completedCount}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
+                <p className="text-xl font-bold text-foreground leading-none">
+                  {managerDoneCount}/{standardAssignments.length}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Mgr Reviews</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-lg bg-amber-50 dark:bg-amber-400/10 flex items-center justify-center shrink-0">
-                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div>
-                <p className="text-xl font-bold text-foreground leading-none">{employees.length - completedCount}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Remaining</p>
-              </div>
-            </div>
+
+            {/* Calibrated */}
             {standardAssignments.length > 0 && (
               <div className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-lg bg-violet-50 dark:bg-violet-400/10 flex items-center justify-center shrink-0">
@@ -233,24 +281,24 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             )}
           </div>
 
-          {/* Progress bar */}
-          {employees.length > 0 && (
+          {/* Progress bar — based on manager review completion */}
+          {standardAssignments.length > 0 && (
             <div className="mb-5">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Review progress</span>
-                <span className="font-medium text-foreground">{completionRate}%</span>
+                <span>Manager review progress</span>
+                <span className="font-medium text-foreground">{managerCompletionRate}%</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className="bg-primary h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${completionRate}%` }}
+                  style={{ width: `${managerCompletionRate}%` }}
                 />
               </div>
             </div>
           )}
 
           {/* Timeline dates */}
-          <div className="flex items-center gap-6 text-sm border-t border-border pt-4">
+          <div className="flex items-center gap-6 text-sm border-t border-border pt-4 flex-wrap">
             <div className="flex items-center gap-2">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">Start:</span>
@@ -263,22 +311,36 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             </div>
             {cycle.review_deadline && (
               <div className="flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                <Clock className={`h-3.5 w-3.5 ${
+                  isDeadlineOverdue ? "text-red-500" : isDeadlineUrgent ? "text-amber-500" : "text-muted-foreground"
+                }`} />
                 <span className="text-muted-foreground">Deadline:</span>
-                <span className="font-medium text-foreground">{format(new Date(cycle.review_deadline), "MMM d, yyyy")}</span>
+                <span className={`font-medium ${
+                  isDeadlineOverdue
+                    ? "text-red-600 dark:text-red-400"
+                    : isDeadlineUrgent
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-foreground"
+                }`}>
+                  {format(new Date(cycle.review_deadline), "MMM d, yyyy")}
+                  {isDeadlineUrgent && !isDeadlineOverdue && (
+                    <span className="ml-1 text-[11px] font-normal opacity-80">({daysUntilDeadline}d left)</span>
+                  )}
+                  {isDeadlineOverdue && (
+                    <span className="ml-1 text-[11px] font-normal opacity-80">(overdue)</span>
+                  )}
+                </span>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Phases Timeline */}
+      {/* ── Review Phases Timeline ─────────────────────────────────────────── */}
       {phases.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              Review Phases
-            </CardTitle>
+            <CardTitle className="text-base font-semibold">Review Phases</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="relative">
@@ -322,7 +384,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         </Card>
       )}
 
-      {/* Review Questions Configuration */}
+      {/* ── Review Questions Configuration ────────────────────────────────── */}
       <CycleQuestions
         cycleId={id}
         isDraft={cycle.status === "draft"}
@@ -330,47 +392,107 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         allCompetencies={allCompetencies}
       />
 
-      {/* Review Assignments (Standard: self + manager) */}
-      {standardAssignments.length > 0 && (
+      {/* ── Participants (unified — replaces Review Assignments + Employees) ─ */}
+      {standardAssignments.length > 0 ? (
         <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Review Assignments</CardTitle>
-            <CardDescription className="text-xs">
-              Self-assessment and manager review progress per employee
-            </CardDescription>
+          <CardHeader className="pb-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold">Participants</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  {standardAssignments.length} participant{standardAssignments.length !== 1 ? "s" : ""} · self and manager review status
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-border">
+          <CardContent className="p-0 mt-4 overflow-x-auto">
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_80px_80px_60px_80px] items-center px-6 pb-2 border-b border-border/60 min-w-[500px]">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Employee</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Self</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Manager</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-right">Rating</p>
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-right">Grade</p>
+            </div>
+
+            {/* Rows */}
+            <div className="divide-y divide-border/50 min-w-[500px]">
               {standardAssignments.map((assignment: any) => {
-                const config = assignmentStatusConfig[assignment.status] || assignmentStatusConfig.pending;
+                const selfDone = assignment.status === "in_progress" || assignment.status === "completed";
+                const managerDone = assignment.status === "completed";
+
                 return (
-                  <div key={assignment.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
+                  <div
+                    key={assignment.id}
+                    className="grid grid-cols-[1fr_80px_80px_60px_80px] items-center px-6 py-3 hover:bg-muted/30 transition-colors group"
+                  >
+                    {/* Employee */}
+                    <div className="min-w-0 pr-3">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {assignment.employee?.slack_name || "Unknown"}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Manager: {assignment.manager?.slack_name || "Unassigned"}
-                        {assignment.employee?.department && ` · ${assignment.employee.department}`}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[
+                          assignment.employee?.department,
+                          assignment.manager?.slack_name ? `Manager: ${assignment.manager.slack_name}` : null,
+                        ].filter(Boolean).join(" · ")}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {assignment.overall_rating && (
-                        <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
+
+                    {/* Self pill */}
+                    <div className="flex justify-center">
+                      {selfDone ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Done
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                          <Circle className="h-3.5 w-3.5" />
+                          Pending
+                        </span>
                       )}
-                      {assignment.final_grade && (
+                    </div>
+
+                    {/* Manager pill */}
+                    <div className="flex justify-center">
+                      {managerDone ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Done
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                          <Circle className="h-3.5 w-3.5" />
+                          Pending
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Rating */}
+                    <div className="text-right">
+                      {assignment.overall_rating ? (
+                        <span className="text-xs font-bold text-foreground">
+                          {assignment.overall_rating}/5
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+
+                    {/* Grade + View link */}
+                    <div className="flex items-center justify-end gap-1.5">
+                      {assignment.final_grade ? (
                         <Badge variant="outline" className="text-[10px]">{assignment.final_grade}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
-                      <Badge className={`text-[10px] font-medium ${config.className}`}>
-                        {config.label}
-                      </Badge>
-                      {assignment.status !== "completed" && (
-                        <Button variant="outline" size="xs" asChild>
-                          <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
-                            Submit Review
-                          </Link>
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                        <Link href={`/dashboard/reviews/${assignment.id}`}>
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="sr-only">View review for {assignment.employee?.slack_name}</span>
+                        </Link>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -378,9 +500,24 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             </div>
           </CardContent>
         </Card>
+      ) : (
+        /* Empty state — no assignments yet */
+        <Card className="border-border/60">
+          <CardContent className="py-12 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No participants yet</p>
+            <p className="text-sm text-muted-foreground">
+              {cycle.status === "draft"
+                ? "Add employees using the form below, then launch the cycle to generate review assignments."
+                : "No review assignments were created for this cycle."}
+            </p>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Upward Feedback Assignments */}
+      {/* ── Upward Feedback ───────────────────────────────────────────────── */}
       {upwardAssignments.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
@@ -393,9 +530,9 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           <CardContent>
             <div className="divide-y divide-border">
               {upwardAssignments.map((assignment: any) => {
-                const config = assignmentStatusConfig[assignment.status] || assignmentStatusConfig.pending;
+                const done = assignment.status === "completed";
                 return (
-                  <div key={assignment.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                  <div key={assignment.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0 group">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">
                         {assignment.reviewer?.slack_name || "Unknown"}
@@ -406,20 +543,27 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                         {assignment.reviewer?.slack_name} provides feedback on {assignment.employee?.slack_name}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
+                      {done ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Submitted
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                          <Circle className="h-3.5 w-3.5" />
+                          Pending
+                        </span>
+                      )}
                       {assignment.overall_rating && (
                         <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
                       )}
-                      <Badge className={`text-[10px] font-medium ${config.className}`}>
-                        {config.label}
-                      </Badge>
-                      {assignment.status !== "completed" && (
-                        <Button variant="outline" size="xs" asChild>
-                          <Link href={`/dashboard/cycles/${id}/review/${assignment.id}`}>
-                            Submit Feedback
-                          </Link>
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                        <Link href={`/dashboard/reviews/${assignment.id}`}>
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="sr-only">View upward feedback</span>
+                        </Link>
+                      </Button>
                     </div>
                   </div>
                 );
@@ -429,57 +573,13 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         </Card>
       )}
 
-      {/* Add Employees Form (only for draft cycles) */}
+      {/* ── Add Employees (draft only) ────────────────────────────────────── */}
       {cycle.status === "draft" && (
         <AddEmployeesForm
           cycleId={id}
           allUsers={allUsers}
           existingEmployeeIds={employees.map((e: any) => e.employee?.id)}
         />
-      )}
-
-      {/* Employees List */}
-      {employees.length > 0 && (
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Employees in Cycle</CardTitle>
-            <CardDescription className="text-xs">
-              {employees.length} employee{employees.length !== 1 ? "s" : ""} included
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-border">
-              {employees.map((emp: any) => {
-                const config = assignmentStatusConfig[emp.status] || assignmentStatusConfig.pending;
-                return (
-                  <div key={emp.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{emp.employee?.slack_name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground">{emp.employee?.slack_email}</p>
-                    </div>
-                    <Badge className={`text-[10px] font-medium ${config.className}`}>
-                      {config.label}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {employees.length === 0 && (
-        <Card className="border-border/60">
-          <CardContent className="py-12 text-center">
-            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <Users className="h-5 w-5 text-muted-foreground" />
-            </div>
-            <p className="text-sm font-medium text-foreground mb-1">No employees yet</p>
-            <p className="text-sm text-muted-foreground">
-              {cycle.status === "draft" ? "Use the form above to add employees to this cycle." : "No employees were added to this cycle."}
-            </p>
-          </CardContent>
-        </Card>
       )}
     </div>
   );

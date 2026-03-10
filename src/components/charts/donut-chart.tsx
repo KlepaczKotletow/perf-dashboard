@@ -29,11 +29,11 @@ export function DonutChart({
   centerLabel,
   className = "",
 }: DonutChartProps) {
-  const [colors, setColors] = useState<string[]>([]);
-
-  useEffect(() => {
-    setColors(data.map((d, i) => d.color || getChartColor(i)));
-  }, [data]);
+  // Use a mounted flag so getChartColor (which reads CSS variables) only runs
+  // on the client. Avoids a [data] dependency that would cause re-renders
+  // every time the parent re-renders with a new array reference.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   if (data.length === 0 || data.every((d) => d.value === 0)) {
     return (
@@ -44,6 +44,9 @@ export function DonutChart({
   }
 
   const total = data.reduce((sum, d) => sum + d.value, 0);
+
+  // Derive colors inline — no separate state needed.
+  const colors = data.map((d, i) => d.color || (mounted ? getChartColor(i) : "#888"));
 
   return (
     <div className={`${className}`}>

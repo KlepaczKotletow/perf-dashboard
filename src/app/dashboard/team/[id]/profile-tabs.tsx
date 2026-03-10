@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { Star, FileText, MessageSquare, Target } from "lucide-react";
 import { format } from "date-fns";
+import { getAssignmentStatus, GOAL_TRACKING_STATUS } from "@/lib/status";
 
 interface ProfileTabsProps {
   reviewAssignments: any[];
@@ -18,23 +19,10 @@ interface ProfileTabsProps {
   canSeeAllRatings: boolean;
 }
 
-const statusConfig: Record<string, { label: string; badge: string }> = {
-  pending: { label: "Pending", badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  in_progress: { label: "In Progress", badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-  completed: { label: "Completed", badge: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-};
-
 const feedbackTypeBadge: Record<string, string> = {
   praise: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
   constructive: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
   general: "bg-muted text-muted-foreground",
-};
-
-const trackingStatusConfig: Record<string, { label: string; color: string }> = {
-  on_track: { label: "On Track", color: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-  at_risk: { label: "At Risk", color: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-  delayed: { label: "Delayed", color: "text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-400/10" },
-  achieved: { label: "Achieved", color: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
 };
 
 function getInitials(name: string | null) {
@@ -189,7 +177,7 @@ export function ProfileTabs({
             ) : (
               <div className="space-y-2">
                 {reviewAssignments.map((a: any) => {
-                  const config = statusConfig[a.status] || statusConfig.pending;
+                  const config = getAssignmentStatus(a.status);
                   return (
                     <div key={a.id} className="flex items-center justify-between p-3 rounded-lg border border-border/60">
                       <div className="min-w-0">
@@ -330,13 +318,13 @@ export function ProfileTabs({
             ) : (
               <div className="space-y-2">
                 {goals.map((goal: any) => {
-                  const tracking = trackingStatusConfig[goal.tracking_status] || trackingStatusConfig.on_track;
+                  const tracking = GOAL_TRACKING_STATUS[goal.tracking_status] || GOAL_TRACKING_STATUS.on_track;
                   return (
                     <div key={goal.id} className="p-3 rounded-lg border border-border/60">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm font-medium text-foreground truncate">{goal.title}</p>
                         <div className="flex items-center gap-2 shrink-0">
-                          <Badge className={`text-[10px] font-medium ${tracking.color}`}>
+                          <Badge className={`text-[10px] font-medium ${tracking.badge}`}>
                             {tracking.label}
                           </Badge>
                         </div>

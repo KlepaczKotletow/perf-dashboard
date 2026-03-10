@@ -204,23 +204,12 @@ async function getAnalyticsData() {
   };
 }
 
-// 9-box grid mapping
-function getNineBoxCell(rating: number, potential: number): { label: string; color: string } {
-  const perf = rating >= 4 ? "high" : rating >= 3 ? "mid" : "low";
-  const pot = potential >= 10 ? "high" : potential >= 5 ? "mid" : "low";
-
-  const map: Record<string, { label: string; color: string }> = {
-    "high-high": { label: "Star", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" },
-    "high-mid": { label: "High Performer", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-    "high-low": { label: "Solid Performer", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
-    "mid-high": { label: "High Potential", color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
-    "mid-mid": { label: "Core Player", color: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400" },
-    "mid-low": { label: "Needs Support", color: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400" },
-    "low-high": { label: "Enigma", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400" },
-    "low-mid": { label: "Underperformer", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
-    "low-low": { label: "Risk", color: "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-300" },
-  };
-  return map[`${perf}-${pot}`] || map["mid-mid"];
+// Performance tier based on average rating
+function getPerformanceTier(avgRating: number): { label: string; color: string } {
+  if (avgRating >= 4.5) return { label: "Exceptional", color: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" };
+  if (avgRating >= 4.0) return { label: "Strong", color: "text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-400/10" };
+  if (avgRating >= 3.0) return { label: "Solid", color: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" };
+  return { label: "Needs Dev", color: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" };
 }
 
 export default async function AnalyticsPage() {
@@ -316,58 +305,79 @@ export default async function AnalyticsPage() {
       {/* Charts */}
       <AnalyticsCharts data={analytics.chartsData} />
 
-      {/* 9-Box Grid */}
+      {/* Performance Ranking */}
       {analytics.nineBoxData.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Grid3X3 className="h-5 w-5" />
-              Talent Grid (9-Box)
+              <Star className="h-5 w-5 text-yellow-500" />
+              Performance Ranking
             </CardTitle>
             <CardDescription>
-              Performance (avg rating) mapped against engagement (review count).
-              This view helps identify talent categories for succession planning.
+              Employees ranked by average review rating across all competencies.
+              Tier is derived from rating: Exceptional ≥ 4.5 · Strong ≥ 4.0 · Solid ≥ 3.0 · Needs Dev &lt; 3.0.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Avg Rating</TableHead>
-                  <TableHead>Reviews</TableHead>
-                  <TableHead>Category</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analytics.nineBoxData
-                  .sort((a, b) => b.avgRating - a.avgRating)
-                  .map((emp) => {
-                    const cell = getNineBoxCell(emp.avgRating, emp.reviewCount);
-                    return (
-                      <TableRow key={emp.id}>
-                        <TableCell>
-                          <Link href={`/dashboard/team/${emp.id}`} className="font-medium text-primary hover:underline">
-                            {emp.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell>{emp.department}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3 w-3 text-yellow-500" />
-                            {emp.avgRating.toFixed(1)}
-                          </div>
-                        </TableCell>
-                        <TableCell>{emp.reviewCount}</TableCell>
-                        <TableCell>
-                          <Badge className={cell.color}>{cell.label}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30">
+                    <TableHead className="w-10">#</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead className="w-[180px]">Avg Rating</TableHead>
+                    <TableHead className="w-[80px] text-right">Reviews</TableHead>
+                    <TableHead className="w-[120px]">Tier</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analytics.nineBoxData
+                    .sort((a, b) => b.avgRating - a.avgRating)
+                    .map((emp, idx) => {
+                      const tier = getPerformanceTier(emp.avgRating);
+                      const pct = Math.round((emp.avgRating / 5) * 100);
+                      return (
+                        <TableRow key={emp.id}>
+                          <TableCell className="text-sm text-muted-foreground font-mono">
+                            {idx + 1}
+                          </TableCell>
+                          <TableCell>
+                            <Link href={`/dashboard/team/${emp.id}`} className="font-medium text-foreground hover:underline">
+                              {emp.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {emp.department}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[100px]">
+                                <div
+                                  className="h-full bg-yellow-400 rounded-full"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-semibold tabular-nums">
+                                {emp.avgRating.toFixed(1)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">/5</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground text-right tabular-nums">
+                            {emp.reviewCount}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`text-[11px] font-medium ${tier.color}`}>
+                              {tier.label}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

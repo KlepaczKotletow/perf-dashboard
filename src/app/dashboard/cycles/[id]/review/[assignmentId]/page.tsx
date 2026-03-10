@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,14 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target } from "lucide-react";
+import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
+import { BehaviorsPanel } from "@/components/behaviors-panel";
+import { formatDistanceToNow } from "date-fns";
 
 interface CompetencyRating {
   competency_id: string;
   name: string;
   category: string | null;
   expected_level: number | null;
+  behaviors: string[];
   rating: number | null;
   comment: string;
 }
@@ -45,6 +48,9 @@ export default function ReviewFormPage({
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [hasCycleQuestions, setHasCycleQuestions] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -131,17 +137,21 @@ export default function ReviewFormPage({
           const compRatings: CompetencyRating[] = [];
           const txtResponses: TextResponse[] = [];
 
-          // If employee has a level, fetch expected_levels for enrichment
+          // If employee has a level, fetch expected_levels and behavioral_indicators for enrichment
           const levelId = assignmentData.employee?.level_id;
           let expectedMap: Record<string, number> = {};
+          let behaviorsMap: Record<string, string[]> = {};
           if (levelId) {
             const { data: levelComps } = await supabase
               .from("level_competencies")
-              .select("competency_id, expected_level")
+              .select("competency_id, expected_level, behavioral_indicators")
               .eq("level_id", levelId);
             if (levelComps) {
               for (const lc of levelComps) {
                 expectedMap[lc.competency_id] = lc.expected_level;
+                behaviorsMap[lc.competency_id] = Array.isArray(lc.behavioral_indicators)
+                  ? lc.behavioral_indicators
+                  : [];
               }
             }
           }
@@ -154,6 +164,7 @@ export default function ReviewFormPage({
                 name: comp.name,
                 category: comp.category,
                 expected_level: expectedMap[comp.id] ?? null,
+                behaviors: behaviorsMap[comp.id] ?? [],
                 rating: null,
                 comment: "",
               });
@@ -166,6 +177,32 @@ export default function ReviewFormPage({
               });
             }
           }
+
+          // Restore saved draft (merge ratings/comments from localStorage)
+          try {
+            const saved = localStorage.getItem(`review-draft-${assignmentId}`);
+            if (saved) {
+              const draft = JSON.parse(saved);
+              if (draft.competencies) {
+                for (const comp of compRatings) {
+                  const savedComp = draft.competencies.find((d: any) => d.competency_id === comp.competency_id);
+                  if (savedComp) {
+                    comp.rating = savedComp.rating ?? comp.rating;
+                    comp.comment = savedComp.comment ?? comp.comment;
+                  }
+                }
+              }
+              if (draft.textResponses) {
+                for (const tq of txtResponses) {
+                  const savedTq = draft.textResponses.find((d: any) => d.questionId === tq.questionId);
+                  if (savedTq) tq.response = savedTq.response ?? tq.response;
+                }
+              }
+              if (draft.overallComment) setOverallComment(draft.overallComment);
+              setLastSaved(new Date());
+              setAutosaveStatus("saved");
+            }
+          } catch { /* ignore */ }
 
           setCompetencies(compRatings);
           setTextResponses(txtResponses);
@@ -182,7 +219,7 @@ export default function ReviewFormPage({
             const { data: levelComps } = await supabase
               .from("level_competencies")
               .select(`
-                expected_level,
+                expected_level, behavioral_indicators,
                 competency:competencies!level_competencies_competency_id_fkey(id, name, category)
               `)
               .eq("level_id", levelId);
@@ -193,6 +230,7 @@ export default function ReviewFormPage({
                 name: lc.competency.name,
                 category: lc.competency.category,
                 expected_level: lc.expected_level,
+                behaviors: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
                 rating: null,
                 comment: "",
               }));
@@ -210,10 +248,31 @@ export default function ReviewFormPage({
               name: c.name,
               category: c.category,
               expected_level: null,
+              behaviors: [],
               rating: null,
               comment: "",
             }));
           }
+
+          // Restore saved draft for fallback path
+          try {
+            const saved = localStorage.getItem(`review-draft-${assignmentId}`);
+            if (saved) {
+              const draft = JSON.parse(saved);
+              if (draft.competencies) {
+                for (const comp of competencyData) {
+                  const savedComp = draft.competencies.find((d: any) => d.competency_id === comp.competency_id);
+                  if (savedComp) {
+                    comp.rating = savedComp.rating ?? comp.rating;
+                    comp.comment = savedComp.comment ?? comp.comment;
+                  }
+                }
+              }
+              if (draft.overallComment) setOverallComment(draft.overallComment);
+              setLastSaved(new Date());
+              setAutosaveStatus("saved");
+            }
+          } catch { /* ignore */ }
 
           setCompetencies(competencyData);
         }
@@ -225,6 +284,29 @@ export default function ReviewFormPage({
     }
     load();
   }, [assignmentId, cycleId]);
+
+  // Autosave to localStorage whenever form data changes
+  useEffect(() => {
+    if (loading || alreadySubmitted || competencies.length === 0) return;
+
+    setAutosaveStatus("saving");
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    autosaveTimer.current = setTimeout(() => {
+      try {
+        const draft = { competencies, textResponses, overallComment };
+        localStorage.setItem(`review-draft-${assignmentId}`, JSON.stringify(draft));
+        setLastSaved(new Date());
+        setAutosaveStatus("saved");
+      } catch {
+        setAutosaveStatus("idle");
+      }
+    }, 800);
+
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+  }, [competencies, textResponses, overallComment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setRating(compIdx: number, rating: number) {
     setCompetencies((prev) => {
@@ -354,6 +436,9 @@ export default function ReviewFormPage({
           .eq("id", assignmentId)
           .eq("status", "pending");
       }
+
+      // Clear the autosave draft on successful submission
+      try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
 
       router.push(`/dashboard/cycles/${cycleId}`);
       router.refresh();
@@ -493,6 +578,10 @@ export default function ReviewFormPage({
                             </Badge>
                           )}
                         </div>
+                        <BehaviorsPanel
+                          behaviors={comp.behaviors}
+                          expectedLevel={comp.expected_level}
+                        />
                         {/* Star Rating */}
                         <div className="flex items-center gap-1">
                           {[1, 2, 3, 4, 5].map((star) => (
@@ -589,18 +678,42 @@ export default function ReviewFormPage({
       )}
 
       {/* Submit */}
-      <div className="flex justify-end gap-3 pb-8">
-        <Button variant="outline" asChild>
-          <Link href={`/dashboard/cycles/${cycleId}`}>Cancel</Link>
-        </Button>
-        <Button onClick={handleSubmit} disabled={submitting}>
-          {submitting ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4 mr-2" />
+      <div className="flex items-center justify-between pb-8">
+        {/* Autosave indicator */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {autosaveStatus === "saving" && (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Saving draft…</span>
+            </>
           )}
-          Submit Review
-        </Button>
+          {autosaveStatus === "saved" && lastSaved && (
+            <>
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              <span>Draft saved {formatDistanceToNow(lastSaved, { addSuffix: true })}</span>
+            </>
+          )}
+          {autosaveStatus === "idle" && !lastSaved && (
+            <>
+              <Clock className="h-3 w-3" />
+              <span>Changes autosave as you go</span>
+            </>
+          )}
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" asChild>
+            <Link href={`/dashboard/cycles/${cycleId}`}>Cancel</Link>
+          </Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            Submit Review
+          </Button>
+        </div>
       </div>
     </div>
   );

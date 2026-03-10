@@ -57,12 +57,14 @@ export default async function CompetencyMatrixPage() {
   const canEdit = isHROrAbove(workspace?.role);
   const workspaceId = workspace?.workspaceId || "";
 
-  // Build a lookup: levelId-competencyId -> { expected_level, id }
-  const matrixLookup: Record<string, { expected_level: number; id: string }> = {};
+  // Build a lookup: levelId-competencyId -> { expected_level, id, behavioral_indicators }
+  const matrixLookup: Record<string, { expected_level: number; id: string; behavioral_indicators: string[] }> = {};
   levelCompetencies.forEach((lc: any) => {
+    const raw = lc.behavioral_indicators;
     matrixLookup[`${lc.level_id}-${lc.competency_id}`] = {
       expected_level: lc.expected_level,
       id: lc.id,
+      behavioral_indicators: Array.isArray(raw) ? raw : [],
     };
   });
 
@@ -162,6 +164,9 @@ export default async function CompetencyMatrixPage() {
                                     workspaceId={workspaceId}
                                     initialValue={entry?.expected_level || null}
                                     existingId={entry?.id || null}
+                                    initialBehaviors={entry?.behavioral_indicators || []}
+                                    competencyName={comp.name}
+                                    levelLabel={`${(level.job_family as any)?.name ?? ""} · ${level.name}`}
                                     canEdit={canEdit}
                                   />
                                 </td>

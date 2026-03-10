@@ -40,6 +40,8 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
   const [showReleaseDialog, setShowReleaseDialog] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const isHR = userRole === "hr" || userRole === "admin";
 
@@ -229,13 +231,13 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
             </DropdownMenuItem>
           )}
           {cycle.status === "active" && (
-            <DropdownMenuItem onClick={() => updateStatus("completed")}>
+            <DropdownMenuItem onClick={() => setShowCompleteDialog(true)}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Mark Completed
             </DropdownMenuItem>
           )}
           {(cycle.status === "completed" || cycle.status === "active") && (
-            <DropdownMenuItem onClick={() => updateStatus("closed")}>
+            <DropdownMenuItem onClick={() => setShowCloseDialog(true)}>
               <Archive className="h-4 w-4 mr-2" />
               Close Cycle
             </DropdownMenuItem>
@@ -296,6 +298,46 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Mark Completed Confirmation Dialog */}
+      <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark Cycle as Completed?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will end the active review period for &quot;{cycle.name}&quot;. Managers who haven&apos;t yet submitted
+              their reviews will no longer be prompted. You can still release grades afterwards.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => updateStatus("completed")}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Mark Completed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Close Cycle Confirmation Dialog */}
+      <AlertDialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Close This Cycle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Closing &quot;{cycle.name}&quot; will archive it and remove it from active views.
+              All data is preserved and the cycle can still be viewed, but no further changes will be expected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => updateStatus("closed")}>
+              <Archive className="h-4 w-4 mr-2" />
+              Close Cycle
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -87,6 +87,7 @@ interface Cycle {
 interface GoalsClientProps {
   goals: GoalRow[];
   cycles: Cycle[];
+  role?: string;
 }
 
 // ─── Tracking status config ─────────────────────────────
@@ -156,7 +157,7 @@ function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
 
 // ─── Component ──────────────────────────────────────────
 
-export default function GoalsClient({ goals: rawGoals, cycles }: GoalsClientProps) {
+export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClientProps) {
   const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -294,7 +295,11 @@ export default function GoalsClient({ goals: rawGoals, cycles }: GoalsClientProp
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Goals</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Track objectives and key results across your organization
+            {role === "admin" || role === "hr"
+              ? "All objectives and key results across the organisation"
+              : role === "manager"
+              ? "Company, team, and individual goals for you and your direct reports"
+              : "Company-wide goals and your personal objectives"}
           </p>
         </div>
         <Button asChild>
@@ -421,7 +426,8 @@ export default function GoalsClient({ goals: rawGoals, cycles }: GoalsClientProp
           </p>
         </div>
       ) : (
-        <div className="border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+        <div className="border rounded-xl overflow-hidden min-w-[600px]">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
@@ -563,6 +569,7 @@ export default function GoalsClient({ goals: rawGoals, cycles }: GoalsClientProp
               })}
             </TableBody>
           </Table>
+        </div>
         </div>
       )}
     </div>

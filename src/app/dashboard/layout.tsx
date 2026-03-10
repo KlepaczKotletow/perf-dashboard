@@ -18,6 +18,8 @@ import {
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { SignOutButton } from "./signout-button";
 import { isManagerOrAbove, isAdmin, ROLE_LABELS, UserRole } from "@/lib/roles";
+import { NavLink } from "./nav-link";
+import { SidebarWrapper } from "./sidebar-wrapper";
 
 interface NavSection {
   label: string;
@@ -53,7 +55,7 @@ export default async function DashboardLayout({
       items: [
         { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresAdmin: false },
       ],
     },
     {
@@ -93,8 +95,8 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-[240px] border-r border-sidebar-border bg-sidebar flex flex-col z-30">
+      {/* Sidebar — wrapped in SidebarWrapper for mobile drawer behaviour */}
+      <SidebarWrapper>
         {/* Logo */}
         <div className="h-14 flex items-center px-5 border-b border-sidebar-border">
           <Link href="/dashboard" className="flex items-center gap-2.5">
@@ -113,19 +115,14 @@ export default async function DashboardLayout({
                 {section.label}
               </p>
               <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className="flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -148,11 +145,13 @@ export default async function DashboardLayout({
           </div>
           <SignOutButton />
         </div>
-      </aside>
+      </SidebarWrapper>
 
-      {/* Main content */}
-      <main className="ml-[240px] min-h-screen">
-        <div className="max-w-[1200px] mx-auto px-8 py-8">
+      {/* Main content
+          — desktop (lg+): offset by sidebar width
+          — mobile: full width with top padding for the fixed mobile header */}
+      <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
+        <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-6 lg:py-8">
           {children}
         </div>
       </main>

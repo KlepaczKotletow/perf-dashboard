@@ -199,12 +199,13 @@ export function CompetenciesClient({
         );
 
   // Matrix lookup
-  const matrixLookup: Record<string, { expected_level: number; id: string }> =
+  const matrixLookup: Record<string, { expected_level: number; id: string; behavioral_indicators: string[] }> =
     {};
   levelCompetencies.forEach((lc: any) => {
     matrixLookup[`${lc.level_id}-${lc.competency_id}`] = {
       expected_level: lc.expected_level,
       id: lc.id,
+      behavioral_indicators: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
     };
   });
 
@@ -330,7 +331,7 @@ export function CompetenciesClient({
             .select("id")
             .single();
           if (data) {
-            matrixLookup[key] = { expected_level: proficiency, id: data.id };
+            matrixLookup[key] = { expected_level: proficiency, id: data.id, behavioral_indicators: [] };
           }
           count++;
         }
@@ -370,7 +371,7 @@ export function CompetenciesClient({
           .select("id")
           .single();
         if (data) {
-          matrixLookup[key] = { expected_level: proficiency, id: data.id };
+          matrixLookup[key] = { expected_level: proficiency, id: data.id, behavioral_indicators: [] };
         }
         count++;
       }
@@ -406,7 +407,7 @@ export function CompetenciesClient({
             .select("id")
             .single();
           if (data) {
-            matrixLookup[key] = { expected_level: 3, id: data.id };
+            matrixLookup[key] = { expected_level: 3, id: data.id, behavioral_indicators: [] };
           }
           count++;
         }
@@ -1063,6 +1064,9 @@ export function CompetenciesClient({
                                             entry?.expected_level || null
                                           }
                                           existingId={entry?.id || null}
+                                          initialBehaviors={entry?.behavioral_indicators || []}
+                                          competencyName={comp.name}
+                                          levelLabel={`${(level.job_family as any)?.name ?? ""} · ${level.name}`}
                                           canEdit={canEdit}
                                         />
                                       </td>
