@@ -26,7 +26,7 @@ interface NavSection {
   items: {
     href: string;
     label: string;
-    icon: any;
+    icon: React.ComponentType<{ className?: string }>;
     requiresManager: boolean;
     requiresAdmin: boolean;
   }[];
@@ -120,7 +120,7 @@ export default async function DashboardLayout({
                     key={item.href}
                     href={item.href}
                     label={item.label}
-                    icon={item.icon}
+                    icon={<item.icon className="h-4 w-4 shrink-0" />}
                   />
                 ))}
               </div>

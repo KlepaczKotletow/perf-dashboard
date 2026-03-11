@@ -7,10 +7,10 @@ import { cn } from "@/lib/utils";
 interface NavLinkProps {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ReactNode;
 }
 
-export function NavLink({ href, label, icon: Icon }: NavLinkProps) {
+export function NavLink({ href, label, icon }: NavLinkProps) {
   const pathname = usePathname();
 
   // Exact match for /dashboard (overview), prefix match for everything else
@@ -29,7 +29,7 @@ export function NavLink({ href, label, icon: Icon }: NavLinkProps) {
           : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      {icon}
       <span>{label}</span>
     </Link>
   );
