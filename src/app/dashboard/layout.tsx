@@ -48,13 +48,14 @@ export default async function DashboardLayout({
         { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/my-reviews", label: "My Reviews", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
       ],
     },
     {
       label: "People",
       items: [
         { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresAdmin: false },
       ],
     },
@@ -63,7 +64,6 @@ export default async function DashboardLayout({
       items: [
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/competencies", label: "Competencies", icon: Target, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresAdmin: false },
       ],
@@ -110,10 +110,8 @@ export default async function DashboardLayout({
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-3">
           {filteredSections.map((section, idx) => (
-            <div key={section.label} className={idx > 0 ? "mt-5" : ""}>
-              <p className="px-2 mb-1.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
-                {section.label}
-              </p>
+            <div key={section.label}>
+              {idx > 0 && <div className="my-2 mx-2 h-px bg-sidebar-border/60" />}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
                   <NavLink

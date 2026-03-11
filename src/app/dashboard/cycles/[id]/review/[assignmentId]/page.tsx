@@ -440,7 +440,7 @@ export default function ReviewFormPage({
       // Clear the autosave draft on successful submission
       try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
 
-      router.push(`/dashboard/cycles/${cycleId}`);
+      router.push(`/dashboard/my-reviews`);
       router.refresh();
     } catch (err) {
       setError("Failed to submit review");
@@ -463,47 +463,59 @@ export default function ReviewFormPage({
 
   if (alreadySubmitted) {
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href={`/dashboard/cycles/${cycleId}`}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">Review Already Submitted</h1>
+      <div className="max-w-lg mx-auto py-16 text-center space-y-4">
+        <div className="h-14 w-14 rounded-full bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center mx-auto">
+          <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
         </div>
-        <Card>
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">
-              You have already submitted a review for this assignment.
-            </p>
-            <Button className="mt-4" asChild>
-              <Link href={`/dashboard/cycles/${cycleId}`}>Back to Cycle</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <h1 className="text-xl font-semibold text-foreground">Already submitted</h1>
+        <p className="text-sm text-muted-foreground">
+          You&apos;ve already submitted your review for this assignment.
+        </p>
+        <Button asChild className="mt-2">
+          <Link href="/dashboard/my-reviews">Go to My Reviews</Link>
+        </Button>
       </div>
     );
   }
 
   const categories = [...new Set(competencies.map((c) => c.category || "General"))];
+  const ratedCount = competencies.filter((c) => c.rating !== null).length;
+  const reviewerRole = getReviewerRole();
+  const roleLabel =
+    reviewerRole === "self" ? "Self-review" :
+    reviewerRole === "manager" ? "Manager review" :
+    reviewerRole === "upward" ? "Upward feedback" : "Peer review";
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href={`/dashboard/cycles/${cycleId}`}>
+    <div className="max-w-2xl mx-auto space-y-5 pb-10">
+
+      {/* ── Page header ──────────────────────────────────────────────── */}
+      <div className="flex items-start gap-3 pt-1">
+        <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" asChild>
+          <Link href="/dashboard/my-reviews">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {getReviewerRole() === "upward" ? "Submit Upward Feedback" : "Submit Review"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Reviewing as <Badge variant="outline" className="ml-1">{getReviewerRole()}</Badge>
-          </p>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{roleLabel}</h1>
+          {employee && (
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {employee.slack_name}
+              {(employee.job_title || employee.department) && (
+                <span className="text-muted-foreground/60">
+                  {" · "}
+                  {[employee.job_title, employee.department].filter(Boolean).join(", ")}
+                </span>
+              )}
+            </p>
+          )}
         </div>
+        {/* Progress pill — only when there are competency ratings */}
+        {competencies.length > 0 && (
+          <div className="shrink-0 text-xs font-medium text-muted-foreground bg-muted rounded-full px-3 py-1.5">
+            {ratedCount}/{competencies.length} rated
+          </div>
+        )}
       </div>
 
       {error && (
@@ -512,137 +524,100 @@ export default function ReviewFormPage({
         </div>
       )}
 
-      {/* Employee Info Card */}
-      {employee && (
-        <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-lg">{employee.slack_name}</CardTitle>
-            <CardDescription>
-              {employee.job_title || "No title"}{" "}
-              {employee.department && `· ${employee.department}`}{" "}
-              {employee.level && (
-                <>
-                  ·{" "}
-                  {employee.level.job_family?.name && `${employee.level.job_family.name} — `}
-                  {employee.level.name}
-                  {employee.level.grade && ` (${employee.level.grade})`}
-                </>
-              )}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {/* ── Rating scale reference — tiny, inline ────────────────────── */}
+      {competencies.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground/70 px-1">
+          {["Below", "Developing", "Meets", "Exceeds", "Outstanding"].map((label, i) => (
+            <span key={i}><span className="font-semibold text-foreground/50">{i + 1}</span> — {label}</span>
+          ))}
+        </div>
       )}
 
-      {/* Rating Scale Legend */}
-      {competencies.length > 0 && (
-        <Card className="border-border/60">
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-center gap-6 text-sm">
-              <span className="text-muted-foreground font-medium">Rating Scale:</span>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <span key={n} className="flex items-center gap-1">
-                  <span className="font-bold">{n}</span>
-                  <span className="text-muted-foreground">
-                    {["Below", "Developing", "Meets", "Exceeds", "Outstanding"][n - 1]}
-                  </span>
-                </span>
-              ))}
+      {/* ── Competencies ─────────────────────────────────────────────── */}
+      {competencies.length > 0 && categories.map((category, catIdx) => (
+        <Card key={category} className="border-border/60">
+          {/* Category label only when there are multiple categories */}
+          {categories.length > 1 && (
+            <div className="px-5 pt-4 pb-0">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                {category}
+              </p>
             </div>
+          )}
+          <CardContent className={`space-y-7 ${categories.length > 1 ? "pt-3 pb-5" : "pt-5 pb-5"}`}>
+            {competencies
+              .filter((c) => (c.category || "General") === category)
+              .map((comp, localIdx) => {
+                const compIdx = competencies.indexOf(comp);
+                return (
+                  <div key={comp.competency_id} className={`space-y-3 ${localIdx > 0 ? "pt-7 border-t border-border/40" : ""}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-[15px] font-medium text-foreground leading-snug">
+                        {comp.name}
+                      </Label>
+                      {comp.expected_level && (
+                        <Badge variant="secondary" className="text-[10px] shrink-0">
+                          Target: {comp.expected_level}/5
+                        </Badge>
+                      )}
+                    </div>
+                    <BehaviorsPanel
+                      behaviors={comp.behaviors}
+                      expectedLevel={comp.expected_level}
+                    />
+                    {/* Stars — larger tap targets for mobile */}
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setRating(compIdx, star)}
+                          className="p-1 focus:outline-none transition-colors rounded"
+                          aria-label={`Rate ${star} out of 5`}
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              comp.rating && star <= comp.rating
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-border hover:text-amber-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      {comp.rating && (
+                        <span className="ml-2 text-sm font-medium text-muted-foreground">
+                          {["Below expectations", "Developing", "Meets expectations", "Exceeds expectations", "Outstanding"][comp.rating - 1]}
+                        </span>
+                      )}
+                    </div>
+                    <Textarea
+                      placeholder={`Comment on ${comp.name} (optional)…`}
+                      value={comp.comment}
+                      onChange={(e) => setComment(compIdx, e.target.value)}
+                      className="min-h-[72px] text-sm resize-none"
+                    />
+                  </div>
+                );
+              })}
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {/* Competency Ratings by Category */}
-      {competencies.length > 0 && (
-        <>
-          {categories.map((category) => (
-            <Card key={category} className="border-border/60">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="h-4 w-4 text-primary" />
-                  {category}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {competencies
-                  .filter((c) => (c.category || "General") === category)
-                  .map((comp) => {
-                    const compIdx = competencies.indexOf(comp);
-                    return (
-                      <div key={comp.competency_id} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-sm font-medium">{comp.name}</Label>
-                          {comp.expected_level && (
-                            <Badge variant="secondary" className="text-xs">
-                              Expected: {comp.expected_level}/5
-                            </Badge>
-                          )}
-                        </div>
-                        <BehaviorsPanel
-                          behaviors={comp.behaviors}
-                          expectedLevel={comp.expected_level}
-                        />
-                        {/* Star Rating */}
-                        <div className="flex items-center gap-1">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              key={star}
-                              type="button"
-                              onClick={() => setRating(compIdx, star)}
-                              className="focus:outline-none transition-colors"
-                            >
-                              <Star
-                                className={`h-7 w-7 ${
-                                  comp.rating && star <= comp.rating
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-muted-foreground/30 hover:text-yellow-300"
-                                }`}
-                              />
-                            </button>
-                          ))}
-                          {comp.rating && (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              {comp.rating}/5
-                            </span>
-                          )}
-                        </div>
-                        {/* Comment */}
-                        <Textarea
-                          placeholder={`Optional comment for ${comp.name}...`}
-                          value={comp.comment}
-                          onChange={(e) => setComment(compIdx, e.target.value)}
-                          className="min-h-[60px]"
-                        />
-                      </div>
-                    );
-                  })}
-              </CardContent>
-            </Card>
-          ))}
-        </>
-      )}
-
-      {/* Text Questions (from cycle_questions) */}
+      {/* ── Text Questions ───────────────────────────────────────────── */}
       {textResponses.length > 0 && (
         <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-primary" />
-              Open-Ended Questions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+          <CardContent className="pt-5 pb-5 space-y-6">
             {textResponses.map((tq, idx) => (
-              <div key={tq.questionId} className="space-y-2">
-                <Label className="text-sm font-medium">
+              <div key={tq.questionId} className={`space-y-2 ${idx > 0 ? "pt-6 border-t border-border/40" : ""}`}>
+                <Label className="text-[15px] font-medium leading-snug">
                   {tq.prompt}
                   {tq.required && <span className="text-destructive ml-0.5">*</span>}
                 </Label>
                 <Textarea
-                  placeholder="Your response..."
+                  placeholder="Your response…"
                   value={tq.response}
                   onChange={(e) => setTextResponse(idx, e.target.value)}
-                  className="min-h-[100px]"
+                  className="min-h-[100px] text-sm resize-none"
                 />
               </div>
             ))}
@@ -650,68 +625,49 @@ export default function ReviewFormPage({
         </Card>
       )}
 
-      {/* No questions configured at all */}
-      {competencies.length === 0 && textResponses.length === 0 && (
-        <Card className="border-border/60">
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            No review questions configured for this cycle. Please ask an admin to set up competencies or review questions.
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Overall Comment (fallback for cycles without cycle_questions) */}
+      {/* ── Overall comment (fallback) ───────────────────────────────── */}
       {!hasCycleQuestions && (
         <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-lg">Overall Comments</CardTitle>
-            <CardDescription>Provide any additional feedback or observations</CardDescription>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-5 pb-5 space-y-2">
+            <Label className="text-[15px] font-medium">Overall comments</Label>
+            <p className="text-xs text-muted-foreground">Strengths, areas for improvement, anything else you want to share.</p>
             <Textarea
-              placeholder="Share your overall assessment, strengths, areas for improvement..."
+              placeholder="Write your assessment…"
               value={overallComment}
               onChange={(e) => setOverallComment(e.target.value)}
-              className="min-h-[120px]"
+              className="min-h-[120px] text-sm resize-none"
             />
           </CardContent>
         </Card>
       )}
 
-      {/* Submit */}
-      <div className="flex items-center justify-between pb-8">
-        {/* Autosave indicator */}
+      {/* ── No questions configured ──────────────────────────────────── */}
+      {competencies.length === 0 && textResponses.length === 0 && (
+        <div className="text-center py-12 text-sm text-muted-foreground">
+          No review questions configured for this cycle. Ask an admin to set up competencies or questions.
+        </div>
+      )}
+
+      {/* ── Submit row ───────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {autosaveStatus === "saving" && (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Saving draft…</span>
-            </>
+            <><Loader2 className="h-3 w-3 animate-spin" /><span>Saving…</span></>
           )}
           {autosaveStatus === "saved" && lastSaved && (
-            <>
-              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-              <span>Draft saved {formatDistanceToNow(lastSaved, { addSuffix: true })}</span>
-            </>
+            <><CheckCircle2 className="h-3 w-3 text-emerald-500" /><span>Saved {formatDistanceToNow(lastSaved, { addSuffix: true })}</span></>
           )}
           {autosaveStatus === "idle" && !lastSaved && (
-            <>
-              <Clock className="h-3 w-3" />
-              <span>Changes autosave as you go</span>
-            </>
+            <><Clock className="h-3 w-3" /><span>Auto-saves as you go</span></>
           )}
         </div>
-
-        <div className="flex gap-3">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/cycles/${cycleId}`}>Cancel</Link>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/my-reviews">Cancel</Link>
           </Button>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            Submit Review
+          <Button size="sm" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+            Submit
           </Button>
         </div>
       </div>
