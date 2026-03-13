@@ -14,6 +14,7 @@ import {
   UsersRound,
   ListChecks,
   Flag,
+  SlidersHorizontal,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { SignOutButton } from "./signout-button";
@@ -72,6 +73,7 @@ export default async function DashboardLayout({
       label: "Settings",
       items: [
         { href: "/dashboard/admin/job-families", label: "Job Families", icon: Briefcase, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],
     },
