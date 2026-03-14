@@ -46,11 +46,30 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [survey, workspace] = await Promise.all([getSurvey(id), getUserWorkspace()]);
+  const [survey, workspace, responses] = await Promise.all([getSurvey(id), getUserWorkspace(), getSurveyResponses(id)]);
   if (!survey) notFound();
 
-  const responses = await getSurveyResponses(id);
   const participants = (survey.survey_participants || []) as any[];
+
+  // Fetch subject display names for 360
+  const subjectUserIds = [
+    ...new Set(
+      participants
+        .filter(p => p.role === "subject")
+        .map((p: any) => p.subject_user_id)
+        .filter(Boolean)
+    ),
+  ];
+  let subjectNames: Record<string, string> = {};
+  if (subjectUserIds.length) {
+    const supabase = await createServerSupabaseClient();
+    const { data: subjectUsers } = await supabase
+      .from("users")
+      .select("id, slack_name")
+      .in("id", subjectUserIds);
+    subjectNames = Object.fromEntries((subjectUsers || []).map((u: any) => [u.id, u.slack_name || u.id]));
+  }
+
   const respondents = participants.filter((p) => p.role !== "subject");
   const completed = respondents.filter((p) => p.status === "completed").length;
   const total = respondents.length;
@@ -111,7 +130,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
       </Card>
 
       {/* Results */}
-      <SurveyResults survey={survey} responses={responses} participants={participants} />
+      <SurveyResults survey={survey} responses={responses} participants={participants} subjectNames={subjectNames} />
     </div>
   );
 }

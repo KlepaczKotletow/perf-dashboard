@@ -7,6 +7,7 @@ interface Props {
   survey: any;
   responses: any[];
   participants: any[];
+  subjectNames: Record<string, string>;
 }
 
 function eNPSScore(responses: any[]) {
@@ -17,7 +18,7 @@ function eNPSScore(responses: any[]) {
   return Math.round(((promoters - detractors) / scores.length) * 100);
 }
 
-export function SurveyResults({ survey, responses, participants }: Props) {
+export function SurveyResults({ survey, responses, participants, subjectNames }: Props) {
   const [selected360Subject, setSelected360Subject] = useState<string | null>(null);
 
   // ── eNPS ──────────────────────────────────────────────────────────────────
@@ -107,10 +108,11 @@ export function SurveyResults({ survey, responses, participants }: Props) {
           }
 
           // rating_7: distribution bar chart
-          const counts = [1, 2, 3, 4, 5, 6, 7].map(n => qResponses.filter(v => v === String(n)).length);
+          const numericResponses = qResponses.map(v => parseInt(String(v), 10)).filter(n => !isNaN(n));
+          const counts = [1, 2, 3, 4, 5, 6, 7].map(n => numericResponses.filter(v => v === n).length);
           const max = Math.max(...counts, 1);
-          const avg = qResponses.length
-            ? (qResponses.reduce((sum, v) => sum + parseInt(v), 0) / qResponses.length).toFixed(1)
+          const avg = numericResponses.length
+            ? (numericResponses.reduce((a, b) => a + b, 0) / numericResponses.length).toFixed(1)
             : null;
 
           return (
@@ -181,7 +183,7 @@ export function SurveyResults({ survey, responses, participants }: Props) {
                     : "border-border hover:bg-muted"
                 }`}
               >
-                {s.subject_user_id}
+                {subjectNames[s.subject_user_id] || s.subject_user_id.slice(0, 8) + "…"}
               </button>
             ))}
           </div>
