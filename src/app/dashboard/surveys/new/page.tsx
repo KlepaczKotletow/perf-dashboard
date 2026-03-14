@@ -102,6 +102,17 @@ export default function NewSurveyPage() {
 
   async function handleLaunch() {
     if (!surveyType || !name.trim()) return;
+    if (surveyType === "360" && selectedSubjects.size === 0) {
+      setError("Select at least one person to review before launching a 360 survey.");
+      return;
+    }
+    if (surveyType === "360" || surveyType === "pulse") {
+      const activeQuestions = surveyType === "360" ? questions360 : pulseQuestions;
+      if (activeQuestions.some(q => !q.label.trim())) {
+        setError("All questions must have a label. Please fill in any empty questions or remove them.");
+        return;
+      }
+    }
     setLoading(true);
     setError(null);
     try {
@@ -365,7 +376,20 @@ export default function NewSurveyPage() {
 
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
-            <Button onClick={() => setStep(3)} disabled={!name.trim()}>
+            <Button
+              onClick={() => {
+                if (surveyType === "360" || surveyType === "pulse") {
+                  const activeQuestions = surveyType === "360" ? questions360 : pulseQuestions;
+                  if (activeQuestions.some(q => !q.label.trim())) {
+                    setError("All questions must have a label. Please fill in any empty questions or remove them.");
+                    return;
+                  }
+                }
+                setError(null);
+                setStep(3);
+              }}
+              disabled={!name.trim()}
+            >
               Review <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           </div>
