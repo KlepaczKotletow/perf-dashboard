@@ -4,15 +4,19 @@ import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Plus, ChevronRight, Lock, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
-import { isManagerOrAbove } from "@/lib/roles";
+import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 
 async function getSurveys() {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
     .from("surveys")
-    .select("id, type, name, status, closes_at, created_at, survey_participants(count)")
+    .select("id, type, name, status, closes_at, created_at, survey_participants(status)")
     .order("created_at", { ascending: false });
-  return data || [];
+  return (data || []).map((s: any) => ({
+    ...s,
+    totalParticipants: s.survey_participants?.length ?? 0,
+    completedParticipants: s.survey_participants?.filter((p: any) => p.status === "completed").length ?? 0,
+  }));
 }
 
 const TYPE_LABELS: Record<string, string> = { "360": "360°", pulse: "Pulse", enps: "eNPS" };
@@ -43,7 +47,7 @@ export default async function SurveysPage() {
   }
 
   const surveys = await getSurveys();
-  const isAdminOrHR = workspace?.role === "admin" || workspace?.role === "hr";
+  const isAdminOrHR = isHROrAbove(workspace?.role);
 
   return (
     <div className="space-y-6">
@@ -84,12 +88,14 @@ export default async function SurveysPage() {
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Closes</span>
             <span />
           </div>
-          {surveys.map((survey: any) => {
-            const total = survey.survey_participants?.[0]?.count ?? 0;
+          {surveys.map((survey) => {
+            const total = survey.totalParticipants;
+            const completed = survey.completedParticipants;
             return (
               <Link
                 key={survey.id}
                 href={`/dashboard/surveys/${survey.id}`}
+                aria-label={`${survey.name} — ${TYPE_LABELS[survey.type] || survey.type} survey, ${survey.status}`}
                 className="grid grid-cols-[1fr_80px_80px_120px_120px_40px] gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors items-center"
               >
                 <span className="text-sm font-medium text-foreground truncate">{survey.name}</span>
@@ -99,11 +105,11 @@ export default async function SurveysPage() {
                 <Badge variant="outline" className={`text-xs w-fit capitalize ${STATUS_COLORS[survey.status] || ""}`}>
                   {survey.status}
                 </Badge>
-                <span className="text-sm text-muted-foreground">{total} responded</span>
+                <span className="text-sm text-muted-foreground">{completed}/{total} responded</span>
                 <span className="text-sm text-muted-foreground">
                   {survey.closes_at ? format(new Date(survey.closes_at), "MMM d, yyyy") : "—"}
                 </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               </Link>
             );
           })}
