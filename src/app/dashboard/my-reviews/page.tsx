@@ -17,12 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-export default async function MyReviewsPage(props: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
-  const searchParams = await props.searchParams;
-  const activeTab = searchParams.tab || "about-me";
-
+export default async function MyReviewsPage() {
   const workspace = await getUserWorkspace();
   if (!workspace?.appUserId) {
     return (
@@ -35,41 +30,49 @@ export default async function MyReviewsPage(props: {
   const supabase = await createServerSupabaseClient();
   const userId = workspace.appUserId;
 
-  // 1. Reviews about me
-  const { data: myAssignments } = await supabase
-    .from("review_assignments")
-    .select(`
-      *,
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
-      manager:users!review_assignments_manager_id_fkey(slack_name)
-    `)
-    .eq("employee_id", userId)
-    .eq("assignment_type", "standard")
-    .order("created_at", { ascending: false });
+  // Fetch all three assignment types in parallel
+  const [
+    { data: myAssignments },
+    { data: managerReviews },
+    { data: upwardReviews },
+  ] = await Promise.all([
+    // 1. Reviews about me
+    supabase
+      .from("review_assignments")
+      .select(`
+        *,
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
+        manager:users!review_assignments_manager_id_fkey(slack_name)
+      `)
+      .eq("employee_id", userId)
+      .eq("assignment_type", "standard")
+      .order("created_at", { ascending: false }),
 
-  // 2. Reviews I need to give as manager (all statuses)
-  const { data: managerReviews } = await supabase
-    .from("review_assignments")
-    .select(`
-      *,
-      employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
-    `)
-    .eq("manager_id", userId)
-    .eq("assignment_type", "standard")
-    .order("created_at", { ascending: false });
+    // 2. Reviews I need to give as manager (exclude self-reviews where I'm both employee and manager)
+    supabase
+      .from("review_assignments")
+      .select(`
+        *,
+        employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
+      `)
+      .eq("manager_id", userId)
+      .eq("assignment_type", "standard")
+      .neq("employee_id", userId)
+      .order("created_at", { ascending: false }),
 
-  // 3. Upward feedback I need to give (all statuses)
-  const { data: upwardReviews } = await supabase
-    .from("review_assignments")
-    .select(`
-      *,
-      employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
-    `)
-    .eq("reviewer_id", userId)
-    .eq("assignment_type", "upward")
-    .order("created_at", { ascending: false });
+    // 3. Upward feedback I need to give
+    supabase
+      .from("review_assignments")
+      .select(`
+        *,
+        employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
+      `)
+      .eq("reviewer_id", userId)
+      .eq("assignment_type", "upward")
+      .order("created_at", { ascending: false }),
+  ]);
 
   // 4. Check which of my assignments have self-review submitted
   const myAssignmentIds = (myAssignments || []).map((a: any) => a.id);
@@ -136,19 +139,17 @@ export default async function MyReviewsPage(props: {
     return { ...a, selfSubmitted, gradesReleased, smartStatus };
   });
 
-  const allManagerReviews = managerReviews || [];
-  const allUpwardReviews = upwardReviews || [];
+  // Sort: pending/active first, completed last
+  const sortByCompletion = (a: any, b: any) => {
+    const aComplete = a.status === "completed";
+    const bComplete = b.status === "completed";
+    if (aComplete === bComplete) return 0;
+    return aComplete ? 1 : -1;
+  };
 
-  // Pending counts for tab badges
-  const aboutMePendingCount = enrichedAssignments.filter(
-    (a: any) => !a.selfSubmitted && a.status !== "completed"
-  ).length;
-  const reviewingPendingCount = allManagerReviews.filter(
-    (r: any) => r.status !== "completed"
-  ).length;
-  const upwardPendingCount = allUpwardReviews.filter(
-    (r: any) => r.status !== "completed"
-  ).length;
+  const sortedMyAssignments = [...enrichedAssignments].sort(sortByCompletion);
+  const sortedManagerReviews = [...(managerReviews || [])].sort(sortByCompletion);
+  const sortedUpwardReviews = [...(upwardReviews || [])].sort(sortByCompletion);
 
   const StatusIcon = ({ icon }: { icon: string }) => {
     switch (icon) {
@@ -160,14 +161,12 @@ export default async function MyReviewsPage(props: {
     }
   };
 
-  const tabs = [
-    { id: "about-me",  label: "About Me",        pendingCount: aboutMePendingCount,  totalCount: enrichedAssignments.length },
-    { id: "reviewing", label: "I'm Reviewing",    pendingCount: reviewingPendingCount, totalCount: allManagerReviews.length },
-    { id: "upward",    label: "Upward Feedback",  pendingCount: upwardPendingCount,   totalCount: allUpwardReviews.length },
-  ];
+  const hasMyAssignments = sortedMyAssignments.length > 0;
+  const hasManagerReviews = sortedManagerReviews.length > 0;
+  const hasUpwardReviews = sortedUpwardReviews.length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Reviews</h1>
@@ -176,136 +175,119 @@ export default async function MyReviewsPage(props: {
         </p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="border-b border-border">
-        <nav className="flex gap-1 -mb-px">
-          {tabs.map((t) => {
-            const isActive = activeTab === t.id;
+      {/* ── My Performance ── */}
+      {hasMyAssignments && (
+        <Section
+          icon={<FileText className="h-4 w-4" />}
+          title="My Performance"
+          description="Your self-assessments and review results"
+        >
+          {sortedMyAssignments.map((a: any, i: number) => {
+            const isCompleted = a.status === "completed";
+            const prevCompleted = i > 0 && sortedMyAssignments[i - 1].status === "completed";
+            const showDivider = isCompleted && !prevCompleted && sortedMyAssignments.some((x: any) => x.status !== "completed");
+
             return (
-              <Link
-                key={t.id}
-                href={`?tab=${t.id}`}
-                className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  isActive
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border/60"
-                }`}
-              >
-                {t.label}
-                {t.totalCount > 0 && (
-                  <span
-                    className={`inline-flex items-center justify-center h-5 min-w-5 px-1 rounded-full text-[10px] font-semibold ${
-                      t.pendingCount > 0
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-400/20 dark:text-amber-400"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {t.pendingCount > 0 ? t.pendingCount : t.totalCount}
-                  </span>
-                )}
-              </Link>
+              <div key={a.id}>
+                {showDivider && <CompletedDivider />}
+                <Card
+                  className={`border-border/60 transition-all ${
+                    isCompleted
+                      ? "opacity-60"
+                      : a.smartStatus.icon === "alert"
+                      ? "border-amber-200/60 bg-amber-50/20 dark:border-amber-400/10 dark:bg-amber-400/[0.02]"
+                      : ""
+                  }`}
+                >
+                  <CardContent className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-sm font-medium text-foreground">
+                            {a.cycle?.name || "Unknown Cycle"}
+                          </h3>
+                          <Badge className={`text-[10px] font-medium flex items-center gap-1 ${a.smartStatus.variant}`}>
+                            <StatusIcon icon={a.smartStatus.icon} />
+                            {a.smartStatus.label}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Reviewed by: {a.manager?.slack_name || "Unassigned"}
+                        </p>
+                        {a.smartStatus.description && (
+                          <p className="text-xs text-muted-foreground/70 mt-1">
+                            {a.smartStatus.description}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        {/* Self-review action */}
+                        {!a.selfSubmitted && !isCompleted && (
+                          <Button size="sm" className="text-xs h-8" asChild>
+                            <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
+                              Start Self-Review <ArrowRight className="h-3 w-3 ml-1" />
+                            </Link>
+                          </Button>
+                        )}
+
+                        {/* Rating + grade when released */}
+                        {a.gradesReleased && isCompleted && (
+                          <>
+                            {a.overall_rating && (
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                <span className="text-sm font-bold text-foreground">
+                                  {a.overall_rating}/5
+                                </span>
+                              </div>
+                            )}
+                            {a.final_grade && (
+                              <Badge variant="outline" className="text-xs font-medium">
+                                <Medal className="h-3 w-3 mr-1" />
+                                {a.final_grade}
+                              </Badge>
+                            )}
+                            <Button size="sm" variant="ghost" className="text-xs h-8" asChild>
+                              <Link href={`/dashboard/reviews/${a.id}`}>
+                                View <ChevronRight className="h-3 w-3 ml-1" />
+                              </Link>
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             );
           })}
-        </nav>
-      </div>
-
-      {/* ── Tab: About Me ── */}
-      {activeTab === "about-me" && (
-        <div className="space-y-3">
-          {enrichedAssignments.length === 0 ? (
-            <EmptyState
-              icon={<FileText className="h-8 w-8 text-muted-foreground/40" />}
-              title="No reviews yet"
-              description="You'll appear here once your manager assigns you to a performance cycle."
-            />
-          ) : (
-            enrichedAssignments.map((a: any) => (
-              <Card key={a.id} className={`border-border/60 transition-all ${
-                a.smartStatus.icon === "check"
-                  ? "border-emerald-200/60 bg-emerald-50/20 dark:border-emerald-400/10 dark:bg-emerald-400/[0.02]"
-                  : a.smartStatus.icon === "alert"
-                  ? "border-amber-200/60 bg-amber-50/20 dark:border-amber-400/10 dark:bg-amber-400/[0.02]"
-                  : ""
-              }`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-medium text-foreground">
-                          {a.cycle?.name || "Unknown Cycle"}
-                        </h3>
-                        <Badge className={`text-[10px] font-medium flex items-center gap-1 ${a.smartStatus.variant}`}>
-                          <StatusIcon icon={a.smartStatus.icon} />
-                          {a.smartStatus.label}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Reviewed by: {a.manager?.slack_name || "Unassigned"}
-                      </p>
-                      {a.smartStatus.description && (
-                        <p className="text-xs text-muted-foreground/70 mt-1">
-                          {a.smartStatus.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 shrink-0">
-                      {/* Self-review action */}
-                      {!a.selfSubmitted && a.status !== "completed" && (
-                        <Button size="sm" className="text-xs h-8" asChild>
-                          <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
-                            Start Self-Review <ArrowRight className="h-3 w-3 ml-1" />
-                          </Link>
-                        </Button>
-                      )}
-
-                      {/* Rating + grade when released */}
-                      {a.gradesReleased && a.status === "completed" && (
-                        <>
-                          {a.overall_rating && (
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                              <span className="text-sm font-bold text-foreground">
-                                {a.overall_rating}/5
-                              </span>
-                            </div>
-                          )}
-                          {a.final_grade && (
-                            <Badge variant="outline" className="text-xs font-medium">
-                              <Medal className="h-3 w-3 mr-1" />
-                              {a.final_grade}
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+        </Section>
       )}
 
-      {/* ── Tab: I'm Reviewing ── */}
-      {activeTab === "reviewing" && (
-        <div className="space-y-3">
-          {allManagerReviews.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardCheck className="h-8 w-8 text-muted-foreground/40" />}
-              title="No reviews to give"
-              description="You'll appear here when you're assigned to review someone in your team."
-            />
-          ) : (
-            allManagerReviews.map((review: any) => {
-              const isDone = review.status === "completed";
-              return (
-                <Card key={review.id} className={`border-border/60 ${
-                  isDone
-                    ? "border-emerald-200/60 bg-emerald-50/20 dark:border-emerald-400/10 dark:bg-emerald-400/[0.02]"
-                    : ""
-                }`}>
-                  <CardContent className="p-4">
+      {/* ── Reviews to Give ── */}
+      {hasManagerReviews && (
+        <Section
+          icon={<ClipboardCheck className="h-4 w-4" />}
+          title="Reviews to Give"
+          description="Manager reviews you need to complete for your team"
+        >
+          {sortedManagerReviews.map((review: any, i: number) => {
+            const isDone = review.status === "completed";
+            const prevDone = i > 0 && sortedManagerReviews[i - 1].status === "completed";
+            const showDivider = isDone && !prevDone && sortedManagerReviews.some((x: any) => x.status !== "completed");
+
+            return (
+              <div key={review.id}>
+                {showDivider && <CompletedDivider />}
+                <Card
+                  className={`border-border/60 transition-all ${
+                    isDone
+                      ? "opacity-60"
+                      : ""
+                  }`}
+                >
+                  <CardContent className="px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -350,31 +332,31 @@ export default async function MyReviewsPage(props: {
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })
-          )}
-        </div>
+              </div>
+            );
+          })}
+        </Section>
       )}
 
-      {/* ── Tab: Upward Feedback ── */}
-      {activeTab === "upward" && (
-        <div className="space-y-3">
-          {allUpwardReviews.length === 0 ? (
-            <EmptyState
-              icon={<Users className="h-8 w-8 text-muted-foreground/40" />}
-              title="No upward feedback requests"
-              description="When your manager is included in a cycle with upward feedback enabled, you'll see it here."
-            />
-          ) : (
-            allUpwardReviews.map((review: any) => {
-              const isDone = review.status === "completed";
-              return (
-                <Card key={review.id} className={`border-border/60 ${
-                  isDone
-                    ? "border-emerald-200/60 bg-emerald-50/20 dark:border-emerald-400/10 dark:bg-emerald-400/[0.02]"
-                    : ""
-                }`}>
-                  <CardContent className="p-4">
+      {/* ── Upward Feedback ── */}
+      {hasUpwardReviews && (
+        <Section
+          icon={<Users className="h-4 w-4" />}
+          title="Upward Feedback"
+          description="Feedback you're giving on your manager's leadership"
+        >
+          {sortedUpwardReviews.map((review: any, i: number) => {
+            const isDone = review.status === "completed";
+            const prevDone = i > 0 && sortedUpwardReviews[i - 1].status === "completed";
+            const showDivider = isDone && !prevDone && sortedUpwardReviews.some((x: any) => x.status !== "completed");
+
+            return (
+              <div key={review.id}>
+                {showDivider && <CompletedDivider />}
+                <Card
+                  className={`border-border/60 transition-all ${isDone ? "opacity-60" : ""}`}
+                >
+                  <CardContent className="px-4 py-3">
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="h-9 w-9 rounded-full bg-violet-100 dark:bg-violet-400/10 flex items-center justify-center shrink-0">
@@ -397,45 +379,73 @@ export default async function MyReviewsPage(props: {
                             Submitted
                           </Badge>
                         ) : (
-                          <Badge className="text-[10px] text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10 flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            {review.status === "in_progress" ? "In Progress" : "Pending"}
-                          </Badge>
-                        )}
-                        {!isDone && (
-                          <Button size="sm" className="text-xs h-8" asChild>
-                            <Link href={`/dashboard/cycles/${review.cycle?.id}/review/${review.id}`}>
-                              Give Feedback <ArrowRight className="h-3 w-3 ml-1" />
-                            </Link>
-                          </Button>
+                          <>
+                            <Badge className="text-[10px] text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10 flex items-center gap-1">
+                              <AlertCircle className="h-3.5 w-3.5" />
+                              {review.status === "in_progress" ? "In Progress" : "Pending"}
+                            </Badge>
+                            <Button size="sm" className="text-xs h-8" asChild>
+                              <Link href={`/dashboard/cycles/${review.cycle?.id}/review/${review.id}`}>
+                                Give Feedback <ArrowRight className="h-3 w-3 ml-1" />
+                              </Link>
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              );
-            })
-          )}
+              </div>
+            );
+          })}
+        </Section>
+      )}
+
+      {/* All empty state */}
+      {!hasMyAssignments && !hasManagerReviews && !hasUpwardReviews && (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <FileText className="h-10 w-10 text-muted-foreground/30 mb-4" />
+          <p className="text-sm font-medium text-foreground">Nothing here yet</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+            You&apos;ll see your reviews, team assessments, and feedback requests here once a cycle is launched.
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-function EmptyState({
+function Section({
   icon,
   title,
   description,
+  children,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4">{icon}</div>
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      <p className="text-xs text-muted-foreground mt-1 max-w-xs">{description}</p>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="text-muted-foreground">{icon}</div>
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function CompletedDivider() {
+  return (
+    <div className="flex items-center gap-3 py-2">
+      <div className="h-px flex-1 bg-border/60" />
+      <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">Completed</span>
+      <div className="h-px flex-1 bg-border/60" />
     </div>
   );
 }

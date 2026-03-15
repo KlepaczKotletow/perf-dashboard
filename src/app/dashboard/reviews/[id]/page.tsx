@@ -107,7 +107,7 @@ export default async function ReviewDetailPage({
   const statusCfg = getAssignmentStatus(assignment.status);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6">
       {/* Back + header */}
       <div>
         <Link

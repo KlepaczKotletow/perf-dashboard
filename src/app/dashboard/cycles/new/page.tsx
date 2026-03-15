@@ -2,17 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, Loader2, Plus, X, Target, MessageSquare } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  ArrowLeft, Loader2, Plus, X, Target, MessageSquare,
+  Users, CalendarIcon, ChevronDown, ChevronRight, Play, Search,
+} from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import { format } from "date-fns";
 
 const CYCLE_TYPES = [
   { value: "annual", label: "Annual Review" },
@@ -22,512 +26,637 @@ const CYCLE_TYPES = [
   { value: "custom", label: "Custom" },
 ];
 
+// Proportions out of 12 total "units" — phases are always scaled to fit the cycle's actual dates
 const DEFAULT_PHASES = [
-  { phase_type: "goal_setting", name: "Goal Setting", offsetWeeks: 0, durationWeeks: 2 },
-  { phase_type: "self_assessment", name: "Self Assessment", offsetWeeks: 2, durationWeeks: 2 },
-  { phase_type: "peer_review", name: "Peer Review", offsetWeeks: 4, durationWeeks: 3 },
-  { phase_type: "manager_review", name: "Manager Review", offsetWeeks: 7, durationWeeks: 2 },
-  { phase_type: "calibration", name: "Calibration", offsetWeeks: 9, durationWeeks: 1 },
-  { phase_type: "communication", name: "Results Communication", offsetWeeks: 10, durationWeeks: 2 },
+  { phase_type: "goal_setting",    name: "Goal Setting",          proportion: 2 / 12 },
+  { phase_type: "self_assessment", name: "Self Assessment",        proportion: 2 / 12 },
+  { phase_type: "peer_review",     name: "Peer Review",            proportion: 3 / 12 },
+  { phase_type: "manager_review",  name: "Manager Review",         proportion: 2 / 12 },
+  { phase_type: "calibration",     name: "Calibration",            proportion: 1 / 12 },
+  { phase_type: "communication",   name: "Results Communication",  proportion: 2 / 12 },
 ];
 
-const SUGGESTED_TEXT_QUESTIONS = [
+const SUGGESTED_QUESTIONS = [
   "What were this person's key achievements this period?",
   "What areas should they focus on improving?",
   "How did they demonstrate company values?",
   "Any additional comments or recommendations?",
 ];
 
+interface User {
+  id: string;
+  slack_name: string | null;
+  slack_email: string | null;
+  manager_id: string | null;
+}
 interface Competency {
   id: string;
   name: string;
   category: string | null;
-  description: string | null;
 }
-
 interface TextQuestion {
   prompt: string;
   required: boolean;
 }
 
+// ── Reusable date picker field ─────────────────────────────────────────────────
+function DatePickerField({
+  label, value, onChange, placeholder = "Pick a date", optional,
+}: {
+  label: string;
+  value: Date | undefined;
+  onChange: (d: Date | undefined) => void;
+  placeholder?: string;
+  optional?: boolean;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">
+        {label}
+        {optional && <span className="text-muted-foreground/60 ml-1">(optional)</span>}
+      </Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={`w-full justify-start text-left font-normal h-9 text-sm ${!value ? "text-muted-foreground" : ""}`}
+          >
+            <CalendarIcon className="h-3.5 w-3.5 mr-2 shrink-0 text-muted-foreground" />
+            {value ? format(value, "MMM d, yyyy") : placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={value} onSelect={onChange} initialFocus />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
+function SectionHeader({
+  icon, title, summary, open, onToggle,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  summary: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center justify-between py-4 text-left group"
+    >
+      <div className="flex items-center gap-2.5">
+        <div className="text-muted-foreground">{icon}</div>
+        <span className="text-sm font-medium text-foreground">{title}</span>
+        <span className="text-xs text-muted-foreground">{summary}</span>
+      </div>
+      {open
+        ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+    </button>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 export default function NewCyclePage() {
   const router = useRouter();
-  const [step, setStep] = useState<1 | 2>(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [cycleType, setCycleType] = useState("annual");
 
-  // Step 1 form data
+  // Core fields
   const [name, setName] = useState("");
+  const [cycleType, setCycleType] = useState("annual");
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date());
+  const [endDate, setEndDate] = useState<Date | undefined>(() => {
+    const d = new Date(); d.setMonth(d.getMonth() + 3); return d;
+  });
+  const [reviewDeadline, setReviewDeadline] = useState<Date | undefined>();
   const [description, setDescription] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [reviewDeadline, setReviewDeadline] = useState("");
+  const [showDescription, setShowDescription] = useState(false);
 
-  // Step 2: review questions
+  // People
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedPeopleIds, setSelectedPeopleIds] = useState<string[]>([]);
+  const [peopleSearch, setPeopleSearch] = useState("");
+  const [peopleOpen, setPeopleOpen] = useState(true);
+
+  // Questions
+  const [questionsOpen, setQuestionsOpen] = useState(false);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [selectedCompIds, setSelectedCompIds] = useState<Set<string>>(new Set());
-  const [textQuestions, setTextQuestions] = useState<TextQuestion[]>([]);
+  const [compOpen, setCompOpen] = useState(true);
+  const [textQuestions, setTextQuestions] = useState<TextQuestion[]>([
+    { prompt: "What were this person's key achievements this period?", required: true },
+    { prompt: "What areas should they focus on improving?", required: true },
+    { prompt: "Any additional comments or recommendations?", required: false },
+  ]);
   const [newPrompt, setNewPrompt] = useState("");
+  const [tqOpen, setTqOpen] = useState(true);
+
+  // UI
+  const [loading, setLoading] = useState<false | "draft" | "launch">(false);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  // Calculate default dates
-  const today = new Date();
-  const threeMonthsLater = new Date(today);
-  threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
-  const formatDate = (d: Date) => d.toISOString().split("T")[0];
-
+  // Load users + competencies on mount
   useEffect(() => {
-    setStartDate(formatDate(today));
-    setEndDate(formatDate(threeMonthsLater));
+    async function load() {
+      const [{ data: usersData }, { data: compsData }] = await Promise.all([
+        supabase.from("users").select("id, slack_name, slack_email, manager_id").order("slack_name"),
+        supabase.from("competencies").select("id, name, category").order("category").order("name"),
+      ]);
+      const loadedUsers = usersData || [];
+      const loadedComps = compsData || [];
+      setUsers(loadedUsers);
+      setSelectedPeopleIds(loadedUsers.map((u: User) => u.id));
+      setCompetencies(loadedComps);
+      setSelectedCompIds(new Set(loadedComps.map((c: Competency) => c.id)));
+    }
+    load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Load competencies when moving to step 2
-  useEffect(() => {
-    if (step === 2 && competencies.length === 0) {
-      loadCompetencies();
-    }
-  }, [step]);
-
-  async function loadCompetencies() {
-    const { data } = await supabase
-      .from("competencies")
-      .select("id, name, category, description")
-      .order("category")
-      .order("name");
-    const comps = data || [];
-    setCompetencies(comps);
-    // Select all by default
-    setSelectedCompIds(new Set(comps.map((c: Competency) => c.id)));
-    // Add default text questions
-    if (textQuestions.length === 0) {
-      setTextQuestions([
-        { prompt: "What were this person's key achievements this period?", required: true },
-        { prompt: "What areas should they focus on improving?", required: true },
-        { prompt: "Any additional comments or recommendations?", required: false },
-      ]);
-    }
+  // ── Validation ──────────────────────────────────────────────────────────────
+  function validateForDraft(): boolean {
+    if (!name.trim()) { setError("Cycle name is required"); return false; }
+    setError(null); return true;
   }
 
-  function toggleCompetency(id: string) {
-    setSelectedCompIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function selectAllCompetencies() {
-    if (selectedCompIds.size === competencies.length) {
-      setSelectedCompIds(new Set());
-    } else {
-      setSelectedCompIds(new Set(competencies.map((c) => c.id)));
-    }
-  }
-
-  function addTextQuestion() {
-    if (!newPrompt.trim()) return;
-    setTextQuestions((prev) => [...prev, { prompt: newPrompt.trim(), required: true }]);
-    setNewPrompt("");
-  }
-
-  function removeTextQuestion(idx: number) {
-    setTextQuestions((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function addSuggested(prompt: string) {
-    if (textQuestions.some((q) => q.prompt === prompt)) return;
-    setTextQuestions((prev) => [...prev, { prompt, required: true }]);
-  }
-
-  // Step 1 validation
-  function validateStep1(): boolean {
+  function validateForLaunch(): boolean {
     if (!name.trim()) { setError("Cycle name is required"); return false; }
     if (!startDate || !endDate) { setError("Start and end dates are required"); return false; }
-    if (new Date(endDate) <= new Date(startDate)) { setError("End date must be after start date"); return false; }
-    if (reviewDeadline && new Date(reviewDeadline) > new Date(endDate)) { setError("Review deadline must be before end date"); return false; }
-    setError(null);
-    return true;
-  }
-
-  function goToStep2() {
-    if (validateStep1()) setStep(2);
-  }
-
-  // Final submit
-  async function handleSubmit() {
-    if (selectedCompIds.size === 0 && textQuestions.length === 0) {
-      setError("Add at least one competency or text question");
-      return;
+    if (endDate <= startDate) { setError("End date must be after start date"); return false; }
+    if (reviewDeadline && endDate && reviewDeadline > endDate) {
+      setError("Review deadline must be on or before the end date"); return false;
     }
+    if (selectedPeopleIds.length === 0) { setError("Add at least one person to launch"); return false; }
+    setError(null); return true;
+  }
 
-    setLoading(true);
-    setError(null);
+  // ── Shared cycle creation ───────────────────────────────────────────────────
+  async function createCycleBase(): Promise<{ cycleId: string; workspaceId: string }> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+    const workspaceId: string = user.user_metadata?.workspace_id;
+    if (!workspaceId) throw new Error("No workspace found");
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError("Not authenticated"); setLoading(false); return; }
+    const { data: cycleData, error: insertError } = await supabase
+      .from("performance_cycles")
+      .insert({
+        name: name.trim(),
+        description: description.trim() || null,
+        start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
+        end_date: endDate ? format(endDate, "yyyy-MM-dd") : null,
+        review_deadline: reviewDeadline ? format(reviewDeadline, "yyyy-MM-dd") : null,
+        type: cycleType,
+        workspace_id: workspaceId,
+        created_by: user.user_metadata?.app_user_id,
+        status: "draft",
+      })
+      .select("id")
+      .single();
 
-      // 1. Create the cycle
-      const { data: cycleData, error: insertError } = await supabase
-        .from("performance_cycles")
-        .insert({
-          name: name.trim(),
-          description: description.trim() || null,
-          start_date: startDate,
-          end_date: endDate,
-          review_deadline: reviewDeadline || null,
-          type: cycleType,
-          workspace_id: user.user_metadata?.workspace_id,
-          created_by: user.user_metadata?.app_user_id,
-          status: "draft",
-        })
-        .select("id")
-        .single();
+    if (insertError || !cycleData) throw new Error(insertError?.message || "Failed to create cycle");
+    const cycleId = cycleData.id;
 
-      if (insertError || !cycleData) {
-        setError(insertError?.message || "Failed to create cycle");
-        setLoading(false);
-        return;
-      }
-
-      // 2. Create default phases
-      const cycleStart = new Date(startDate);
+    // Create timeline phases — scaled proportionally to fit within the cycle's actual dates
+    if (startDate && endDate) {
+      const cycleDurationMs = endDate.getTime() - startDate.getTime();
+      let cumulativeProportion = 0;
       const phases = DEFAULT_PHASES.map((phase, idx) => {
-        const phaseStart = new Date(cycleStart);
-        phaseStart.setDate(phaseStart.getDate() + phase.offsetWeeks * 7);
-        const phaseEnd = new Date(phaseStart);
-        phaseEnd.setDate(phaseEnd.getDate() + phase.durationWeeks * 7);
+        const phaseStart = new Date(startDate.getTime() + cumulativeProportion * cycleDurationMs);
+        cumulativeProportion += phase.proportion;
+        const phaseEnd = new Date(startDate.getTime() + cumulativeProportion * cycleDurationMs);
         return {
-          cycle_id: cycleData.id,
-          phase_type: phase.phase_type,
-          name: phase.name,
-          start_date: phaseStart.toISOString(),
-          end_date: phaseEnd.toISOString(),
-          status: "pending",
-          sort_order: idx,
+          cycle_id: cycleId, phase_type: phase.phase_type, name: phase.name,
+          start_date: phaseStart.toISOString(), end_date: phaseEnd.toISOString(),
+          status: "pending", sort_order: idx,
         };
       });
       await supabase.from("cycle_phases").insert(phases);
+    }
 
-      // 3. Create cycle_questions
-      const questions: any[] = [];
-      let sortOrder = 0;
+    // Create review questions
+    const questions: any[] = [];
+    let sortOrder = 0;
+    for (const compId of selectedCompIds) {
+      questions.push({ cycle_id: cycleId, question_type: "competency", competency_id: compId, sort_order: sortOrder++, required: true });
+    }
+    for (const tq of textQuestions) {
+      questions.push({ cycle_id: cycleId, question_type: "text", prompt: tq.prompt, sort_order: sortOrder++, required: tq.required });
+    }
+    if (questions.length > 0) await supabase.from("cycle_questions").insert(questions);
 
-      // Competency questions
-      for (const compId of selectedCompIds) {
-        questions.push({
-          cycle_id: cycleData.id,
-          question_type: "competency",
-          competency_id: compId,
-          sort_order: sortOrder++,
-          required: true,
-        });
-      }
+    return { cycleId, workspaceId };
+  }
 
-      // Text questions
-      for (const tq of textQuestions) {
-        questions.push({
-          cycle_id: cycleData.id,
-          question_type: "text",
-          prompt: tq.prompt,
-          sort_order: sortOrder++,
-          required: tq.required,
-        });
-      }
-
-      if (questions.length > 0) {
-        const { error: qErr } = await supabase.from("cycle_questions").insert(questions);
-        if (qErr) console.error("Error inserting cycle_questions:", qErr);
-      }
-
-      router.push(`/dashboard/cycles/${cycleData.id}`);
+  // ── Save as Draft ───────────────────────────────────────────────────────────
+  async function handleSaveDraft() {
+    if (!validateForDraft()) return;
+    setLoading("draft");
+    try {
+      const { cycleId } = await createCycleBase();
+      router.push(`/dashboard/cycles/${cycleId}`);
       router.refresh();
-    } catch (err) {
-      console.error("Error creating cycle:", err);
-      setError("Failed to create performance cycle");
+    } catch (err: any) {
+      setError(err.message || "Failed to create cycle");
       setLoading(false);
     }
   }
 
-  // Group competencies by category
+  // ── Create & Launch ─────────────────────────────────────────────────────────
+  async function handleCreateAndLaunch() {
+    if (!validateForLaunch()) return;
+    setLoading("launch");
+    try {
+      const { cycleId, workspaceId } = await createCycleBase();
+
+      // Enroll employees
+      await supabase.from("performance_cycle_employees").insert(
+        selectedPeopleIds.map((id) => ({ performance_cycle_id: cycleId, employee_id: id, status: "pending", workspace_id: workspaceId }))
+      );
+
+      // Build assignments
+      const enrolledIds = new Set(selectedPeopleIds);
+      const enrolledUsers = users.filter((u) => selectedPeopleIds.includes(u.id));
+
+      // Standard (self + manager review per employee)
+      const standardAssignments = enrolledUsers.map((u) => ({
+        cycle_id: cycleId, employee_id: u.id, manager_id: u.manager_id || null,
+        assignment_type: "standard", status: "pending", workspace_id: workspaceId,
+      }));
+      if (standardAssignments.length > 0) {
+        const { error: e } = await supabase.from("review_assignments").insert(standardAssignments);
+        if (e) throw e;
+      }
+
+      // Upward (direct reports review their manager, only when manager is also enrolled)
+      const upwardAssignments = enrolledUsers
+        .filter((u) => u.manager_id && enrolledIds.has(u.manager_id))
+        .map((u) => ({
+          cycle_id: cycleId, employee_id: u.manager_id, reviewer_id: u.id,
+          manager_id: null, assignment_type: "upward", status: "pending", workspace_id: workspaceId,
+        }));
+      if (upwardAssignments.length > 0) {
+        const { error: e } = await supabase.from("review_assignments").insert(upwardAssignments);
+        if (e) throw e;
+      }
+
+      // Activate first phase
+      const { data: phases } = await supabase
+        .from("cycle_phases").select("id").eq("cycle_id", cycleId).order("sort_order").limit(1);
+      if (phases?.[0]) {
+        await supabase.from("cycle_phases").update({ status: "active" }).eq("id", phases[0].id);
+      }
+
+      // Set cycle active
+      await supabase.from("performance_cycles")
+        .update({ status: "active", updated_at: new Date().toISOString() }).eq("id", cycleId);
+      await supabase.from("performance_cycle_employees")
+        .update({ status: "in_progress" }).eq("performance_cycle_id", cycleId);
+
+      // Send Slack notifications — awaited so they complete before redirect
+      const { error: notifError } = await supabase.functions.invoke("cycle-notifications", {
+        body: { action: "launch", cycle_id: cycleId },
+      });
+      if (notifError) {
+        // Notifications failed but cycle is live — show warning, don't block
+        console.error("Notification error:", notifError);
+        setError(`Cycle launched, but Slack notifications failed: ${notifError.message}. You can re-trigger them from the cycle page.`);
+        setLoading(false);
+        router.push(`/dashboard/cycles/${cycleId}`);
+        router.refresh();
+        return;
+      }
+
+      router.push(`/dashboard/cycles/${cycleId}`);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "Failed to launch cycle");
+      setLoading(false);
+    }
+  }
+
+  // ── People helpers ──────────────────────────────────────────────────────────
+  const filteredUsers = users.filter((u) => {
+    if (!peopleSearch) return true;
+    const q = peopleSearch.toLowerCase();
+    return u.slack_name?.toLowerCase().includes(q) || u.slack_email?.toLowerCase().includes(q);
+  });
+
+  function togglePerson(id: string) {
+    setSelectedPeopleIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  }
+
+  // ── Competency helpers ──────────────────────────────────────────────────────
   const categories = [...new Set(competencies.map((c) => c.category || "Uncategorized"))].sort();
 
+  function toggleCompetency(id: string) {
+    setSelectedCompIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // ── Questions summary ───────────────────────────────────────────────────────
+  const questionsSummary = [
+    selectedCompIds.size > 0 ? `${selectedCompIds.size} competenc${selectedCompIds.size !== 1 ? "ies" : "y"}` : null,
+    textQuestions.length > 0 ? `${textQuestions.length} question${textQuestions.length !== 1 ? "s" : ""}` : null,
+  ].filter(Boolean).join(" · ") || "None configured";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 mb-8">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/cycles">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <Link href="/dashboard/cycles"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">New Performance Cycle</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {step === 1 ? "Step 1: Define the cycle period" : "Step 2: Configure review questions"}
-          </p>
-        </div>
-      </div>
-
-      {/* Step indicator */}
-      <div className="flex items-center gap-2">
-        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-          step === 1 ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary"
-        }`}>
-          1. Cycle Details
-        </div>
-        <div className="w-6 h-px bg-border" />
-        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-          step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-        }`}>
-          2. Review Questions
+          <h1 className="text-xl font-semibold tracking-tight">New Performance Cycle</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Set up and launch a review cycle for your team</p>
         </div>
       </div>
 
       {error && (
-        <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm">
+        <div className="bg-destructive/10 text-destructive px-4 py-3 rounded-lg text-sm mb-6">
           {error}
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* STEP 1: Cycle Details */}
-      {/* ============================================================ */}
-      {step === 1 && (
-        <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-lg">Cycle Details</CardTitle>
-            <CardDescription>Define the time period and type for this review cycle</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="name">Cycle Name *</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Q1 2026 Performance Review"
-              />
-            </div>
+      {/* ── Core fields ── */}
+      <div className="space-y-4 mb-2">
+        {/* Name + Type */}
+        <div className="flex gap-3">
+          <div className="flex-1 space-y-1.5">
+            <Label htmlFor="name">Cycle Name *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Q2 2026 Performance Review"
+            />
+          </div>
+          <div className="w-44 space-y-1.5">
+            <Label>Type</Label>
+            <Select value={cycleType} onValueChange={setCycleType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CYCLE_TYPES.map((t) => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
-            <div className="space-y-2">
-              <Label>Cycle Type</Label>
-              <Select value={cycleType} onValueChange={setCycleType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {CYCLE_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Dates */}
+        <div className="grid grid-cols-3 gap-3">
+          <DatePickerField label="Start Date" value={startDate} onChange={setStartDate} placeholder="Start" />
+          <DatePickerField label="End Date" value={endDate} onChange={setEndDate} placeholder="End" />
+          <DatePickerField label="Review Deadline" value={reviewDeadline} onChange={setReviewDeadline} placeholder="Optional" optional />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe the goals and focus areas for this review cycle..."
-                rows={3}
-              />
-            </div>
+        {/* Description toggle */}
+        {!showDescription ? (
+          <button
+            type="button"
+            onClick={() => setShowDescription(true)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            + Add description
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Goals and focus areas for this review cycle..."
+              rows={2}
+            />
+          </div>
+        )}
+      </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+      {/* ── People ── */}
+      <div className="border-t border-border/60 mt-4">
+        <SectionHeader
+          icon={<Users className="h-4 w-4" />}
+          title="People"
+          summary={selectedPeopleIds.length > 0 ? `${selectedPeopleIds.length} selected` : "None selected"}
+          open={peopleOpen}
+          onToggle={() => setPeopleOpen(!peopleOpen)}
+        />
+        {peopleOpen && (
+          <div className="pb-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={peopleSearch}
+                  onChange={(e) => setPeopleSearch(e.target.value)}
+                  placeholder="Search people..."
+                  className="pl-8 h-8 text-sm"
+                />
               </div>
-              <div className="space-y-2">
-                <Label>End Date *</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Review Deadline (Optional)</Label>
-              <Input type="date" value={reviewDeadline} onChange={(e) => setReviewDeadline(e.target.value)} />
-              <p className="text-xs text-muted-foreground">When should all reviews be submitted by?</p>
-            </div>
-
-            <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" asChild>
-                <Link href="/dashboard/cycles">Cancel</Link>
-              </Button>
-              <Button type="button" onClick={goToStep2}>
-                Next: Review Questions
-                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              <Button
+                variant="outline" size="sm" className="h-8 text-xs shrink-0"
+                onClick={() => {
+                  const allFiltered = filteredUsers.map((u) => u.id);
+                  const allSelected = allFiltered.every((id) => selectedPeopleIds.includes(id));
+                  if (allSelected) {
+                    setSelectedPeopleIds((prev) => prev.filter((id) => !allFiltered.includes(id)));
+                  } else {
+                    setSelectedPeopleIds((prev) => [...new Set([...prev, ...allFiltered])]);
+                  }
+                }}
+              >
+                {filteredUsers.every((u) => selectedPeopleIds.includes(u.id)) && filteredUsers.length > 0
+                  ? "Deselect All" : "Select All"}
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ============================================================ */}
-      {/* STEP 2: Review Questions */}
-      {/* ============================================================ */}
-      {step === 2 && (
-        <>
-          {/* Competency Selection */}
-          <Card className="border-border/60">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    Competency Ratings
-                  </CardTitle>
-                  <CardDescription>
-                    Select which competencies employees will be rated on.
-                    {competencies.length === 0 && (
-                      <span className="block mt-1 text-amber-600">
-                        No competencies defined yet. <Link href="/dashboard/competencies/new" className="underline">Create competencies</Link> first.
+            <div className="border border-border/60 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+              {users.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">Loading people…</p>
+              ) : filteredUsers.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-6">No people found</p>
+              ) : (
+                filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted/40 cursor-pointer border-b border-border/30 last:border-0"
+                    onClick={() => togglePerson(user.id)}
+                  >
+                    <Checkbox
+                      checked={selectedPeopleIds.includes(user.id)}
+                      onCheckedChange={() => togglePerson(user.id)}
+                    />
+                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-medium text-primary">
+                        {user.slack_name?.[0]?.toUpperCase() || "?"}
                       </span>
-                    )}
-                  </CardDescription>
-                </div>
-                {competencies.length > 0 && (
-                  <Button variant="outline" size="sm" className="text-xs" onClick={selectAllCompetencies}>
-                    {selectedCompIds.size === competencies.length ? "Deselect All" : "Select All"}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            {competencies.length > 0 && (
-              <CardContent>
-                <div className="space-y-4">
-                  {categories.map((cat) => (
-                    <div key={cat}>
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{cat}</p>
-                      <div className="space-y-1">
-                        {competencies
-                          .filter((c) => (c.category || "Uncategorized") === cat)
-                          .map((comp) => (
-                            <label
-                              key={comp.id}
-                              className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer ${
-                                selectedCompIds.has(comp.id)
-                                  ? "border-primary/40 bg-primary/[0.03]"
-                                  : "border-border/60 hover:border-border"
-                              }`}
-                            >
-                              <Checkbox
-                                checked={selectedCompIds.has(comp.id)}
-                                onCheckedChange={() => toggleCompetency(comp.id)}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <span className="text-sm font-medium text-foreground">{comp.name}</span>
-                                {comp.description && (
-                                  <span className="text-xs text-muted-foreground ml-2 hidden sm:inline">
-                                    {comp.description.slice(0, 60)}{comp.description.length > 60 ? "..." : ""}
-                                  </span>
-                                )}
-                              </div>
-                            </label>
-                          ))}
-                      </div>
                     </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {selectedCompIds.size} of {competencies.length} competencies selected
-                </p>
-              </CardContent>
-            )}
-          </Card>
+                    <span className="text-sm text-foreground">{user.slack_name || "Unknown"}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
 
-          {/* Text Questions */}
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                Open-Ended Questions
-              </CardTitle>
-              <CardDescription>
-                Add text questions for strengths, areas for improvement, company values, etc.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Existing questions */}
-              {textQuestions.length > 0 && (
-                <div className="space-y-2">
+      {/* ── Review Questions ── */}
+      <div className="border-t border-border/60">
+        <SectionHeader
+          icon={<Target className="h-4 w-4" />}
+          title="Review Questions"
+          summary={questionsSummary}
+          open={questionsOpen}
+          onToggle={() => setQuestionsOpen(!questionsOpen)}
+        />
+        {questionsOpen && (
+          <div className="pb-4 space-y-3">
+
+            {/* Competencies */}
+            <div className="border border-border/60 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setCompOpen(!compOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/30 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Target className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium">Competency Ratings</span>
+                  <span className="text-xs text-muted-foreground">{selectedCompIds.size} selected</span>
+                </div>
+                {compOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              {compOpen && (
+                <div className="p-3">
+                  {competencies.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-3">
+                      No competencies defined. <Link href="/dashboard/competencies/new" className="underline">Create some first.</Link>
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex justify-end mb-2">
+                        <Button
+                          variant="ghost" size="sm" className="text-xs h-6"
+                          onClick={() => selectedCompIds.size === competencies.length
+                            ? setSelectedCompIds(new Set())
+                            : setSelectedCompIds(new Set(competencies.map((c) => c.id)))}
+                        >
+                          {selectedCompIds.size === competencies.length ? "Deselect All" : "Select All"}
+                        </Button>
+                      </div>
+                      <div className="space-y-3">
+                        {categories.map((cat) => (
+                          <div key={cat}>
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">{cat}</p>
+                            <div className="space-y-0.5">
+                              {competencies.filter((c) => (c.category || "Uncategorized") === cat).map((comp) => (
+                                <label
+                                  key={comp.id}
+                                  className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-muted/40 cursor-pointer"
+                                >
+                                  <Checkbox checked={selectedCompIds.has(comp.id)} onCheckedChange={() => toggleCompetency(comp.id)} />
+                                  <span className="text-sm text-foreground">{comp.name}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Text questions */}
+            <div className="border border-border/60 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setTqOpen(!tqOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/30 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium">Open-ended Questions</span>
+                  <span className="text-xs text-muted-foreground">{textQuestions.length} question{textQuestions.length !== 1 ? "s" : ""}</span>
+                </div>
+                {tqOpen ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+              </button>
+              {tqOpen && (
+                <div className="p-3 space-y-2.5">
                   {textQuestions.map((q, idx) => (
-                    <div key={idx} className="flex items-center gap-2 p-2.5 rounded-lg border border-border/60">
-                      <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-sm text-foreground flex-1">{q.prompt}</span>
-                      {q.required && (
-                        <Badge variant="outline" className="text-[10px] shrink-0">Required</Badge>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 shrink-0"
-                        onClick={() => removeTextQuestion(idx)}
-                      >
+                    <div key={idx} className="flex items-center gap-2 px-3 py-2 rounded-md border border-border/60 bg-muted/20">
+                      <MessageSquare className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-foreground flex-1">{q.prompt}</span>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => setTextQuestions((p) => p.filter((_, i) => i !== idx))}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   ))}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newPrompt}
+                      onChange={(e) => setNewPrompt(e.target.value)}
+                      placeholder="Add a question…"
+                      className="flex-1 h-8 text-sm"
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), newPrompt.trim() && (setTextQuestions((p) => [...p, { prompt: newPrompt.trim(), required: true }]), setNewPrompt("")))}
+                    />
+                    <Button
+                      variant="outline" size="sm" className="h-8 shrink-0"
+                      onClick={() => { if (newPrompt.trim()) { setTextQuestions((p) => [...p, { prompt: newPrompt.trim(), required: true }]); setNewPrompt(""); } }}
+                      disabled={!newPrompt.trim()}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {SUGGESTED_QUESTIONS.filter((s) => !textQuestions.some((q) => q.prompt === s)).map((s) => (
+                      <button
+                        key={s} type="button"
+                        className="text-[11px] px-2 py-1 rounded-full border border-border/60 text-muted-foreground hover:border-primary/60 hover:text-primary transition-colors"
+                        onClick={() => setTextQuestions((p) => [...p, { prompt: s, required: true }])}
+                      >
+                        + {s.length > 45 ? s.slice(0, 42) + "…" : s}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
+            </div>
 
-              {/* Add new question */}
-              <div className="flex gap-2">
-                <Input
-                  value={newPrompt}
-                  onChange={(e) => setNewPrompt(e.target.value)}
-                  placeholder="Type a question, e.g. 'How did they demonstrate leadership?'"
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTextQuestion())}
-                />
-                <Button variant="outline" size="sm" onClick={addTextQuestion} disabled={!newPrompt.trim()}>
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add
-                </Button>
-              </div>
-
-              {/* Suggestions */}
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Suggested questions:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {SUGGESTED_TEXT_QUESTIONS.filter(
-                    (s) => !textQuestions.some((q) => q.prompt === s)
-                  ).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      className="text-[11px] px-2.5 py-1 rounded-full border border-border/60 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                      onClick={() => addSuggested(s)}
-                    >
-                      + {s.length > 50 ? s.slice(0, 47) + "..." : s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <div className="flex justify-between pt-2 pb-8">
-            <Button variant="outline" onClick={() => setStep(1)}>
-              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-              Back
-            </Button>
-            <Button onClick={handleSubmit} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : null}
-              Create Cycle
-            </Button>
           </div>
-        </>
-      )}
+        )}
+      </div>
+
+      {/* ── Actions ── */}
+      <div className="border-t border-border/60 mt-2 pt-5 flex items-center justify-between">
+        <Button variant="ghost" asChild>
+          <Link href="/dashboard/cycles">Cancel</Link>
+        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={handleSaveDraft} disabled={!!loading}>
+            {loading === "draft" && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Save as Draft
+          </Button>
+          <Button onClick={handleCreateAndLaunch} disabled={!!loading}>
+            {loading === "launch"
+              ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              : <Play className="h-4 w-4 mr-2" />}
+            Create & Launch
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

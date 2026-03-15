@@ -66,7 +66,7 @@ export default async function BillingPage() {
         <h1 className="text-2xl font-bold text-foreground mb-2">
           Access Restricted
         </h1>
-        <p className="text-muted-foreground mb-6 max-w-md">
+        <p className="text-muted-foreground mb-6">
           Billing management is only available to workspace administrators.
         </p>
         <Button asChild>
@@ -82,7 +82,7 @@ export default async function BillingPage() {
   const planInfo = planDetails[plan] || planDetails.free;
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold text-foreground">Billing & Subscription</h1>
         <p className="text-muted-foreground mt-2">Manage your workspace subscription and billing</p>

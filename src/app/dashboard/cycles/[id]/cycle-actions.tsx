@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal } from "lucide-react";
+import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal, Bell, BellOff } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 interface CycleActionsProps {
@@ -42,6 +42,8 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
   const [showReleaseDialog, setShowReleaseDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [notificationError, setNotificationError] = useState(false);
+  const [notificationSent, setNotificationSent] = useState(false);
 
   const isHR = userRole === "hr" || userRole === "admin";
 
@@ -68,8 +70,29 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
     }
   }
 
+  async function sendNotifications() {
+    setNotificationError(false);
+    setNotificationSent(false);
+    try {
+      const { error: notifError } = await supabase.functions.invoke("cycle-notifications", {
+        body: { action: "launch", cycle_id: cycle.id },
+      });
+      if (notifError) {
+        console.error("Failed to send Slack notifications:", notifError);
+        setNotificationError(true);
+      } else {
+        setNotificationSent(true);
+      }
+    } catch (notifErr) {
+      console.error("Failed to send Slack notifications:", notifErr);
+      setNotificationError(true);
+    }
+  }
+
   async function launchCycle() {
     setLoading(true);
+    setNotificationError(false);
+    setNotificationSent(false);
     try {
       // 1. Fetch employees enrolled in this cycle
       const { data: cycleEmployees, error: empError } = await supabase
@@ -88,7 +111,13 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
 
       if (usersError) throw usersError;
 
-      // 3. Create standard review_assignments for each employee (self + manager review)
+      // 3. Delete any existing assignments (handles partial-launch retries safely)
+      await supabase
+        .from("review_assignments")
+        .delete()
+        .eq("cycle_id", cycle.id);
+
+      // 3a. Create standard review_assignments for each employee (self + manager review)
       const assignments = (users || []).map((u: any) => ({
         cycle_id: cycle.id,
         employee_id: u.id,
@@ -153,14 +182,8 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
         .update({ status: "in_progress" })
         .eq("performance_cycle_id", cycle.id);
 
-      // 7. Send Slack notifications (fire and forget)
-      try {
-        await supabase.functions.invoke("cycle-notifications", {
-          body: { action: "launch", cycle_id: cycle.id },
-        });
-      } catch (notifErr) {
-        console.error("Failed to send launch notifications:", notifErr);
-      }
+      // 7. Send Slack notifications — check the returned error (functions.invoke never throws)
+      await sendNotifications();
 
       router.refresh();
     } catch (err) {
@@ -210,6 +233,18 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
 
   return (
     <>
+      {notificationError && (
+        <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 px-3 py-1.5 rounded-md">
+          <BellOff className="h-3.5 w-3.5 shrink-0" />
+          Slack notifications failed — use &quot;Re-send Slack Notifications&quot; to retry.
+        </div>
+      )}
+      {notificationSent && (
+        <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-400/20 px-3 py-1.5 rounded-md">
+          <Bell className="h-3.5 w-3.5 shrink-0" />
+          Slack notifications sent successfully.
+        </div>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="icon" disabled={loading}>
@@ -234,6 +269,18 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
             <DropdownMenuItem onClick={() => setShowCompleteDialog(true)}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Mark Completed
+            </DropdownMenuItem>
+          )}
+          {cycle.status === "active" && (
+            <DropdownMenuItem
+              onClick={async () => {
+                setLoading(true);
+                await sendNotifications();
+                setLoading(false);
+              }}
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Re-send Slack Notifications
             </DropdownMenuItem>
           )}
           {(cycle.status === "completed" || cycle.status === "active") && (

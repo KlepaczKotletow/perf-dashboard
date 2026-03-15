@@ -2,42 +2,111 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, ArrowRight, Users, Settings, BarChart3, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 function AuthSuccessContent() {
   const searchParams = useSearchParams();
   const team = searchParams.get("team");
+  const returning = searchParams.get("returning") === "true";
+
+  if (returning) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md text-center space-y-6">
+          <div className="flex justify-center">
+            <div className="h-14 w-14 rounded-2xl bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center">
+              <RefreshCw className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+          </div>
+
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              App Re-installed
+            </h1>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm mx-auto">
+              {team ? `${team} has been reconnected.` : "Your workspace has been reconnected."}{" "}
+              All your existing data — reviews, cycles, and competencies — is intact.
+            </p>
+          </div>
+
+          <Button size="sm" asChild className="gap-1.5">
+            <Link href="/dashboard">
+              Go to Dashboard
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <CheckCircle2 className="h-16 w-16 text-green-600" />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-lg text-center space-y-8">
+        {/* Hero */}
+        <div className="space-y-3">
+          <div className="flex justify-center">
+            <div className="h-14 w-14 rounded-2xl bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center">
+              <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </div>
-          <CardTitle className="text-2xl">Installation Successful!</CardTitle>
-          <CardDescription>
-            {team ? `${team} has been successfully connected.` : "Your workspace has been successfully connected."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-            You can now use the 360 Feedback app in Slack. Try the following commands:
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            You&apos;re all set!
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+            {team ? `${team} is now connected to Perf.` : "Your workspace is now connected to Perf."}{" "}
+            Here&apos;s what to do next:
           </p>
-          <ul className="text-sm space-y-2 text-slate-600 dark:text-slate-400">
-            <li>• <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/feedback @user message</code> - Give quick feedback</li>
-            <li>• <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/review start</code> - Start a 360 review</li>
-            <li>• <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/review status</code> - Check pending reviews</li>
-          </ul>
-          <div className="pt-4">
-            <Button asChild className="w-full">
-              <Link href="/dashboard">Go to Dashboard</Link>
-            </Button>
+        </div>
+
+        {/* Onboarding steps */}
+        <div className="grid gap-3 text-left max-w-md mx-auto">
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-card">
+            <div className="h-8 w-8 rounded-lg bg-sky-100 dark:bg-sky-400/10 flex items-center justify-center shrink-0 mt-0.5">
+              <Users className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">1. Sync your team</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Import your Slack workspace members with one click
+              </p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-card">
+            <div className="h-8 w-8 rounded-lg bg-violet-100 dark:bg-violet-400/10 flex items-center justify-center shrink-0 mt-0.5">
+              <Settings className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">2. Set up org structure</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Assign managers, departments, and define competencies
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-card">
+            <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-400/10 flex items-center justify-center shrink-0 mt-0.5">
+              <BarChart3 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">3. Launch your first review cycle</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Start collecting 360° feedback from your team
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <Button size="sm" asChild className="gap-1.5">
+          <Link href="/dashboard">
+            Go to Dashboard
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -45,7 +114,7 @@ function AuthSuccessContent() {
 export default function AuthSuccess() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     }>

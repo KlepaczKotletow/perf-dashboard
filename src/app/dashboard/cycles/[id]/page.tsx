@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,14 +74,18 @@ async function getCycleEmployees(cycleId: string) {
   return data || [];
 }
 
-async function getWorkspaceUsers() {
-  const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
-    .from("users")
-    .select("id, slack_name, slack_email")
-    .order("slack_name");
-  return data || [];
-}
+const getWorkspaceUsers = unstable_cache(
+  async () => {
+    const supabase = await createServerSupabaseClient();
+    const { data } = await supabase
+      .from("users")
+      .select("id, slack_name, slack_email")
+      .order("slack_name");
+    return data || [];
+  },
+  ["workspace-users"],
+  { revalidate: 30 } // revalidate every 30 seconds
+);
 
 async function getCycleQuestions(cycleId: string) {
   const supabase = await createServerSupabaseClient();
@@ -98,15 +103,19 @@ async function getCycleQuestions(cycleId: string) {
   }));
 }
 
-async function getAllCompetencies() {
-  const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
-    .from("competencies")
-    .select("id, name, category, description")
-    .order("category")
-    .order("name");
-  return data || [];
-}
+const getAllCompetencies = unstable_cache(
+  async () => {
+    const supabase = await createServerSupabaseClient();
+    const { data } = await supabase
+      .from("competencies")
+      .select("id, name, category, description")
+      .order("category")
+      .order("name");
+    return data || [];
+  },
+  ["all-competencies"],
+  { revalidate: 300 } // revalidate every 5 minutes — competencies rarely change
+);
 
 
 export default async function CycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -131,10 +140,11 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     notFound();
   }
 
-  // Auto-progress phases based on current date
+  // Auto-progress phases in background — don't block the page render
   if (cycle.status === "active") {
-    const supabase2 = await createServerSupabaseClient();
-    await supabase2.rpc("progress_cycle_phases", { p_cycle_id: id });
+    createServerSupabaseClient().then((sb) =>
+      sb.rpc("progress_cycle_phases", { p_cycle_id: id })
+    );
   }
 
   const [employees, allUsers, phases, assignments, cycleQuestions, allCompetencies] = await Promise.all([

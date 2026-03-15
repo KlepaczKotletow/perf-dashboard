@@ -44,7 +44,7 @@ export default async function TemplateDetailPage({
   const questions = Array.isArray(template.questions) ? template.questions : [];
 
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8">
       <div className="flex items-start gap-4">
         <Button variant="outline" size="icon" asChild>
           <Link href="/dashboard/templates">
