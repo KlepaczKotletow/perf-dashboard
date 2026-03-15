@@ -54,14 +54,19 @@ export function OnboardingClient({ workspaceId, workspaceName }: Props) {
     const useDepartments = c === "departments" || c === "both";
     const useCareerFramework = c === "career_framework" || c === "both";
 
-    await supabase.from("workspaces").update({
-      use_departments: useDepartments,
-      use_career_framework: useCareerFramework,
-      onboarding_completed: true,
-    }).eq("id", workspaceId);
-
-    setSaving(false);
-    setStep(3);
+    try {
+      const { error: err } = await supabase.from("workspaces").update({
+        use_departments: useDepartments,
+        use_career_framework: useCareerFramework,
+        onboarding_completed: true,
+      }).eq("id", workspaceId);
+      if (err) throw err;
+      setStep(3);
+    } catch {
+      // If update fails, retry is implicit — user can press Continue again
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
