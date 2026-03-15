@@ -45,7 +45,7 @@ export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps
 
   if (!canEdit) {
     return (
-      <span className="text-sm capitalize">
+      <span className="text-sm capitalize h-10 w-32 inline-flex items-center px-3">
         {ROLE_LABELS[currentRole as UserRole] || currentRole || "Employee"}
       </span>
     );
