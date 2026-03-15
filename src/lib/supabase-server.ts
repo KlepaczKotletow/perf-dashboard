@@ -44,8 +44,8 @@ export async function getUserWorkspace() {
   // If we have an app_user_id, fetch the actual role from the users table
   // (more secure than relying on user_metadata which could be stale)
   let role = user.user_metadata?.role || 'user'
+  const supabase = await createServerSupabaseClient()
   if (appUserId) {
-    const supabase = await createServerSupabaseClient()
     const { data: dbUser } = await supabase
       .from('users')
       .select('role')
@@ -56,6 +56,16 @@ export async function getUserWorkspace() {
     }
   }
 
+  const { data: wsData } = await supabase
+    .from("workspaces")
+    .select("use_departments, use_career_framework, onboarding_completed")
+    .eq("id", workspaceId)
+    .single();
+
+  const useDepartments = wsData?.use_departments ?? true;
+  const useCareerFramework = wsData?.use_career_framework ?? true;
+  const onboardingCompleted = wsData?.onboarding_completed ?? true;
+
   return {
     userId: user.id,
     email: user.email,
@@ -65,6 +75,9 @@ export async function getUserWorkspace() {
     role,
     slackUserId: user.user_metadata?.slack_user_id,
     appUserId,
+    useDepartments,
+    useCareerFramework,
+    onboardingCompleted,
   }
 }
 
