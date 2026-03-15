@@ -106,7 +106,6 @@ export function FunctionsClient({
 
   const [selectedId, setSelectedId] = useState<string | null>(initialFunctions[0]?.id ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   // Sidebar: add function
   const [showAddFunction, setShowAddFunction] = useState(false);
@@ -175,11 +174,6 @@ export function FunctionsClient({
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
-  function showToast(msg: string) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  }
-
   async function getAuthUser() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
@@ -213,34 +207,19 @@ export function FunctionsClient({
     }
   }
 
-  async function handleRenameFunction(id: string) {
-    if (!renameFunctionValue.trim()) { setRenamingFunctionId(null); return; }
+  async function handleRenameFunction(id: string, newName: string, onDone: () => void) {
+    if (!newName.trim()) { onDone(); return; }
     try {
       const { error: err } = await supabase
         .from("job_families")
-        .update({ name: renameFunctionValue.trim() })
+        .update({ name: newName.trim() })
         .eq("id", id);
       if (err) throw err;
-      setRenamingFunctionId(null);
+      onDone();
       router.refresh();
     } catch (e: any) {
       setError(e.message ?? "Failed to rename");
-    }
-  }
-
-  async function handleRenameFunctionFromHeader(id: string) {
-    if (!editFunctionNameValue.trim()) { setEditingFunctionName(false); return; }
-    try {
-      const { error: err } = await supabase
-        .from("job_families")
-        .update({ name: editFunctionNameValue.trim() })
-        .eq("id", id);
-      if (err) throw err;
-      setEditingFunctionName(false);
-      router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to rename");
-      setEditingFunctionName(false);
+      onDone();
     }
   }
 
@@ -319,7 +298,7 @@ export function FunctionsClient({
       .select("id", { count: "exact", head: true })
       .eq("level_id", id);
     if ((count ?? 0) > 0) {
-      if (!confirm(`${count} person${count !== 1 ? "s are" : " is"} at this level. Deleting it will unassign them. Continue?`)) return;
+      if (!confirm(`${count} ${count !== 1 ? "people are" : "person is"} at this level. Deleting it will unassign them. Continue?`)) return;
     }
     try {
       const { error: err } = await supabase.from("levels").delete().eq("id", id);
@@ -408,13 +387,6 @@ export function FunctionsClient({
 
   return (
     <div className="flex h-full min-h-[calc(100vh-4rem)] -m-6">
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2">
-          <Check className="h-4 w-4" /> {toast}
-        </div>
-      )}
-
       {/* ── Left Sidebar ──────────────────────────────────────────────── */}
       <div className="w-56 shrink-0 border-r border-border/60 bg-muted/20 flex flex-col">
         {/* Sidebar header */}
@@ -454,10 +426,10 @@ export function FunctionsClient({
                   value={renameFunctionValue}
                   onChange={(e) => setRenameFunctionValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleRenameFunction(fn.id);
+                    if (e.key === "Enter") handleRenameFunction(fn.id, renameFunctionValue, () => setRenamingFunctionId(null));
                     if (e.key === "Escape") setRenamingFunctionId(null);
                   }}
-                  onBlur={() => handleRenameFunction(fn.id)}
+                  onBlur={() => handleRenameFunction(fn.id, renameFunctionValue, () => setRenamingFunctionId(null))}
                   className="h-6 text-xs px-1.5 py-0"
                   onClick={(e) => e.stopPropagation()}
                 />
@@ -561,10 +533,10 @@ export function FunctionsClient({
                     value={editFunctionNameValue}
                     onChange={(e) => setEditFunctionNameValue(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRenameFunctionFromHeader(selectedId!);
+                      if (e.key === "Enter") handleRenameFunction(selectedId!, editFunctionNameValue, () => setEditingFunctionName(false));
                       if (e.key === "Escape") setEditingFunctionName(false);
                     }}
-                    onBlur={() => handleRenameFunctionFromHeader(selectedId!)}
+                    onBlur={() => handleRenameFunction(selectedId!, editFunctionNameValue, () => setEditingFunctionName(false))}
                     className="text-xl font-semibold h-9 max-w-sm"
                   />
                 ) : (
@@ -574,7 +546,6 @@ export function FunctionsClient({
                       if (!canEdit) return;
                       setEditingFunctionName(true);
                       setEditFunctionNameValue(selectedFunction.name);
-                      setRenameFunctionValue(selectedFunction.name);
                     }}
                   >
                     {selectedFunction.name}
