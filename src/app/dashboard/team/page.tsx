@@ -72,7 +72,7 @@ export default async function TeamPage({
   const seatUsed = users.length;
   const seatPercent = Math.min(Math.round((seatUsed / seatLimit) * 100), 100);
 
-  const unassignedCount = users.filter((u: any) => !u.level_id).length;
+  const unassignedCount = users.filter((u: any) => !u.level).length;
 
   const departments = [...new Set(users.map((u: any) => u.department).filter(Boolean))].sort();
 
