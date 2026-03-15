@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Users,
   MoreHorizontal,
+  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -24,6 +25,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +98,108 @@ function ScorePicker({
         </button>
       </div>
     </>
+  );
+}
+
+// ── Sortable Level Pill ────────────────────────────────────────────────────
+
+interface SortableLevelProps {
+  level: Level;
+  canEdit: boolean;
+  isRenaming: boolean;
+  renameValue: string;
+  onRenameChange: (v: string) => void;
+  onRenameKeyDown: (e: React.KeyboardEvent) => void;
+  onRenameBlur: () => void;
+  onStartRename: () => void;
+  onDelete: () => void;
+}
+
+function SortableLevel({
+  level,
+  canEdit,
+  isRenaming,
+  renameValue,
+  onRenameChange,
+  onRenameKeyDown,
+  onRenameBlur,
+  onStartRename,
+  onDelete,
+}: SortableLevelProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: level.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  if (isRenaming) {
+    return (
+      <div ref={setNodeRef} style={style}>
+        <Input
+          autoFocus
+          value={renameValue}
+          onChange={(e) => onRenameChange(e.target.value)}
+          onKeyDown={onRenameKeyDown}
+          onBlur={onRenameBlur}
+          className="h-7 text-xs w-28"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group/level relative"
+    >
+      <div
+        className={`flex items-center gap-1 px-2 py-1.5 rounded-full border text-xs font-medium transition-colors ${
+          canEdit
+            ? "border-border bg-background hover:border-primary/40 hover:bg-primary/5"
+            : "border-border bg-muted/30"
+        } ${isDragging ? "shadow-md" : ""}`}
+      >
+        {canEdit && (
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none"
+            tabIndex={-1}
+            aria-label="Drag to reorder"
+          >
+            <GripVertical className="h-3 w-3" />
+          </button>
+        )}
+        <span
+          className={canEdit ? "cursor-pointer" : ""}
+          onClick={canEdit ? onStartRename : undefined}
+        >
+          {level.name}
+        </span>
+        {level.grade && (
+          <span className="text-muted-foreground text-[10px]">{level.grade}</span>
+        )}
+        {canEdit && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="opacity-0 group-hover/level:opacity-100 transition-opacity ml-0.5 hover:text-destructive"
+          >
+            <X className="h-2.5 w-2.5" />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
