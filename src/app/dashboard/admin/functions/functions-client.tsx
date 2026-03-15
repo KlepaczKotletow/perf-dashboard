@@ -132,6 +132,18 @@ export function FunctionsClient({
   // Score picker — key is `${level_id}-${competency_id}`
   const [pickerKey, setPickerKey] = useState<string | null>(null);
 
+  // Function header inline editing
+  const [editingFunctionName, setEditingFunctionName] = useState(false);
+  const [editFunctionNameValue, setEditFunctionNameValue] = useState("");
+  const [editingFunctionDesc, setEditingFunctionDesc] = useState(false);
+  const [editFunctionDescValue, setEditFunctionDescValue] = useState("");
+
+  // Core skills collapsible
+  const [coreSkillsOpen, setCoreSkillsOpen] = useState(true);
+
+  // Skill description expand/collapse
+  const [expandedSkillId, setExpandedSkillId] = useState<string | null>(null);
+
   // ── Derived ────────────────────────────────────────────────────────────
 
   const matrixLookup = useMemo(() => {
@@ -213,6 +225,36 @@ export function FunctionsClient({
       router.refresh();
     } catch (e: any) {
       setError(e.message ?? "Failed to rename");
+    }
+  }
+
+  async function handleRenameFunctionFromHeader(id: string) {
+    if (!editFunctionNameValue.trim()) { setEditingFunctionName(false); return; }
+    try {
+      const { error: err } = await supabase
+        .from("job_families")
+        .update({ name: editFunctionNameValue.trim() })
+        .eq("id", id);
+      if (err) throw err;
+      setEditingFunctionName(false);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to rename");
+      setEditingFunctionName(false);
+    }
+  }
+
+  async function handleUpdateFunctionDescription(id: string, desc: string) {
+    try {
+      const { error: err } = await supabase
+        .from("job_families")
+        .update({ description: desc.trim() || null })
+        .eq("id", id);
+      if (err) throw err;
+      setEditingFunctionDesc(false);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to update description");
     }
   }
 
@@ -422,11 +464,13 @@ export function FunctionsClient({
               ) : (
                 <>
                   <span className="flex-1 text-sm font-medium truncate">{fn.name}</span>
-                  {(memberCountByFunction[fn.id] ?? 0) > 0 && (
-                    <span className={`text-[10px] tabular-nums shrink-0 ${selectedId === fn.id ? "text-primary/70" : "text-muted-foreground"}`}>
-                      {memberCountByFunction[fn.id]}
-                    </span>
-                  )}
+                  <span className={`text-[10px] tabular-nums shrink-0 px-1.5 py-0.5 rounded-full ${
+                    (memberCountByFunction[fn.id] ?? 0) > 0
+                      ? selectedId === fn.id ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                      : "text-muted-foreground/40"
+                  }`}>
+                    {memberCountByFunction[fn.id] ?? 0}
+                  </span>
                   {canEdit && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -510,11 +554,59 @@ export function FunctionsClient({
           <div className="p-6 space-y-6 max-w-4xl">
             {/* Function header */}
             <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-foreground">{selectedFunction.name}</h2>
-                {selectedFunction.description && (
-                  <p className="text-sm text-muted-foreground mt-1">{selectedFunction.description}</p>
+              <div className="flex-1 min-w-0">
+                {editingFunctionName ? (
+                  <Input
+                    autoFocus
+                    value={editFunctionNameValue}
+                    onChange={(e) => setEditFunctionNameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRenameFunctionFromHeader(selectedId!);
+                      if (e.key === "Escape") setEditingFunctionName(false);
+                    }}
+                    onBlur={() => handleRenameFunctionFromHeader(selectedId!)}
+                    className="text-xl font-semibold h-9 max-w-sm"
+                  />
+                ) : (
+                  <h2
+                    className={`text-xl font-semibold text-foreground ${canEdit ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
+                    onClick={() => {
+                      if (!canEdit) return;
+                      setEditingFunctionName(true);
+                      setEditFunctionNameValue(selectedFunction.name);
+                      setRenameFunctionValue(selectedFunction.name);
+                    }}
+                  >
+                    {selectedFunction.name}
+                  </h2>
                 )}
+
+                {editingFunctionDesc ? (
+                  <Input
+                    autoFocus
+                    value={editFunctionDescValue}
+                    onChange={(e) => setEditFunctionDescValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleUpdateFunctionDescription(selectedId!, editFunctionDescValue);
+                      if (e.key === "Escape") setEditingFunctionDesc(false);
+                    }}
+                    onBlur={() => handleUpdateFunctionDescription(selectedId!, editFunctionDescValue)}
+                    placeholder="Add a description…"
+                    className="text-sm mt-1 max-w-sm"
+                  />
+                ) : (
+                  <p
+                    className={`text-sm mt-1 ${selectedFunction.description ? "text-muted-foreground" : "text-muted-foreground/40 italic"} ${canEdit ? "cursor-pointer hover:text-foreground transition-colors" : ""}`}
+                    onClick={() => {
+                      if (!canEdit) return;
+                      setEditingFunctionDesc(true);
+                      setEditFunctionDescValue(selectedFunction.description ?? "");
+                    }}
+                  >
+                    {selectedFunction.description ?? (canEdit ? "Add a description…" : "")}
+                  </p>
+                )}
+
                 {(memberCountByFunction[selectedId!] ?? 0) > 0 && (
                   <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
                     <Users className="h-3.5 w-3.5" />
@@ -608,14 +700,6 @@ export function FunctionsClient({
             <div>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Skills & Expected Scores</p>
-                {canEdit && (
-                  <button
-                    onClick={() => setShowAddSkill(true)}
-                    className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
-                  >
-                    <Plus className="h-3.5 w-3.5" /> Add skill
-                  </button>
-                )}
               </div>
 
               {functionLevels.length === 0 && functionSkills.length === 0 && coreSkills.length === 0 ? (
@@ -644,8 +728,14 @@ export function FunctionsClient({
                       {functionSkills.map((skill) => (
                         <tr key={skill.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group/row">
                           <td className="py-3 px-4">
-                            <span className="text-xs font-medium text-foreground">{skill.name}</span>
-                            {skill.description && (
+                            <button
+                              className="text-xs font-medium text-foreground hover:text-primary transition-colors text-left"
+                              onClick={() => setExpandedSkillId(expandedSkillId === skill.id ? null : skill.id)}
+                            >
+                              {skill.name}
+                              {skill.description && <ChevronRight className={`inline h-3 w-3 ml-1 transition-transform ${expandedSkillId === skill.id ? "rotate-90" : ""}`} />}
+                            </button>
+                            {expandedSkillId === skill.id && skill.description && (
                               <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed max-w-xs">{skill.description}</p>
                             )}
                           </td>
@@ -735,21 +825,30 @@ export function FunctionsClient({
                       {/* Core skills divider */}
                       {coreSkills.length > 0 && (
                         <>
-                          <tr className="bg-muted/10 border-y border-border/40">
+                          <tr className="bg-muted/10 border-y border-border/40 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => setCoreSkillsOpen(!coreSkillsOpen)}>
                             <td colSpan={functionLevels.length + (canEdit ? 2 : 1)} className="py-1.5 px-4">
-                              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                Core skills — apply to all functions
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${coreSkillsOpen ? "rotate-90" : ""}`} />
+                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                  Core skills ({coreSkills.length}) — apply to all functions
+                                </span>
+                              </div>
                             </td>
                           </tr>
-                          {coreSkills.map((skill) => (
+                          {coreSkillsOpen && coreSkills.map((skill) => (
                             <tr key={skill.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-foreground">{skill.name}</span>
+                                  <button
+                                    className="text-xs font-medium text-foreground hover:text-primary transition-colors text-left"
+                                    onClick={() => setExpandedSkillId(expandedSkillId === skill.id ? null : skill.id)}
+                                  >
+                                    {skill.name}
+                                    {skill.description && <ChevronRight className={`inline h-3 w-3 ml-1 transition-transform ${expandedSkillId === skill.id ? "rotate-90" : ""}`} />}
+                                  </button>
                                   <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/30 text-primary">Core</Badge>
                                 </div>
-                                {skill.description && (
+                                {expandedSkillId === skill.id && skill.description && (
                                   <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed max-w-xs">{skill.description}</p>
                                 )}
                               </td>
@@ -794,6 +893,16 @@ export function FunctionsClient({
                       )}
                     </tbody>
                   </table>
+                  {canEdit && !showAddSkill && (
+                    <div className="px-4 py-2.5 border-t border-border/30">
+                      <button
+                        onClick={() => setShowAddSkill(true)}
+                        className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5 transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" /> Add skill to {selectedFunction.name}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -21,11 +21,11 @@ export default async function FunctionsPage() {
     { data: levelCompetencies },
     { data: users },
   ] = await Promise.all([
-    supabase.from("job_families").select("id, name, description").order("name"),
-    supabase.from("levels").select("id, name, grade, sort_order, job_family_id").order("sort_order"),
-    supabase.from("competencies").select("*").order("name"),
-    supabase.from("level_competencies").select("*"),
-    supabase.from("users").select("id, level_id"),
+    supabase.from("job_families").select("id, name, description").eq("workspace_id", workspace.workspaceId).order("name"),
+    supabase.from("levels").select("id, name, grade, sort_order, job_family_id").eq("workspace_id", workspace.workspaceId).order("sort_order"),
+    supabase.from("competencies").select("*").eq("workspace_id", workspace.workspaceId).order("name"),
+    supabase.from("level_competencies").select("*").eq("workspace_id", workspace.workspaceId),
+    supabase.from("users").select("id, level_id").eq("workspace_id", workspace.workspaceId),
   ]);
 
   return (
