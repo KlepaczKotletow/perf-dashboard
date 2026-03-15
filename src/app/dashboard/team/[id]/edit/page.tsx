@@ -34,7 +34,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<UserData | null>(null);
   const [allUsers, setAllUsers] = useState<{ id: string; slack_name: string }[]>([]);
-  const [levels, setLevels] = useState<{ id: string; name: string; grade: string | null; job_family_name: string }[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string; grade: string | null; job_family_id: string; job_family_name: string }[]>([]);
+  const [jobFamilies, setJobFamilies] = useState<{ id: string; name: string }[]>([]);
+  const [jobFamilyId, setJobFamilyId] = useState<string>("");
 
   const [jobTitle, setJobTitle] = useState("");
   const [department, setDepartment] = useState("");
@@ -74,27 +76,29 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setRole(userData.role || "user");
         setIsDeptHead(userData.is_department_head || false);
 
-        // Load all users for manager selection
-        const { data: usersData } = await supabase
-          .from("users")
-          .select("id, slack_name")
-          .neq("id", id)
-          .order("slack_name");
-        setAllUsers(usersData || []);
+        const [{ data: usersData }, { data: levelsData }, { data: familiesData }] = await Promise.all([
+          supabase.from("users").select("id, slack_name").neq("id", id).order("slack_name"),
+          supabase.from("levels").select("id, name, grade, job_family_id, job_family:job_families(name)").order("sort_order"),
+          supabase.from("job_families").select("id, name").order("name"),
+        ]);
 
-        // Load levels with job family names
-        const { data: levelsData } = await supabase
-          .from("levels")
-          .select("id, name, grade, job_family:job_families(name)")
-          .order("name");
-        setLevels(
-          (levelsData || []).map((l: any) => ({
-            id: l.id,
-            name: l.name,
-            grade: l.grade,
-            job_family_name: l.job_family?.name || "",
-          }))
-        );
+        setAllUsers(usersData || []);
+        setJobFamilies(familiesData || []);
+
+        const mappedLevels = (levelsData || []).map((l: any) => ({
+          id: l.id,
+          name: l.name,
+          grade: l.grade,
+          job_family_id: l.job_family_id,
+          job_family_name: l.job_family?.name || "",
+        }));
+        setLevels(mappedLevels);
+
+        // Derive current job family from the user's current level
+        if (userData.level_id) {
+          const currentLevel = mappedLevels.find(l => l.id === userData.level_id);
+          setJobFamilyId(currentLevel?.job_family_id || "");
+        }
       } catch (err) {
         setError("Failed to load user data");
       } finally {
@@ -222,16 +226,6 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            <Input
-              id="department"
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              placeholder="e.g. Engineering"
-            />
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="manager">Manager</Label>
             <Select value={managerId} onValueChange={setManagerId}>
               <SelectTrigger id="manager">
@@ -248,21 +242,68 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
             </Select>
           </div>
 
+          {/* Job Family */}
           <div className="space-y-2">
-            <Label htmlFor="level">Job Level</Label>
-            <Select value={levelId} onValueChange={setLevelId}>
-              <SelectTrigger id="level">
-                <SelectValue placeholder="Select level" />
+            <Label htmlFor="jobFamily">Job Family</Label>
+            <Select
+              value={jobFamilyId}
+              onValueChange={(val) => {
+                setJobFamilyId(val);
+                setLevelId(""); // reset level when family changes
+              }}
+            >
+              <SelectTrigger id="jobFamily">
+                <SelectValue placeholder="Select job family" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Level</SelectItem>
-                {levels.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.job_family_name ? `${l.job_family_name} — ` : ""}{l.name}{l.grade ? ` (${l.grade})` : ""}
-                  </SelectItem>
+                <SelectItem value="">No job family</SelectItem>
+                {jobFamilies.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {jobFamilies.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No job families yet.{" "}
+                <Link href="/dashboard/admin/job-families" target="_blank" className="text-primary underline underline-offset-2">
+                  Create one →
+                </Link>
+              </p>
+            )}
+          </div>
+
+          {/* Level — filtered to selected family */}
+          <div className="space-y-2">
+            <Label htmlFor="level">Job Level</Label>
+            <Select value={levelId} onValueChange={setLevelId} disabled={!jobFamilyId}>
+              <SelectTrigger id="level">
+                <SelectValue placeholder={jobFamilyId ? "Select level" : "Select a job family first"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No level</SelectItem>
+                {levels
+                  .filter((l) => l.job_family_id === jobFamilyId)
+                  .map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}{l.grade ? ` (${l.grade})` : ""}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Informal team label */}
+          <div className="space-y-2">
+            <Label htmlFor="department">
+              Team / Squad name <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Input
+              id="department"
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              placeholder="e.g. Squad Falcon or Platform Team"
+            />
+            <p className="text-xs text-muted-foreground">Informal name — not linked to job families</p>
           </div>
 
           <div className="space-y-2">
