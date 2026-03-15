@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
 import { X, Loader2, Check } from "lucide-react";
 
 interface BulkActionsProps {
@@ -17,9 +16,12 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
   const [action, setAction] = useState<string>("");
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
+
   const [allUsers, setAllUsers] = useState<{ id: string; slack_name: string }[]>([]);
-  const [levels, setLevels] = useState<{ id: string; name: string; grade: string | null; family: string }[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
+  const [functions, setFunctions] = useState<{ id: string; name: string }[]>([]);
+  const [levels, setLevels] = useState<{ id: string; name: string; grade: string | null; job_family_id: string | null }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [selectedFunctionId, setSelectedFunctionId] = useState<string>("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,27 +30,29 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
 
   useEffect(() => {
     async function load() {
-      const [{ data: usersData }, { data: levelsData }] = await Promise.all([
+      const [
+        { data: usersData },
+        { data: functionsData },
+        { data: levelsData },
+        { data: deptsData },
+      ] = await Promise.all([
         supabase.from("users").select("id, slack_name").order("slack_name"),
-        supabase.from("levels").select("id, name, grade, job_family:job_families(name)").order("name"),
+        supabase.from("job_families").select("id, name").order("name"),
+        supabase.from("levels").select("id, name, grade, job_family_id").order("sort_order"),
+        supabase.from("departments").select("id, name").order("name"),
       ]);
       setAllUsers(usersData || []);
-      setLevels(
-        (levelsData || []).map((l: any) => ({
-          id: l.id,
-          name: l.name,
-          grade: l.grade,
-          family: l.job_family?.name || "",
-        }))
-      );
-      // Collect unique departments from all users
-      const depts = [...new Set((usersData || []).map((u: any) => u.department).filter(Boolean))] as string[];
-      // Also include from the parent users prop
-      const parentDepts = [...new Set(users.map((u) => u.department).filter(Boolean))] as string[];
-      setDepartments([...new Set([...depts, ...parentDepts])].sort());
+      setFunctions(functionsData || []);
+      setLevels(levelsData || []);
+      setDepartments(deptsData || []);
     }
     load();
   }, []);
+
+  // Levels filtered to the selected function
+  const functionLevels = selectedFunctionId
+    ? levels.filter((l) => l.job_family_id === selectedFunctionId)
+    : [];
 
   async function apply() {
     if (!action || !value) return;
@@ -58,7 +62,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
 
     if (action === "department") updateData.department = value;
     if (action === "manager") updateData.manager_id = value === "none" ? null : value;
-    if (action === "level") updateData.level_id = value === "none" ? null : value;
+    if (action === "function_level") updateData.level_id = value === "none" ? null : value;
     if (action === "role") updateData.role = value;
 
     for (const id of selectedIds) {
@@ -68,6 +72,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
     setApplying(false);
     setAction("");
     setValue("");
+    setSelectedFunctionId("");
     onDone();
     window.location.reload();
   }
@@ -80,40 +85,33 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
 
       <div className="h-5 w-px bg-border" />
 
-      <Select value={action} onValueChange={(v) => { setAction(v); setValue(""); }}>
-        <SelectTrigger className="w-40 h-8 text-xs">
+      <Select value={action} onValueChange={(v) => { setAction(v); setValue(""); setSelectedFunctionId(""); }}>
+        <SelectTrigger className="w-44 h-8 text-xs">
           <SelectValue placeholder="Bulk action..." />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="department">Set Department</SelectItem>
           <SelectItem value="manager">Set Manager</SelectItem>
-          <SelectItem value="level">Set Level</SelectItem>
+          <SelectItem value="function_level">Set Function & Level</SelectItem>
           <SelectItem value="role">Set Role</SelectItem>
         </SelectContent>
       </Select>
 
+      {/* Set Department */}
       {action === "department" && (
-        <div className="flex items-center gap-1.5">
-          <Select value={value} onValueChange={setValue}>
-            <SelectTrigger className="w-40 h-8 text-xs">
-              <SelectValue placeholder="Select dept..." />
-            </SelectTrigger>
-            <SelectContent>
-              {departments.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">or</span>
-          <Input
-            className="w-32 h-8 text-xs"
-            placeholder="New dept..."
-            value={departments.includes(value) ? "" : value}
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </div>
+        <Select value={value} onValueChange={setValue}>
+          <SelectTrigger className="w-44 h-8 text-xs">
+            <SelectValue placeholder="Select department..." />
+          </SelectTrigger>
+          <SelectContent>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       )}
 
+      {/* Set Manager */}
       {action === "manager" && (
         <Select value={value} onValueChange={setValue}>
           <SelectTrigger className="w-48 h-8 text-xs">
@@ -132,22 +130,42 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
         </Select>
       )}
 
-      {action === "level" && (
-        <Select value={value} onValueChange={setValue}>
-          <SelectTrigger className="w-56 h-8 text-xs">
-            <SelectValue placeholder="Select level..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">No Level</SelectItem>
-            {levels.map((l) => (
-              <SelectItem key={l.id} value={l.id}>
-                {l.family ? `${l.family} — ` : ""}{l.name}{l.grade ? ` (${l.grade})` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Set Function & Level — two-step */}
+      {action === "function_level" && (
+        <>
+          <Select value={selectedFunctionId} onValueChange={(v) => { setSelectedFunctionId(v); setValue(""); }}>
+            <SelectTrigger className="w-40 h-8 text-xs">
+              <SelectValue placeholder="Function..." />
+            </SelectTrigger>
+            <SelectContent>
+              {functions.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {selectedFunctionId && (
+            <Select value={value} onValueChange={setValue}>
+              <SelectTrigger className="w-40 h-8 text-xs">
+                <SelectValue placeholder="Level..." />
+              </SelectTrigger>
+              <SelectContent>
+                {functionLevels.length === 0 ? (
+                  <SelectItem value="_none" disabled>No levels configured</SelectItem>
+                ) : (
+                  functionLevels.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}{l.grade ? ` (${l.grade})` : ""}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          )}
+        </>
       )}
 
+      {/* Set Role */}
       {action === "role" && (
         <Select value={value} onValueChange={setValue}>
           <SelectTrigger className="w-32 h-8 text-xs">
@@ -165,7 +183,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
       <Button
         size="sm"
         className="h-8 text-xs"
-        disabled={!action || !value || applying}
+        disabled={!action || !value || applying || (action === "function_level" && !selectedFunctionId)}
         onClick={apply}
       >
         {applying ? (
