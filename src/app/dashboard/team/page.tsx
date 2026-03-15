@@ -68,6 +68,8 @@ export default async function TeamPage({
     getSubscription(),
   ]);
   const isAdmin = canManageUsers(workspace?.role);
+  const useDepartments = workspace?.useDepartments ?? false;
+  const useCareerFramework = workspace?.useCareerFramework ?? false;
   const seatLimit = subscription?.user_limit || 5;
   const seatUsed = users.length;
   const seatPercent = Math.min(Math.round((seatUsed / seatLimit) * 100), 100);
@@ -181,6 +183,8 @@ export default async function TeamPage({
           currentUserId={workspace?.appUserId}
           workspaceId={workspace?.workspaceId}
           filterUnassigned={filterUnassigned}
+          useDepartments={useDepartments}
+          useCareerFramework={useCareerFramework}
         />
       )}
     </div>

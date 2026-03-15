@@ -10,9 +10,11 @@ interface BulkActionsProps {
   selectedIds: string[];
   users: { id: string; slack_name: string | null; department: string | null }[];
   onDone: () => void;
+  useDepartments?: boolean;
+  useCareerFramework?: boolean;
 }
 
-export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
+export function BulkActions({ selectedIds, users, onDone, useDepartments = false, useCareerFramework = false }: BulkActionsProps) {
   const [action, setAction] = useState<string>("");
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
@@ -93,15 +95,15 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
           <SelectValue placeholder="Bulk action..." />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="department">Set Department</SelectItem>
+          {useDepartments && <SelectItem value="department">Set Department</SelectItem>}
           <SelectItem value="manager">Set Manager</SelectItem>
-          <SelectItem value="function_level">Set Function & Level</SelectItem>
+          {useCareerFramework && <SelectItem value="function_level">Set Function & Level</SelectItem>}
           <SelectItem value="role">Set Role</SelectItem>
         </SelectContent>
       </Select>
 
       {/* Set Department */}
-      {action === "department" && (
+      {action === "department" && useDepartments && (
         <Select value={value} onValueChange={setValue}>
           <SelectTrigger className="w-44 h-8 text-xs">
             <SelectValue placeholder="Select department..." />
@@ -134,7 +136,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
       )}
 
       {/* Set Function & Level — two-step */}
-      {action === "function_level" && (
+      {action === "function_level" && useCareerFramework && (
         <>
           <Select value={selectedFunctionId} onValueChange={(v) => { setSelectedFunctionId(v); setValue(""); }}>
             <SelectTrigger className="w-40 h-8 text-xs">

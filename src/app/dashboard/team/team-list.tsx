@@ -27,9 +27,11 @@ interface TeamListProps {
   currentUserId?: string;
   workspaceId?: string;
   filterUnassigned?: boolean;
+  useDepartments?: boolean;
+  useCareerFramework?: boolean;
 }
 
-export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned }: TeamListProps) {
+export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned, useDepartments = false, useCareerFramework = false }: TeamListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const displayUsers = filterUnassigned ? users.filter(u => !u.level) : users;
@@ -179,6 +181,8 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
           selectedIds={Array.from(selected)}
           users={displayUsers}
           onDone={clearSelection}
+          useDepartments={useDepartments}
+          useCareerFramework={useCareerFramework}
         />
       )}
     </>
