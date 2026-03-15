@@ -32,6 +32,10 @@ export function isAdmin(role: string | undefined): boolean {
   return role === "admin";
 }
 
+export function isAdminOrAbove(role: string | undefined): boolean {
+  return hasRole(role, "admin");
+}
+
 export function isManagerOrAbove(role: string | undefined): boolean {
   return hasRole(role, "manager");
 }
