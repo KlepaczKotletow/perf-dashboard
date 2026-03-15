@@ -9,6 +9,7 @@ import {
   CalendarClock,
   CreditCard,
   Briefcase,
+  Building2,
   ClipboardCheck,
   ClipboardList,
   UsersRound,
@@ -73,6 +74,7 @@ export default async function DashboardLayout({
       label: "Settings",
       items: [
         { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/admin/departments", label: "Departments", icon: Building2, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],
