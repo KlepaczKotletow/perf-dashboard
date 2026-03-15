@@ -1,0 +1,211 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@supabase/ssr";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Plus, X, Pencil, Check, Building2 } from "lucide-react";
+
+interface Department { id: string; name: string; }
+
+interface DepartmentsClientProps {
+  departments: Department[];
+  memberCounts: Record<string, number>;
+  workspaceId: string;
+}
+
+export function DepartmentsClient({ departments: initialDepartments, memberCounts: initialCounts, workspaceId }: DepartmentsClientProps) {
+  const router = useRouter();
+  const supabase = useMemo(
+    () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
+    []
+  );
+
+  const [error, setError] = useState<string | null>(null);
+
+  // Add
+  const [showAdd, setShowAdd] = useState(false);
+  const [addValue, setAddValue] = useState("");
+  const [addLoading, setAddLoading] = useState(false);
+
+  // Rename
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  async function handleAdd() {
+    if (!addValue.trim()) return;
+    setAddLoading(true);
+    try {
+      const { error: err } = await supabase.from("departments").insert({
+        name: addValue.trim(),
+        workspace_id: workspaceId,
+      });
+      if (err) throw err;
+      setAddValue("");
+      setShowAdd(false);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to add department");
+    } finally {
+      setAddLoading(false);
+    }
+  }
+
+  async function handleRename(dept: Department) {
+    if (!renameValue.trim() || renameValue.trim() === dept.name) {
+      setRenamingId(null);
+      return;
+    }
+    const newName = renameValue.trim();
+    try {
+      const { error: err } = await supabase
+        .from("departments")
+        .update({ name: newName })
+        .eq("id", dept.id)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+
+      await supabase
+        .from("users")
+        .update({ department: newName })
+        .eq("department", dept.name)
+        .eq("workspace_id", workspaceId);
+
+      setRenamingId(null);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to rename department");
+    }
+  }
+
+  async function handleDelete(dept: Department) {
+    const count = initialCounts[dept.name] || 0;
+    const msg = count > 0
+      ? `${count} ${count === 1 ? "person is" : "people are"} in "${dept.name}". Deleting will unassign them. Continue?`
+      : `Delete "${dept.name}"?`;
+    if (!confirm(msg)) return;
+
+    try {
+      if (count > 0) {
+        await supabase
+          .from("users")
+          .update({ department: null })
+          .eq("department", dept.name)
+          .eq("workspace_id", workspaceId);
+      }
+      const { error: err } = await supabase
+        .from("departments")
+        .delete()
+        .eq("id", dept.id)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to delete department");
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Departments</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {initialDepartments.length} department{initialDepartments.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" />
+          Add Department
+        </Button>
+      </div>
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-destructive/30 bg-destructive/5 text-destructive text-sm">
+          {error}
+          <button onClick={() => setError(null)}><X className="h-4 w-4" /></button>
+        </div>
+      )}
+
+      <div className="border border-border rounded-xl overflow-hidden bg-card">
+        {initialDepartments.length === 0 && !showAdd ? (
+          <div className="py-16 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No departments yet</p>
+            <p className="text-sm text-muted-foreground">Add your first department to get started.</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-border">
+            {initialDepartments.map((dept) => (
+              <li key={dept.id} className="group flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
+                {renamingId === dept.id ? (
+                  <Input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleRename(dept);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    onBlur={() => handleRename(dept)}
+                    className="h-7 text-sm w-48"
+                  />
+                ) : (
+                  <span className="text-sm font-medium text-foreground">{dept.name}</span>
+                )}
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="text-xs">
+                    {initialCounts[dept.name] || 0} {(initialCounts[dept.name] || 0) === 1 ? "member" : "members"}
+                  </Badge>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => { setRenamingId(dept.id); setRenameValue(dept.name); }}
+                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      title="Rename"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(dept)}
+                      className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+
+            {showAdd && (
+              <li className="flex items-center gap-2 px-5 py-3">
+                <Input
+                  autoFocus
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAdd();
+                    if (e.key === "Escape") { setShowAdd(false); setAddValue(""); }
+                  }}
+                  placeholder="Department name…"
+                  className="h-7 text-sm w-48"
+                />
+                <Button size="sm" className="h-7 text-xs" onClick={handleAdd} disabled={addLoading || !addValue.trim()}>
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowAdd(false); setAddValue(""); }}>
+                  Cancel
+                </Button>
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
