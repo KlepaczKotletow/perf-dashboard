@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   ListChecks,
   Flag,
   SlidersHorizontal,
+  Settings2,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { SignOutButton } from "./signout-button";
@@ -31,6 +33,8 @@ interface NavSection {
     icon: React.ComponentType<{ className?: string }>;
     requiresManager: boolean;
     requiresAdmin: boolean;
+    requiresCareerFramework?: boolean;
+    requiresDepartments?: boolean;
   }[];
 }
 
@@ -40,6 +44,15 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const workspace = await getUserWorkspace();
+
+  if (workspace && !workspace.onboardingCompleted) {
+    redirect("/onboarding");
+  }
+
+  const { useDepartments, useCareerFramework } = {
+    useDepartments: workspace?.useDepartments ?? true,
+    useCareerFramework: workspace?.useCareerFramework ?? true,
+  };
   const canAccessManagerFeatures = isManagerOrAbove(workspace?.role);
   const canAccessAdminFeatures = isAdmin(workspace?.role);
 
@@ -73,8 +86,9 @@ export default async function DashboardLayout({
     {
       label: "Settings",
       items: [
-        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true },
-        { href: "/dashboard/admin/departments", label: "Departments", icon: Building2, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/settings/general", label: "General", icon: Settings2, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true, requiresCareerFramework: true },
+        { href: "/dashboard/admin/departments", label: "Departments", icon: Building2, requiresManager: false, requiresAdmin: true, requiresDepartments: true },
         { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],
@@ -86,8 +100,10 @@ export default async function DashboardLayout({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (item.requiresAdmin) return canAccessAdminFeatures;
-        if (item.requiresManager) return canAccessManagerFeatures;
+        if (item.requiresAdmin && !canAccessAdminFeatures) return false;
+        if (item.requiresManager && !canAccessManagerFeatures) return false;
+        if (item.requiresCareerFramework && !useCareerFramework) return false;
+        if (item.requiresDepartments && !useDepartments) return false;
         return true;
       }),
     }))
