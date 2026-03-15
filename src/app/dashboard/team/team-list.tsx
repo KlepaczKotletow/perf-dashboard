@@ -26,19 +26,22 @@ interface TeamListProps {
   isAdmin: boolean;
   currentUserId?: string;
   workspaceId?: string;
+  filterUnassigned?: boolean;
 }
 
-export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamListProps) {
+export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned }: TeamListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const allSelected = users.length > 0 && selected.size === users.length;
-  const someSelected = selected.size > 0 && selected.size < users.length;
+  const displayUsers = filterUnassigned ? users.filter(u => !u.level) : users;
+
+  const allSelected = displayUsers.length > 0 && selected.size === displayUsers.length;
+  const someSelected = selected.size > 0 && selected.size < displayUsers.length;
 
   function toggleAll() {
     if (allSelected) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(users.map((u) => u.id)));
+      setSelected(new Set(displayUsers.map((u) => u.id)));
     }
   }
 
@@ -64,7 +67,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamLis
     <>
       <div className="space-y-2">
         {/* Select all header */}
-        {isAdmin && users.length > 0 && (
+        {isAdmin && displayUsers.length > 0 && (
           <div className="flex items-center gap-3 px-3 py-1.5">
             <Checkbox
               checked={allSelected ? true : someSelected ? "indeterminate" : false}
@@ -79,7 +82,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamLis
           </div>
         )}
 
-        {users.map((user) => (
+        {displayUsers.map((user) => (
           <div
             key={user.id}
             className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${
@@ -124,18 +127,20 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamLis
 
               {/* Department + Level */}
               <div className="min-w-0 hidden md:block">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {user.department && (
                     <span className="text-xs text-muted-foreground truncate">{user.department}</span>
                   )}
-                  {user.level && (
+                  {user.level ? (
                     <span className="text-xs text-muted-foreground/60">
-                      {user.department && " · "}
+                      {user.department ? " · " : ""}
+                      {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}
                       {user.level.name}
                     </span>
-                  )}
-                  {!user.department && !user.level && (
-                    <span className="text-xs text-muted-foreground/40">—</span>
+                  ) : (
+                    <span className="text-xs text-amber-500 dark:text-amber-400">
+                      {user.department ? " · " : ""}Unassigned
+                    </span>
                   )}
                 </div>
               </div>
@@ -172,7 +177,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId }: TeamLis
       {isAdmin && selected.size > 0 && (
         <BulkActions
           selectedIds={Array.from(selected)}
-          users={users}
+          users={displayUsers}
           onDone={clearSelection}
         />
       )}

@@ -54,7 +54,14 @@ async function getSubscription() {
   return data;
 }
 
-export default async function TeamPage() {
+export default async function TeamPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const params = await searchParams;
+  const filterUnassigned = params.filter === "unassigned";
+
   const [users, workspace, subscription] = await Promise.all([
     getUsers(),
     getUserWorkspace(),
@@ -64,6 +71,8 @@ export default async function TeamPage() {
   const seatLimit = subscription?.user_limit || 5;
   const seatUsed = users.length;
   const seatPercent = Math.min(Math.round((seatUsed / seatLimit) * 100), 100);
+
+  const unassignedCount = users.filter((u: any) => !u.level_id).length;
 
   const departments = [...new Set(users.map((u: any) => u.department).filter(Boolean))].sort();
 
@@ -116,6 +125,32 @@ export default async function TeamPage() {
         </div>
       </div>
 
+      {/* Unassigned warning banner */}
+      {isAdmin && unassignedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:border-amber-400/20 dark:text-amber-400 text-sm">
+          <div className="flex items-center gap-2">
+            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <path d="M12 9v4"/>
+              <path d="M12 17h.01"/>
+            </svg>
+            <span>
+              <strong>{unassignedCount} {unassignedCount === 1 ? "person has" : "people have"} no job level assigned</strong>
+              {" "}— their reviews won&apos;t have a competency baseline.
+            </span>
+          </div>
+          {filterUnassigned ? (
+            <Link href="/dashboard/team" className="shrink-0 text-xs font-medium underline underline-offset-2 whitespace-nowrap">
+              Show all
+            </Link>
+          ) : (
+            <Link href="/dashboard/team?filter=unassigned" className="shrink-0 text-xs font-medium underline underline-offset-2 whitespace-nowrap">
+              Show unassigned →
+            </Link>
+          )}
+        </div>
+      )}
+
       {users.length === 0 ? (
         <Card className="border-border/60">
           <CardContent className="py-16 text-center">
@@ -123,7 +158,20 @@ export default async function TeamPage() {
               <Users className="h-5 w-5 text-muted-foreground" />
             </div>
             <p className="text-sm font-medium text-foreground mb-1">No team members yet</p>
-            <p className="text-sm text-muted-foreground">Click &quot;Sync from Slack&quot; above to import your workspace members.</p>
+            <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+              Import your Slack workspace members to get started. This will pull in names, emails, departments, and job titles.
+            </p>
+            {isAdmin && (
+              <div className="flex items-center gap-3 justify-center">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/dashboard/team/import">
+                    <Upload className="h-3.5 w-3.5 mr-1.5" />
+                    Import CSV
+                  </Link>
+                </Button>
+                <SyncButton workspaceId={workspace?.workspaceId} />
+              </div>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -132,6 +180,7 @@ export default async function TeamPage() {
           isAdmin={isAdmin}
           currentUserId={workspace?.appUserId}
           workspaceId={workspace?.workspaceId}
+          filterUnassigned={filterUnassigned}
         />
       )}
     </div>
