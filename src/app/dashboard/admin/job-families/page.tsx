@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,13 +26,16 @@ interface JobFamily {
 }
 
 export default function JobFamiliesPage() {
-  const supabase = createBrowserClient(
+  // Fix 1 — memoize Supabase client so it's not recreated on every render
+  const supabase = useMemo(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  ), []);
 
   const [families, setFamilies] = useState<JobFamily[]>([]);
   const [loading, setLoading] = useState(true);
+  // Fix 2 — error state
+  const [error, setError] = useState<string | null>(null);
 
   // New family form
   const [showNewFamily, setShowNewFamily] = useState(false);
@@ -51,32 +54,44 @@ export default function JobFamiliesPage() {
   const [savingLevel, setSavingLevel] = useState(false);
 
   async function load() {
-    const [{ data: fams }, { data: lvls }, { data: members }] = await Promise.all([
-      supabase.from("job_families").select("id, name, description").order("name"),
-      supabase.from("levels").select("id, name, grade, sort_order, job_family_id").order("sort_order"),
-      supabase.from("users").select("level_id, levels!users_level_id_fkey(job_family_id)"),
-    ]);
+    setError(null);
+    try {
+      const [{ data: fams, error: e1 }, { data: lvls, error: e2 }, { data: members }] = await Promise.all([
+        supabase.from("job_families").select("id, name, description").order("name"),
+        supabase.from("levels").select("id, name, grade, sort_order, job_family_id").order("sort_order"),
+        supabase.from("users").select("level_id, levels!users_level_id_fkey(job_family_id)"),
+      ]);
 
-    const memberCountByFamily: Record<string, number> = {};
-    (members || []).forEach((u: any) => {
-      const jfId = u.levels?.job_family_id;
-      if (jfId) memberCountByFamily[jfId] = (memberCountByFamily[jfId] || 0) + 1;
-    });
+      if (e1 || e2) {
+        setError("Failed to load job families. Please refresh.");
+        setLoading(false);
+        return;
+      }
 
-    const levelsByFamily: Record<string, Level[]> = {};
-    (lvls || []).forEach((l: any) => {
-      if (!levelsByFamily[l.job_family_id]) levelsByFamily[l.job_family_id] = [];
-      levelsByFamily[l.job_family_id].push(l);
-    });
+      const memberCountByFamily: Record<string, number> = {};
+      (members || []).forEach((u: any) => {
+        const jfId = u.levels?.job_family_id;
+        if (jfId) memberCountByFamily[jfId] = (memberCountByFamily[jfId] || 0) + 1;
+      });
 
-    setFamilies(
-      (fams || []).map((f: any) => ({
-        ...f,
-        levels: levelsByFamily[f.id] || [],
-        member_count: memberCountByFamily[f.id] || 0,
-      }))
-    );
-    setLoading(false);
+      const levelsByFamily: Record<string, Level[]> = {};
+      (lvls || []).forEach((l: any) => {
+        if (!levelsByFamily[l.job_family_id]) levelsByFamily[l.job_family_id] = [];
+        levelsByFamily[l.job_family_id].push(l);
+      });
+
+      setFamilies(
+        (fams || []).map((f: any) => ({
+          ...f,
+          levels: levelsByFamily[f.id] || [],
+          member_count: memberCountByFamily[f.id] || 0,
+        }))
+      );
+      setLoading(false);
+    } catch {
+      setError("Failed to load job families. Please refresh.");
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -85,24 +100,51 @@ export default function JobFamiliesPage() {
     e.preventDefault();
     if (!newFamilyName.trim()) return;
     setSavingFamily(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("job_families").insert({
-      name: newFamilyName.trim(),
-      description: newFamilyDesc.trim() || null,
-      workspace_id: user?.user_metadata?.workspace_id,
-    });
-    setNewFamilyName("");
-    setNewFamilyDesc("");
-    setShowNewFamily(false);
-    setSavingFamily(false);
-    load();
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Fix 3 — guard workspace_id before insert
+      const workspaceId = user?.user_metadata?.workspace_id;
+      if (!workspaceId) {
+        setError("Could not determine workspace. Please reload.");
+        setSavingFamily(false);
+        return;
+      }
+      const { error: insertError } = await supabase.from("job_families").insert({
+        name: newFamilyName.trim(),
+        description: newFamilyDesc.trim() || null,
+        workspace_id: workspaceId,
+      });
+      if (insertError) {
+        setError(`Failed to create job family: ${insertError.message}`);
+        setSavingFamily(false);
+        return;
+      }
+      setNewFamilyName("");
+      setNewFamilyDesc("");
+      setShowNewFamily(false);
+      setSavingFamily(false);
+      load();
+    } catch {
+      setError("Failed to create job family. Please try again.");
+      setSavingFamily(false);
+    }
   }
 
   async function handleRename(id: string) {
     if (!renameValue.trim()) return;
-    await supabase.from("job_families").update({ name: renameValue.trim() }).eq("id", id);
-    setRenamingId(null);
-    load();
+    setError(null);
+    try {
+      const { error: updateError } = await supabase.from("job_families").update({ name: renameValue.trim() }).eq("id", id);
+      if (updateError) {
+        setError(`Failed to rename job family: ${updateError.message}`);
+        return;
+      }
+      setRenamingId(null);
+      load();
+    } catch {
+      setError("Failed to rename job family. Please try again.");
+    }
   }
 
   async function handleDeleteFamily(family: JobFamily) {
@@ -110,36 +152,80 @@ export default function JobFamiliesPage() {
       ? `Delete "${family.name}"? ${family.member_count} ${family.member_count === 1 ? "person is" : "people are"} assigned to levels in this family — they will lose their level assignment.`
       : `Delete "${family.name}"? Its ${family.levels.length} level${family.levels.length !== 1 ? "s" : ""} will also be deleted.`;
     if (!confirm(msg)) return;
-    await supabase.from("job_families").delete().eq("id", family.id);
-    load();
+    setError(null);
+    try {
+      const { error: deleteError } = await supabase.from("job_families").delete().eq("id", family.id);
+      if (deleteError) {
+        setError(`Failed to delete job family: ${deleteError.message}`);
+        return;
+      }
+      load();
+    } catch {
+      setError("Failed to delete job family. Please try again.");
+    }
   }
 
   async function handleAddLevel(familyId: string) {
     if (!newLevelName.trim()) return;
     setSavingLevel(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const family = families.find(f => f.id === familyId);
-    const nextOrder = family && family.levels.length > 0
-      ? Math.max(...family.levels.map(l => l.sort_order)) + 1
-      : 0;
-    await supabase.from("levels").insert({
-      name: newLevelName.trim(),
-      grade: newLevelGrade.trim() || null,
-      job_family_id: familyId,
-      sort_order: nextOrder,
-      workspace_id: user?.user_metadata?.workspace_id,
-    });
-    setNewLevelName("");
-    setNewLevelGrade("");
-    setAddingLevelFor(null);
-    setSavingLevel(false);
-    load();
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Fix 3 — guard workspace_id before insert
+      const workspaceId = user?.user_metadata?.workspace_id;
+      if (!workspaceId) {
+        setError("Could not determine workspace. Please reload.");
+        setSavingLevel(false);
+        return;
+      }
+      const family = families.find(f => f.id === familyId);
+      const nextOrder = family && family.levels.length > 0
+        ? Math.max(...family.levels.map(l => l.sort_order)) + 1
+        : 0;
+      const { error: insertError } = await supabase.from("levels").insert({
+        name: newLevelName.trim(),
+        grade: newLevelGrade.trim() || null,
+        job_family_id: familyId,
+        sort_order: nextOrder,
+        workspace_id: workspaceId,
+      });
+      if (insertError) {
+        setError(`Failed to add level: ${insertError.message}`);
+        setSavingLevel(false);
+        return;
+      }
+      setNewLevelName("");
+      setNewLevelGrade("");
+      setAddingLevelFor(null);
+      setSavingLevel(false);
+      load();
+    } catch {
+      setError("Failed to add level. Please try again.");
+      setSavingLevel(false);
+    }
   }
 
+  // Fix 4 — warn before deleting a level if members are assigned to it
   async function handleDeleteLevel(levelId: string, levelName: string) {
-    if (!confirm(`Remove level "${levelName}"?`)) return;
-    await supabase.from("levels").delete().eq("id", levelId);
-    load();
+    const { count } = await supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("level_id", levelId);
+    const msg = count && count > 0
+      ? `Remove level "${levelName}"? ${count} ${count === 1 ? "person is" : "people are"} assigned to this level — they will lose their level assignment.`
+      : `Remove level "${levelName}"?`;
+    if (!confirm(msg)) return;
+    setError(null);
+    try {
+      const { error: deleteError } = await supabase.from("levels").delete().eq("id", levelId);
+      if (deleteError) {
+        setError(`Failed to delete level: ${deleteError.message}`);
+        return;
+      }
+      load();
+    } catch {
+      setError("Failed to delete level. Please try again.");
+    }
   }
 
   if (loading) {
@@ -169,6 +255,13 @@ export default function JobFamiliesPage() {
           New Job Family
         </Button>
       </div>
+
+      {/* Fix 2 — surface errors */}
+      {error && (
+        <div className="px-4 py-3 rounded-lg border border-destructive/20 bg-destructive/[0.06] text-destructive text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Inline new-family form */}
       {showNewFamily && (
