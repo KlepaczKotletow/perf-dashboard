@@ -7,7 +7,6 @@ import {
   MessageSquare,
   BarChart3,
   CalendarClock,
-  Target,
   CreditCard,
   Briefcase,
   ClipboardCheck,
@@ -67,14 +66,13 @@ export default async function DashboardLayout({
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/competencies", label: "Competencies", icon: Target, requiresManager: true, requiresAdmin: false },
         { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresAdmin: false },
       ],
     },
     {
       label: "Settings",
       items: [
-        { href: "/dashboard/admin/job-families", label: "Job Families", icon: Briefcase, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],
@@ -153,7 +151,7 @@ export default async function DashboardLayout({
           — desktop (lg+): offset by sidebar width
           — mobile: full width with top padding for the fixed mobile header */}
       <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
-        <div className="max-w-[1200px] mx-auto px-4 lg:px-8 py-6 lg:py-8">
+        <div className="px-4 lg:px-8 py-6 lg:py-8">
           {children}
         </div>
       </main>
