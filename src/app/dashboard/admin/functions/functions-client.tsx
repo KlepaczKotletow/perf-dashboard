@@ -1,7 +1,7 @@
 // src/app/dashboard/admin/functions/functions-client.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
@@ -121,6 +121,7 @@ export function FunctionsClient({
   const [newLevelName, setNewLevelName] = useState("");
   const [renamingLevelId, setRenamingLevelId] = useState<string | null>(null);
   const [renameLevelValue, setRenameLevelValue] = useState("");
+  const [levels, setLevels] = useState<Level[]>(initialLevels);
 
   // Skills
   const [showAddSkill, setShowAddSkill] = useState(false);
@@ -153,20 +154,25 @@ export function FunctionsClient({
     return lookup;
   }, [initialLevelCompetencies]);
 
+  // Keep local levels state in sync after router.refresh()
+  useEffect(() => {
+    setLevels(initialLevels);
+  }, [initialLevels]);
+
   const memberCountByFunction = useMemo(() => {
     const counts: Record<string, number> = {};
     users.forEach((u) => {
       if (!u.level_id) return;
-      const level = initialLevels.find((l) => l.id === u.level_id);
+      const level = levels.find((l) => l.id === u.level_id);
       if (level?.job_family_id) {
         counts[level.job_family_id] = (counts[level.job_family_id] || 0) + 1;
       }
     });
     return counts;
-  }, [users, initialLevels]);
+  }, [users, levels]);
 
   const selectedFunction = initialFunctions.find((f) => f.id === selectedId);
-  const functionLevels = initialLevels
+  const functionLevels = levels
     .filter((l) => l.job_family_id === selectedId)
     .sort((a, b) => a.sort_order - b.sort_order);
   const functionSkills = initialCompetencies.filter((c) => c.job_family_id === selectedId);
