@@ -436,6 +436,56 @@ export function FunctionsClient({
     }
   }
 
+  // ── Handlers: Level Reorder ────────────────────────────────────────────────
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 }, // prevent accidental drags on click
+    })
+  );
+
+  async function handleReorderLevels(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = functionLevels.findIndex((l) => l.id === active.id);
+    const newIndex = functionLevels.findIndex((l) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Compute new sorted array for this function only
+    const reordered = arrayMove(functionLevels, oldIndex, newIndex);
+
+    // Optimistically update local state — splice the reordered items back in
+    const originalLevels = levels;
+    setLevels((prev) => {
+      const otherLevels = prev.filter((l) => l.job_family_id !== selectedId);
+      const updatedLevels = reordered.map((l, i) => ({ ...l, sort_order: i }));
+      return [...otherLevels, ...updatedLevels];
+    });
+
+    try {
+      // Batch update only levels whose sort_order actually changed
+      await Promise.all(
+        reordered.map((level, i) => {
+          if (level.sort_order === i) return Promise.resolve(); // unchanged
+          return supabase
+            .from("levels")
+            .update({ sort_order: i })
+            .eq("id", level.id)
+            .eq("workspace_id", workspaceId)
+            .then(({ error: err }) => {
+              if (err) throw err;
+            });
+        })
+      );
+      router.refresh();
+    } catch (e: any) {
+      // Roll back optimistic update on error
+      setLevels(originalLevels);
+      setError(e.message ?? "Failed to reorder levels");
+    }
+  }
+
   // ── Handlers: Skills ───────────────────────────────────────────────────
 
   async function handleAddSkill() {
@@ -719,47 +769,37 @@ export function FunctionsClient({
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2.5">Levels</p>
               <div className="flex flex-wrap items-center gap-2">
-                {functionLevels.map((level) => (
-                  <div key={level.id} className="group/level relative">
-                    {renamingLevelId === level.id ? (
-                      <Input
-                        autoFocus
-                        value={renameLevelValue}
-                        onChange={(e) => setRenameLevelValue(e.target.value)}
-                        onKeyDown={(e) => {
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleReorderLevels}
+                >
+                  <SortableContext
+                    items={functionLevels.map((l) => l.id)}
+                    strategy={horizontalListSortingStrategy}
+                  >
+                    {functionLevels.map((level) => (
+                      <SortableLevel
+                        key={level.id}
+                        level={level}
+                        canEdit={canEdit}
+                        isRenaming={renamingLevelId === level.id}
+                        renameValue={renameLevelValue}
+                        onRenameChange={setRenameLevelValue}
+                        onRenameKeyDown={(e) => {
                           if (e.key === "Enter") handleRenameLevel(level.id);
                           if (e.key === "Escape") setRenamingLevelId(null);
                         }}
-                        onBlur={() => handleRenameLevel(level.id)}
-                        className="h-7 text-xs w-28"
-                      />
-                    ) : (
-                      <div
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${
-                          canEdit
-                            ? "cursor-pointer hover:border-primary/40 hover:bg-primary/5 border-border bg-background"
-                            : "border-border bg-muted/30"
-                        }`}
-                        onClick={() => {
-                          if (!canEdit) return;
+                        onRenameBlur={() => handleRenameLevel(level.id)}
+                        onStartRename={() => {
                           setRenamingLevelId(level.id);
                           setRenameLevelValue(level.name);
                         }}
-                      >
-                        {level.name}
-                        {level.grade && <span className="text-muted-foreground text-[10px]">{level.grade}</span>}
-                        {canEdit && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteLevel(level.id); }}
-                            className="opacity-0 group-hover/level:opacity-100 transition-opacity ml-0.5 hover:text-destructive"
-                          >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                        onDelete={() => handleDeleteLevel(level.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
 
                 {/* Add level */}
                 {canEdit && (
