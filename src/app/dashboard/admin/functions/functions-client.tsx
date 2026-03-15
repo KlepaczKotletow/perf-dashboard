@@ -213,7 +213,8 @@ export function FunctionsClient({
       const { error: err } = await supabase
         .from("job_families")
         .update({ name: newName.trim() })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (err) throw err;
       onDone();
       router.refresh();
@@ -228,7 +229,8 @@ export function FunctionsClient({
       const { error: err } = await supabase
         .from("job_families")
         .update({ description: desc.trim() || null })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (err) throw err;
       setEditingFunctionDesc(false);
       router.refresh();
@@ -244,7 +246,7 @@ export function FunctionsClient({
       : "Delete this function and all its levels and skills?";
     if (!confirm(msg)) return;
     try {
-      const { error: err } = await supabase.from("job_families").delete().eq("id", id);
+      const { error: err } = await supabase.from("job_families").delete().eq("id", id).eq("workspace_id", workspaceId);
       if (err) throw err;
       if (selectedId === id) setSelectedId(initialFunctions.find(f => f.id !== id)?.id ?? null);
       router.refresh();
@@ -283,7 +285,8 @@ export function FunctionsClient({
       const { error: err } = await supabase
         .from("levels")
         .update({ name: renameLevelValue.trim() })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (err) throw err;
       setRenamingLevelId(null);
       router.refresh();
@@ -301,7 +304,7 @@ export function FunctionsClient({
       if (!confirm(`${count} ${count !== 1 ? "people are" : "person is"} at this level. Deleting it will unassign them. Continue?`)) return;
     }
     try {
-      const { error: err } = await supabase.from("levels").delete().eq("id", id);
+      const { error: err } = await supabase.from("levels").delete().eq("id", id).eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
     } catch (e: any) {
@@ -342,7 +345,7 @@ export function FunctionsClient({
       if (!confirm(`This will also remove ${linkedCount} expected score${linkedCount !== 1 ? "s" : ""} for this skill. Continue?`)) return;
     }
     try {
-      const { error: err } = await supabase.from("competencies").delete().eq("id", competencyId);
+      const { error: err } = await supabase.from("competencies").delete().eq("id", competencyId).eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
     } catch (e: any) {
@@ -359,14 +362,15 @@ export function FunctionsClient({
     try {
       if (value === null) {
         if (existing) {
-          const { error: err } = await supabase.from("level_competencies").delete().eq("id", existing.id);
+          const { error: err } = await supabase.from("level_competencies").delete().eq("id", existing.id).eq("workspace_id", workspaceId);
           if (err) throw err;
         }
       } else if (existing) {
         const { error: err } = await supabase
           .from("level_competencies")
           .update({ expected_level: value })
-          .eq("id", existing.id);
+          .eq("id", existing.id)
+          .eq("workspace_id", workspaceId);
         if (err) throw err;
       } else {
         const { error: err } = await supabase.from("level_competencies").insert({
