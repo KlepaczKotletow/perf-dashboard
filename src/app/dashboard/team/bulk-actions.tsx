@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,9 +23,12 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedFunctionId, setSelectedFunctionId] = useState<string>("");
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabase = useMemo(
+    () => createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ),
+    []
   );
 
   useEffect(() => {
