@@ -32,8 +32,12 @@ async function logNotification(
   const { error } = await supabase
     .from("notification_log")
     .insert({ workspace_id: workspaceId, user_id: userId, event_type: eventType, reference_id: referenceId });
-  // If unique constraint fires, insert fails — that means already sent, return false
-  return !error;
+  if (!error) return true;
+  // Unique constraint violation (code 23505) = already sent, skip silently
+  if ((error as any).code === "23505") return false;
+  // Any other error is unexpected — log it but still skip to avoid crashing the loop
+  console.error("logNotification unexpected error:", error.message, { eventType, referenceId });
+  return false;
 }
 
 async function handleCycleLaunch(cycleId: string) {
@@ -160,6 +164,14 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
+  }
+
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return new Response("Unauthorized", { status: 401 });
+    }
   }
 
   try {
