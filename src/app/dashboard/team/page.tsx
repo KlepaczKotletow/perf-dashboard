@@ -5,7 +5,8 @@ import Link from "next/link";
 import { SyncButton } from "./sync-button";
 import { TeamList } from "./team-list";
 import { canManageUsers } from "@/lib/roles";
-import { Users, Upload } from "lucide-react";
+import { Users, Upload, List, Network } from "lucide-react";
+import { OrgChart } from "./org-chart";
 
 async function getUsers() {
   const supabase = await createServerSupabaseClient();
@@ -57,10 +58,11 @@ async function getSubscription() {
 export default async function TeamPage({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; view?: string }>;
 }) {
   const params = await searchParams;
   const filterUnassigned = params.filter === "unassigned";
+  const viewChart = params.view === "chart";
 
   const [users, workspace, subscription] = await Promise.all([
     getUsers(),
@@ -109,6 +111,23 @@ export default async function TeamPage({
               </div>
               <span className="text-[10px] text-muted-foreground">seats</span>
             </div>
+          </div>
+          {/* View toggle */}
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <Link
+              href="/dashboard/team"
+              className={`p-1.5 transition-colors ${!viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              title="List view"
+            >
+              <List className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/dashboard/team?view=chart"
+              className={`p-1.5 transition-colors ${viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              title="Org chart"
+            >
+              <Network className="h-4 w-4" />
+            </Link>
           </div>
           {isAdmin && (
             <>
@@ -176,6 +195,8 @@ export default async function TeamPage({
             )}
           </CardContent>
         </Card>
+      ) : viewChart ? (
+        <OrgChart users={users} />
       ) : (
         <TeamList
           users={users}
