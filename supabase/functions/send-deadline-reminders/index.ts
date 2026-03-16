@@ -23,7 +23,15 @@ async function sendSlackDM(botToken: string, slackUserId: string, text: string):
   }
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  if (cronSecret) {
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
   try {
     const today = new Date();
     const daysToCheck = [3, 7];
@@ -35,15 +43,17 @@ Deno.serve(async (_req) => {
       const targetDate = new Date(today);
       targetDate.setDate(today.getDate() + daysAhead);
       const dateStr = targetDate.toISOString().split("T")[0]; // YYYY-MM-DD
+      const nextDateStr = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
       // Find active cycles with deadline on this date
-      const { data: cycles } = await supabase
+      const { data: cycles, error: cyclesError } = await supabase
         .from("performance_cycles")
         .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
         .eq("status", "active")
         .gte("review_deadline", `${dateStr}T00:00:00Z`)
-        .lt("review_deadline", `${dateStr}T23:59:59Z`);
+        .lt("review_deadline", `${nextDateStr}T00:00:00Z`);
 
+      if (cyclesError) { console.error("Failed to fetch cycles:", cyclesError.message); continue; }
       if (!cycles) continue;
 
       for (const cycle of cycles) {
@@ -55,7 +65,7 @@ Deno.serve(async (_req) => {
         });
 
         // Find incomplete review assignments
-        const { data: assignments } = await supabase
+        const { data: assignments, error: assignmentsError } = await supabase
           .from("review_assignments")
           .select(`
             id,
@@ -66,6 +76,7 @@ Deno.serve(async (_req) => {
           .eq("cycle_id", cycle.id)
           .neq("status", "completed");
 
+        if (assignmentsError) { console.error("Failed to fetch assignments:", assignmentsError.message); continue; }
         if (!assignments) continue;
 
         for (const a of assignments) {
