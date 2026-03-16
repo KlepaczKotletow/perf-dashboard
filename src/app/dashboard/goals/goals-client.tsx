@@ -281,8 +281,16 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
     }
   }
 
-  async function updateTrackingStatus(goalId: string, status: string) {
+  async function updateTrackingStatus(goalId: string, status: string, employeeId?: string) {
     await supabase.from("goals").update({ tracking_status: status }).eq("id", goalId);
+
+    // Notify manager if status is at_risk, delayed, or achieved (fire-and-forget, don't block UI)
+    if (employeeId && (status === "at_risk" || status === "delayed" || status === "achieved")) {
+      supabase.functions.invoke("cycle-notifications", {
+        body: { action: "goal_status", goal_id: goalId, new_status: status, employee_id: employeeId },
+      }).catch(() => {}); // silent fail — notification is best-effort
+    }
+
     router.refresh();
   }
 
@@ -554,7 +562,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
                           {Object.entries(trackingConfig).map(([key, cfg]) => (
                             <DropdownMenuItem
                               key={key}
-                              onClick={() => updateTrackingStatus(goal.id, key)}
+                              onClick={() => updateTrackingStatus(goal.id, key, goal.employee?.id ?? undefined)}
                               className="text-xs"
                             >
                               <div className={`h-2 w-2 rounded-full ${cfg.barColor} mr-2`} />
