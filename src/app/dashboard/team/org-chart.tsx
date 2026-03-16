@@ -9,7 +9,6 @@ interface OrgUser {
   job_title: string | null;
   department: string | null;
   manager_id: string | null;
-  avatar_url?: string | null;
 }
 
 interface OrgNode extends OrgUser {
@@ -20,9 +19,22 @@ function buildTree(users: OrgUser[]): OrgNode[] {
   const map = new Map<string, OrgNode>();
   users.forEach((u) => map.set(u.id, { ...u, children: [] }));
 
+  // Detect cycles: a node is a root if its manager chain would cycle back to itself
+  function wouldCycle(nodeId: string, managerId: string): boolean {
+    let current: string | null = managerId;
+    const visited = new Set<string>();
+    while (current) {
+      if (current === nodeId) return true;
+      if (visited.has(current)) return true; // cycle not involving nodeId but still a cycle
+      visited.add(current);
+      current = map.get(current)?.manager_id ?? null;
+    }
+    return false;
+  }
+
   const roots: OrgNode[] = [];
   map.forEach((node) => {
-    if (node.manager_id && map.has(node.manager_id)) {
+    if (node.manager_id && map.has(node.manager_id) && !wouldCycle(node.id, node.manager_id)) {
       map.get(node.manager_id)!.children.push(node);
     } else {
       roots.push(node);
@@ -60,7 +72,7 @@ function OrgNodeItem({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
           </div>
           {node.children.length > 0 && (
             <span className="ml-2 text-[10px] text-muted-foreground/60 shrink-0">
-              {node.children.length} direct
+              {node.children.length} {node.children.length === 1 ? "report" : "reports"}
             </span>
           )}
         </Link>
