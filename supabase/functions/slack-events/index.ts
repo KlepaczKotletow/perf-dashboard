@@ -9,7 +9,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Slack HMAC-SHA256 signature verification (same pattern as slack-interactivity)
 async function verifySlackSignature(req: Request, body: string): Promise<boolean> {
-  if (!SLACK_SIGNING_SECRET) return true; // skip in dev
+  if (!SLACK_SIGNING_SECRET) {
+    console.warn("SLACK_SIGNING_SECRET not set — skipping signature verification");
+    return true; // only acceptable in local dev
+  }
   const timestamp = req.headers.get("x-slack-request-timestamp") || "";
   const slackSig = req.headers.get("x-slack-signature") || "";
   if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) return false;
@@ -123,17 +126,15 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
 
   // ── Manager: team's pending reviews ──────────────────────────────
   if (isManagerOrAbove) {
-    const { data: teamPending } = await supabase
+    const { data: myTeamPending } = await supabase
       .from("review_assignments")
-      .select("id, employee:users!review_assignments_employee_id_fkey(slack_name, manager_id)")
+      .select("id, employee:users!review_assignments_employee_id_fkey(slack_name)")
       .neq("status", "completed")
-      .eq("workspace_id", workspaceId);
+      .eq("manager_id", userId);
 
-    const myTeamPending = (teamPending || []).filter((a: any) => a.employee?.manager_id === userId);
-
-    if (myTeamPending.length > 0) {
-      blocks.push(header(`👥 Team Reviews Pending (${myTeamPending.length})`));
-      const names = [...new Set(myTeamPending.map((a: any) => a.employee?.slack_name).filter(Boolean))] as string[];
+    if ((myTeamPending || []).length > 0) {
+      blocks.push(header(`👥 Team Reviews Pending (${(myTeamPending || []).length})`));
+      const names = [...new Set((myTeamPending || []).map((a: any) => a.employee?.slack_name).filter(Boolean))] as string[];
       blocks.push(section(names.slice(0, 5).map((n) => `• ${n}`).join("\n") + (names.length > 5 ? `\n_...and ${names.length - 5} more_` : "")));
       blocks.push(section(`<${DASHBOARD_URL}/dashboard/cycles|View all cycles>`));
       blocks.push(divider());
@@ -201,11 +202,15 @@ Deno.serve(async (req) => {
     const teamId = event.team_id;
 
     // Look up workspace by Slack team_id
-    const { data: workspace } = await supabase
+    const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
       .select("id, bot_token")
       .eq("team_id", teamId)
       .single();
+
+    if (workspaceError && workspaceError.code !== "PGRST116") {
+      console.error("Workspace lookup error:", workspaceError.message, { teamId });
+    }
 
     if (!workspace?.bot_token) {
       console.error("Workspace not found for team_id:", teamId);
