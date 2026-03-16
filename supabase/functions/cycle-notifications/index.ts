@@ -1,0 +1,185 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL") || "https://nami-ochre.vercel.app";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+async function sendSlackDM(botToken: string, slackUserId: string, text: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://slack.com/api/chat.postMessage", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${botToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ channel: slackUserId, text }),
+    });
+    const data = await res.json();
+    return data.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function logNotification(
+  workspaceId: string,
+  userId: string,
+  eventType: string,
+  referenceId: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from("notification_log")
+    .insert({ workspace_id: workspaceId, user_id: userId, event_type: eventType, reference_id: referenceId });
+  // If unique constraint fires, insert fails — that means already sent, return false
+  return !error;
+}
+
+async function handleCycleLaunch(cycleId: string) {
+  // Fetch cycle + workspace bot token
+  const { data: cycle } = await supabase
+    .from("performance_cycles")
+    .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
+    .eq("id", cycleId)
+    .single();
+
+  if (!cycle) return { sent: 0, skipped: 0 };
+
+  const botToken = (cycle as any).workspaces?.bot_token;
+  if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
+
+  // Fetch all review assignments for this cycle (both standard and upward)
+  const { data: assignments } = await supabase
+    .from("review_assignments")
+    .select(`
+      id,
+      employee_id,
+      manager_id,
+      assignment_type,
+      employee:users!review_assignments_employee_id_fkey(id, slack_user_id, slack_name),
+      manager:users!review_assignments_manager_id_fkey(id, slack_user_id, slack_name)
+    `)
+    .eq("cycle_id", cycleId);
+
+  if (!assignments) return { sent: 0, skipped: 0 };
+
+  const workspaceId = cycle.workspace_id;
+  const deadline = cycle.review_deadline
+    ? new Date(cycle.review_deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "no deadline set";
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const a of assignments) {
+    const emp = (a as any).employee;
+    const mgr = (a as any).manager;
+
+    // Notify manager to complete review for employee
+    if (mgr?.slack_user_id) {
+      const canSend = await logNotification(workspaceId, mgr.id, "review_assigned", a.id);
+      if (canSend) {
+        const text = `📋 *Review cycle started: ${cycle.name}*\nYou have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/cycles/${cycleId}`;
+        const ok = await sendSlackDM(botToken, mgr.slack_user_id, text);
+        if (ok) sent++; else skipped++;
+      } else {
+        skipped++;
+      }
+    }
+
+    // Notify employee to complete self-assessment
+    if (emp?.slack_user_id && a.assignment_type === "standard") {
+      const canSend = await logNotification(workspaceId, emp.id, "review_assigned", `self_${a.id}`);
+      if (canSend) {
+        const text = `📋 *Review cycle started: ${cycle.name}*\nYour performance review has begun. Please complete your self-assessment.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/my-reviews`;
+        const ok = await sendSlackDM(botToken, emp.slack_user_id, text);
+        if (ok) sent++; else skipped++;
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  return { sent, skipped };
+}
+
+async function handleGoalStatusUpdate(goalId: string, newStatus: string, employeeId: string) {
+  // Fetch goal + employee + manager
+  const { data: goal } = await supabase
+    .from("goals")
+    .select("id, title, workspace_id")
+    .eq("id", goalId)
+    .single();
+
+  if (!goal) return { sent: 0 };
+
+  const { data: employee } = await supabase
+    .from("users")
+    .select("id, slack_name, manager_id")
+    .eq("id", employeeId)
+    .single();
+
+  if (!employee?.manager_id) return { sent: 0 };
+
+  const { data: manager } = await supabase
+    .from("users")
+    .select("id, slack_user_id")
+    .eq("id", employee.manager_id)
+    .single();
+
+  if (!manager?.slack_user_id) return { sent: 0 };
+
+  // Get bot token
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("bot_token")
+    .eq("id", goal.workspace_id)
+    .single();
+
+  if (!workspace?.bot_token) return { sent: 0 };
+
+  const statusLabels: Record<string, string> = {
+    at_risk: "⚠️ At risk",
+    delayed: "🔴 Delayed",
+    on_track: "✅ Back on track",
+    achieved: "🎉 Achieved",
+  };
+
+  const label = statusLabels[newStatus] || newStatus;
+  const referenceId = `goal_${goalId}_${newStatus}`;
+
+  const canSend = await logNotification(goal.workspace_id, manager.id, "goal_status_update", referenceId);
+  if (!canSend) return { sent: 0 };
+
+  const text = `${label} — *${goal.title}*\n${employee.slack_name}'s goal status has changed.\n→ ${DASHBOARD_URL}/dashboard/goals`;
+  const ok = await sendSlackDM(workspace.bot_token, manager.slack_user_id, text);
+  return { sent: ok ? 1 : 0 };
+}
+
+Deno.serve(async (req) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  try {
+    const body = await req.json();
+    const { action, cycle_id, goal_id, new_status, employee_id } = body;
+
+    let result;
+    if (action === "launch" && cycle_id) {
+      result = await handleCycleLaunch(cycle_id);
+    } else if (action === "goal_status" && goal_id && new_status && employee_id) {
+      result = await handleGoalStatusUpdate(goal_id, new_status, employee_id);
+    } else {
+      return new Response(JSON.stringify({ error: "Unknown action" }), { status: 400 });
+    }
+
+    return new Response(JSON.stringify({ ok: true, ...result }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    console.error("cycle-notifications error:", err);
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+  }
+});
