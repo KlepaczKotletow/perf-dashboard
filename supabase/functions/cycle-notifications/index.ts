@@ -112,7 +112,7 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
     .eq("id", goalId)
     .single();
 
-  if (!goal) return { sent: 0 };
+  if (!goal) return { sent: 0, skipped: 1 };
 
   const { data: employee } = await supabase
     .from("users")
@@ -120,7 +120,7 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
     .eq("id", employeeId)
     .single();
 
-  if (!employee?.manager_id) return { sent: 0 };
+  if (!employee?.manager_id) return { sent: 0, skipped: 1 };
 
   const { data: manager } = await supabase
     .from("users")
@@ -128,7 +128,7 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
     .eq("id", employee.manager_id)
     .single();
 
-  if (!manager?.slack_user_id) return { sent: 0 };
+  if (!manager?.slack_user_id) return { sent: 0, skipped: 1 };
 
   // Get bot token
   const { data: workspace } = await supabase
@@ -137,7 +137,7 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
     .eq("id", goal.workspace_id)
     .single();
 
-  if (!workspace?.bot_token) return { sent: 0 };
+  if (!workspace?.bot_token) return { sent: 0, skipped: 1 };
 
   const statusLabels: Record<string, string> = {
     at_risk: "⚠️ At risk",
@@ -150,11 +150,11 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
   const referenceId = `goal_${goalId}_${newStatus}`;
 
   const canSend = await logNotification(goal.workspace_id, manager.id, "goal_status_update", referenceId);
-  if (!canSend) return { sent: 0 };
+  if (!canSend) return { sent: 0, skipped: 1 };
 
   const text = `${label} — *${goal.title}*\n${employee.slack_name}'s goal status has changed.\n→ ${DASHBOARD_URL}/dashboard/goals`;
   const ok = await sendSlackDM(workspace.bot_token, manager.slack_user_id, text);
-  return { sent: ok ? 1 : 0 };
+  return { sent: ok ? 1 : 0, skipped: ok ? 0 : 1 };
 }
 
 Deno.serve(async (req) => {
