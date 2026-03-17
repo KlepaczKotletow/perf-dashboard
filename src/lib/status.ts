@@ -52,8 +52,8 @@ export const CYCLE_STATUS: Record<string, StatusConfig> = {
     badge: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
     dot: "bg-sky-500",
   },
-  archived: {
-    label: "Archived",
+  closed: {
+    label: "Closed",
     badge: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
     dot: "bg-zinc-400",
   },

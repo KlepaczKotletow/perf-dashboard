@@ -100,6 +100,7 @@ export default async function CyclesPage() {
             const allAssignments: any[] = cycle.assignments || [];
             const totalAssignments = allAssignments.length;
             const completedAssignments = allAssignments.filter((a: any) => a.status === "completed").length;
+            const inProgressAssignments = allAssignments.filter((a: any) => a.status === "in_progress").length;
             const completionPct = totalAssignments > 0
               ? Math.round((completedAssignments / totalAssignments) * 100)
               : null;
@@ -166,7 +167,7 @@ export default async function CyclesPage() {
                   {completionPct !== null ? (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{completedAssignments}/{totalAssignments} reviews</span>
+                        <span>{completedAssignments}/{totalAssignments} done</span>
                         <span className="font-medium tabular-nums">{completionPct}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
@@ -181,6 +182,11 @@ export default async function CyclesPage() {
                           style={{ width: `${completionPct}%` }}
                         />
                       </div>
+                      {inProgressAssignments > 0 && completionPct < 100 && (
+                        <p className="text-[10px] text-sky-600 dark:text-sky-400">
+                          {inProgressAssignments} awaiting manager review
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground/50">No assignments</span>

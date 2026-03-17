@@ -90,6 +90,7 @@ export interface PerformanceCycle {
   start_date: string
   end_date: string
   review_deadline: string | null
+  grades_released: boolean
   created_by: string | null
   created_at: string | null
   updated_at: string | null
@@ -207,9 +208,17 @@ export interface ReviewAssignment {
   cycle_id: string
   employee_id: string
   manager_id: string | null
+  reviewer_id: string | null
+  assignment_type: 'standard' | 'upward'
   status: 'pending' | 'in_progress' | 'completed'
   overall_rating: number | null
   final_grade: string | null
+  calibrated_by: string | null
+  calibrated_at: string | null
+  slack_notification_ts: string | null
+  slack_notification_channel: string | null
+  last_reminder_at: string | null
+  reminder_count: number | null
   created_at: string | null
   updated_at: string | null
   // Relations
@@ -258,7 +267,7 @@ export interface Goal {
   metric_current: number | null
   metric_target: number | null
   metric_unit: string | null
-  tracking_status: GoalTrackingStatus
+  tracking_status: GoalTrackingStatus | null
   scope: GoalScope
   due_date: string | null
   created_at: string | null

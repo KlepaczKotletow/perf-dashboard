@@ -19,6 +19,7 @@ const CYCLE_STATUS_STYLE: Record<string, string> = {
   active:    "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-400",
   draft:     "bg-muted text-muted-foreground",
   completed: "bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-400",
+  closed:    "bg-zinc-100 text-zinc-600 dark:bg-zinc-400/10 dark:text-zinc-400",
 };
 
 const SORT_OPTIONS = [
@@ -29,7 +30,7 @@ const SORT_OPTIONS = [
 ];
 
 const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 };
-const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2 };
+const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2, closed: 3 };
 
 function AssignmentRow({ a }: { a: any }) {
   const config = getAssignmentStatus(a.status);

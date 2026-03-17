@@ -52,10 +52,10 @@ async function getPersonalData(userId: string) {
       .limit(3),
   ]);
 
-  // Fix: filter by cycle status in app since the join filter above may not work directly
+  // Filter to assignments in active cycles only
   const allAssignments = assignmentsRes.data || [];
   const activeAssignments = allAssignments.filter(
-    (a: any) => a.cycle?.status === "active" || a.cycle?.status === "in_progress"
+    (a: any) => a.cycle?.status === "active"
   );
 
   // Check self submissions
@@ -117,6 +117,10 @@ async function getManagerData(userId: string) {
   }
 
   // Build per-report status
+  // Assignment status state machine:
+  //   pending     → employee has not yet submitted their self-assessment
+  //   in_progress → employee submitted self-assessment; manager review not yet done
+  //   completed   → manager has submitted their review
   const reportMap = new Map(reports.map((r: any) => [r.id, r]));
   const teamStatus = teamAssignments.map((a: any) => {
     const report = reportMap.get(a.employee_id);
@@ -227,8 +231,10 @@ async function getChartData(workspaceId: string | undefined): Promise<DashboardC
   const activeGoals = goals.filter((g) => g.status === "active" || g.status === "draft");
   const trackingCounts: Record<string, number> = { on_track: 0, at_risk: 0, delayed: 0, achieved: 0 };
   activeGoals.forEach((g: any) => {
-    const ts = g.tracking_status || "on_track";
-    if (ts in trackingCounts) trackingCounts[ts]++;
+    // Skip goals with no tracking status rather than silently inflating on_track
+    if (g.tracking_status && g.tracking_status in trackingCounts) {
+      trackingCounts[g.tracking_status]++;
+    }
   });
   const goalDistribution = Object.entries(trackingCounts).map(([key, value]) => ({
     name: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.label || key,
@@ -585,7 +591,7 @@ export default async function DashboardPage() {
                 {pendingMgrReviews.length > 0 ? "Ready for your review" : "Team review status"}
               </h2>
               <Link
-                href="/dashboard/my-reviews?tab=reviewing"
+                href="/dashboard/my-reviews"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
                 See all <ChevronRight className="h-3 w-3" />

@@ -104,20 +104,21 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
     blocks.push(divider());
   }
 
-  // ── Recent feedback received (visibility-gated: non-anonymous only) ─
+  // ── Recent feedback received ─────────────────────────────────────
+  // Include anonymous feedback but redact the sender name, consistent
+  // with how the web dashboard handles it.
   const { data: feedback } = await supabase
     .from("continuous_feedback")
     .select("id, message, is_anonymous, created_at, from_user:users!continuous_feedback_from_user_id_fkey(slack_name)")
     .eq("to_user_id", userId)
     .eq("workspace_id", workspaceId)
-    .eq("is_anonymous", false)
     .order("created_at", { ascending: false })
     .limit(3);
 
   if (feedback && feedback.length > 0) {
     blocks.push(header("💬 Recent Feedback"));
     for (const f of feedback) {
-      const from = (f as any).from_user?.slack_name || "Someone";
+      const from = f.is_anonymous ? "Anonymous" : ((f as any).from_user?.slack_name || "Someone");
       const preview = f.message.length > 120 ? f.message.slice(0, 120) + "…" : f.message;
       blocks.push(section(`*From ${from}:* ${preview}`));
     }

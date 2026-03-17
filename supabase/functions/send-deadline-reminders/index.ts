@@ -87,33 +87,42 @@ Deno.serve(async (req) => {
           const eventType = "cycle_deadline_reminder";
           const referenceId = `${cycle.id}_${a.id}_d${daysAhead}`;
 
-          // Check if already sent
-          const { data: existing } = await supabase
+          // Atomically claim the send slot — insert first to prevent race conditions
+          // between concurrent function invocations
+          const { error: logError } = await supabase
             .from("notification_log")
-            .select("id")
-            .eq("workspace_id", cycle.workspace_id)
-            .eq("user_id", mgr.id)
-            .eq("event_type", eventType)
-            .eq("reference_id", referenceId)
-            .maybeSingle();
-
-          if (existing) {
-            totalSkipped++;
-            continue;
-          }
-
-          const text = `⏰ *Reminder: ${daysAhead} days left — ${cycle.name}*\nYou still have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/cycles/${cycle.id}`;
-          const ok = await sendSlackDM(botToken, mgr.slack_user_id, text);
-
-          if (ok) {
-            await supabase.from("notification_log").insert({
+            .insert({
               workspace_id: cycle.workspace_id,
               user_id: mgr.id,
               event_type: eventType,
               reference_id: referenceId,
             });
+
+          if (logError) {
+            // Unique constraint violation (23505) means already sent — skip silently
+            if ((logError as any).code === "23505") {
+              totalSkipped++;
+              continue;
+            }
+            console.error("Failed to claim notification slot:", logError.message);
+            continue;
+          }
+
+          // Slot claimed — now send the DM
+          const text = `⏰ *Reminder: ${daysAhead} days left — ${cycle.name}*\nYou still have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/cycles/${cycle.id}`;
+          const ok = await sendSlackDM(botToken, mgr.slack_user_id, text);
+
+          if (ok) {
             totalSent++;
           } else {
+            // Send failed — remove the log entry so this reminder is retried next run
+            await supabase
+              .from("notification_log")
+              .delete()
+              .eq("workspace_id", cycle.workspace_id)
+              .eq("user_id", mgr.id)
+              .eq("event_type", eventType)
+              .eq("reference_id", referenceId);
             totalSkipped++;
           }
         }
