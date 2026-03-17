@@ -12,10 +12,13 @@ import { getAssignmentStatus } from "@/lib/status";
 
 export default async function ReviewDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string; cycleId?: string }>;
 }) {
   const { id } = await params;
+  const { from, cycleId } = await searchParams;
   const supabase = await createServerSupabaseClient();
   const workspace = await getUserWorkspace();
 
@@ -121,11 +124,21 @@ export default async function ReviewDetailPage({
       {/* Back + header */}
       <div>
         <Link
-          href={isAssignmentEmployee ? "/dashboard/my-reviews" : "/dashboard/reviews"}
+          href={
+            from === "cycle" && cycleId
+              ? `/dashboard/cycles/${cycleId}`
+              : isAssignmentEmployee
+              ? "/dashboard/my-reviews"
+              : "/dashboard/reviews"
+          }
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          {isAssignmentEmployee ? "Back to my reviews" : "Back to reviews"}
+          {from === "cycle" && cycleId
+            ? "Back to cycle"
+            : isAssignmentEmployee
+            ? "Back to my reviews"
+            : "Back to reviews"}
         </Link>
 
         <div className="flex items-start justify-between gap-4">

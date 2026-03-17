@@ -242,8 +242,19 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
   }, [filtered, sortKey, sortDir]);
 
   // Build tree for hierarchy display
-  const tree = useMemo(() => buildTree(sorted), [sorted]);
-  const flat = useMemo(() => flattenTree(tree, expanded), [tree, expanded]);
+  const hasActiveFilter = search !== "" || cycleFilter !== "all" || scopeFilter !== "all" || statusFilter !== "all";
+
+  const tree = useMemo(
+    () => hasActiveFilter ? [] : buildTree(sorted),
+    [sorted, hasActiveFilter]
+  );
+
+  const flat = useMemo(
+    () => hasActiveFilter
+      ? sorted.map((g) => ({ ...g, children: [], depth: 0 }))
+      : flattenTree(tree, expanded),
+    [sorted, tree, expanded, hasActiveFilter]
+  );
 
   // ─── Summary stats ──────────────────────────────────
 
@@ -534,9 +545,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
                     {/* Weight */}
                     <TableCell>
                       <span className="text-sm text-muted-foreground">
-                        {Math.round(goal.weight * 100) > 100
-                          ? goal.weight.toFixed(1)
-                          : `${Math.round(goal.weight * 100)}%`}
+                        {goal.weight === 1 ? "1×" : `${goal.weight % 1 === 0 ? goal.weight.toFixed(0) : goal.weight.toFixed(1)}×`}
                       </span>
                     </TableCell>
 
