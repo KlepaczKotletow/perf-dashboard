@@ -20,7 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal, Bell, BellOff } from "lucide-react";
+import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal, Bell, BellOff, AlertCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 interface CycleActionsProps {
@@ -31,10 +31,12 @@ interface CycleActionsProps {
     grades_released?: boolean;
   };
   employeeCount: number;
+  submittedCount?: number;
+  pendingManagerCount?: number;
   userRole?: string;
 }
 
-export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsProps) {
+export function CycleActions({ cycle, employeeCount, submittedCount, pendingManagerCount, userRole }: CycleActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -44,6 +46,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [notificationError, setNotificationError] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const isHR = userRole === "hr" || userRole === "admin";
 
@@ -54,6 +57,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
 
   async function updateStatus(newStatus: string) {
     setLoading(true);
+    setActionError(null);
     try {
       const { error } = await supabase
         .from("performance_cycles")
@@ -64,6 +68,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
       router.refresh();
     } catch (err) {
       console.error("Error updating cycle status:", err);
+      setActionError("Failed to update cycle status. Please try again.");
     } finally {
       setLoading(false);
       setShowLaunchDialog(false);
@@ -90,6 +95,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
   }
 
   async function launchCycle() {
+    let failed = false;
     setLoading(true);
     setNotificationError(false);
     setNotificationSent(false);
@@ -186,16 +192,19 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
       await sendNotifications();
 
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
+      failed = true;
       console.error("Error launching cycle:", err);
+      setActionError("Failed to launch cycle. Please try again.");
     } finally {
       setLoading(false);
-      setShowLaunchDialog(false);
+      if (!failed) setShowLaunchDialog(false);  // only close dialog on success
     }
   }
 
   async function handleDelete() {
     setLoading(true);
+    setActionError(null);
     try {
       const { error } = await supabase
         .from("performance_cycles")
@@ -207,6 +216,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
       router.refresh();
     } catch (err) {
       console.error("Error deleting cycle:", err);
+      setActionError("Failed to delete cycle. Please try again.");
     } finally {
       setLoading(false);
       setShowDeleteDialog(false);
@@ -215,6 +225,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
 
   async function releaseGrades() {
     setLoading(true);
+    setActionError(null);
     try {
       const { error } = await supabase
         .from("performance_cycles")
@@ -225,6 +236,7 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
       router.refresh();
     } catch (err) {
       console.error("Error releasing grades:", err);
+      setActionError("Failed to release grades. Please try again.");
     } finally {
       setLoading(false);
       setShowReleaseDialog(false);
@@ -233,6 +245,12 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
 
   return (
     <>
+      {actionError && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-3 py-1.5 rounded-md">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {actionError}
+        </div>
+      )}
       {notificationError && (
         <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 px-3 py-1.5 rounded-md">
           <BellOff className="h-3.5 w-3.5 shrink-0" />
@@ -335,7 +353,10 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
             <AlertDialogTitle>Delete Performance Cycle?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete &quot;{cycle.name}&quot; and all associated data.
-              This action cannot be undone.
+              {submittedCount && submittedCount > 0 ? (
+                <> This includes <strong>{submittedCount} submitted review{submittedCount !== 1 ? "s" : ""}</strong> that will be permanently lost.</>
+              ) : null}
+              {" "}This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -356,8 +377,13 @@ export function CycleActions({ cycle, employeeCount, userRole }: CycleActionsPro
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Cycle as Completed?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will end the active review period for &quot;{cycle.name}&quot;. Managers who haven&apos;t yet submitted
-              their reviews will no longer be prompted. You can still release grades afterwards.
+              This will end the active review period for &quot;{cycle.name}&quot;.
+              {pendingManagerCount !== undefined && pendingManagerCount > 0 ? (
+                <> <strong>{pendingManagerCount} manager review{pendingManagerCount !== 1 ? "s" : ""} are still pending</strong> and managers will no longer be prompted once closed.</>
+              ) : (
+                <> All manager reviews have been submitted.</>
+              )}
+              {" "}You can still release grades afterwards.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

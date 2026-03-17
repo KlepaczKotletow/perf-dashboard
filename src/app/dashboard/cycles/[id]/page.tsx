@@ -74,18 +74,20 @@ async function getCycleEmployees(cycleId: string) {
   return data || [];
 }
 
-const getWorkspaceUsers = unstable_cache(
-  async () => {
-    const supabase = await createServerSupabaseClient();
-    const { data } = await supabase
-      .from("users")
-      .select("id, slack_name, slack_email")
-      .order("slack_name");
-    return data || [];
-  },
-  ["workspace-users"],
-  { revalidate: 30 } // revalidate every 30 seconds
-);
+async function getWorkspaceUsers(workspaceId: string) {
+  return unstable_cache(
+    async () => {
+      const supabase = await createServerSupabaseClient();
+      const { data } = await supabase
+        .from("users")
+        .select("id, slack_name, slack_email")
+        .order("slack_name");
+      return data || [];
+    },
+    [`workspace-users-${workspaceId}`],
+    { revalidate: 30 }
+  )();
+}
 
 async function getCycleQuestions(cycleId: string) {
   const supabase = await createServerSupabaseClient();
@@ -149,7 +151,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
 
   const [employees, allUsers, phases, assignments, cycleQuestions, allCompetencies] = await Promise.all([
     getCycleEmployees(id),
-    getWorkspaceUsers(),
+    getWorkspaceUsers(workspace!.workspaceId!),
     getCyclePhases(id),
     getReviewAssignments(id),
     getCycleQuestions(id),
@@ -159,6 +161,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");
   const upwardAssignments = assignments.filter((a: any) => a.assignment_type === "upward");
   const calibratedCount = standardAssignments.filter((a: any) => a.final_grade).length;
+  const submittedCount = assignments.filter((a: any) => a.status !== "pending").length;
 
   // ── New computed values ────────────────────────────────────────────────────
   // Self-review done = status is "in_progress" OR "completed"
@@ -169,6 +172,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const managerDoneCount = standardAssignments.filter(
     (a: any) => a.status === "completed"
   ).length;
+  const pendingManagerCount = standardAssignments.length - managerDoneCount;
 
   // Deadline urgency (milliseconds → days)
   const daysUntilDeadline = cycle.review_deadline
@@ -210,10 +214,12 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
-          </Button>
-          <CycleActions cycle={cycle} employeeCount={employees.length} userRole={workspace?.role || undefined} />
+          {isHROrAbove(workspace?.role) && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
+            </Button>
+          )}
+          <CycleActions cycle={cycle} employeeCount={employees.length} submittedCount={submittedCount} pendingManagerCount={pendingManagerCount} userRole={workspace?.role || undefined} />
         </div>
       </div>
 
@@ -312,12 +318,12 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             <div className="flex items-center gap-2">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">Start:</span>
-              <span className="font-medium text-foreground">{format(new Date(cycle.start_date), "MMM d, yyyy")}</span>
+              <span className="font-medium text-foreground">{cycle.start_date ? format(new Date(cycle.start_date), "MMM d, yyyy") : "—"}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">End:</span>
-              <span className="font-medium text-foreground">{format(new Date(cycle.end_date), "MMM d, yyyy")}</span>
+              <span className="font-medium text-foreground">{cycle.end_date ? format(new Date(cycle.end_date), "MMM d, yyyy") : "—"}</span>
             </div>
             {cycle.review_deadline && (
               <div className="flex items-center gap-2">
@@ -498,7 +504,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                       <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
-                        <Link href={`/dashboard/reviews/${assignment.id}`}>
+                        <Link href={`/dashboard/reviews/${assignment.id}?from=cycle&cycleId=${id}`}>
                           <ExternalLink className="h-3.5 w-3.5" />
                           <span className="sr-only">View review for {assignment.employee?.slack_name}</span>
                         </Link>
@@ -569,7 +575,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                         <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
-                        <Link href={`/dashboard/reviews/${assignment.id}`}>
+                        <Link href={`/dashboard/reviews/${assignment.id}?from=cycle&cycleId=${id}`}>
                           <ExternalLink className="h-3.5 w-3.5" />
                           <span className="sr-only">View upward feedback</span>
                         </Link>
