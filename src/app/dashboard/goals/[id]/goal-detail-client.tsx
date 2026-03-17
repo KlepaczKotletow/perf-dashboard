@@ -98,7 +98,23 @@ const trackingConfig: Record<string, { label: string; color: string }> = {
   },
 };
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Derive progress % from metric values.
+ * Returns null when inputs are insufficient (no target, or empty current).
+ */
+function deriveProgress(
+  metricCurrent: string,
+  metricStart: number | null,
+  metricTarget: number | null
+): number | null {
+  const current = parseFloat(metricCurrent);
+  if (isNaN(current) || metricStart == null || metricTarget == null) return null;
+  if (metricTarget === metricStart) return 100;
+  const pct = Math.round(((current - metricStart) / (metricTarget - metricStart)) * 100);
+  return Math.min(100, Math.max(0, pct));
+}
 
 function scopeLabel(scope: string): string {
   switch (scope) {
@@ -162,13 +178,20 @@ export default function GoalDetailClient({
     setSaving(true);
     setSaveError(null);
 
+    // If metric values are present, derive progress from them; otherwise use slider value
+    const metricCurrentVal = form.metric_current !== "" ? Number(form.metric_current) : null;
+    const derivedProgress = metricCurrentVal !== null
+      ? deriveProgress(form.metric_current, goal.metric_start, goal.metric_target)
+      : null;
+    const progressVal = derivedProgress !== null ? derivedProgress : Number(form.progress);
+
     const payload: Record<string, unknown> = {
       title: form.title.trim(),
       description: form.description.trim() || null,
-      progress: Number(form.progress),
+      progress: progressVal,
       tracking_status: form.tracking_status,
       status: form.status,
-      metric_current: form.metric_current !== "" ? Number(form.metric_current) : null,
+      metric_current: metricCurrentVal,
       due_date: form.due_date || null,
       weight: Number(form.weight),
     };
@@ -441,34 +464,50 @@ export default function GoalDetailClient({
           {/* Progress bar + number */}
           {editing ? (
             <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={form.progress}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, progress: Number(e.target.value) }))
-                  }
-                  className="flex-1 accent-primary"
-                />
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number"
+              {goal.metric_target != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Progress is calculated automatically from the metric value below.
+                </p>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
                     min={0}
                     max={100}
+                    step={1}
                     value={form.progress}
                     onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        progress: Math.min(100, Math.max(0, Number(e.target.value))),
-                      }))
+                      setForm((f) => ({ ...f, progress: Number(e.target.value) }))
                     }
-                    className="h-8 w-16 text-sm text-right"
+                    className="flex-1 accent-primary"
                   />
-                  <span className="text-sm text-muted-foreground">%</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={form.progress}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          progress: Math.min(100, Math.max(0, Number(e.target.value))),
+                        }))
+                      }
+                      className="h-8 w-16 text-sm text-right"
+                    />
+                    <span className="text-sm text-muted-foreground">%</span>
+                  </div>
                 </div>
+              )}
+              {/* Live derived preview */}
+              <div className="space-y-1">
+                <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all duration-300"
+                    style={{ width: `${form.progress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground text-right tabular-nums">{form.progress}%</p>
               </div>
             </div>
           ) : (
@@ -502,9 +541,15 @@ export default function GoalDetailClient({
                     <Input
                       type="number"
                       value={form.metric_current}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, metric_current: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        const newCurrent = e.target.value;
+                        const derived = deriveProgress(newCurrent, goal.metric_start, goal.metric_target);
+                        setForm((f) => ({
+                          ...f,
+                          metric_current: newCurrent,
+                          ...(derived !== null ? { progress: derived } : {}),
+                        }));
+                      }}
                       className="h-8 w-24 text-sm"
                       placeholder="Current"
                     />
