@@ -39,6 +39,7 @@ import {
   ArrowUpDown,
   CheckCircle2,
   X,
+  AlertCircle,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────
@@ -182,6 +183,8 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
   // Sort
   const [sortKey, setSortKey] = useState<string>("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -252,12 +255,13 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
             activeGoals.reduce((sum, g) => sum + g.weight, 0)
         )
       : 0;
+  const goalsWithStatus = goals.filter((g) => g.tracking_status != null);
   const roadmapPct =
-    goals.length > 0
+    goalsWithStatus.length > 0
       ? Math.round(
-          (goals.filter((g) => g.tracking_status === "on_track" || g.tracking_status === "achieved").length /
-            goals.length) *
-            100
+          (goalsWithStatus.filter(
+            (g) => g.tracking_status === "on_track" || g.tracking_status === "achieved"
+          ).length / goalsWithStatus.length) * 100
         )
       : 0;
 
@@ -282,13 +286,22 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
   }
 
   async function updateTrackingStatus(goalId: string, status: string, employeeId?: string) {
-    await supabase.from("goals").update({ tracking_status: status }).eq("id", goalId);
+    const { error } = await supabase
+      .from("goals")
+      .update({ tracking_status: status })
+      .eq("id", goalId);
 
-    // Notify manager if status is at_risk, delayed, or achieved (fire-and-forget, don't block UI)
+    if (error) {
+      console.error("Failed to update tracking status:", error);
+      setUpdateError("Failed to update status. Please try again.");
+      return;
+    }
+    setUpdateError(null);
+
     if (employeeId && (status === "at_risk" || status === "delayed" || status === "achieved")) {
       supabase.functions.invoke("cycle-notifications", {
         body: { action: "goal_status", goal_id: goalId, new_status: status, employee_id: employeeId },
-      }).catch(() => {}); // silent fail — notification is best-effort
+      }).catch(() => {});
     }
 
     router.refresh();
@@ -422,6 +435,14 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
         )}
       </div>
 
+      {/* Update error banner */}
+      {updateError && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-3 py-2 rounded-md">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {updateError}
+        </div>
+      )}
+
       {/* Data Table */}
       {flat.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
@@ -489,9 +510,17 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
                         ) : (
                           <span className="w-[18px] shrink-0" />
                         )}
-                        <span className="text-sm font-medium text-foreground truncate">
+                        <Link
+                          href={`/dashboard/goals/${goal.id}`}
+                          className="text-sm font-medium text-foreground truncate hover:underline"
+                        >
                           {goal.title}
-                        </span>
+                        </Link>
+                        {goal.status === "draft" && (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">
+                            Draft
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
 

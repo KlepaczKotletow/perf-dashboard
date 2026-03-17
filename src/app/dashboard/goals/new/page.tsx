@@ -24,6 +24,7 @@ export default function NewGoalPage() {
   const [parentId, setParentId] = useState("");
   const [scope, setScope] = useState("individual");
   const [trackingStatus, setTrackingStatus] = useState("on_track");
+  const [goalStatus, setGoalStatus] = useState("active");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -69,7 +70,7 @@ export default function NewGoalPage() {
         cycle_id: cycleId || null,
         parent_id: parentId || null,
         due_date: dueDate || null,
-        status: "draft",
+        status: goalStatus,
         progress: 0,
         weight,
         metric_start: metricStart ? parseFloat(metricStart) : null,
@@ -155,6 +156,7 @@ export default function NewGoalPage() {
                 <Select value={cycleId} onValueChange={setCycleId}>
                   <SelectTrigger><SelectValue placeholder="Link to cycle" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">None (no cycle)</SelectItem>
                     {cycles.map((cycle) => (
                       <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>
                     ))}
@@ -167,6 +169,7 @@ export default function NewGoalPage() {
                 <Select value={parentId} onValueChange={setParentId}>
                   <SelectTrigger><SelectValue placeholder="None (top-level)" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="">None (top-level)</SelectItem>
                     {existingGoals.map((g) => (
                       <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
                     ))}
@@ -196,10 +199,20 @@ export default function NewGoalPage() {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
                 <Label htmlFor="weight">Weight</Label>
                 <Input id="weight" name="weight" type="number" step="0.01" min="0.01" defaultValue="1.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={goalStatus} onValueChange={setGoalStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="draft">Draft</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Tracking Status</Label>
@@ -209,6 +222,7 @@ export default function NewGoalPage() {
                     <SelectItem value="on_track">On Track</SelectItem>
                     <SelectItem value="at_risk">At Risk</SelectItem>
                     <SelectItem value="delayed">Delayed</SelectItem>
+                    <SelectItem value="achieved">Achieved</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
