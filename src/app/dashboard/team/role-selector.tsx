@@ -21,10 +21,14 @@ interface RoleSelectorProps {
 export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps) {
   const router = useRouter();
   const [updating, setUpdating] = useState(false);
+  const [localRole, setLocalRole] = useState(currentRole);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const handleRoleChange = async (newRole: string) => {
-    if (newRole === currentRole) return;
-    
+    if (newRole === localRole) return;
+
+    setLocalRole(newRole);
+    setRoleError(null);
     setUpdating(true);
     try {
       const supabase = createClient();
@@ -37,7 +41,8 @@ export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps
       router.refresh();
     } catch (error) {
       console.error("Error updating role:", error);
-      alert("Failed to update role");
+      setLocalRole(currentRole);
+      setRoleError("Failed to update role");
     } finally {
       setUpdating(false);
     }
@@ -52,8 +57,9 @@ export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps
   }
 
   return (
+    <div className="flex flex-col items-start gap-1">
     <Select
-      value={currentRole || "user"}
+      value={localRole || "user"}
       onValueChange={handleRoleChange}
       disabled={updating}
     >
@@ -67,5 +73,9 @@ export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps
         <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
       </SelectContent>
     </Select>
+      {roleError && (
+        <p className="text-xs text-red-600 dark:text-red-400">{roleError}</p>
+      )}
+    </div>
   );
 }

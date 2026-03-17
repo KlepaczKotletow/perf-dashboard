@@ -25,6 +25,7 @@ export default function NewGoalPage() {
   const [scope, setScope] = useState("individual");
   const [trackingStatus, setTrackingStatus] = useState("on_track");
   const [goalStatus, setGoalStatus] = useState("active");
+  const [title, setTitle] = useState("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +52,6 @@ export default function NewGoalPage() {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
-    const title = formData.get("title") as string;
     const description = formData.get("description") as string;
     const dueDate = formData.get("due_date") as string;
     const weight = parseFloat(formData.get("weight") as string) || 1.0;
@@ -62,6 +62,8 @@ export default function NewGoalPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError("Not authenticated"); setLoading(false); return; }
+      const workspaceId = user.user_metadata?.workspace_id;
+      if (!workspaceId) { setError("Workspace not found. Please sign out and sign back in."); setLoading(false); return; }
 
       const { error: insertError } = await supabase.from("goals").insert({
         title,
@@ -79,7 +81,7 @@ export default function NewGoalPage() {
         metric_unit: metricUnit || null,
         tracking_status: trackingStatus,
         scope,
-        workspace_id: user.user_metadata?.workspace_id,
+        workspace_id: workspaceId,
       });
 
       if (insertError) { setError(insertError.message); setLoading(false); return; }
@@ -142,7 +144,7 @@ export default function NewGoalPage() {
 
             <div className="space-y-2">
               <Label htmlFor="title">Goal Title *</Label>
-              <Input id="title" name="title" placeholder="e.g., Improve API response times by 50%" required />
+              <Input id="title" name="title" placeholder="e.g., Improve API response times by 50%" required value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
 
             <div className="space-y-2">
@@ -236,7 +238,7 @@ export default function NewGoalPage() {
               <Button type="button" variant="outline" asChild>
                 <Link href="/dashboard/goals">Cancel</Link>
               </Button>
-              <Button type="submit" disabled={loading || !employeeId}>
+              <Button type="submit" disabled={loading || !employeeId || !title.trim()}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Create Goal
               </Button>

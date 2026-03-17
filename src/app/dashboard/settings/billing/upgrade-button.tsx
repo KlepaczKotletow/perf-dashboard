@@ -12,8 +12,10 @@ interface UpgradeButtonProps {
 
 export function UpgradeButton({ workspaceId, customerId, isManage = false }: UpgradeButtonProps) {
   const [loading, setLoading] = useState(false);
+  const [buttonError, setButtonError] = useState<string | null>(null);
 
   async function handleClick() {
+    setButtonError(null);
     setLoading(true);
 
     try {
@@ -23,11 +25,16 @@ export function UpgradeButton({ workspaceId, customerId, isManage = false }: Upg
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          setButtonError(errData.error || `Request failed (${res.status}). Please try again.`);
+          return;
+        }
         const data = await res.json();
         if (data.url) {
           window.location.href = data.url;
         } else {
-          alert(data.error || "Failed to open billing portal");
+          setButtonError(data.error || "Failed to open billing portal");
         }
       } else {
         // Redirect to pricing page for new subscriptions
@@ -35,20 +42,25 @@ export function UpgradeButton({ workspaceId, customerId, isManage = false }: Upg
       }
     } catch (err) {
       console.error("Error:", err);
-      alert("Something went wrong. Please try again.");
+      setButtonError("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Button onClick={handleClick} disabled={loading}>
-      {loading ? (
-        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-      ) : (
-        <ExternalLink className="h-4 w-4 mr-2" />
+    <>
+      <Button onClick={handleClick} disabled={loading}>
+        {loading ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <ExternalLink className="h-4 w-4 mr-2" />
+        )}
+        {isManage ? "Manage Subscription" : "Upgrade Plan"}
+      </Button>
+      {buttonError && (
+        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{buttonError}</p>
       )}
-      {isManage ? "Manage Subscription" : "Upgrade Plan"}
-    </Button>
+    </>
   );
 }

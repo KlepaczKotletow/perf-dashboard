@@ -118,8 +118,10 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
         );
       case "pending_first":
         return copy.sort((a, b) => {
-          const aMin = Math.min(...[...a.standard, ...a.upward].map(x => STATUS_ORDER[x.status] ?? 9));
-          const bMin = Math.min(...[...b.standard, ...b.upward].map(x => STATUS_ORDER[x.status] ?? 9));
+          const aArr = [...a.standard, ...a.upward].map(x => STATUS_ORDER[x.status] ?? 9);
+          const bArr = [...b.standard, ...b.upward].map(x => STATUS_ORDER[x.status] ?? 9);
+          const aMin = aArr.length > 0 ? Math.min(...aArr) : Infinity;
+          const bMin = bArr.length > 0 ? Math.min(...bArr) : Infinity;
           return aMin - bMin;
         });
       default: // newest

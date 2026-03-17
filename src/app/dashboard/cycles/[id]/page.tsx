@@ -105,19 +105,21 @@ async function getCycleQuestions(cycleId: string) {
   }));
 }
 
-const getAllCompetencies = unstable_cache(
-  async () => {
-    const supabase = await createServerSupabaseClient();
-    const { data } = await supabase
-      .from("competencies")
-      .select("id, name, category, description")
-      .order("category")
-      .order("name");
-    return data || [];
-  },
-  ["all-competencies"],
-  { revalidate: 300 } // revalidate every 5 minutes — competencies rarely change
-);
+function getAllCompetencies(workspaceId: string) {
+  return unstable_cache(
+    async () => {
+      const supabase = await createServerSupabaseClient();
+      const { data } = await supabase
+        .from("competencies")
+        .select("id, name, category, description")
+        .order("category")
+        .order("name");
+      return data || [];
+    },
+    [`all-competencies-${workspaceId}`],
+    { revalidate: 300 } // revalidate every 5 minutes — competencies rarely change
+  )();
+}
 
 
 export default async function CycleDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -155,7 +157,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     getCyclePhases(id),
     getReviewAssignments(id),
     getCycleQuestions(id),
-    getAllCompetencies(),
+    getAllCompetencies(workspace?.workspaceId ?? ""),
   ]);
 
   const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");
