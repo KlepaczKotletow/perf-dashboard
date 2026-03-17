@@ -445,6 +445,11 @@ export default function ReviewFormPage({
           .update({ status: "in_progress" })
           .eq("id", assignmentId)
           .eq("status", "pending");
+
+        // Fire-and-forget: notify manager that self-review is done
+        supabase.functions.invoke("cycle-notifications", {
+          body: { action: "self_submitted", assignment_id: assignmentId },
+        }).catch(() => {}); // intentionally ignored — non-blocking
       }
 
       // Clear the autosave draft on successful submission
