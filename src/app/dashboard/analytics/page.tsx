@@ -143,8 +143,10 @@ async function getAnalyticsData() {
   const activeGoals = (goalsData || []).filter((g: any) => g.status === "active" || g.status === "draft");
   const trackingCounts: Record<string, number> = { on_track: 0, at_risk: 0, delayed: 0, achieved: 0 };
   activeGoals.forEach((g: any) => {
-    const ts = g.tracking_status || "on_track";
-    if (ts in trackingCounts) trackingCounts[ts]++;
+    // Skip goals with no tracking status rather than silently inflating on_track
+    if (g.tracking_status && g.tracking_status in trackingCounts) {
+      trackingCounts[g.tracking_status]++;
+    }
   });
   const goalStatusDistribution = Object.entries(trackingCounts).map(([key, value]) => ({
     name: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.label || key,
@@ -301,6 +303,23 @@ export default async function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {analytics.totalFeedback === 0 && analytics.totalAssignments === 0 && (
+        <Card className="border-border/60">
+          <CardContent className="py-16 text-center">
+            <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <BarChart3 className="h-7 w-7 text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-semibold text-foreground mb-1">No review data yet</p>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              Analytics will populate once performance cycles are launched and employees submit reviews.
+            </p>
+            <Button asChild className="mt-5" variant="outline" size="sm">
+              <Link href="/dashboard/cycles">Go to Cycles</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts */}
       <AnalyticsCharts data={analytics.chartsData} />

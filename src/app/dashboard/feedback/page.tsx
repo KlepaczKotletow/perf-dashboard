@@ -234,7 +234,12 @@ export default async function FeedbackPage({
       {showReview && reviewFeedback.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Review Ratings</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Review Ratings
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {reviewFeedback.length}{reviewFeedback.length === 100 ? " (showing first 100)" : ""}
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-border">
@@ -315,7 +320,12 @@ export default async function FeedbackPage({
       {showContinuous && continuousFeedback.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Continuous Feedback</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Continuous Feedback
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {continuousFeedback.length}{continuousFeedback.length === 50 ? " (showing first 50)" : ""}
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-border">
