@@ -374,10 +374,17 @@ export default async function MyReviewsPage() {
 
                       <div className="flex items-center gap-2 shrink-0">
                         {isDone ? (
-                          <Badge className="text-[10px] text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10 flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            Submitted
-                          </Badge>
+                          <>
+                            <Badge className="text-[10px] text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10 flex items-center gap-1">
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Submitted
+                            </Badge>
+                            <Button size="sm" variant="ghost" className="text-xs h-8" asChild>
+                              <Link href={`/dashboard/reviews/${review.id}`}>
+                                View <ChevronRight className="h-3 w-3 ml-1" />
+                              </Link>
+                            </Button>
+                          </>
                         ) : (
                           <>
                             <Badge className="text-[10px] text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10 flex items-center gap-1">

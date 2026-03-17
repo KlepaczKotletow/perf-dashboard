@@ -17,6 +17,16 @@ import {
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const CYCLE_TYPES = [
   { value: "annual", label: "Annual Review" },
@@ -61,13 +71,14 @@ interface TextQuestion {
 
 // ── Reusable date picker field ─────────────────────────────────────────────────
 function DatePickerField({
-  label, value, onChange, placeholder = "Pick a date", optional,
+  label, value, onChange, placeholder = "Pick a date", optional, fromDate,
 }: {
   label: string;
   value: Date | undefined;
   onChange: (d: Date | undefined) => void;
   placeholder?: string;
   optional?: boolean;
+  fromDate?: Date;
 }) {
   return (
     <div className="space-y-1.5">
@@ -86,7 +97,7 @@ function DatePickerField({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
-          <Calendar mode="single" selected={value} onSelect={onChange} initialFocus />
+          <Calendar mode="single" selected={value} onSelect={onChange} initialFocus fromDate={fromDate} />
         </PopoverContent>
       </Popover>
     </div>
@@ -158,6 +169,7 @@ export default function NewCyclePage() {
   // UI
   const [loading, setLoading] = useState<false | "draft" | "launch">(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLaunchConfirm, setShowLaunchConfirm] = useState(false);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -417,7 +429,7 @@ export default function NewCyclePage() {
 
         {/* Dates */}
         <div className="grid grid-cols-3 gap-3">
-          <DatePickerField label="Start Date" value={startDate} onChange={setStartDate} placeholder="Start" />
+          <DatePickerField label="Start Date" value={startDate} onChange={setStartDate} placeholder="Start" fromDate={new Date()} />
           <DatePickerField label="End Date" value={endDate} onChange={setEndDate} placeholder="End" />
           <DatePickerField label="Review Deadline" value={reviewDeadline} onChange={setReviewDeadline} placeholder="Optional" optional />
         </div>
@@ -649,7 +661,12 @@ export default function NewCyclePage() {
             {loading === "draft" && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Save as Draft
           </Button>
-          <Button onClick={handleCreateAndLaunch} disabled={!!loading}>
+          <Button
+            onClick={() => {
+              if (validateForLaunch()) setShowLaunchConfirm(true);
+            }}
+            disabled={!!loading}
+          >
             {loading === "launch"
               ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               : <Play className="h-4 w-4 mr-2" />}
@@ -657,6 +674,31 @@ export default function NewCyclePage() {
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={showLaunchConfirm} onOpenChange={setShowLaunchConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Launch Performance Cycle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will create the cycle, enroll {selectedPeopleIds.length} employee{selectedPeopleIds.length !== 1 ? "s" : ""}, and send Slack notifications to start their reviews.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowLaunchConfirm(false);
+                handleCreateAndLaunch();
+              }}
+              disabled={!!loading}
+            >
+              {loading === "launch" ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+              Launch Cycle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

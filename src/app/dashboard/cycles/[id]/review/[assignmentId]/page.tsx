@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, use } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ export default function ReviewFormPage({
 }) {
   const { id: cycleId, assignmentId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,8 @@ export default function ReviewFormPage({
               id, slack_name, slack_email, job_title, department, level_id,
               level:levels!users_level_id_fkey(id, name, grade, job_family:job_families(name))
             ),
-            manager:users!review_assignments_manager_id_fkey(id, slack_name)
+            manager:users!review_assignments_manager_id_fkey(id, slack_name),
+            cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
           `)
           .eq("id", assignmentId)
           .single();
@@ -91,6 +93,14 @@ export default function ReviewFormPage({
 
         setAssignment(assignmentData);
         setEmployee(assignmentData.employee);
+
+        // Block submission if cycle is no longer active
+        const cycleStatus = (assignmentData as any).cycle?.status;
+        if (cycleStatus && cycleStatus !== "active") {
+          setError(`This review cycle is ${cycleStatus} and no longer accepting submissions.`);
+          setLoading(false);
+          return;
+        }
 
         // Determine what reviewer role the current user would have
         let currentReviewerRole = "peer";
@@ -440,7 +450,13 @@ export default function ReviewFormPage({
       // Clear the autosave draft on successful submission
       try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
 
-      router.push(`/dashboard/my-reviews`);
+      const fromCycle = searchParams.get("from") === "cycle";
+      const fromCycleId = searchParams.get("cycleId");
+      if (fromCycle && fromCycleId) {
+        router.push(`/dashboard/cycles/${fromCycleId}`);
+      } else {
+        router.push(`/dashboard/my-reviews`);
+      }
       router.refresh();
     } catch (err) {
       setError("Failed to submit review");
