@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { format } from "date-fns";
 import {
   ClipboardCheck,
   Star,
@@ -41,7 +42,7 @@ export default async function MyReviewsPage() {
       .from("review_assignments")
       .select(`
         *,
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released, review_deadline),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", userId)
@@ -96,10 +97,18 @@ export default async function MyReviewsPage() {
   const enrichedAssignments = (myAssignments || []).map((a: any) => {
     const selfSubmitted = mySubmissions[a.id]?.has("self") || false;
     const gradesReleased = a.cycle?.grades_released || false;
+    const cycleEnded = a.cycle?.status === "closed" || a.cycle?.status === "completed";
 
     let smartStatus: { label: string; description: string; variant: string; icon: string };
 
-    if (a.status === "pending" && !selfSubmitted) {
+    if (cycleEnded && a.status !== "completed") {
+      smartStatus = {
+        label: "Cycle Ended",
+        description: "This review cycle has ended without completion.",
+        variant: "text-muted-foreground bg-muted",
+        icon: "clock",
+      };
+    } else if (a.status === "pending" && !selfSubmitted) {
       smartStatus = {
         label: "Self-Review Required",
         description: "Complete your self-assessment to get started",
@@ -136,7 +145,7 @@ export default async function MyReviewsPage() {
       };
     }
 
-    return { ...a, selfSubmitted, gradesReleased, smartStatus };
+    return { ...a, selfSubmitted, gradesReleased, cycleEnded, smartStatus };
   });
 
   // Sort: pending/active first, completed last
@@ -206,6 +215,11 @@ export default async function MyReviewsPage() {
                           <h3 className="text-sm font-medium text-foreground">
                             {a.cycle?.name || "Unknown Cycle"}
                           </h3>
+                          {a.cycle?.status && a.cycle.status !== "active" && (
+                            <Badge variant="outline" className="text-[9px] font-normal text-muted-foreground capitalize">
+                              {a.cycle.status}
+                            </Badge>
+                          )}
                           <Badge className={`text-[10px] font-medium flex items-center gap-1 ${a.smartStatus.variant}`}>
                             <StatusIcon icon={a.smartStatus.icon} />
                             {a.smartStatus.label}
@@ -219,11 +233,16 @@ export default async function MyReviewsPage() {
                             {a.smartStatus.description}
                           </p>
                         )}
+                        {a.cycle?.review_deadline && !isCompleted && (
+                          <p className="text-xs text-muted-foreground/70 mt-0.5">
+                            Deadline: {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
+                          </p>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
                         {/* Self-review action */}
-                        {!a.selfSubmitted && !isCompleted && (
+                        {!a.selfSubmitted && !isCompleted && !a.cycleEnded && (
                           <Button size="sm" className="text-xs h-8" asChild>
                             <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
                               Start Self-Review <ArrowRight className="h-3 w-3 ml-1" />
@@ -299,8 +318,13 @@ export default async function MyReviewsPage() {
                           <p className="text-sm font-medium text-foreground truncate">
                             {review.employee?.slack_name || "Unknown"}
                           </p>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground truncate flex items-center gap-1 flex-wrap">
                             {review.employee?.job_title || "No title"} &middot; {review.cycle?.name || "Unknown cycle"}
+                            {review.cycle?.status && review.cycle.status !== "active" && (
+                              <Badge variant="outline" className="text-[9px] font-normal text-muted-foreground capitalize">
+                                {review.cycle.status}
+                              </Badge>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -319,12 +343,12 @@ export default async function MyReviewsPage() {
                         )}
                         <Button
                           size="sm"
-                          variant={isDone ? "ghost" : "default"}
+                          variant={(isDone || review.cycle?.status === "closed" || review.cycle?.status === "completed") ? "ghost" : "default"}
                           className="text-xs h-8"
                           asChild
                         >
                           <Link href={`/dashboard/reviews/${review.id}`}>
-                            {isDone ? "View" : "Review Now"}
+                            {isDone ? "View" : (review.cycle?.status === "closed" || review.cycle?.status === "completed") ? "View" : "Review Now"}
                             <ChevronRight className="h-3 w-3 ml-1" />
                           </Link>
                         </Button>
