@@ -22,6 +22,7 @@ interface Question {
 export default function NewTemplatePage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isDefault, setIsDefault] = useState(false);
@@ -53,6 +54,7 @@ export default function NewTemplatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setSubmitError(null);
 
     try {
       const supabase = createClient();
@@ -66,9 +68,9 @@ export default function NewTemplatePage() {
       if (error) throw error;
       router.push("/dashboard/templates");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating template:", error);
-      alert("Failed to create template. Please try again.");
+      setSubmitError(error?.message || "Failed to create template. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -197,6 +199,12 @@ export default function NewTemplatePage() {
             </Button>
           </CardContent>
         </Card>
+
+        {submitError && (
+          <p className="mt-4 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 rounded-md px-3 py-2">
+            {submitError}
+          </p>
+        )}
 
         <div className="flex gap-4 mt-6">
           <Button type="submit" disabled={saving || !name || questions.length === 0}>

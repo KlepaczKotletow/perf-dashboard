@@ -12,8 +12,7 @@ function AuthErrorContent() {
   const message = searchParams.get("message");
   const displayError = message || error;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zhfvxfvmdlpdfgxrwtdn.supabase.co";
-  const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
+  const signInWithSlackUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/dashboard-auth`;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">

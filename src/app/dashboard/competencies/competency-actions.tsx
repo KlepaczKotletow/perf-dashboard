@@ -37,7 +37,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
 
 const CATEGORY_OPTIONS = [
@@ -64,6 +64,8 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
   const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [editName, setEditName] = useState(competency.name);
   const [editDescription, setEditDescription] = useState(competency.description || "");
   const [editCategory, setEditCategory] = useState(competency.category || "");
@@ -76,6 +78,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
 
   async function handleUpdate() {
     setLoading(true);
+    setUpdateError(null);
     try {
       const { error } = await supabase
         .from("competencies")
@@ -91,8 +94,9 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
       if (error) throw error;
       router.refresh();
       setShowEditDialog(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error updating competency:", err);
+      setUpdateError(err?.message || "Failed to save changes. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -100,6 +104,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
 
   async function handleDelete() {
     setLoading(true);
+    setActionError(null);
     try {
       const { error } = await supabase
         .from("competencies")
@@ -108,8 +113,9 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
 
       if (error) throw error;
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error deleting competency:", err);
+      setActionError(err?.message || "Failed to delete competency. Please try again.");
     } finally {
       setLoading(false);
       setShowDeleteDialog(false);
@@ -118,6 +124,12 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
 
   return (
     <>
+      {actionError && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-3 py-1.5 rounded-md">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {actionError}
+        </div>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" disabled={loading}>
@@ -152,7 +164,13 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
               Update the competency details
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          {updateError && (
+        <div className="flex items-center gap-2 text-xs text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 px-3 py-2 rounded-md mx-4 mb-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {updateError}
+        </div>
+      )}
+      <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="edit-name">Name</Label>
               <input

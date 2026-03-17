@@ -143,6 +143,7 @@ export function CompetenciesClient({
   const [bulkRowPicker, setBulkRowPicker] = useState<string | null>(null);
   const [bulkColPicker, setBulkColPicker] = useState<string | null>(null);
   const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -277,6 +278,11 @@ export function CompetenciesClient({
     setTimeout(() => setBulkSuccess(null), 3000);
   }
 
+  function showBulkErrorToast(message: string) {
+    setBulkError(message);
+    setTimeout(() => setBulkError(null), 4000);
+  }
+
   // Bulk-set entire row (one competency across all visible levels)
   async function bulkSetRow(competencyId: string, proficiency: number | null) {
     setBulkLoading(true);
@@ -332,6 +338,7 @@ export function CompetenciesClient({
       router.refresh();
     } catch (err) {
       console.error("Bulk set row error:", err);
+      showBulkErrorToast("Failed to update cells. Please try again.");
     } finally {
       setBulkLoading(false);
     }
@@ -367,6 +374,7 @@ export function CompetenciesClient({
       router.refresh();
     } catch (err) {
       console.error("Bulk fill column error:", err);
+      showBulkErrorToast("Failed to fill column. Please try again.");
     } finally {
       setBulkLoading(false);
     }
@@ -408,6 +416,7 @@ export function CompetenciesClient({
       router.refresh();
     } catch (err) {
       console.error("Auto-assign core error:", err);
+      showBulkErrorToast("Failed to auto-assign. Please try again.");
     } finally {
       setBulkLoading(false);
     }
@@ -426,6 +435,14 @@ export function CompetenciesClient({
         <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2">
           <Check className="h-4 w-4" />
           {bulkSuccess}
+        </div>
+      )}
+
+      {/* Bulk error toast */}
+      {bulkError && (
+        <div className="fixed top-4 right-4 z-50 bg-red-600 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 text-sm animate-in fade-in slide-in-from-top-2">
+          <span className="h-4 w-4 shrink-0">✕</span>
+          {bulkError}
         </div>
       )}
 

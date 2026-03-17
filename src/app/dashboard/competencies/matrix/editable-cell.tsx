@@ -48,12 +48,14 @@ export function EditableCell({
   const [rowId, setRowId] = useState<string | null>(existingId);
   const [showPicker, setShowPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [cellError, setCellError] = useState(false);
 
   // Behaviors state
   const [behaviors, setBehaviors] = useState<string[]>(initialBehaviors);
   const [showBehaviorsDialog, setShowBehaviorsDialog] = useState(false);
   const [newBehavior, setNewBehavior] = useState("");
   const [savingBehaviors, setSavingBehaviors] = useState(false);
+  const [behaviorSaveError, setBehaviorSaveError] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -101,6 +103,8 @@ export function EditableCell({
       }
     } catch (err) {
       console.error("Error saving level competency:", err);
+      setCellError(true);
+      setTimeout(() => setCellError(false), 3000);
     } finally {
       setSaving(false);
     }
@@ -109,6 +113,7 @@ export function EditableCell({
   async function handleSaveBehaviors() {
     if (!rowId) return;
     setSavingBehaviors(true);
+    setBehaviorSaveError(null);
     try {
       await supabase
         .from("level_competencies")
@@ -117,6 +122,7 @@ export function EditableCell({
       setShowBehaviorsDialog(false);
     } catch (err) {
       console.error("Error saving behaviors:", err);
+      setBehaviorSaveError("Failed to save. Please check your connection and try again.");
     } finally {
       setSavingBehaviors(false);
     }
@@ -156,7 +162,8 @@ export function EditableCell({
           disabled={saving}
           className={`cursor-pointer transition-all rounded px-2 py-1 hover:ring-2 hover:ring-primary/40 ${
             saving ? "opacity-50" : ""
-          }`}
+          } ${cellError ? "ring-2 ring-red-500/60" : ""}`}
+          title={cellError ? "Failed to save — click to try again" : undefined}
         >
           {value ? (
             <div className="relative inline-block">
@@ -279,12 +286,19 @@ export function EditableCell({
             </div>
           </div>
 
+          {behaviorSaveError && (
+            <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-400/10 border border-red-200 dark:border-red-400/20 rounded px-2.5 py-1.5">
+              {behaviorSaveError}
+            </p>
+          )}
+
           <div className="flex justify-end gap-2 pt-2 border-t border-border/60">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setBehaviors(initialBehaviors); // reset on cancel
+                setBehaviorSaveError(null);
                 setShowBehaviorsDialog(false);
               }}
             >
