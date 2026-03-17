@@ -17,15 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, CheckCircle2, ChevronUp, Info } from "lucide-react";
+import { Loader2, CheckCircle2, ChevronUp, Info, AlertCircle } from "lucide-react";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
 
 const PROFICIENCY_LABELS: Record<number, string> = {
-  1: "Basic",
+  1: "Below expectations",
   2: "Developing",
-  3: "Proficient",
-  4: "Advanced",
-  5: "Expert",
+  3: "Meets expectations",
+  4: "Exceeds expectations",
+  5: "Outstanding",
 };
 
 const ratingColors: Record<number, string> = {
@@ -60,7 +60,7 @@ interface ReviewDetailClientProps {
   assignmentId: string;
   workspaceId: string;
   reviewerId: string;
-  reviewerRole: "self" | "peer" | "manager" | "skip_level";
+  reviewerRole: "self" | "peer" | "manager" | "skip_level" | "upward";
   competencyRatings: CompetencyRating[];
   existingOverallRating: number | null;
   canEdit: boolean;
@@ -89,6 +89,7 @@ export function ReviewDetailClient({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
   const supabase = createBrowserClient(
@@ -154,10 +155,12 @@ export function ReviewDetailClient({
           .eq("id", assignmentId);
       }
 
+      setSaveError(null);
       setSaved(true);
       router.refresh();
     } catch (err) {
       console.error("Save error:", err);
+      setSaveError("Failed to save. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -318,7 +321,14 @@ export function ReviewDetailClient({
 
       {/* Save / Complete actions */}
       {canEdit && (
-        <div className="flex items-center justify-between pt-2 border-t border-border/60">
+        <div className="pt-2 border-t border-border/60 space-y-2">
+          {saveError && (
+            <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              {saveError}
+            </p>
+          )}
+          <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
             {saved ? (
               <span className="text-primary flex items-center gap-1">
@@ -345,6 +355,7 @@ export function ReviewDetailClient({
             >
               {status === "completed" ? "Completed" : "Submit review"}
             </Button>
+          </div>
           </div>
         </div>
       )}

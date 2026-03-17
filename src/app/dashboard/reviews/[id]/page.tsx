@@ -26,7 +26,7 @@ export default async function ReviewDetailPage({
     .from("review_assignments")
     .select(`
       id, status, overall_rating, created_at, updated_at,
-      employee_id, manager_id,
+      employee_id, manager_id, assignment_type, reviewer_id,
       employee:users!review_assignments_employee_id_fkey(
         id, slack_name, job_title, department, avatar_url,
         level_id,
@@ -44,13 +44,23 @@ export default async function ReviewDetailPage({
   const isAssignmentManager = (assignment as any)?.manager_id === currentUserId;
   const isAssignmentEmployee = (assignment as any)?.employee_id === currentUserId;
   const isWorkspaceManager = isManagerOrAbove(workspace.role as any);
+  const isUpwardReviewer =
+    (assignment as any)?.assignment_type === "upward" &&
+    (assignment as any)?.reviewer_id === currentUserId;
 
-  // Can edit if: you are the assigned manager OR you're an HR/admin-level role
-  const canEdit = isAssignmentManager || (isWorkspaceManager && !isAssignmentEmployee);
+  // Can edit if: you are the upward reviewer, the assigned manager, or an HR/admin-level role
+  const canEdit =
+    isUpwardReviewer ||
+    isAssignmentManager ||
+    (isWorkspaceManager && !isAssignmentEmployee);
 
   // Role used when saving responses
-  const reviewerRole: "manager" | "self" =
-    isAssignmentEmployee ? "self" : "manager";
+  const reviewerRole: "self" | "manager" | "upward" =
+    isUpwardReviewer
+      ? "upward"
+      : isAssignmentEmployee
+      ? "self"
+      : "manager";
 
   if (!assignment) notFound();
 
