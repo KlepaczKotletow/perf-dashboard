@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
-  ClipboardCheck,
   Star,
   FileText,
   ArrowRight,
@@ -142,16 +141,6 @@ export default async function PerformancePage() {
   // Cap badge display at 99
   const todoCount = Math.min(rawTodoCount, 99);
 
-  const StatusIcon = ({ icon }: { icon: string }) => {
-    switch (icon) {
-      case "alert":  return <AlertCircle className="h-3.5 w-3.5" />;
-      case "clock":  return <Clock className="h-3.5 w-3.5" />;
-      case "eyeoff": return <EyeOff className="h-3.5 w-3.5" />;
-      case "check":  return <CheckCircle2 className="h-3.5 w-3.5" />;
-      default:       return <Clock className="h-3.5 w-3.5" />;
-    }
-  };
-
   // ── Results Tab ──
   const resultsContent = (
     <div className="space-y-1.5">
@@ -225,14 +214,15 @@ export default async function PerformancePage() {
   );
 
   // ── To Do Tab ──
-  const hasTodo =
+  // Includes completed items too (historical inbox), not just pending
+  const hasAnyItems =
     pendingSelfReviews.length > 0 ||
     sortedManagerReviews.length > 0 ||
     sortedUpwardReviews.length > 0;
 
   const todoContent = (
     <div className="space-y-1.5">
-      {!hasTodo ? (
+      {!hasAnyItems ? (
         <EmptyState
           icon={<Inbox className="h-10 w-10 text-muted-foreground/30" />}
           title="All caught up"
@@ -410,6 +400,16 @@ export default async function PerformancePage() {
       />
     </div>
   );
+}
+
+function StatusIcon({ icon }: { icon: string }) {
+  switch (icon) {
+    case "alert":  return <AlertCircle className="h-3.5 w-3.5" />;
+    case "clock":  return <Clock className="h-3.5 w-3.5" />;
+    case "eyeoff": return <EyeOff className="h-3.5 w-3.5" />;
+    case "check":  return <CheckCircle2 className="h-3.5 w-3.5" />;
+    default:       return <Clock className="h-3.5 w-3.5" />;
+  }
 }
 
 function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
