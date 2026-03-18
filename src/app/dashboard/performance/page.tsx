@@ -15,9 +15,9 @@ import {
   Medal,
   Users,
   ChevronRight,
-  Inbox,
 } from "lucide-react";
 import { PerformanceTabsClient } from "./performance-tabs-client";
+import { CollapsibleSection, SectionEmptyNote } from "./collapsible-section";
 
 export default async function PerformancePage() {
   const workspace = await getUserWorkspace();
@@ -214,24 +214,20 @@ export default async function PerformancePage() {
   );
 
   // ── To Do Tab ──
-  // Includes completed items too (historical inbox), not just pending
-  const hasAnyItems =
-    pendingSelfReviews.length > 0 ||
-    sortedManagerReviews.length > 0 ||
-    sortedUpwardReviews.length > 0;
-
   const todoContent = (
-    <div className="space-y-1.5">
-      {!hasAnyItems ? (
-        <EmptyState
-          icon={<Inbox className="h-10 w-10 text-muted-foreground/30" />}
-          title="All caught up"
-          description="No pending reviews or feedback requests."
-        />
-      ) : (
-        <>
-          {/* Pending self-reviews */}
-          {pendingSelfReviews.map((a: any) => (
+    <div className="space-y-2">
+
+      {/* ── Self-Review ── */}
+      <CollapsibleSection
+        title="Self-Review"
+        pendingCount={pendingSelfReviews.length}
+        allDone={sortedMyAssignments.length > 0 && pendingSelfReviews.length === 0}
+        defaultOpen={pendingSelfReviews.length > 0}
+      >
+        {pendingSelfReviews.length === 0 ? (
+          <SectionEmptyNote message="No self-reviews due" />
+        ) : (
+          pendingSelfReviews.map((a: any) => (
             <Card key={`self-${a.id}`} className="border-amber-200/60 bg-amber-50/20 dark:border-amber-400/10 dark:bg-amber-400/[0.02] border-border/60">
               <CardContent className="px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
@@ -256,10 +252,21 @@ export default async function PerformancePage() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+          ))
+        )}
+      </CollapsibleSection>
 
-          {/* Manager reviews */}
-          {sortedManagerReviews.map((review: any, i: number) => {
+      {/* ── Reviews to Give ── */}
+      <CollapsibleSection
+        title="Reviews to Give"
+        pendingCount={pendingManagerReviews.length}
+        allDone={sortedManagerReviews.length > 0 && pendingManagerReviews.length === 0}
+        defaultOpen={pendingManagerReviews.length > 0}
+      >
+        {sortedManagerReviews.length === 0 ? (
+          <SectionEmptyNote message="No reviews to give" />
+        ) : (
+          sortedManagerReviews.map((review: any, i: number) => {
             const isDone = review.status === "completed";
             const prevDone = i > 0 && sortedManagerReviews[i - 1].status === "completed";
             const showDivider = isDone && !prevDone && sortedManagerReviews.some((x: any) => x.status !== "completed");
@@ -320,10 +327,21 @@ export default async function PerformancePage() {
                 </Card>
               </div>
             );
-          })}
+          })
+        )}
+      </CollapsibleSection>
 
-          {/* Upward feedback */}
-          {sortedUpwardReviews.map((review: any, i: number) => {
+      {/* ── Upward Feedback ── */}
+      <CollapsibleSection
+        title="Upward Feedback"
+        pendingCount={pendingUpwardReviews.length}
+        allDone={sortedUpwardReviews.length > 0 && pendingUpwardReviews.length === 0}
+        defaultOpen={pendingUpwardReviews.length > 0}
+      >
+        {sortedUpwardReviews.length === 0 ? (
+          <SectionEmptyNote message="No upward feedback assigned" />
+        ) : (
+          sortedUpwardReviews.map((review: any, i: number) => {
             const isDone = review.status === "completed";
             const prevDone = i > 0 && sortedUpwardReviews[i - 1].status === "completed";
             const showDivider = isDone && !prevDone && sortedUpwardReviews.some((x: any) => x.status !== "completed");
@@ -378,9 +396,10 @@ export default async function PerformancePage() {
                 </Card>
               </div>
             );
-          })}
-        </>
-      )}
+          })
+        )}
+      </CollapsibleSection>
+
     </div>
   );
 
