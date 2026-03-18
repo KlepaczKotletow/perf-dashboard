@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { LogOut, User, Settings } from "lucide-react";
+import { LogOut, User, Settings, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -11,17 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronUp } from "lucide-react";
 
 interface Props {
   initials: string;
   name: string;
-  role: string;
   roleLabel: string;
   isAdmin: boolean;
 }
 
-export function FooterDropdown({ initials, name, role, roleLabel, isAdmin }: Props) {
+export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
   const router = useRouter();
 
   async function handleSignOut() {
