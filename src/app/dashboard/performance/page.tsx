@@ -41,7 +41,7 @@ export default async function PerformancePage() {
       .from("review_assignments")
       .select(`
         *,
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released, review_deadline),
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released, review_deadline, type),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", userId)
@@ -168,52 +168,46 @@ export default async function PerformancePage() {
         <>
           {annualAssignments.length > 0 && (
             <CollapsibleSection title="Annual Reviews" defaultOpen={true}>
-              <div className="space-y-1.5">
-                {annualAssignments.map((a: any, i: number) => {
-                  const prevCompleted = i > 0 && annualAssignments[i - 1].status === "completed";
-                  const showDivider = a.status === "completed" && !prevCompleted && annualAssignments.some((x: any) => x.status !== "completed");
-                  return (
-                    <div key={a.id}>
-                      {showDivider && <CompletedDivider />}
-                      <ResultCard assignment={a} />
-                    </div>
-                  );
-                })}
-              </div>
+              {annualAssignments.map((a: any, i: number) => {
+                const prevCompleted = i > 0 && annualAssignments[i - 1].status === "completed";
+                const showDivider = a.status === "completed" && !prevCompleted && annualAssignments.some((x: any) => x.status !== "completed");
+                return (
+                  <div key={a.id}>
+                    {showDivider && <CompletedDivider />}
+                    <ResultCard assignment={a} />
+                  </div>
+                );
+              })}
             </CollapsibleSection>
           )}
 
           {quarterlyAssignments.length > 0 && (
             <CollapsibleSection title="Quarterly Reviews" defaultOpen={true}>
-              <div className="space-y-1.5">
-                {quarterlyAssignments.map((a: any, i: number) => {
-                  const prevCompleted = i > 0 && quarterlyAssignments[i - 1].status === "completed";
-                  const showDivider = a.status === "completed" && !prevCompleted && quarterlyAssignments.some((x: any) => x.status !== "completed");
-                  return (
-                    <div key={a.id}>
-                      {showDivider && <CompletedDivider />}
-                      <ResultCard assignment={a} />
-                    </div>
-                  );
-                })}
-              </div>
+              {quarterlyAssignments.map((a: any, i: number) => {
+                const prevCompleted = i > 0 && quarterlyAssignments[i - 1].status === "completed";
+                const showDivider = a.status === "completed" && !prevCompleted && quarterlyAssignments.some((x: any) => x.status !== "completed");
+                return (
+                  <div key={a.id}>
+                    {showDivider && <CompletedDivider />}
+                    <ResultCard assignment={a} />
+                  </div>
+                );
+              })}
             </CollapsibleSection>
           )}
 
           {otherAssignments.length > 0 && (
             <CollapsibleSection title="Performance Reviews" defaultOpen={true}>
-              <div className="space-y-1.5">
-                {otherAssignments.map((a: any, i: number) => {
-                  const prevCompleted = i > 0 && otherAssignments[i - 1].status === "completed";
-                  const showDivider = a.status === "completed" && !prevCompleted && otherAssignments.some((x: any) => x.status !== "completed");
-                  return (
-                    <div key={a.id}>
-                      {showDivider && <CompletedDivider />}
-                      <ResultCard assignment={a} />
-                    </div>
-                  );
-                })}
-              </div>
+              {otherAssignments.map((a: any, i: number) => {
+                const prevCompleted = i > 0 && otherAssignments[i - 1].status === "completed";
+                const showDivider = a.status === "completed" && !prevCompleted && otherAssignments.some((x: any) => x.status !== "completed");
+                return (
+                  <div key={a.id}>
+                    {showDivider && <CompletedDivider />}
+                    <ResultCard assignment={a} />
+                  </div>
+                );
+              })}
             </CollapsibleSection>
           )}
         </>
