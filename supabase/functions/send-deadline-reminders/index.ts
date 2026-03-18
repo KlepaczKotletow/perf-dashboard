@@ -25,11 +25,12 @@ async function sendSlackDM(botToken: string, slackUserId: string, text: string):
 
 Deno.serve(async (req) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization") || "";
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+  if (!cronSecret) {
+    return new Response("Server misconfiguration: CRON_SECRET not set", { status: 500 });
+  }
+  const authHeader = req.headers.get("authorization") || "";
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {

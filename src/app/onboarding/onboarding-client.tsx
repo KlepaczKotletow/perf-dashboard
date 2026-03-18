@@ -27,6 +27,7 @@ export function OnboardingClient({ workspaceId, workspaceName }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [choice, setChoice] = useState<Choice | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const options: { id: Choice; icon: React.ReactNode; title: string; description: string }[] = [
     {
@@ -51,6 +52,7 @@ export function OnboardingClient({ workspaceId, workspaceName }: Props) {
 
   async function finish(c: Choice) {
     setSaving(true);
+    setSaveError(null);
     const useDepartments = c === "departments" || c === "both";
     const useCareerFramework = c === "career_framework" || c === "both";
 
@@ -63,7 +65,7 @@ export function OnboardingClient({ workspaceId, workspaceName }: Props) {
       if (err) throw err;
       setStep(3);
     } catch {
-      // If update fails, retry is implicit — user can press Continue again
+      setSaveError("Failed to save your preferences. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -119,6 +121,10 @@ export function OnboardingClient({ workspaceId, workspaceName }: Props) {
                 </button>
               ))}
             </div>
+
+            {saveError && (
+              <p className="text-sm text-destructive text-center">{saveError}</p>
+            )}
 
             <Button
               size="lg"

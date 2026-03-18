@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,9 +16,11 @@ interface BulkActionsProps {
 }
 
 export function BulkActions({ selectedIds, users, onDone, useDepartments = false, useCareerFramework = false }: BulkActionsProps) {
+  const router = useRouter();
   const [action, setAction] = useState<string>("");
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
   const [allUsers, setAllUsers] = useState<{ id: string; slack_name: string }[]>([]);
   const [functions, setFunctions] = useState<{ id: string; name: string }[]>([]);
@@ -62,6 +65,57 @@ export function BulkActions({ selectedIds, users, onDone, useDepartments = false
   async function apply() {
     if (!action || !value) return;
     setApplying(true);
+    setApplyError(null);
+
+    // Guard: prevent removing all admins
+    if (action === "role" && value !== "admin") {
+      const { count: adminCount } = await supabase
+        .from("users")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin");
+
+      const { data: selectedUserRoles } = await supabase
+        .from("users")
+        .select("id, role")
+        .in("id", selectedIds);
+
+      const selectedAdminCount = (selectedUserRoles || []).filter(
+        (u: any) => u.role === "admin"
+      ).length;
+
+      if ((adminCount || 0) - selectedAdminCount < 1) {
+        setApplyError("Cannot remove all admins. At least one admin must remain.");
+        setApplying(false);
+        return;
+      }
+    }
+
+    // Guard: prevent circular manager references
+    if (action === "manager" && value !== "none") {
+      if (selectedIds.includes(value)) {
+        setApplyError("Cannot set a person as their own manager.");
+        setApplying(false);
+        return;
+      }
+
+      // Walk up the manager chain from the proposed manager to detect cycles
+      const selectedSet = new Set(selectedIds);
+      let currentId: string | null = value;
+      for (let depth = 0; depth < 20 && currentId; depth++) {
+        const result = await supabase
+          .from("users")
+          .select("manager_id")
+          .eq("id", currentId)
+          .single();
+        const mgrRow = result.data as { manager_id: string | null } | null;
+        currentId = mgrRow?.manager_id || null;
+        if (currentId && selectedSet.has(currentId)) {
+          setApplyError("This would create a circular reporting chain.");
+          setApplying(false);
+          return;
+        }
+      }
+    }
 
     const updateData: any = { updated_at: new Date().toISOString() };
 
@@ -70,20 +124,33 @@ export function BulkActions({ selectedIds, users, onDone, useDepartments = false
     if (action === "function_level") updateData.level_id = value === "none" ? null : value;
     if (action === "role") updateData.role = value;
 
-    for (const id of selectedIds) {
-      await supabase.from("users").update(updateData).eq("id", id);
+    const results = await Promise.all(
+      selectedIds.map((id) => supabase.from("users").update(updateData).eq("id", id))
+    );
+
+    const failed = results.filter((r) => r.error).length;
+    setApplying(false);
+
+    if (failed > 0) {
+      setApplyError(`${failed} of ${selectedIds.length} update${failed !== 1 ? "s" : ""} failed. Please try again.`);
+      return;
     }
 
-    setApplying(false);
     setAction("");
     setValue("");
     setSelectedFunctionId("");
     onDone();
-    window.location.reload();
+    router.refresh();
   }
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-card border border-border shadow-xl rounded-xl px-4 py-3 animate-in slide-in-from-bottom-4">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2">
+      {applyError && (
+        <div className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg shadow">
+          {applyError}
+        </div>
+      )}
+    <div className="flex items-center gap-3 bg-card border border-border shadow-xl rounded-xl px-4 py-3 animate-in slide-in-from-bottom-4">
       <span className="text-sm font-medium text-foreground whitespace-nowrap">
         {selectedIds.length} selected
       </span>
@@ -204,6 +271,7 @@ export function BulkActions({ selectedIds, users, onDone, useDepartments = false
       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDone}>
         <X className="h-3.5 w-3.5" />
       </Button>
+    </div>
     </div>
   );
 }

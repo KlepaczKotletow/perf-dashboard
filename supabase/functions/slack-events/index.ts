@@ -80,7 +80,7 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
       blocks.push(section(`*${emp?.slack_name || "Unknown"}* — ${cycle?.name || "Review"}\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/cycles/${r.cycle_id}|Complete review>`));
     }
     if (pendingReviews.length > 5) {
-      blocks.push(section(`_...and ${pendingReviews.length - 5} more. <${DASHBOARD_URL}/dashboard/my-reviews|View all>_`));
+      blocks.push(section(`_...and ${pendingReviews.length - 5} more. <${DASHBOARD_URL}/dashboard/performance|View all>_`));
     }
     blocks.push(divider());
   }
@@ -99,7 +99,7 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
       const deadline = cycle?.review_deadline
         ? new Date(cycle.review_deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
         : "no deadline";
-      blocks.push(section(`*${cycle?.name || "Review"}*\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/my-reviews|Start>`));
+      blocks.push(section(`*${cycle?.name || "Review"}*\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/performance|Start>`));
     }
     blocks.push(divider());
   }

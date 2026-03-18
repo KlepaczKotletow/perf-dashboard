@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
@@ -34,37 +35,32 @@ export async function getUser() {
   return user
 }
 
-export async function getUserWorkspace() {
+export const getUserWorkspace = cache(async () => {
   const user = await getUser()
   if (!user) return null
-  
+
   const workspaceId = user.user_metadata?.workspace_id
   const appUserId = user.user_metadata?.app_user_id
-  
-  // If we have an app_user_id, fetch the actual role from the users table
-  // (more secure than relying on user_metadata which could be stale)
-  let role = user.user_metadata?.role || 'user'
+
   const supabase = await createServerSupabaseClient()
-  if (appUserId) {
-    const { data: dbUser } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', appUserId)
-      .single()
-    if (dbUser?.role) {
-      role = dbUser.role
-    }
-  }
 
-  const { data: wsData } = await supabase
-    .from("workspaces")
-    .select("use_departments, use_career_framework, onboarding_completed")
-    .eq("id", workspaceId)
-    .single();
+  // Fetch role and workspace settings in parallel — both only depend on user
+  const [dbUserRes, wsDataRes] = await Promise.all([
+    appUserId
+      ? supabase.from('users').select('role').eq('id', appUserId).single()
+      : Promise.resolve({ data: null }),
+    workspaceId
+      ? supabase
+          .from("workspaces")
+          .select("use_departments, use_career_framework, onboarding_completed")
+          .eq("id", workspaceId)
+          .single()
+      : Promise.resolve({ data: null }),
+  ])
 
-  const useDepartments = wsData?.use_departments ?? true;
-  const useCareerFramework = wsData?.use_career_framework ?? true;
-  const onboardingCompleted = wsData?.onboarding_completed ?? true;
+  // Use DB role if available (more authoritative than user_metadata)
+  const role = dbUserRes.data?.role || user.user_metadata?.role || 'user'
+  const wsData = wsDataRes.data
 
   return {
     userId: user.id,
@@ -75,11 +71,11 @@ export async function getUserWorkspace() {
     role,
     slackUserId: user.user_metadata?.slack_user_id,
     appUserId,
-    useDepartments,
-    useCareerFramework,
-    onboardingCompleted,
+    useDepartments: wsData?.use_departments ?? true,
+    useCareerFramework: wsData?.use_career_framework ?? true,
+    onboardingCompleted: wsData?.onboarding_completed ?? true,
   }
-}
+})
 
 /**
  * Get the workspace_id for the current user. 

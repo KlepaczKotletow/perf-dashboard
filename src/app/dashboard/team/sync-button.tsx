@@ -32,8 +32,9 @@ export function SyncButton({ workspaceId }: { workspaceId?: string }) {
         setSyncError("Sync failed. Please try again.");
       } else if (data?.success) {
         setResult({ created: data.created, updated: data.updated, linked: data.linked || 0 });
-        // Refresh the page to show new members
+        // Refresh the page to show new members, then clear the result text
         setTimeout(() => router.refresh(), 1500);
+        setTimeout(() => setResult(null), 6000);
       }
     } catch (err) {
       console.error("Sync error:", err);

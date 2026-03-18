@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, X, Pencil, Check, Building2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Department { id: string; name: string; }
 
@@ -30,9 +40,14 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
   const [addValue, setAddValue] = useState("");
   const [addLoading, setAddLoading] = useState(false);
 
-  // Rename
+  // Rename — escapingRef prevents blur from saving when Escape is pressed
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const escapingRename = useRef(false);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<Department | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   async function handleAdd() {
     if (!addValue.trim()) return;
@@ -54,6 +69,10 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
   }
 
   async function handleRename(dept: Department) {
+    if (escapingRename.current) {
+      escapingRename.current = false;
+      return;
+    }
     if (!renameValue.trim() || renameValue.trim() === dept.name) {
       setRenamingId(null);
       return;
@@ -80,14 +99,12 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
     }
   }
 
-  async function handleDelete(dept: Department) {
-    const count = initialCounts[dept.name] || 0;
-    const msg = count > 0
-      ? `${count} ${count === 1 ? "person is" : "people are"} in "${dept.name}". Deleting will unassign them. Continue?`
-      : `Delete "${dept.name}"?`;
-    if (!confirm(msg)) return;
-
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const dept = deleteTarget;
+    setDeleteLoading(true);
     try {
+      const count = initialCounts[dept.name] || 0;
       if (count > 0) {
         await supabase
           .from("users")
@@ -104,8 +121,13 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
       router.refresh();
     } catch (e: any) {
       setError(e.message ?? "Failed to delete department");
+    } finally {
+      setDeleteLoading(false);
+      setDeleteTarget(null);
     }
   }
+
+  const deleteCount = deleteTarget ? (initialCounts[deleteTarget.name] || 0) : 0;
 
   return (
     <div className="space-y-6">
@@ -149,7 +171,10 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
                     onChange={(e) => setRenameValue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleRename(dept);
-                      if (e.key === "Escape") setRenamingId(null);
+                      if (e.key === "Escape") {
+                        escapingRename.current = true;
+                        setRenamingId(null);
+                      }
                     }}
                     onBlur={() => handleRename(dept)}
                     className="h-7 text-sm w-48"
@@ -170,7 +195,7 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(dept)}
+                      onClick={() => setDeleteTarget(dept)}
                       className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                       title="Delete"
                     >
@@ -206,6 +231,30 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
           </ul>
         )}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteCount > 0
+                ? `${deleteCount} ${deleteCount === 1 ? "person is" : "people are"} in this department and will be unassigned. This cannot be undone.`
+                : "This department has no members and will be permanently removed."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

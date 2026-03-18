@@ -122,7 +122,7 @@ async function handleCycleLaunch(cycleId: string) {
       if (reviewer?.slack_user_id) {
         const canSend = await logNotification(workspaceId, reviewer.id, "review_assigned", `upward_${a.id}`);
         if (canSend) {
-          const text = `📋 *Review cycle started: ${cycle.name}*\nYou've been asked to give upward feedback on *${emp?.slack_name || "your manager"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/my-reviews`;
+          const text = `📋 *Review cycle started: ${cycle.name}*\nYou've been asked to give upward feedback on *${emp?.slack_name || "your manager"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/performance`;
           const ok = await sendSlackDM(botToken, reviewer.slack_user_id, text);
           if (ok) {
             sent++;
@@ -140,7 +140,7 @@ async function handleCycleLaunch(cycleId: string) {
     if (emp?.slack_user_id && a.assignment_type === "standard") {
       const canSend = await logNotification(workspaceId, emp.id, "review_assigned", `self_${a.id}`);
       if (canSend) {
-        const text = `📋 *Review cycle started: ${cycle.name}*\nYour performance review has begun. Please complete your self-assessment.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/my-reviews`;
+        const text = `📋 *Review cycle started: ${cycle.name}*\nYour performance review has begun. Please complete your self-assessment.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/performance`;
         const ok = await sendSlackDM(botToken, emp.slack_user_id, text);
         if (ok) {
           sent++;
@@ -254,11 +254,12 @@ Deno.serve(async (req) => {
   }
 
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    const authHeader = req.headers.get("authorization") || "";
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+  if (!cronSecret) {
+    return new Response("Server misconfiguration: CRON_SECRET not set", { status: 500 });
+  }
+  const authHeader = req.headers.get("authorization") || "";
+  if (authHeader !== `Bearer ${cronSecret}`) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   try {

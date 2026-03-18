@@ -160,10 +160,14 @@ function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
 
 export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClientProps) {
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  const supabase = useMemo(
+    () => createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ),
+    []
   );
+  const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
 
   // Normalize Supabase FK join arrays into single objects
   const goals: NormalizedGoalRow[] = useMemo(
@@ -297,10 +301,15 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
   }
 
   async function updateTrackingStatus(goalId: string, status: string, employeeId?: string) {
+    if (updatingIds.has(goalId)) return;
+    setUpdatingIds((prev) => new Set(prev).add(goalId));
+
     const { error } = await supabase
       .from("goals")
       .update({ tracking_status: status })
       .eq("id", goalId);
+
+    setUpdatingIds((prev) => { const next = new Set(prev); next.delete(goalId); return next; });
 
     if (error) {
       console.error("Failed to update tracking status:", error);
@@ -589,8 +598,8 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
                     {/* Status (inline editable) */}
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="focus:outline-none">
+                        <DropdownMenuTrigger asChild disabled={updatingIds.has(goal.id)}>
+                          <button className="focus:outline-none disabled:opacity-50 disabled:cursor-wait">
                             <Badge className={`text-[10px] font-medium cursor-pointer ${tc.color}`}>
                               {tc.label}
                             </Badge>

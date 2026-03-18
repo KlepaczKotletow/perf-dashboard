@@ -137,7 +137,7 @@ export default async function ReviewDetailPage({
           {from === "cycle" && cycleId
             ? "Back to cycle"
             : isAssignmentEmployee
-            ? "Back to my reviews"
+            ? "Back to Performance"
             : "Back to reviews"}
         </Link>
 

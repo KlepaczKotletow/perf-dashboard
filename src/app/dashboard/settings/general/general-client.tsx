@@ -32,6 +32,7 @@ export function GeneralClient({ workspaceId, useDepartments: initialDepts, useCa
     if (field === "use_departments" && !value && !cf) return;
     if (field === "use_career_framework" && !value && !depts) return;
 
+    setError(null);
     if (field === "use_departments") setDepts(value);
     else setCf(value);
 

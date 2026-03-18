@@ -83,7 +83,7 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
       const { error } = await supabase
         .from("competencies")
         .update({
-          name: editName,
+          name: editName.trim(),
           description: editDescription || null,
           category: editCategory || null,
           is_core: editIsCore,
