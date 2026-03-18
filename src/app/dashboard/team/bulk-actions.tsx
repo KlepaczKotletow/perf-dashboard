@@ -11,11 +11,9 @@ interface BulkActionsProps {
   selectedIds: string[];
   users: { id: string; slack_name: string | null; department: string | null }[];
   onDone: () => void;
-  useDepartments?: boolean;
-  useCareerFramework?: boolean;
 }
 
-export function BulkActions({ selectedIds, users, onDone, useDepartments = false, useCareerFramework = false }: BulkActionsProps) {
+export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
   const router = useRouter();
   const [action, setAction] = useState<string>("");
   const [value, setValue] = useState("");
@@ -162,15 +160,15 @@ export function BulkActions({ selectedIds, users, onDone, useDepartments = false
           <SelectValue placeholder="Bulk action..." />
         </SelectTrigger>
         <SelectContent>
-          {useDepartments && <SelectItem value="department">Set Department</SelectItem>}
+          <SelectItem value="department">Set Department</SelectItem>
           <SelectItem value="manager">Set Manager</SelectItem>
-          {useCareerFramework && <SelectItem value="function_level">Set Function & Level</SelectItem>}
+          <SelectItem value="function_level">Set Function & Level</SelectItem>
           <SelectItem value="role">Set Role</SelectItem>
         </SelectContent>
       </Select>
 
       {/* Set Department */}
-      {action === "department" && useDepartments && (
+      {action === "department" && (
         <Select value={value} onValueChange={setValue}>
           <SelectTrigger className="w-44 h-8 text-xs">
             <SelectValue placeholder="Select department..." />
@@ -203,7 +201,7 @@ export function BulkActions({ selectedIds, users, onDone, useDepartments = false
       )}
 
       {/* Set Function & Level — two-step */}
-      {action === "function_level" && useCareerFramework && (
+      {action === "function_level" && (
         <>
           <Select value={selectedFunctionId} onValueChange={(v) => { setSelectedFunctionId(v); setValue(""); }}>
             <SelectTrigger className="w-40 h-8 text-xs">
