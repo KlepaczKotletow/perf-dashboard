@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, CheckCircle2, ChevronUp, Info, AlertCircle } from "lucide-react";
+import { Loader2, CheckCircle2, Info, AlertCircle } from "lucide-react";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
 
 const PROFICIENCY_LABELS: Record<number, string> = {
@@ -65,6 +65,8 @@ interface ReviewDetailClientProps {
   existingOverallRating: number | null;
   canEdit: boolean;
   status: string;
+  /** Where to navigate after successful submission. Defaults to /dashboard/reviews */
+  redirectTo?: string;
 }
 
 export function ReviewDetailClient({
@@ -76,8 +78,17 @@ export function ReviewDetailClient({
   existingOverallRating,
   canEdit,
   status,
+  redirectTo = "/dashboard/reviews",
 }: ReviewDetailClientProps) {
   const router = useRouter();
+  const supabase = useMemo(
+    () => createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ),
+    []
+  );
+
   const [ratings, setRatings] = useState<Record<string, { rating: number | null; comment: string }>>(
     () =>
       Object.fromEntries(
@@ -89,42 +100,54 @@ export function ReviewDetailClient({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const ratedCount = Object.values(ratings).filter((r) => r.rating !== null).length;
   const totalCount = initialRatings.length;
   const allRated = ratedCount === totalCount && totalCount > 0;
 
+  // Warn before navigating away with unsaved work
+  useEffect(() => {
+    if (!isDirty || !canEdit) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, canEdit]);
+
   function setRating(competencyId: string, rating: number | null) {
     setRatings((prev) => ({ ...prev, [competencyId]: { ...prev[competencyId], rating } }));
     setSaved(false);
+    setIsDirty(true);
   }
 
   function setComment(competencyId: string, comment: string) {
     setRatings((prev) => ({ ...prev, [competencyId]: { ...prev[competencyId], comment } }));
     setSaved(false);
+    setIsDirty(true);
   }
 
   async function handleSave(complete = false) {
     setSaving(true);
+    setSaveError(null);
     try {
+      // Save all rated competencies — check EVERY error
       for (const comp of initialRatings) {
         const { rating, comment } = ratings[comp.competencyId];
         if (rating === null) continue;
 
         if (comp.existingResponseId) {
-          await supabase
+          const { error } = await supabase
             .from("review_responses")
             .update({ rating, comment: comment || null, updated_at: new Date().toISOString() })
             .eq("id", comp.existingResponseId);
+          if (error) throw new Error(`Failed to save "${comp.competencyName}": ${error.message}`);
         } else {
-          await supabase.from("review_responses").insert({
+          const { error } = await supabase.from("review_responses").insert({
             assignment_id: assignmentId,
             reviewer_id: reviewerId,
             reviewer_role: reviewerRole,
@@ -133,14 +156,14 @@ export function ReviewDetailClient({
             comment: comment || null,
             workspace_id: workspaceId,
           });
+          if (error) throw new Error(`Failed to save "${comp.competencyName}": ${error.message}`);
         }
       }
 
       if (complete && allRated) {
-        // Compute overall rating as average
         const rated = Object.values(ratings).filter((r) => r.rating !== null);
         const avg = rated.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rated.length;
-        await supabase
+        const { error } = await supabase
           .from("review_assignments")
           .update({
             status: "completed",
@@ -148,19 +171,27 @@ export function ReviewDetailClient({
             updated_at: new Date().toISOString(),
           })
           .eq("id", assignmentId);
+        if (error) throw new Error(`Failed to submit review: ${error.message}`);
+
+        // Clear dirty flag before redirect so beforeunload doesn't fire
+        setIsDirty(false);
+        router.push(redirectTo);
+        router.refresh();
+        return;
       } else if (status === "pending") {
-        await supabase
+        const { error } = await supabase
           .from("review_assignments")
           .update({ status: "in_progress", updated_at: new Date().toISOString() })
           .eq("id", assignmentId);
+        if (error) throw new Error(`Failed to update status: ${error.message}`);
       }
 
-      setSaveError(null);
       setSaved(true);
+      setIsDirty(false);
       router.refresh();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Save error:", err);
-      setSaveError("Failed to save. Please check your connection and try again.");
+      setSaveError(err?.message || "Failed to save. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -329,33 +360,33 @@ export function ReviewDetailClient({
             </p>
           )}
           <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            {saved ? (
-              <span className="text-primary flex items-center gap-1">
-                <CheckCircle2 className="h-3.5 w-3.5" /> Saved
-              </span>
-            ) : (
-              `${ratedCount} of ${totalCount} competencies rated`
-            )}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSave(false)}
-              disabled={saving || ratedCount === 0}
-            >
-              {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-              Save draft
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowSubmitDialog(true)}
-              disabled={saving || !allRated || status === "completed"}
-            >
-              {status === "completed" ? "Completed" : "Submit review"}
-            </Button>
-          </div>
+            <p className="text-xs text-muted-foreground">
+              {saved ? (
+                <span className="text-primary flex items-center gap-1">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Saved
+                </span>
+              ) : (
+                `${ratedCount} of ${totalCount} competencies rated`
+              )}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSave(false)}
+                disabled={saving || ratedCount === 0}
+              >
+                {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Save draft
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setShowSubmitDialog(true)}
+                disabled={saving || !allRated || status === "completed"}
+              >
+                {status === "completed" ? "Completed" : "Submit review"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -372,7 +403,7 @@ export function ReviewDetailClient({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Go back</AlertDialogCancel>
+            <AlertDialogCancel disabled={saving}>Go back</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowSubmitDialog(false);

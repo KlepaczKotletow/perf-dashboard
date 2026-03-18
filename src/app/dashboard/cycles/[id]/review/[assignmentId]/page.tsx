@@ -460,7 +460,7 @@ export default function ReviewFormPage({
       if (fromCycle && fromCycleId) {
         router.push(`/dashboard/cycles/${fromCycleId}`);
       } else {
-        router.push(`/dashboard/my-reviews`);
+        router.push(`/dashboard/performance`);
       }
       router.refresh();
     } catch (err) {
@@ -493,7 +493,7 @@ export default function ReviewFormPage({
           You&apos;ve already submitted your review for this assignment.
         </p>
         <Button asChild className="mt-2">
-          <Link href="/dashboard/my-reviews">Go to My Reviews</Link>
+          <Link href="/dashboard/performance">Go to Performance</Link>
         </Button>
       </div>
     );
@@ -513,7 +513,7 @@ export default function ReviewFormPage({
       {/* ── Page header ──────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 pt-1">
         <Button variant="ghost" size="icon" className="shrink-0 mt-0.5" asChild>
-          <Link href="/dashboard/my-reviews">
+          <Link href="/dashboard/performance">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
@@ -684,7 +684,7 @@ export default function ReviewFormPage({
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/my-reviews">Cancel</Link>
+            <Link href="/dashboard/performance">Cancel</Link>
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={submitting}>
             {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}

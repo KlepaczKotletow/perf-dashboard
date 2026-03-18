@@ -45,7 +45,11 @@ export default async function DashboardLayout({
 }) {
   const workspace = await getUserWorkspace();
 
-  if (workspace && !workspace.onboardingCompleted) {
+  if (!workspace) {
+    redirect("/");
+  }
+
+  if (!workspace.onboardingCompleted) {
     redirect("/onboarding");
   }
 
@@ -61,7 +65,7 @@ export default async function DashboardLayout({
       label: "Personal",
       items: [
         { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/my-reviews", label: "My Reviews", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
       ],

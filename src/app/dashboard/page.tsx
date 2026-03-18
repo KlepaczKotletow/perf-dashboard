@@ -144,23 +144,8 @@ async function getManagerData(userId: string) {
 async function getOrgData(workspaceId: string | undefined) {
   const supabase = await createServerSupabaseClient();
 
-  const [reviewsRes, feedbackRes, usersRes, activeRes] = await Promise.all([
-    supabase.from("review_assignments").select("*", { count: "exact", head: true }),
-    supabase.from("continuous_feedback").select("*", { count: "exact", head: true }),
-    supabase.from("users").select("*", { count: "exact", head: true }),
-    supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active"),
-  ]);
-
-  const [usersSetup, compRes, cyclesRes, managersRes] = workspaceId
-    ? await Promise.all([
-        supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-        supabase.from("competencies").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-        supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-        supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("manager_id", "is", null),
-      ])
-    : [{ count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }];
-
-  const activeCycles = await (async () => {
+  // Build workspace-scoped activeCycles query up-front so we can include it in one batch
+  const activeCyclesQuery = (() => {
     let q = supabase
       .from("performance_cycles")
       .select("id, name, status, start_date, end_date")
@@ -168,9 +153,34 @@ async function getOrgData(workspaceId: string | undefined) {
       .order("created_at", { ascending: false })
       .limit(3);
     if (workspaceId) q = q.eq("workspace_id", workspaceId);
-    const { data } = await q;
-    return data || [];
+    return q;
   })();
+
+  const workspacedQueries = workspaceId
+    ? [
+        supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+        supabase.from("competencies").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+        supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+        supabase.from("users").select("*", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("manager_id", "is", null),
+      ]
+    : [
+        Promise.resolve({ count: 0 }),
+        Promise.resolve({ count: 0 }),
+        Promise.resolve({ count: 0 }),
+        Promise.resolve({ count: 0 }),
+      ];
+
+  const [reviewsRes, feedbackRes, usersRes, activeRes, usersSetup, compRes, cyclesRes, managersRes, activeCyclesRes] =
+    await Promise.all([
+      supabase.from("review_assignments").select("*", { count: "exact", head: true }),
+      supabase.from("continuous_feedback").select("*", { count: "exact", head: true }),
+      supabase.from("users").select("*", { count: "exact", head: true }),
+      supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active"),
+      ...workspacedQueries,
+      activeCyclesQuery,
+    ]);
+
+  const activeCycles = (activeCyclesRes as any).data || [];
 
   return {
     stats: {
@@ -370,7 +380,7 @@ export default async function DashboardPage() {
                   statusClass = "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10";
                   StatusIcon = EyeOff;
                 } else if (a.selfSubmitted) {
-                  statusLabel = "Waiting on manager";
+                  statusLabel = a.manager_id ? "Waiting on manager" : "Self-review submitted";
                   statusClass = "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10";
                   StatusIcon = Clock;
                 } else {
@@ -393,7 +403,7 @@ export default async function DashboardPage() {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Reviewed by: {a.manager?.slack_name || "Unassigned"}
+                        {a.manager_id ? `Reviewed by: ${a.manager?.slack_name || "Unknown"}` : "No manager assigned"}
                       </p>
                     </div>
                     {/* Show grade/rating when results released */}
@@ -419,7 +429,7 @@ export default async function DashboardPage() {
             </div>
             <div className="pt-1">
               <Link
-                href="/dashboard/my-reviews"
+                href="/dashboard/performance"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
                 View full review history <ChevronRight className="h-3 w-3" />
@@ -591,7 +601,7 @@ export default async function DashboardPage() {
                 {pendingMgrReviews.length > 0 ? "Ready for your review" : "Team review status"}
               </h2>
               <Link
-                href="/dashboard/my-reviews"
+                href="/dashboard/performance"
                 className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
               >
                 See all <ChevronRight className="h-3 w-3" />
@@ -718,7 +728,7 @@ export default async function DashboardPage() {
   ];
 
   const quickLinks = [
-    { href: "/dashboard/my-reviews", label: "My Reviews", icon: ClipboardCheck, description: "View your performance reviews and pending actions" },
+    { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, description: "View your performance reviews and pending actions" },
     { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, description: "See feedback you've given and received" },
     { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, description: "Manage performance review cycles" },
     { href: "/dashboard/competencies", label: "Competencies", icon: Target, description: "Define and track competency frameworks" },
@@ -795,64 +805,25 @@ export default async function DashboardPage() {
 
       {!showOnboarding && chartData && <DashboardCharts data={chartData} />}
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        <div className="lg:col-span-3 space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Quick access</h2>
-          <div className="grid gap-2">
-            {quickLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="group flex items-center gap-4 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
-              >
-                <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center shrink-0">
-                  <link.icon className="h-4 w-4 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{link.label}</p>
-                  <p className="text-xs text-muted-foreground truncate">{link.description}</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Active cycles</h2>
-          <Card className="border-border/60">
-            <CardContent className="pt-5">
-              {activeCycles.length === 0 ? (
-                <div className="text-center py-6">
-                  <CalendarClock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No active cycles</p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/dashboard/cycles/new">Create cycle</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {activeCycles.map((cycle: any) => (
-                    <Link
-                      key={cycle.id}
-                      href={`/dashboard/cycles/${cycle.id}`}
-                      className="block p-3 rounded-lg border border-border/60 hover:border-border hover:shadow-sm transition-all"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                        <p className="text-sm font-medium text-foreground truncate">{cycle.name}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 ml-4">
-                        {new Date(cycle.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        {" — "}
-                        {new Date(cycle.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      <div className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Quick access</h2>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {quickLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="group flex items-center gap-4 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
+            >
+              <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center shrink-0">
+                <link.icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{link.label}</p>
+                <p className="text-xs text-muted-foreground truncate">{link.description}</p>
+              </div>
+              <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+            </Link>
+          ))}
         </div>
       </div>
     </div>

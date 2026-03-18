@@ -81,6 +81,7 @@ async function getWorkspaceUsers(workspaceId: string) {
       const { data } = await supabase
         .from("users")
         .select("id, slack_name, slack_email")
+        .eq("workspace_id", workspaceId)
         .order("slack_name");
       return data || [];
     },
@@ -112,6 +113,7 @@ function getAllCompetencies(workspaceId: string) {
       const { data } = await supabase
         .from("competencies")
         .select("id, name, category, description")
+        .eq("workspace_id", workspaceId)
         .order("category")
         .order("name");
       return data || [];
@@ -170,11 +172,12 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const selfDoneCount = standardAssignments.filter(
     (a: any) => a.status === "in_progress" || a.status === "completed"
   ).length;
-  // Manager review done = status is "completed" only
-  const managerDoneCount = standardAssignments.filter(
+  // Manager review done = status is "completed" only (only count assignments that have a manager)
+  const assignmentsWithManager = standardAssignments.filter((a: any) => a.manager_id);
+  const managerDoneCount = assignmentsWithManager.filter(
     (a: any) => a.status === "completed"
   ).length;
-  const pendingManagerCount = standardAssignments.length - managerDoneCount;
+  const pendingManagerCount = assignmentsWithManager.length - managerDoneCount;
 
   // Deadline urgency (milliseconds → days)
   const daysUntilDeadline = cycle.review_deadline
@@ -184,8 +187,8 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const isDeadlineOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
 
   // Progress bar tracks manager review completion (true signal of cycle health)
-  const managerCompletionRate = standardAssignments.length > 0
-    ? Math.round((managerDoneCount / standardAssignments.length) * 100)
+  const managerCompletionRate = assignmentsWithManager.length > 0
+    ? Math.round((managerDoneCount / assignmentsWithManager.length) * 100)
     : 0;
 
   return (
@@ -234,8 +237,8 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         }`}>
           <TriangleAlert className="h-4 w-4 shrink-0" />
           {isDeadlineOverdue
-            ? `Review deadline passed — ${Math.abs(daysUntilDeadline!)} day${Math.abs(daysUntilDeadline!) !== 1 ? "s" : ""} overdue. ${managerDoneCount} of ${standardAssignments.length} manager review${standardAssignments.length !== 1 ? "s" : ""} submitted.`
-            : `${daysUntilDeadline} day${daysUntilDeadline !== 1 ? "s" : ""} until review deadline — ${standardAssignments.length - managerDoneCount} manager review${(standardAssignments.length - managerDoneCount) !== 1 ? "s" : ""} still pending.`
+            ? `Review deadline passed ${Math.abs(daysUntilDeadline!)} day${Math.abs(daysUntilDeadline!) !== 1 ? "s" : ""} ago`
+            : `${daysUntilDeadline} day${daysUntilDeadline !== 1 ? "s" : ""} until review deadline`
           }
         </div>
       )}
@@ -277,7 +280,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
               </div>
               <div>
                 <p className="text-xl font-bold text-foreground leading-none">
-                  {managerDoneCount}/{standardAssignments.length}
+                  {managerDoneCount}/{assignmentsWithManager.length}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">Mgr Reviews</p>
               </div>
@@ -303,7 +306,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           {standardAssignments.length > 0 && (
             <div className="mb-5">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                <span>Manager review progress</span>
+                <span>Manager review progress{assignmentsWithManager.length < standardAssignments.length ? ` · ${standardAssignments.length - assignmentsWithManager.length} without manager` : ""}</span>
                 <span className="font-medium text-foreground">{managerCompletionRate}%</span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
@@ -474,7 +477,11 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
 
                     {/* Manager pill */}
                     <div className="flex justify-center">
-                      {managerDone ? (
+                      {!assignment.manager_id ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                          N/A
+                        </span>
+                      ) : managerDone ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           Done

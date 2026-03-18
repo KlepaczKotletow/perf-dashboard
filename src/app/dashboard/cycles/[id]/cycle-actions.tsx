@@ -87,6 +87,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         setNotificationError(true);
       } else {
         setNotificationSent(true);
+        setTimeout(() => setNotificationSent(false), 5000);
       }
     } catch (notifErr) {
       console.error("Failed to send Slack notifications:", notifErr);
@@ -117,14 +118,26 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
 
       if (usersError) throw usersError;
 
-      // 3. Delete any existing assignments (handles partial-launch retries safely)
-      await supabase
-        .from("review_assignments")
-        .delete()
-        .eq("cycle_id", cycle.id);
+      // 2b. Validate all enrolled employees still exist
+      const foundIds = new Set((users || []).map((u: any) => u.id));
+      const missingIds = employeeIds.filter((id: string) => !foundIds.has(id));
+      if (missingIds.length > 0) {
+        await supabase
+          .from("performance_cycle_employees")
+          .delete()
+          .in("employee_id", missingIds)
+          .eq("performance_cycle_id", cycle.id);
+        if (foundIds.size === 0) {
+          throw new Error("No valid employees found. All enrolled employees may have been removed.");
+        }
+      }
 
-      // 3a. Create standard review_assignments for each employee (self + manager review)
-      const assignments = (users || []).map((u: any) => ({
+      // 3. Build all assignments in memory first — so if anything is wrong with the
+      //    data we catch it before touching the DB. Delete old rows only after we
+      //    know the new set is ready to insert.
+      const enrolledIds = new Set((users || []).map((u: any) => u.id));
+
+      const standardAssignments = (users || []).map((u: any) => ({
         cycle_id: cycle.id,
         employee_id: u.id,
         manager_id: u.manager_id || null,
@@ -132,15 +145,6 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         status: "pending",
       }));
 
-      if (assignments.length > 0) {
-        const { error: assignError } = await supabase
-          .from("review_assignments")
-          .insert(assignments);
-        if (assignError) throw assignError;
-      }
-
-      // 3b. Create upward review assignments (direct reports review their managers)
-      const enrolledIds = new Set(employeeIds);
       const upwardAssignments = (users || [])
         .filter((u: any) => u.manager_id && enrolledIds.has(u.manager_id))
         .map((u: any) => ({
@@ -152,11 +156,22 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
           status: "pending",
         }));
 
-      if (upwardAssignments.length > 0) {
-        const { error: upwardError } = await supabase
+      const allAssignments = [...standardAssignments, ...upwardAssignments];
+
+      // Delete existing rows only once we have a valid replacement set ready
+      const { error: deleteError } = await supabase
+        .from("review_assignments")
+        .delete()
+        .eq("cycle_id", cycle.id);
+      if (deleteError) throw deleteError;
+
+      // Insert all assignments in one batch — if this fails the cycle stays
+      // in draft so the admin can retry (the next launch attempt re-deletes & re-inserts)
+      if (allAssignments.length > 0) {
+        const { error: insertError } = await supabase
           .from("review_assignments")
-          .insert(upwardAssignments);
-        if (upwardError) throw upwardError;
+          .insert(allAssignments);
+        if (insertError) throw insertError;
       }
 
       // 4. Activate the first phase if any exist
@@ -275,22 +290,23 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {cycle.status === "draft" && (
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => setShowLaunchDialog(true)}
-              disabled={employeeCount === 0}
+              disabled={loading || employeeCount === 0}
             >
               <Play className="h-4 w-4 mr-2" />
               Launch Cycle
             </DropdownMenuItem>
           )}
           {cycle.status === "active" && (
-            <DropdownMenuItem onClick={() => setShowCompleteDialog(true)}>
+            <DropdownMenuItem onClick={() => setShowCompleteDialog(true)} disabled={loading}>
               <CheckCircle className="h-4 w-4 mr-2" />
               Mark Completed
             </DropdownMenuItem>
           )}
           {cycle.status === "active" && (
             <DropdownMenuItem
+              disabled={loading}
               onClick={async () => {
                 setLoading(true);
                 await sendNotifications();
@@ -302,7 +318,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
             </DropdownMenuItem>
           )}
           {(cycle.status === "completed" || cycle.status === "active") && (
-            <DropdownMenuItem onClick={() => setShowCloseDialog(true)}>
+            <DropdownMenuItem onClick={() => setShowCloseDialog(true)} disabled={loading}>
               <Archive className="h-4 w-4 mr-2" />
               Close Cycle
             </DropdownMenuItem>
@@ -310,15 +326,16 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
           {isHR && !cycle.grades_released && (cycle.status === "active" || cycle.status === "completed") && (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setShowReleaseDialog(true)}>
+              <DropdownMenuItem onClick={() => setShowReleaseDialog(true)} disabled={loading}>
                 <Medal className="h-4 w-4 mr-2" />
                 Release Grades
               </DropdownMenuItem>
             </>
           )}
           <DropdownMenuSeparator />
-          <DropdownMenuItem 
+          <DropdownMenuItem
             onClick={() => setShowDeleteDialog(true)}
+            disabled={loading}
             className="text-destructive focus:text-destructive"
           >
             <Trash2 className="h-4 w-4 mr-2" />
@@ -338,9 +355,9 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={launchCycle}>
-              Launch Cycle
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={launchCycle} disabled={loading}>
+              {loading ? "Launching…" : "Launch Cycle"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
