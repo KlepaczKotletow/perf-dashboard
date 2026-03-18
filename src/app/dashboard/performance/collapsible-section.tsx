@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -9,7 +9,7 @@ interface CollapsibleSectionProps {
   pendingCount?: number;   // amber badge when > 0
   allDone?: boolean;       // green "All done" badge — only shown when pendingCount is 0
   defaultOpen?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function CollapsibleSection({
@@ -24,6 +24,7 @@ export function CollapsibleSection({
   return (
     <div>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between py-2 group"
         aria-expanded={open}
@@ -45,11 +46,10 @@ export function CollapsibleSection({
         </div>
         <ChevronDown
           className={`h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200 ${
-            open ? "rotate-180" : "rotate-0"
+            open ? "rotate-180" : ""
           }`}
         />
       </button>
-      <div className="h-px bg-border/50 mb-3" />
       {/* CSS grid trick: animates height from 0 to auto without JS measurement */}
       <div
         className={`grid transition-all duration-200 ease-in-out ${
@@ -57,6 +57,7 @@ export function CollapsibleSection({
         }`}
       >
         <div className="overflow-hidden">
+          <div className="h-px bg-border/50 mb-3" />
           <div className="space-y-1.5 pb-4">
             {children}
           </div>
