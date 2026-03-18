@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
   FileText,
@@ -10,7 +9,6 @@ import {
   CalendarClock,
   CreditCard,
   Briefcase,
-  Building2,
   ClipboardCheck,
   ClipboardList,
   UsersRound,
@@ -20,7 +18,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
-import { SignOutButton } from "./signout-button";
+import { FooterDropdown } from "./footer-dropdown";
 import { isManagerOrAbove, isAdmin, ROLE_LABELS, UserRole } from "@/lib/roles";
 import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
@@ -33,8 +31,6 @@ interface NavSection {
     icon: React.ComponentType<{ className?: string }>;
     requiresManager: boolean;
     requiresAdmin: boolean;
-    requiresCareerFramework?: boolean;
-    requiresDepartments?: boolean;
   }[];
 }
 
@@ -53,10 +49,6 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
-  const { useDepartments, useCareerFramework } = {
-    useDepartments: workspace?.useDepartments ?? true,
-    useCareerFramework: workspace?.useCareerFramework ?? true,
-  };
   const canAccessManagerFeatures = isManagerOrAbove(workspace?.role);
   const canAccessAdminFeatures = isAdmin(workspace?.role);
 
@@ -90,9 +82,8 @@ export default async function DashboardLayout({
     {
       label: "Settings",
       items: [
-        { href: "/dashboard/settings/general", label: "General", icon: Settings2, requiresManager: false, requiresAdmin: true },
-        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true, requiresCareerFramework: true },
-        { href: "/dashboard/admin/departments", label: "Departments", icon: Building2, requiresManager: false, requiresAdmin: true, requiresDepartments: true },
+        { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
       ],
@@ -106,8 +97,6 @@ export default async function DashboardLayout({
       items: section.items.filter((item) => {
         if (item.requiresAdmin && !canAccessAdminFeatures) return false;
         if (item.requiresManager && !canAccessManagerFeatures) return false;
-        if (item.requiresCareerFramework && !useCareerFramework) return false;
-        if (item.requiresDepartments && !useDepartments) return false;
         return true;
       }),
     }))
@@ -152,20 +141,12 @@ export default async function DashboardLayout({
 
         {/* User Footer */}
         <div className="border-t border-sidebar-border p-3">
-          <div className="flex items-center gap-2.5 px-1 mb-2.5">
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-xs font-medium text-primary">{initials}</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-sidebar-foreground truncate">
-                {workspace?.name || workspace?.email || "User"}
-              </p>
-              <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize border-sidebar-border text-sidebar-foreground/50 font-normal">
-                {ROLE_LABELS[workspace?.role as UserRole] || workspace?.role || "User"}
-              </Badge>
-            </div>
-          </div>
-          <SignOutButton />
+          <FooterDropdown
+            initials={initials}
+            name={workspace?.name || workspace?.email || "User"}
+            roleLabel={ROLE_LABELS[workspace?.role as UserRole] || workspace?.role || "User"}
+            isAdmin={canAccessAdminFeatures}
+          />
         </div>
       </SidebarWrapper>
 
