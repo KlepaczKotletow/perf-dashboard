@@ -123,6 +123,15 @@ export default async function PerformancePage() {
   };
 
   const sortedMyAssignments = [...enrichedAssignments].sort(sortByCompletion);
+
+  // Split results by cycle cadence
+  const annualAssignments = sortedMyAssignments.filter((a: any) => a.cycle?.type === "annual");
+  const quarterlyAssignments = sortedMyAssignments.filter((a: any) => a.cycle?.type === "quarterly");
+  // Catch-all for assignments with no cycle type (or future types)
+  const otherAssignments = sortedMyAssignments.filter(
+    (a: any) => !["annual", "quarterly"].includes(a.cycle?.type)
+  );
+
   const sortedManagerReviews = [...(managerReviews || [])].sort(sortByCompletion);
   const sortedUpwardReviews = [...(upwardReviews || [])].sort(sortByCompletion);
 
@@ -148,7 +157,7 @@ export default async function PerformancePage() {
 
   // ── Results Tab ──
   const resultsContent = (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {sortedMyAssignments.length === 0 ? (
         <EmptyState
           icon={<FileText className="h-10 w-10 text-muted-foreground/30" />}
@@ -156,64 +165,58 @@ export default async function PerformancePage() {
           description="Your review results will appear here once a cycle is completed."
         />
       ) : (
-        sortedMyAssignments.map((a: any, i: number) => {
-          const isCompleted = a.status === "completed";
-          const prevCompleted = i > 0 && sortedMyAssignments[i - 1].status === "completed";
-          const showDivider = isCompleted && !prevCompleted && sortedMyAssignments.some((x: any) => x.status !== "completed");
+        <>
+          {annualAssignments.length > 0 && (
+            <CollapsibleSection title="Annual Reviews" defaultOpen={true}>
+              <div className="space-y-1.5">
+                {annualAssignments.map((a: any, i: number) => {
+                  const prevCompleted = i > 0 && annualAssignments[i - 1].status === "completed";
+                  const showDivider = a.status === "completed" && !prevCompleted && annualAssignments.some((x: any) => x.status !== "completed");
+                  return (
+                    <div key={a.id}>
+                      {showDivider && <CompletedDivider />}
+                      <ResultCard assignment={a} />
+                    </div>
+                  );
+                })}
+              </div>
+            </CollapsibleSection>
+          )}
 
-          return (
-            <div key={a.id}>
-              {showDivider && <CompletedDivider />}
-              <Card className={`border-border/60 transition-all ${isCompleted ? "opacity-60" : a.smartStatus.icon === "alert" ? "border-amber-200/60 bg-amber-50/20 dark:border-amber-400/10 dark:bg-amber-400/[0.02]" : ""}`}>
-                <CardContent className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-medium text-foreground">{a.cycle?.name || "Unknown Cycle"}</h3>
-                        <Badge className={`text-[10px] font-medium flex items-center gap-1 ${a.smartStatus.variant}`}>
-                          <StatusIcon icon={a.smartStatus.icon} />
-                          {a.smartStatus.label}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {a.manager_id ? `Reviewed by: ${a.manager?.slack_name || "Unknown"}` : "No manager assigned"}
-                      </p>
-                      {a.smartStatus.description && (
-                        <p className="text-xs text-muted-foreground/70 mt-1">{a.smartStatus.description}</p>
-                      )}
-                      {a.cycle?.review_deadline && !isCompleted && (
-                        <p className="text-xs text-muted-foreground/70 mt-0.5">
-                          Deadline: {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
-                        </p>
-                      )}
+          {quarterlyAssignments.length > 0 && (
+            <CollapsibleSection title="Quarterly Reviews" defaultOpen={true}>
+              <div className="space-y-1.5">
+                {quarterlyAssignments.map((a: any, i: number) => {
+                  const prevCompleted = i > 0 && quarterlyAssignments[i - 1].status === "completed";
+                  const showDivider = a.status === "completed" && !prevCompleted && quarterlyAssignments.some((x: any) => x.status !== "completed");
+                  return (
+                    <div key={a.id}>
+                      {showDivider && <CompletedDivider />}
+                      <ResultCard assignment={a} />
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      {a.gradesReleased && isCompleted && (
-                        <>
-                          {a.overall_rating && (
-                            <div className="flex items-center gap-1">
-                              <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                              <span className="text-sm font-bold text-foreground">{a.overall_rating}/5</span>
-                            </div>
-                          )}
-                          {a.final_grade && (
-                            <Badge variant="outline" className="text-xs font-medium">
-                              <Medal className="h-3 w-3 mr-1" />
-                              {a.final_grade}
-                            </Badge>
-                          )}
-                          <Button size="sm" variant="ghost" className="text-xs h-8" asChild>
-                            <Link href={`/dashboard/reviews/${a.id}`}>View <ChevronRight className="h-3 w-3 ml-1" /></Link>
-                          </Button>
-                        </>
-                      )}
+                  );
+                })}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {otherAssignments.length > 0 && (
+            <CollapsibleSection title="Performance Reviews" defaultOpen={true}>
+              <div className="space-y-1.5">
+                {otherAssignments.map((a: any, i: number) => {
+                  const prevCompleted = i > 0 && otherAssignments[i - 1].status === "completed";
+                  const showDivider = a.status === "completed" && !prevCompleted && otherAssignments.some((x: any) => x.status !== "completed");
+                  return (
+                    <div key={a.id}>
+                      {showDivider && <CompletedDivider />}
+                      <ResultCard assignment={a} />
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          );
-        })
+                  );
+                })}
+              </div>
+            </CollapsibleSection>
+          )}
+        </>
       )}
     </div>
   );
@@ -453,5 +456,58 @@ function CompletedDivider() {
       <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">Completed</span>
       <div className="h-px flex-1 bg-border/60" />
     </div>
+  );
+}
+
+function ResultCard({ assignment: a }: { assignment: any }) {
+  const isCompleted = a.status === "completed";
+  return (
+    <Card className={`border-border/60 transition-all ${isCompleted ? "opacity-60" : a.smartStatus.icon === "alert" ? "border-amber-200/60 bg-amber-50/20 dark:border-amber-400/10 dark:bg-amber-400/[0.02]" : ""}`}>
+      <CardContent className="px-4 py-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-medium text-foreground">{a.cycle?.name || "Unknown Cycle"}</h3>
+              <Badge className={`text-[10px] font-medium flex items-center gap-1 ${a.smartStatus.variant}`}>
+                <StatusIcon icon={a.smartStatus.icon} />
+                {a.smartStatus.label}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {a.manager_id ? `Reviewed by: ${a.manager?.slack_name || "Unknown"}` : "No manager assigned"}
+            </p>
+            {a.smartStatus.description && (
+              <p className="text-xs text-muted-foreground/70 mt-1">{a.smartStatus.description}</p>
+            )}
+            {a.cycle?.review_deadline && !isCompleted && (
+              <p className="text-xs text-muted-foreground/70 mt-0.5">
+                Deadline: {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {a.gradesReleased && isCompleted && (
+              <>
+                {a.overall_rating && (
+                  <div className="flex items-center gap-1">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <span className="text-sm font-bold text-foreground">{a.overall_rating}/5</span>
+                  </div>
+                )}
+                {a.final_grade && (
+                  <Badge variant="outline" className="text-xs font-medium">
+                    <Medal className="h-3 w-3 mr-1" />
+                    {a.final_grade}
+                  </Badge>
+                )}
+                <Button size="sm" variant="ghost" className="text-xs h-8" asChild>
+                  <Link href={`/dashboard/reviews/${a.id}`}>View <ChevronRight className="h-3 w-3 ml-1" /></Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
