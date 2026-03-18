@@ -130,6 +130,11 @@ export default async function PerformancePage() {
     (a: any) => !a.selfSubmitted && !a.cycleEnded && a.status !== "completed"
   );
 
+  // Assignments where self-review was expected and completed (cycle not ended early)
+  const completedSelfReviewAssignments = sortedMyAssignments.filter(
+    (a: any) => a.selfSubmitted || a.status === "completed"
+  );
+
   const pendingManagerReviews = sortedManagerReviews.filter((r: any) => r.status !== "completed");
   const pendingUpwardReviews = sortedUpwardReviews.filter((r: any) => r.status !== "completed");
 
@@ -221,7 +226,7 @@ export default async function PerformancePage() {
       <CollapsibleSection
         title="Self-Review"
         pendingCount={pendingSelfReviews.length}
-        allDone={sortedMyAssignments.length > 0 && pendingSelfReviews.length === 0}
+        allDone={completedSelfReviewAssignments.length > 0 && pendingSelfReviews.length === 0}
         defaultOpen={pendingSelfReviews.length > 0}
       >
         {pendingSelfReviews.length === 0 ? (

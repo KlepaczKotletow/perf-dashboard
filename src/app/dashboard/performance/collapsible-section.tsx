@@ -25,9 +25,10 @@ export function CollapsibleSection({
     <div>
       <button
         type="button"
+        aria-label={title}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between py-2 group"
-        aria-expanded={open}
       >
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider group-hover:text-foreground transition-colors">
