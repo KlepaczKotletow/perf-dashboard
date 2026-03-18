@@ -52,7 +52,7 @@ export const getUserWorkspace = cache(async () => {
     workspaceId
       ? supabase
           .from("workspaces")
-          .select("use_departments, use_career_framework, onboarding_completed")
+          .select("onboarding_completed")
           .eq("id", workspaceId)
           .single()
       : Promise.resolve({ data: null }),
@@ -71,8 +71,6 @@ export const getUserWorkspace = cache(async () => {
     role,
     slackUserId: user.user_metadata?.slack_user_id,
     appUserId,
-    useDepartments: wsData?.use_departments ?? true,
-    useCareerFramework: wsData?.use_career_framework ?? true,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
   }
 })
