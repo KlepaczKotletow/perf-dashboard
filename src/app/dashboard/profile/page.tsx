@@ -26,7 +26,7 @@ export default async function ProfilePage() {
           <span className="text-xl font-medium text-primary">{initials}</span>
         </div>
         <div>
-          <p className="font-medium text-lg">{workspace.name || "—"}</p>
+          <p className="font-medium text-lg">{workspace.name || "Not set"}</p>
           <Badge variant="outline" className="text-xs capitalize mt-1">
             {ROLE_LABELS[workspace.role as UserRole] || workspace.role}
           </Badge>
