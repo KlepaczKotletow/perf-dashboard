@@ -83,6 +83,7 @@ async function getAnalyticsData(filters: FilterParams) {
   const assignments = (assignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
 
   const assignmentIds = new Set(assignments.map((a: any) => a.id));
+  const assignmentEmployeeMap = new Map(assignments.map((a: any) => [a.id, a.employee_id]));
 
   // 3. Review responses for those assignments
   const { data: responsesRaw } = await supabase
@@ -138,8 +139,7 @@ async function getAnalyticsData(filters: FilterParams) {
   // Per-employee averages
   const empRatings: Record<string, number[]> = {};
   responses.forEach((r: any) => {
-    const assignment = assignments.find((a: any) => a.id === r.assignment_id);
-    const empId = assignment?.employee_id;
+    const empId = assignmentEmployeeMap.get(r.assignment_id);
     if (empId) {
       if (!empRatings[empId]) empRatings[empId] = [];
       empRatings[empId].push(r.rating);
@@ -233,7 +233,6 @@ async function getAnalyticsData(filters: FilterParams) {
 async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<TrendsData> {
   const supabase = await createServerSupabaseClient();
 
-  // Get last 6 completed cycles
   const { data: cycles } = await supabase
     .from("performance_cycles")
     .select("id, name, status")
@@ -241,11 +240,10 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
     .order("created_at", { ascending: false })
     .limit(6);
 
-  const recentCycles = (cycles || []).reverse(); // oldest first for chart
+  const recentCycles = (cycles || []).reverse();
 
   if (recentCycles.length === 0) return { ratingTrend: [], completionTrend: [] };
 
-  // Users filtered by function/department
   const { data: usersData } = await supabase
     .from("users")
     .select("id, department, level:levels!users_level_id_fkey(job_family_id)");
@@ -260,32 +258,53 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
       .map((u: any) => u.id)
   );
 
+  // Batch: fetch all assignments for all cycles at once
+  const cycleIds = recentCycles.map((c: any) => c.id);
+  const { data: allAssignmentsRaw } = await supabase
+    .from("review_assignments")
+    .select("id, status, employee_id, cycle_id")
+    .in("cycle_id", cycleIds);
+
+  const allAssignments = (allAssignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
+  const allAssignmentIds = allAssignments.map((a: any) => a.id);
+
+  // Batch: fetch all responses for all assignments at once
+  let allResponses: any[] = [];
+  if (allAssignmentIds.length > 0) {
+    const { data: responsesRaw } = await supabase
+      .from("review_responses")
+      .select("rating, assignment_id")
+      .in("assignment_id", allAssignmentIds)
+      .not("rating", "is", null);
+    allResponses = responsesRaw || [];
+  }
+
+  // Build lookup maps
+  const assignmentsByCycle = new Map<string, typeof allAssignments>();
+  for (const a of allAssignments) {
+    const list = assignmentsByCycle.get(a.cycle_id) || [];
+    list.push(a);
+    assignmentsByCycle.set(a.cycle_id, list);
+  }
+
+  const responsesByAssignment = new Map<string, number[]>();
+  for (const r of allResponses) {
+    const list = responsesByAssignment.get(r.assignment_id) || [];
+    list.push(r.rating as number);
+    responsesByAssignment.set(r.assignment_id, list);
+  }
+
   const ratingTrend: { name: string; value: number }[] = [];
   const completionTrend: { name: string; value: number }[] = [];
 
   for (const cycle of recentCycles) {
-    const { data: assignments } = await supabase
-      .from("review_assignments")
-      .select("id, status, employee_id")
-      .eq("cycle_id", cycle.id);
-
-    const cycleAssignments = (assignments || []).filter((a: any) => filteredUserIds.has(a.employee_id));
-    const cycleAssignmentIds = new Set(cycleAssignments.map((a: any) => a.id));
-
+    const cycleAssignments = assignmentsByCycle.get(cycle.id) || [];
     const total = cycleAssignments.length;
     const completed = cycleAssignments.filter((a: any) => a.status === "completed").length;
 
-    const { data: responses } = await supabase
-      .from("review_responses")
-      .select("rating, assignment_id")
-      .not("rating", "is", null);
-
-    const cycleRatings = (responses || [])
-      .filter((r: any) => cycleAssignmentIds.has(r.assignment_id))
-      .map((r: any) => r.rating as number);
-
+    const cycleRatings = cycleAssignments.flatMap((a: any) => responsesByAssignment.get(a.id) || []);
     const avgRating = cycleRatings.length > 0
-      ? cycleRatings.reduce((a, b) => a + b, 0) / cycleRatings.length
+      ? cycleRatings.reduce((a: number, b: number) => a + b, 0) / cycleRatings.length
       : 0;
 
     ratingTrend.push({ name: cycle.name, value: parseFloat(avgRating.toFixed(2)) });
