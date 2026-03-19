@@ -88,10 +88,10 @@ export default function Home() {
       </header>
 
       {/* Hero — gradient, light, friendly */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#eeeeff] via-[#f2e8ff] to-[#fce8ff] px-6">
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f8f7ff] via-[#faf5ff] to-[#fff8ff] px-6">
         {/* Decorative gradient blobs */}
-        <div className="absolute top-[-80px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br from-primary/25 to-secondary/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-60px] left-[-80px] w-[350px] h-[350px] bg-gradient-to-tr from-secondary/20 to-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-[-80px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br from-primary/10 to-secondary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-60px] left-[-80px] w-[350px] h-[350px] bg-gradient-to-tr from-secondary/8 to-primary/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-5xl mx-auto relative">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-end">
@@ -304,7 +304,7 @@ export default function Home() {
       </section>
 
       {/* Slack mockup — light lavender section */}
-      <section className="bg-gradient-to-br from-[#f0eaff] via-[#ede8ff] to-[#e8e4ff] py-28">
+      <section className="bg-gradient-to-br from-[#f5f2ff] via-[#f8f5ff] to-[#f3f1ff] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
@@ -769,9 +769,9 @@ export default function Home() {
       </section>
 
       {/* CTA — light gradient, friendly */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#f0e8ff] via-background to-[#e8ecff] py-28">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f8f5ff] via-background to-[#f5f7ff] py-28">
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-5xl mx-auto px-6 text-center relative">
           <ScrollReveal>
             <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
