@@ -321,83 +321,51 @@ export default async function EmployeeProfilePage({
         </div>
       </div>
 
-      {/* ── 2. KPI Strip ───────────────────────────────────────────────── */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border/60">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Overall Rating
-                </p>
-                <p className="text-2xl font-semibold mt-1 text-foreground">
-                  {showRating && overallAvg ? `${overallAvg}/5` : "—"}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
-                <Star className="h-5 w-5" />
+      {/* ── 2. Performance Hero ────────────────────────────────────────── */}
+      <Card className="border-border/60">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-8">
+            {/* Circular rating ring */}
+            <div className="relative shrink-0 flex items-center justify-center" style={{ width: 80, height: 80 }}>
+              <RatingRing rating={showRating && overallAvg ? parseFloat(overallAvg) : null} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-xl font-bold text-foreground leading-none">
+                  {showRating && overallAvg ? overallAvg : "—"}
+                </span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">Overall</span>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-border/60">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Reviews
-                </p>
-                <p className="text-2xl font-semibold mt-1 text-foreground">
-                  {reviewAssignments.length}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-primary bg-primary/[0.08]">
-                <FileText className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Feedback
-                </p>
-                <p className="text-2xl font-semibold mt-1 text-foreground">
-                  {showFeedbackSection ? continuousFeedback.length : "—"}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Goals
-                </p>
-                <p className="text-2xl font-semibold mt-1 text-foreground">{goals.length}</p>
-                {activeGoals.length > 0 && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {onTrackGoals.length}/{activeGoals.length} on track
+            {/* Grade + inline stats */}
+            <div className="flex-1 min-w-0">
+              {latestReview?.final_grade &&
+                (canSeeAllRatings || latestReview.cycle?.grades_released) && (
+                  <p className={`text-2xl font-bold leading-tight ${gradeColor(latestReview.final_grade)}`}>
+                    {latestReview.final_grade}
                   </p>
                 )}
-              </div>
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">
-                <Target className="h-5 w-5" />
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2">
+                <span className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">{reviewAssignments.length}</span>{" "}
+                  {reviewAssignments.length === 1 ? "review" : "reviews"}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  <span className="font-semibold text-foreground">
+                    {onTrackGoals.length}/{activeGoals.length > 0 ? activeGoals.length : goals.length}
+                  </span>{" "}
+                  goals on track
+                </span>
+                {showFeedbackSection && (
+                  <span className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">{continuousFeedback.length}</span>{" "}
+                    feedback
+                  </span>
+                )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── 3. At-a-Glance Row ─────────────────────────────────────────── */}
       <div className="grid gap-4 md:grid-cols-2">
