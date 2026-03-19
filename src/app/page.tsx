@@ -594,7 +594,7 @@ export default function Home() {
                             <td className="px-4 py-2.5 font-medium text-foreground">{row.name}</td>
                             {row.scores.map((score, i) => (
                               <td
-                                key={i}
+                                key={`${row.name}-${i}`}
                                 className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
                                   score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
                                   score >= 3.5 ? "bg-primary/5 text-primary" :
@@ -608,9 +608,9 @@ export default function Home() {
                         ))}
                         {/* Overall row */}
                         <tr className="border-t-2 border-border/60 bg-muted/30 font-semibold">
-                          <td className="px-4 py-2.5 font-semibold text-foreground">Overall</td>
+                          <td className="px-4 py-2.5 text-foreground">Overall</td>
                           {[4.0, 4.0, 4.1, 4.3].map((score, i) => (
-                            <td key={i} className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
+                            <td key={`overall-${i}`} className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
                               score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
                               score >= 3.5 ? "bg-primary/5 text-primary" :
                               "bg-amber-50 text-amber-700"
