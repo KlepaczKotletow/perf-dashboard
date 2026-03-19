@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import {
-  Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star,
-  ArrowRight, Check, Target, TrendingUp, Flag, ChevronRight,
-  Grid3X3, CalendarClock,
+  Slack, Shield, BarChart3, MessageSquare, Users, Star,
+  Check, Target, TrendingUp, Flag, ChevronRight,
+  Grid3X3,
 } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
