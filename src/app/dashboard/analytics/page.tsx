@@ -478,12 +478,14 @@ export default async function AnalyticsPage({
     ? params.heatmap_dim
     : "role") as HeatmapDim;
 
-  const [filterOptions, analytics, trends, heatmapData] = await Promise.all([
+  const [filterOptions, analytics, trends] = await Promise.all([
     getFilterOptions(),
     getAnalyticsData(filters),
     getTrendsData({ functionId: filters.functionId, department: filters.department }),
-    getHeatmapData(filters, heatmapDim),
   ]);
+  const heatmapData = activeTab === "heatmap"
+    ? await getHeatmapData(filters, heatmapDim)
+    : null;
 
   return (
     <div className="space-y-8">
