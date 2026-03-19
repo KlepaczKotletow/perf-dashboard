@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AnalyticsCharts, type AnalyticsChartsData } from "./analytics-charts";
 import { AnalyticsTrends, type TrendsData } from "./analytics-trends";
 import { AnalyticsFilterBar } from "./analytics-filter-bar";
+import { AnalyticsTabNav } from "./analytics-tab-nav";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -331,7 +332,7 @@ function getPerformanceTier(avgRating: number): { label: string; color: string }
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cycleId?: string; functionId?: string; department?: string }>;
+  searchParams: Promise<{ cycleId?: string; functionId?: string; department?: string; tab?: string; heatmap_dim?: string }>;
 }) {
   const workspace = await getUserWorkspace();
 
@@ -349,6 +350,7 @@ export default async function AnalyticsPage({
   }
 
   const params = await searchParams;
+  const activeTab = (params.tab === "heatmap" ? "heatmap" : "overview") as "overview" | "heatmap";
   const filters: FilterParams = {
     cycleId: params.cycleId || null,
     functionId: params.functionId || null,
@@ -371,6 +373,9 @@ export default async function AnalyticsPage({
         </p>
       </div>
 
+      {/* Tab nav */}
+      <AnalyticsTabNav activeTab={activeTab} />
+
       {/* Filter bar */}
       <AnalyticsFilterBar
         cycles={filterOptions.cycles}
@@ -381,6 +386,8 @@ export default async function AnalyticsPage({
         selectedDepartment={filters.department || ""}
       />
 
+      {activeTab === "overview" && (
+        <>
       {/* KPI tiles */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <Card>
@@ -527,6 +534,16 @@ export default async function AnalyticsPage({
 
       {/* Trends (cross-cycle) */}
       <AnalyticsTrends data={trends} />
+        </>
+      )}
+
+      {activeTab === "heatmap" && (
+        <Card className="border-border/60">
+          <CardContent className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">Heatmap coming in next step…</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
