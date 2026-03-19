@@ -21,6 +21,44 @@ interface FilterParams {
   department: string | null;
 }
 
+// ─── Heatmap types ────────────────────────────────────────────────────────────
+
+type HeatmapDim = "role" | "department" | "level" | "tenure";
+
+interface HeatmapCell {
+  sum: number;
+  count: number;
+}
+
+interface HeatmapData {
+  competencies: string[];          // sorted alphabetically
+  groups: string[];                // sorted alphabetically
+  cells: Record<string, HeatmapCell>;           // key: `${comp}::${group}`
+  overallByGroup: Record<string, HeatmapCell>;  // "Overall" row
+  overallByComp: Record<string, HeatmapCell>;   // "All" column
+  grandTotal: HeatmapCell;
+}
+
+// ─── Heatmap helpers ──────────────────────────────────────────────────────────
+
+function getTenureBucket(hireDate: string | null | undefined): string {
+  if (!hireDate) return "Unknown";
+  const ms = Date.now() - new Date(hireDate).getTime();
+  const years = ms / (1000 * 60 * 60 * 24 * 365.25);
+  if (years < 1) return "< 1yr";
+  if (years < 2) return "1–2yr";
+  if (years < 5) return "2–5yr";
+  return "5yr+";
+}
+
+function heatmapCellClass(avg: number | null): string {
+  if (avg === null) return "";
+  if (avg >= 4.5) return "bg-emerald-50 dark:bg-emerald-950/40";
+  if (avg >= 3.5) return "bg-primary/5 dark:bg-primary/10";
+  if (avg >= 2.5) return "bg-amber-50 dark:bg-amber-950/40";
+  return "bg-red-50 dark:bg-red-950/40";
+}
+
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
 async function getFilterOptions() {
@@ -319,6 +357,85 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
   return { ratingTrend, completionTrend };
 }
 
+async function getHeatmapData(filters: FilterParams, dim: HeatmapDim): Promise<HeatmapData> {
+  const supabase = await createServerSupabaseClient();
+
+  // 1. Fetch users with dimension fields
+  const { data: usersRaw } = await supabase
+    .from("users")
+    .select("id, role, department, hire_date, level:levels!users_level_id_fkey(name)");
+
+  const userMap = new Map(
+    (usersRaw || []).map((u: any) => {
+      let groupValue: string;
+      if (dim === "role") groupValue = u.role || "Unknown";
+      else if (dim === "department") groupValue = u.department || "Unknown";
+      else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
+      else groupValue = getTenureBucket(u.hire_date);
+      return [u.id as string, groupValue];
+    })
+  );
+
+  // 2. Fetch responses with competency name and assignment employee_id
+  const { data: responsesRaw } = await supabase
+    .from("review_responses")
+    .select("rating, competency:competencies(name), assignment:review_assignments!inner(employee_id, cycle_id)")
+    .not("rating", "is", null);
+
+  const responses = (responsesRaw || []).filter((r: any) => {
+    if (filters.cycleId && (r.assignment as any)?.cycle_id !== filters.cycleId) return false;
+    const empId = (r.assignment as any)?.employee_id;
+    if (!empId) return false;
+    return userMap.has(empId);
+  });
+
+  // 3. Aggregate
+  const cells: Record<string, HeatmapCell> = {};
+  const overallByGroup: Record<string, HeatmapCell> = {};
+  const overallByComp: Record<string, HeatmapCell> = {};
+  const grandTotal: HeatmapCell = { sum: 0, count: 0 };
+  const competencySet = new Set<string>();
+  const groupSet = new Set<string>();
+
+  function accumulate(cell: HeatmapCell, rating: number) {
+    cell.sum += rating;
+    cell.count += 1;
+  }
+
+  for (const r of responses) {
+    const comp = (r.competency as any)?.name as string | undefined;
+    const empId = (r.assignment as any)?.employee_id as string;
+    const group = userMap.get(empId);
+    const rating = r.rating as number;
+
+    if (!comp || !group) continue;
+
+    competencySet.add(comp);
+    groupSet.add(group);
+
+    const cellKey = `${comp}::${group}`;
+    if (!cells[cellKey]) cells[cellKey] = { sum: 0, count: 0 };
+    accumulate(cells[cellKey], rating);
+
+    if (!overallByGroup[group]) overallByGroup[group] = { sum: 0, count: 0 };
+    accumulate(overallByGroup[group], rating);
+
+    if (!overallByComp[comp]) overallByComp[comp] = { sum: 0, count: 0 };
+    accumulate(overallByComp[comp], rating);
+
+    accumulate(grandTotal, rating);
+  }
+
+  return {
+    competencies: [...competencySet].sort(),
+    groups: [...groupSet].sort(),
+    cells,
+    overallByGroup,
+    overallByComp,
+    grandTotal,
+  };
+}
+
 // ─── Performance tier helper ──────────────────────────────────────────────────
 
 function getPerformanceTier(avgRating: number): { label: string; color: string } {
@@ -357,11 +474,15 @@ export default async function AnalyticsPage({
     functionId: params.functionId || null,
     department: params.department || null,
   };
+  const heatmapDim = (["role", "department", "level", "tenure"].includes(params.heatmap_dim || "")
+    ? params.heatmap_dim
+    : "role") as HeatmapDim;
 
-  const [filterOptions, analytics, trends] = await Promise.all([
+  const [filterOptions, analytics, trends, heatmapData] = await Promise.all([
     getFilterOptions(),
     getAnalyticsData(filters),
     getTrendsData({ functionId: filters.functionId, department: filters.department }),
+    getHeatmapData(filters, heatmapDim),
   ]);
 
   return (
