@@ -11,6 +11,7 @@ import { AnalyticsCharts, type AnalyticsChartsData } from "./analytics-charts";
 import { AnalyticsTrends, type TrendsData } from "./analytics-trends";
 import { AnalyticsFilterBar } from "./analytics-filter-bar";
 import { AnalyticsTabNav } from "./analytics-tab-nav";
+import { AnalyticsHeatmapDimSwitcher } from "./analytics-heatmap-dim-switcher";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -663,10 +664,130 @@ export default async function AnalyticsPage({
         </>
       )}
 
-      {activeTab === "heatmap" && (
+      {activeTab === "heatmap" && heatmapData && (
         <Card className="border-border/60">
-          <CardContent className="py-16 text-center">
-            <p className="text-sm text-muted-foreground">Heatmap coming in next step…</p>
+          <div className="px-6 pt-6 pb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Competency Heatmap</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Average ratings per competency, grouped by {heatmapDim}
+              </p>
+            </div>
+            <Suspense fallback={null}>
+              <AnalyticsHeatmapDimSwitcher activeDim={heatmapDim} />
+            </Suspense>
+          </div>
+          <CardContent className="px-0 pb-6">
+            {heatmapData.competencies.length === 0 ? (
+              <div className="py-16 text-center px-6">
+                <p className="text-sm font-semibold text-foreground mb-1">No performance data for this period</p>
+                <p className="text-sm text-muted-foreground">Complete a review cycle to populate the heatmap.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-background px-4 py-2 text-left text-xs font-medium text-muted-foreground w-48 min-w-48">
+                        Competency
+                      </th>
+                      <th className="px-3 py-2 text-center text-xs font-medium text-muted-foreground min-w-[80px]">
+                        All
+                      </th>
+                      {heatmapData.groups.map((group) => (
+                        <th
+                          key={group}
+                          className="px-3 py-2 text-center text-xs font-medium text-muted-foreground min-w-[80px] max-w-[120px] truncate"
+                          title={group}
+                        >
+                          {group}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {heatmapData.competencies.map((comp) => {
+                      const allCell = heatmapData.overallByComp[comp];
+                      const allAvg = allCell && allCell.count > 0 ? allCell.sum / allCell.count : null;
+                      return (
+                        <tr key={comp} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+                          <td className="sticky left-0 z-10 bg-background px-4 py-2.5 font-medium text-foreground">
+                            {comp}
+                          </td>
+                          <td className={`px-3 py-2.5 text-center ${heatmapCellClass(allAvg)}`}>
+                            {allAvg !== null ? (
+                              <>
+                                <div className="font-semibold tabular-nums">{allAvg.toFixed(1)}</div>
+                                <div className="text-[10px] text-muted-foreground tabular-nums">n={allCell.count}</div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </td>
+                          {heatmapData.groups.map((group) => {
+                            const cell = heatmapData.cells[`${comp}::${group}`];
+                            const avg = cell && cell.count > 0 ? cell.sum / cell.count : null;
+                            return (
+                              <td
+                                key={group}
+                                className={`px-3 py-2.5 text-center ${heatmapCellClass(avg)}`}
+                              >
+                                {avg !== null ? (
+                                  <>
+                                    <div className="font-semibold tabular-nums">{avg.toFixed(1)}</div>
+                                    <div className="text-[10px] text-muted-foreground tabular-nums">n={cell.count}</div>
+                                  </>
+                                ) : (
+                                  <span className="text-muted-foreground/40">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+
+                    {/* Overall row */}
+                    <tr className="border-t-2 border-border/60 bg-muted/30 font-medium">
+                      <td className="sticky left-0 z-10 bg-muted/30 px-4 py-2.5 font-semibold text-foreground">
+                        Overall
+                      </td>
+                      <td className={`px-3 py-2.5 text-center ${heatmapCellClass(heatmapData.grandTotal.count > 0 ? heatmapData.grandTotal.sum / heatmapData.grandTotal.count : null)}`}>
+                        {heatmapData.grandTotal.count > 0 ? (
+                          <>
+                            <div className="font-semibold tabular-nums">
+                              {(heatmapData.grandTotal.sum / heatmapData.grandTotal.count).toFixed(1)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground tabular-nums">n={heatmapData.grandTotal.count}</div>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+                      {heatmapData.groups.map((group) => {
+                        const cell = heatmapData.overallByGroup[group];
+                        const avg = cell && cell.count > 0 ? cell.sum / cell.count : null;
+                        return (
+                          <td
+                            key={group}
+                            className={`px-3 py-2.5 text-center ${heatmapCellClass(avg)}`}
+                          >
+                            {avg !== null ? (
+                              <>
+                                <div className="font-semibold tabular-nums">{avg.toFixed(1)}</div>
+                                <div className="text-[10px] text-muted-foreground tabular-nums">n={cell.count}</div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
