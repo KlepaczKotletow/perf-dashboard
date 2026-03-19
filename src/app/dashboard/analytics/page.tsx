@@ -515,152 +515,152 @@ export default async function AnalyticsPage({
 
       {activeTab === "overview" && (
         <>
-      {/* KPI tiles */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-            <p className="text-sm font-medium">Overall Rating</p>
-            <Star className="h-4 w-4 text-yellow-500" />
-          </div>
-          <div className="px-6 pb-6">
-            <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
-            <p className="text-xs text-muted-foreground">Avg across all competencies</p>
-          </div>
-        </Card>
+          {/* KPI tiles */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+            <Card>
+              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
+                <p className="text-sm font-medium">Overall Rating</p>
+                <Star className="h-4 w-4 text-yellow-500" />
+              </div>
+              <div className="px-6 pb-6">
+                <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
+                <p className="text-xs text-muted-foreground">Avg across all competencies</p>
+              </div>
+            </Card>
 
-        <Card>
-          <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-            <p className="text-sm font-medium">Completion Rate</p>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </div>
-          <div className="px-6 pb-6">
-            <div className="text-2xl font-bold">{analytics.completionRate}%</div>
-            <p className="text-xs text-muted-foreground">{analytics.completedAssignments}/{analytics.totalAssignments} assignments</p>
-          </div>
-        </Card>
+            <Card>
+              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
+                <p className="text-sm font-medium">Completion Rate</p>
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              </div>
+              <div className="px-6 pb-6">
+                <div className="text-2xl font-bold">{analytics.completionRate}%</div>
+                <p className="text-xs text-muted-foreground">{analytics.completedAssignments}/{analytics.totalAssignments} assignments</p>
+              </div>
+            </Card>
 
-        <Card>
-          <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-            <p className="text-sm font-medium">Total Ratings</p>
-            <BarChart3 className="h-4 w-4 text-blue-500" />
-          </div>
-          <div className="px-6 pb-6">
-            <div className="text-2xl font-bold">{analytics.totalRatings}</div>
-            <p className="text-xs text-muted-foreground">Review response ratings</p>
-          </div>
-        </Card>
+            <Card>
+              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
+                <p className="text-sm font-medium">Total Ratings</p>
+                <BarChart3 className="h-4 w-4 text-blue-500" />
+              </div>
+              <div className="px-6 pb-6">
+                <div className="text-2xl font-bold">{analytics.totalRatings}</div>
+                <p className="text-xs text-muted-foreground">Review response ratings</p>
+              </div>
+            </Card>
 
-        <Card>
-          <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-            <p className="text-sm font-medium">Participants</p>
-            <Users className="h-4 w-4 text-purple-500" />
-          </div>
-          <div className="px-6 pb-6">
-            <div className="text-2xl font-bold">{analytics.participants}</div>
-            <p className="text-xs text-muted-foreground">Employees in scope</p>
-          </div>
-        </Card>
+            <Card>
+              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
+                <p className="text-sm font-medium">Participants</p>
+                <Users className="h-4 w-4 text-purple-500" />
+              </div>
+              <div className="px-6 pb-6">
+                <div className="text-2xl font-bold">{analytics.participants}</div>
+                <p className="text-xs text-muted-foreground">Employees in scope</p>
+              </div>
+            </Card>
 
-        <Card>
-          <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-            <p className="text-sm font-medium">Active Cycles</p>
-            <Grid3X3 className="h-4 w-4 text-orange-500" />
+            <Card>
+              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
+                <p className="text-sm font-medium">Active Cycles</p>
+                <Grid3X3 className="h-4 w-4 text-orange-500" />
+              </div>
+              <div className="px-6 pb-6">
+                <div className="text-2xl font-bold">{analytics.cycleStats.active}</div>
+                <p className="text-xs text-muted-foreground">{analytics.cycleStats.total} total</p>
+              </div>
+            </Card>
           </div>
-          <div className="px-6 pb-6">
-            <div className="text-2xl font-bold">{analytics.cycleStats.active}</div>
-            <p className="text-xs text-muted-foreground">{analytics.cycleStats.total} total</p>
-          </div>
-        </Card>
-      </div>
 
-      {/* Empty state */}
-      {analytics.totalRatings === 0 && analytics.totalAssignments === 0 && (
-        <Card className="border-border/60">
-          <CardContent className="py-16 text-center">
-            <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
-              <BarChart3 className="h-7 w-7 text-muted-foreground/50" />
-            </div>
-            <p className="text-sm font-semibold text-foreground mb-1">No data for this selection</p>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Try adjusting the filters above, or launch a performance cycle to start collecting data.
-            </p>
-            <Button asChild className="mt-5" variant="outline" size="sm">
-              <Link href="/dashboard/cycles">Go to Cycles</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+          {/* Empty state */}
+          {analytics.totalRatings === 0 && analytics.totalAssignments === 0 && (
+            <Card className="border-border/60">
+              <CardContent className="py-16 text-center">
+                <div className="h-14 w-14 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <BarChart3 className="h-7 w-7 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-1">No data for this selection</p>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  Try adjusting the filters above, or launch a performance cycle to start collecting data.
+                </p>
+                <Button asChild className="mt-5" variant="outline" size="sm">
+                  <Link href="/dashboard/cycles">Go to Cycles</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Charts */}
-      <AnalyticsCharts data={analytics.chartsData} />
+          {/* Charts */}
+          <AnalyticsCharts data={analytics.chartsData} />
 
-      {/* Performance Ranking */}
-      {analytics.rankingData.length > 0 && (
-        <Card>
-          <div className="px-6 pt-6 pb-2">
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <h2 className="text-base font-semibold">Performance Ranking</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Employees ranked by average rating. Tier: Exceptional ≥ 4.5 · Strong ≥ 4.0 · Solid ≥ 3.0 · Needs Dev &lt; 3.0
-            </p>
-          </div>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30">
-                    <TableHead className="w-10">#</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Function</TableHead>
-                    <TableHead>Level</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead className="w-[180px]">Avg Rating</TableHead>
-                    <TableHead className="w-[80px] text-right">Reviews</TableHead>
-                    <TableHead className="w-[120px]">Tier</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analytics.rankingData.map((emp, idx) => {
-                    const tier = getPerformanceTier(emp.avgRating);
-                    const pct = Math.round((emp.avgRating / 5) * 100);
-                    return (
-                      <TableRow key={emp.id}>
-                        <TableCell className="text-sm text-muted-foreground font-mono">{idx + 1}</TableCell>
-                        <TableCell>
-                          <Link href={`/dashboard/team/${emp.id}`} className="font-medium text-foreground hover:underline">
-                            {emp.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{emp.functionName}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{emp.levelName}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{emp.department}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[100px]">
-                              <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${pct}%` }} />
-                            </div>
-                            <span className="text-sm font-semibold tabular-nums">{emp.avgRating.toFixed(1)}</span>
-                            <span className="text-xs text-muted-foreground">/5</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground text-right tabular-nums">{emp.reviewCount}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-[11px] font-medium ${tier.color}`}>{tier.label}</Badge>
-                        </TableCell>
+          {/* Performance Ranking */}
+          {analytics.rankingData.length > 0 && (
+            <Card>
+              <div className="px-6 pt-6 pb-2">
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-500" />
+                  <h2 className="text-base font-semibold">Performance Ranking</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Employees ranked by average rating. Tier: Exceptional ≥ 4.5 · Strong ≥ 4.0 · Solid ≥ 3.0 · Needs Dev &lt; 3.0
+                </p>
+              </div>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/30">
+                        <TableHead className="w-10">#</TableHead>
+                        <TableHead>Employee</TableHead>
+                        <TableHead>Function</TableHead>
+                        <TableHead>Level</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead className="w-[180px]">Avg Rating</TableHead>
+                        <TableHead className="w-[80px] text-right">Reviews</TableHead>
+                        <TableHead className="w-[120px]">Tier</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                    </TableHeader>
+                    <TableBody>
+                      {analytics.rankingData.map((emp, idx) => {
+                        const tier = getPerformanceTier(emp.avgRating);
+                        const pct = Math.round((emp.avgRating / 5) * 100);
+                        return (
+                          <TableRow key={emp.id}>
+                            <TableCell className="text-sm text-muted-foreground font-mono">{idx + 1}</TableCell>
+                            <TableCell>
+                              <Link href={`/dashboard/team/${emp.id}`} className="font-medium text-foreground hover:underline">
+                                {emp.name}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{emp.functionName}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{emp.levelName}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{emp.department}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden max-w-[100px]">
+                                  <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <span className="text-sm font-semibold tabular-nums">{emp.avgRating.toFixed(1)}</span>
+                                <span className="text-xs text-muted-foreground">/5</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground text-right tabular-nums">{emp.reviewCount}</TableCell>
+                            <TableCell>
+                              <Badge className={`text-[11px] font-medium ${tier.color}`}>{tier.label}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Trends (cross-cycle) */}
-      <AnalyticsTrends data={trends} />
+          {/* Trends (cross-cycle) */}
+          <AnalyticsTrends data={trends} />
         </>
       )}
 
@@ -697,7 +697,7 @@ export default async function AnalyticsPage({
                       {heatmapData.groups.map((group) => (
                         <th
                           key={group}
-                          className="px-3 py-2 text-center text-xs font-medium text-muted-foreground min-w-[80px] max-w-[120px] truncate"
+                          className="px-3 py-2 text-center text-xs font-medium text-muted-foreground min-w-[80px]"
                           title={group}
                         >
                           {group}
