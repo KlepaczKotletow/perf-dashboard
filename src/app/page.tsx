@@ -30,7 +30,7 @@ export default function Home() {
             <a href="#features" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
             <a href="#goals" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Goals</a>
             <a href="#analytics" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Analytics</a>
-            <Link href="#pricing" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+            <a href="#pricing" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
             <a href={signInWithSlackUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</a>
             <Button size="sm" asChild>
               <a href={addToSlackUrl}>
