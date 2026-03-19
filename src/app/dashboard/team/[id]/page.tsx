@@ -283,7 +283,7 @@ export default async function EmployeeProfilePage({
                   Feedback
                 </p>
                 <p className="text-2xl font-semibold mt-1 text-foreground">
-                  {continuousFeedback.length}
+                  {showFeedbackSection ? continuousFeedback.length : "—"}
                 </p>
               </div>
               <div className="h-10 w-10 rounded-xl flex items-center justify-center text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">
