@@ -24,12 +24,9 @@ export function AnalyticsTabNav({ activeTab }: AnalyticsTabNavProps) {
       const params = new URLSearchParams(searchParams.toString());
       if (tab === "overview") {
         params.delete("tab");
+        params.delete("heatmap_dim");
       } else {
         params.set("tab", tab);
-      }
-      // Reset heatmap-specific params when leaving heatmap
-      if (tab === "overview") {
-        params.delete("heatmap_dim");
       }
       router.push(`/dashboard/analytics?${params.toString()}`);
     },

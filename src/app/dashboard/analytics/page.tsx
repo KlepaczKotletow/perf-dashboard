@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { BarChart3, TrendingUp, Star, Users, Lock, Grid3X3 } from "lucide-react";
@@ -374,7 +375,9 @@ export default async function AnalyticsPage({
       </div>
 
       {/* Tab nav */}
-      <AnalyticsTabNav activeTab={activeTab} />
+      <Suspense fallback={null}>
+        <AnalyticsTabNav activeTab={activeTab} />
+      </Suspense>
 
       {/* Filter bar */}
       <AnalyticsFilterBar
