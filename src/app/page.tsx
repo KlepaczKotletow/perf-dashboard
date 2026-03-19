@@ -662,313 +662,70 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it Works — light */}
-      <section id="how-it-works" className="max-w-5xl mx-auto px-6 py-28">
-        <ScrollReveal className="text-center mb-14">
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-            How it works
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
-          <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
-            No lengthy onboarding. No training required. Just add Perf to Slack and you&apos;re set.
-          </p>
-        </ScrollReveal>
-
-        <div className="relative">
-          {/* Connector line through icon centers */}
-          <div className="hidden lg:block absolute top-[27px] left-[calc(16.66%+34px)] right-[calc(16.66%+34px)] h-px bg-border" aria-hidden="true" />
-
-          <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
-            {[
-              {
-                step: 1,
-                icon: Slack,
-                title: "Add Perf to Slack",
-                description: "Click 'Add to Slack' and authorize Perf in your workspace. Takes under 60 seconds.",
-              },
-              {
-                step: 2,
-                icon: Users,
-                title: "Set up your team",
-                description: "Perf syncs your Slack members automatically. Assign managers and define reporting lines.",
-              },
-              {
-                step: 3,
-                icon: BarChart3,
-                title: "Launch your first cycle",
-                description: "Pick a template, set a deadline, and Perf handles assignments, reminders, and collection.",
-              },
-            ].map((item, i) => (
-              <ScrollReveal key={item.step} delay={i * 120}>
-                <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
-                  <div className="relative mb-5">
-                    <div className="h-14 w-14 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center">
-                      <item.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
-                      {item.step}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
-                </li>
-              </ScrollReveal>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* Dashboard Mockup — mobile only */}
-      <section className="max-w-5xl mx-auto px-6 pb-24 lg:hidden">
-        <ScrollReveal className="text-center mb-12">
-          <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-            The dashboard
-          </span>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Everything in one place</h2>
-          <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
-            Track cycles, calibrate scores, and explore team performance — all from a clean, focused interface.
-          </p>
-        </ScrollReveal>
-
-        <ScrollReveal scale className="relative">
-          <div className="absolute inset-x-12 top-8 bottom-0 bg-primary/[0.10] blur-3xl rounded-full -z-10 pointer-events-none" />
-
-          <div className="rounded-2xl border border-border/70 overflow-hidden shadow-xl shadow-black/[0.06] bg-card">
-            <div className="bg-muted/60 border-b border-border px-4 py-3 flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-red-400/70" />
-                <div className="h-3 w-3 rounded-full bg-yellow-400/70" />
-                <div className="h-3 w-3 rounded-full bg-green-400/70" />
-              </div>
-              <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
-                app.perf.team/dashboard/cycles
-              </div>
-            </div>
-
-            <div className="flex h-[340px] sm:h-[400px] overflow-hidden">
-              <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
-                <div className="px-2 py-1.5 mb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
-                      <span className="text-white text-[9px] font-bold">P</span>
-                    </div>
-                    <span className="text-xs font-semibold text-foreground">Perf</span>
-                  </div>
-                </div>
-                {[
-                  { label: "Overview", active: false },
-                  { label: "Cycles", active: true },
-                  { label: "My Reviews", active: false },
-                  { label: "Goals", active: false },
-                  { label: "Team", active: false },
-                  { label: "Analytics", active: false },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className={`px-2.5 py-1.5 rounded-md text-[12px] ${
-                      item.active
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {item.label}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex-1 p-5 sm:p-6 overflow-hidden">
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">Active cycle</p>
-                    <h3 className="text-sm font-semibold text-foreground mt-0.5">Q1 2025 Performance Review</h3>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[11px] text-muted-foreground">Completion</p>
-                    <p className="text-lg font-bold text-primary">73%</p>
-                  </div>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full mb-6 overflow-hidden">
-                  <div className="h-full bg-primary rounded-full" style={{ width: "73%" }} />
-                </div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-3">Avg. competency scores</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: "Leadership", score: 4.2, pct: 84, color: "bg-primary" },
-                    { label: "Execution", score: 3.8, pct: 76, color: "bg-chart-2" },
-                    { label: "Collaboration", score: 4.5, pct: 90, color: "bg-chart-3" },
-                  ].map((c) => (
-                    <div key={c.label} className="bg-muted/40 rounded-xl p-3">
-                      <p className="text-[11px] text-muted-foreground mb-1">{c.label}</p>
-                      <p className="text-base font-bold text-foreground">{c.score}</p>
-                      <div className="h-1 bg-border rounded-full mt-2 overflow-hidden">
-                        <div className={`h-full rounded-full ${c.color}`} style={{ width: `${c.pct}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium mb-2 mt-5">Recent assignments</p>
-                <div className="space-y-1.5">
-                  {[
-                    { name: "Alex Johnson", status: "Submitted", dot: "bg-green-500" },
-                    { name: "Maria Garcia", status: "In progress", dot: "bg-yellow-500" },
-                    { name: "Chris Lee", status: "Pending", dot: "bg-border" },
-                  ].map((r) => (
-                    <div key={r.name} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-muted-foreground">
-                          {r.name[0]}
-                        </div>
-                        <span className="text-[12px] text-foreground">{r.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <div className={`h-1.5 w-1.5 rounded-full ${r.dot}`} />
-                        <span className="text-[11px] text-muted-foreground">{r.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </ScrollReveal>
-      </section>
-
-      {/* Features — light with white cards */}
-      <section className="bg-white py-28">
+      {/* ── How It Works ── */}
+      <section id="how-it-works" className="bg-background py-28">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="mb-12">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
-              Everything you need
+          <ScrollReveal className="text-center mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              How it works
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Built for how teams actually work
-            </h2>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
+            <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
+              No lengthy onboarding. No training. No new tool for your team to learn. Just add Perf to Slack and you&apos;re set.
+            </p>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 gap-px bg-border rounded-2xl overflow-hidden mb-px">
-            {[
-              {
-                icon: MessageSquare,
-                title: "Anytime feedback",
-                description: "Give praise or constructive feedback with /feedback — no forms, no friction.",
-              },
-              {
-                icon: Star,
-                title: "360 reviews",
-                description: "Structured multi-rater reviews with competency ratings, built-in calibration, and deadlines.",
-              },
-            ].map((f) => (
-              <ScrollReveal key={f.title}>
-                <div className="bg-background p-10">
-                  <f.icon className="h-6 w-6 text-primary mb-6" />
-                  <h3 className="text-2xl font-bold text-foreground mb-3">{f.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed">{f.description}</p>
-                </div>
-              </ScrollReveal>
-            ))}
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border rounded-b-2xl overflow-hidden">
-            {[
-              {
-                icon: Users,
-                title: "Performance cycles",
-                description: "Launch org-wide review cycles with automated assignments based on reporting lines.",
-              },
-              {
-                icon: BarChart3,
-                title: "Live analytics",
-                description: "Rating distributions, department benchmarks, 9-box grids, and trend analysis in real time.",
-              },
-              {
-                icon: Shield,
-                title: "Enterprise security",
-                description: "Row-level isolation, cross-tenant validation triggers, and signed Slack payloads.",
-              },
-              {
-                icon: Zap,
-                title: "Zero context-switching",
-                description: "Start reviews in Slack, finish on the web. Or do everything in Slack — your choice.",
-              },
-            ].map((f, i) => (
-              <ScrollReveal key={f.title} delay={i * 60}>
-                <div className="bg-background p-7">
-                  <f.icon className="h-5 w-5 text-primary/70 mb-4" />
-                  <h3 className="text-base font-semibold text-foreground mb-2">{f.title}</h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
-                </div>
-              </ScrollReveal>
-            ))}
+          <div className="relative">
+            <div className="hidden lg:block absolute top-[27px] left-[calc(16.66%+34px)] right-[calc(16.66%+34px)] h-px bg-border" aria-hidden="true" />
+            <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
+              {[
+                {
+                  step: 1,
+                  icon: Slack,
+                  title: "Add Perf to Slack",
+                  description: "Click 'Add to Slack' and authorize in your workspace. Takes under 60 seconds. No engineering setup required.",
+                },
+                {
+                  step: 2,
+                  icon: Target,
+                  title: "Set up your team and competencies",
+                  description: "Perf syncs your Slack members automatically. Assign managers, define reporting lines, and set the competencies your org values.",
+                },
+                {
+                  step: 3,
+                  icon: BarChart3,
+                  title: "Launch cycles and read the data",
+                  description: "Pick a template, set a deadline, and Perf handles assignments, DM reminders, and collection. Analytics update in real time.",
+                },
+              ].map((item, i) => (
+                <ScrollReveal key={item.step} delay={i * 120}>
+                  <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
+                    <div className="relative mb-5">
+                      <div className="h-14 w-14 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center">
+                        <item.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                        {item.step}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
+                  </li>
+                </ScrollReveal>
+              ))}
+            </ol>
           </div>
         </div>
       </section>
 
-      {/* Testimonials — soft lavender */}
-      <section className="bg-background py-28">
-        <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
-              What teams say
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Teams that switched don&apos;t go back
-            </h2>
-          </ScrollReveal>
-
-          <div className="grid sm:grid-cols-3 gap-6">
-            {[
-              {
-                quote: "We went from 40% review completion to nearly 100% in one cycle. The Slack integration removes every excuse not to respond.",
-                name: "Sarah Chen",
-                role: "Engineering Manager",
-                company: "Forma",
-                initial: "S",
-              },
-              {
-                quote: "Finally a tool that doesn't make HR feel like HR. Our team actually appreciates getting feedback — and giving it.",
-                name: "Marcus Webb",
-                role: "Head of People",
-                company: "Archetype Labs",
-                initial: "M",
-              },
-              {
-                quote: "The 9-box calibration grid alone saved us hours of spreadsheet wrangling. Setup took an afternoon.",
-                name: "Priya Nair",
-                role: "VP of Engineering",
-                company: "Meridian",
-                initial: "P",
-              },
-            ].map((t, i) => (
-              <ScrollReveal key={t.name} delay={i * 100}>
-                <figure className="flex flex-col h-full p-7 rounded-2xl border border-border bg-white shadow-sm shadow-primary/5">
-                  <blockquote className="flex-1">
-                    <span className="block text-5xl font-serif leading-none text-primary mb-5 select-none">&ldquo;</span>
-                    <p className="text-[15px] leading-relaxed text-muted-foreground">{t.quote}</p>
-                  </blockquote>
-                  <figcaption className="mt-6 flex items-center gap-3 pt-5 border-t border-border">
-                    <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
-                      {t.initial}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role} · {t.company}</p>
-                    </div>
-                  </figcaption>
-                </figure>
-              </ScrollReveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats strip — vibrant purple gradient */}
+      {/* ── Stats strip ── */}
       <section className="bg-gradient-to-r from-primary via-[#8b35d6] to-secondary py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid sm:grid-cols-3 gap-10 text-center">
             {[
-              { metric: "95%+", label: "Average review completion rate with Perf" },
-              { metric: "< 2 min", label: "Time to complete a peer review via Slack" },
-              { metric: "1 day", label: "From install to first live review cycle" },
+              { metric: "95%+", label: "Average review completion rate — up from ~40% with traditional tools" },
+              { metric: "< 2 min", label: "Time to complete a peer review via Slack — no new tool required" },
+              { metric: "1 day", label: "From install to first live review cycle with real data" },
             ].map((stat) => (
               <div key={stat.label}>
                 <p className="text-4xl font-black text-white">{stat.metric}</p>
@@ -979,7 +736,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing — light, with CTA buttons */}
+      {/* ── Pricing ── */}
       <section id="pricing" className="bg-background border-t border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-24">
           <ScrollReveal className="text-center mb-12">
@@ -1001,6 +758,7 @@ export default function Home() {
                   {[
                     "Up to 10 team members",
                     "Slack /feedback command",
+                    "Goals tracking",
                     "Basic analytics",
                     "1 active review cycle",
                   ].map((f) => (
@@ -1031,10 +789,13 @@ export default function Home() {
                 <ul className="space-y-2.5 flex-1">
                   {[
                     "Unlimited team members",
-                    "360° review cycles",
-                    "Competency frameworks",
+                    "360° review cycles with calibration",
+                    "Competency frameworks + level matrix",
                     "9-box calibration grid",
-                    "Advanced analytics",
+                    "Competency heatmap by role/dept/level",
+                    "Performance ranking + tier badges",
+                    "Cross-cycle trend analytics",
+                    "Upward feedback",
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
                       <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
@@ -1054,18 +815,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA — light gradient, friendly */}
+      {/* ── CTA ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#f8f5ff] via-background to-[#f5f7ff] py-28">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/6 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-5xl mx-auto px-6 text-center relative">
           <ScrollReveal>
             <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
-              Ready to make reviews{" "}
-              <span className="text-primary">actually happen?</span>
+              Ready for performance management that{" "}
+              <span className="text-primary">actually works?</span>
             </h2>
-            <p className="mt-5 text-muted-foreground text-lg max-w-md mx-auto">
-              Add Perf to your Slack workspace in under a minute. Free forever.
+            <p className="mt-5 text-muted-foreground text-lg max-w-lg mx-auto">
+              Add Perf to your Slack workspace in under a minute. Reviews, goals, and analytics — all in one place, free forever for small teams.
             </p>
             <div className="mt-10">
               <Button size="lg" className="h-13 px-8 text-base font-semibold" asChild>
@@ -1080,7 +841,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer — light */}
+      {/* ── Footer ── */}
       <footer className="bg-muted/40 border-t border-border">
         <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1092,19 +853,14 @@ export default function Home() {
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex gap-6 text-sm">
-              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">
-                Privacy
-              </Link>
-              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">
-                Terms
-              </Link>
-              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">
-                Support
-              </Link>
+              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
             </div>
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
