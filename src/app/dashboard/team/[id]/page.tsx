@@ -434,29 +434,17 @@ export default async function EmployeeProfilePage({
                 {activeGoals.slice(0, 3).map((goal: any) => {
                   const tracking =
                     GOAL_TRACKING_STATUS[goal.tracking_status] || GOAL_TRACKING_STATUS.on_track;
-                  const barColor = goal.tracking_status === "on_track" || goal.tracking_status === "achieved"
-                    ? "bg-emerald-500"
-                    : goal.tracking_status === "at_risk"
-                      ? "bg-amber-500"
-                      : "bg-red-500";
                   return (
-                    <div key={goal.id}>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-sm font-medium truncate pr-2">{goal.title}</p>
-                        <Badge className={`text-[10px] shrink-0 ${tracking.badge}`}>
-                          {tracking.label}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${barColor}`}
-                            style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
-                          />
+                    <div key={goal.id} className="flex items-center gap-3">
+                      <GoalRing progress={goal.progress || 0} trackingStatus={goal.tracking_status} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium truncate">{goal.title}</p>
+                          <Badge className={`text-[10px] shrink-0 ${tracking.badge}`}>
+                            {tracking.label}
+                          </Badge>
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {goal.progress || 0}%
-                        </span>
+                        <p className="text-xs text-muted-foreground">{goal.progress || 0}%</p>
                       </div>
                     </div>
                   );
@@ -632,50 +620,36 @@ export default async function EmployeeProfilePage({
               No goals assigned yet.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {goals.map((goal: any) => {
                 const tracking =
                   GOAL_TRACKING_STATUS[goal.tracking_status] || GOAL_TRACKING_STATUS.on_track;
                 return (
-                  <div key={goal.id} className="p-3 rounded-lg border border-border/60">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium text-foreground truncate">{goal.title}</p>
-                      <Badge className={`text-[10px] font-medium shrink-0 ml-2 ${tracking.badge}`}>
-                        {tracking.label}
-                      </Badge>
-                    </div>
-                    {goal.description && (
-                      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                        {goal.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            goal.tracking_status === "on_track" || goal.tracking_status === "achieved"
-                              ? "bg-emerald-500"
-                              : goal.tracking_status === "at_risk"
-                                ? "bg-amber-500"
-                                : "bg-red-500"
-                          }`}
-                          style={{ width: `${Math.min(goal.progress || 0, 100)}%` }}
-                        />
+                  <div key={goal.id} className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+                    <GoalRing progress={goal.progress || 0} trackingStatus={goal.tracking_status} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <p className="text-sm font-medium text-foreground truncate">{goal.title}</p>
+                        <Badge className={`text-[10px] font-medium shrink-0 ml-2 ${tracking.badge}`}>
+                          {tracking.label}
+                        </Badge>
                       </div>
-                      <span className="text-xs font-medium text-muted-foreground shrink-0">
-                        {goal.progress || 0}%
-                      </span>
-                      {goal.metric_target && goal.metric_unit && (
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {goal.metric_current ?? goal.metric_start ?? 0} / {goal.metric_target}{" "}
-                          {goal.metric_unit}
-                        </span>
+                      {goal.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1">{goal.description}</p>
                       )}
-                      {goal.due_date && (
-                        <span className="text-[11px] text-muted-foreground shrink-0">
-                          Due {format(new Date(goal.due_date), "MMM d")}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="text-xs text-muted-foreground">{goal.progress || 0}%</span>
+                        {goal.metric_target && goal.metric_unit && (
+                          <span className="text-xs text-muted-foreground">
+                            {goal.metric_current ?? goal.metric_start ?? 0} / {goal.metric_target} {goal.metric_unit}
+                          </span>
+                        )}
+                        {goal.due_date && (
+                          <span className="text-[11px] text-muted-foreground">
+                            Due {format(new Date(goal.due_date), "MMM d")}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
