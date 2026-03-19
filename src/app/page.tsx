@@ -743,75 +743,41 @@ export default function Home() {
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
               Pricing
             </span>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Simple, transparent pricing</h2>
-            <p className="mt-3 text-muted-foreground text-[15px]">Start free. Upgrade when your team is ready.</p>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">One plan. Everything included.</h2>
+            <p className="mt-3 text-muted-foreground text-[15px]">Try it free for 7 days — no credit card required.</p>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Free tier */}
-            <ScrollReveal delay={0}>
-              <div className="flex flex-col h-full p-7 rounded-2xl border-2 border-border bg-white">
-                <p className="text-sm font-semibold text-foreground mb-1">Free</p>
-                <p className="text-4xl font-black text-foreground mb-1">$0</p>
-                <p className="text-[12px] text-muted-foreground mb-5">Forever, no credit card</p>
-                <ul className="space-y-2.5 flex-1">
-                  {[
-                    "Up to 10 team members",
-                    "Slack /feedback command",
-                    "Goals tracking",
-                    "Basic analytics",
-                    "1 active review cycle",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
-                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button variant="outline" className="mt-6 w-full" asChild>
-                  <a href={addToSlackUrl}>
-                    <Slack className="h-4 w-4 mr-2" />
-                    Get started free
-                  </a>
-                </Button>
-              </div>
-            </ScrollReveal>
-
-            {/* Pro tier */}
-            <ScrollReveal delay={100}>
-              <div className="flex flex-col h-full p-7 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] relative">
-                <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-wider">
-                  Popular
-                </div>
-                <p className="text-sm font-semibold text-foreground mb-1">Pro</p>
-                <p className="text-4xl font-black text-foreground mb-1">$8<span className="text-base font-normal text-muted-foreground">/user/mo</span></p>
-                <p className="text-[12px] text-muted-foreground mb-5">Billed monthly or annually</p>
-                <ul className="space-y-2.5 flex-1">
-                  {[
-                    "Unlimited team members",
-                    "360° review cycles with calibration",
-                    "Competency frameworks + level matrix",
-                    "9-box calibration grid",
-                    "Competency heatmap by role/dept/level",
-                    "Performance ranking + tier badges",
-                    "Cross-cycle trend analytics",
-                    "Upward feedback",
-                  ].map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
-                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button className="mt-6 w-full" asChild>
-                  <a href={addToSlackUrl}>
-                    <Slack className="h-4 w-4 mr-2" />
-                    Start with Pro
-                  </a>
-                </Button>
-              </div>
-            </ScrollReveal>
-          </div>
+          <ScrollReveal>
+            <div className="flex flex-col items-center max-w-md mx-auto p-8 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] relative">
+              <p className="text-sm font-semibold text-foreground mb-1">Everything, for everyone</p>
+              <p className="text-6xl font-black text-foreground mt-3 mb-1">$1<span className="text-xl font-normal text-muted-foreground">/user/mo</span></p>
+              <p className="text-[12px] text-muted-foreground mb-2">7-day free trial · No credit card · Cancel anytime</p>
+              <ul className="mt-6 space-y-2.5 w-full">
+                {[
+                  "Unlimited review cycles with calibration",
+                  "360° reviews via Slack DMs",
+                  "Goals & OKR tracking",
+                  "Competency frameworks + level matrix",
+                  "9-box calibration grid",
+                  "Competency heatmap by role/dept/level",
+                  "Performance ranking + tier badges",
+                  "Cross-cycle trend analytics",
+                  "Upward feedback",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
+                    <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Button className="mt-8 w-full" asChild>
+                <a href={addToSlackUrl}>
+                  <Slack className="h-4 w-4 mr-2" />
+                  Start your free trial
+                </a>
+              </Button>
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
