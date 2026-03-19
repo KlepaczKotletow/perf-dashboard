@@ -336,6 +336,163 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Feature Spotlight 2: Goals ── */}
+      <section id="goals" className="bg-gradient-to-br from-[#f5f2ff] via-[#f8f5ff] to-[#f3f1ff] py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: Goals mockup — desktop only */}
+            <ScrollReveal scale>
+              <div className="relative hidden lg:block">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
+                  {/* Header */}
+                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Goals</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Q1 2025 · 4 active goals</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                      3 on track
+                    </div>
+                  </div>
+
+                  {/* Goal rows */}
+                  <div className="divide-y divide-border/50">
+                    {[
+                      {
+                        title: "Achieve 90%+ review completion org-wide",
+                        progress: 100,
+                        statusLabel: "Achieved",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Launch competency framework for all IC levels",
+                        progress: 75,
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Reduce time-to-hire for Engineering by 20%",
+                        progress: 38,
+                        statusLabel: "At Risk",
+                        statusColor: "text-amber-700 bg-amber-50",
+                        ringColor: "#f59e0b",
+                      },
+                      {
+                        title: "Complete 360 reviews for all senior ICs",
+                        progress: 88,
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                    ].map((goal) => {
+                      const circumference = 2 * Math.PI * 14;
+                      const dash = (goal.progress / 100) * circumference;
+                      return (
+                        <div key={goal.title} className="px-5 py-4 flex items-center gap-4">
+                          {/* SVG ring indicator */}
+                          <div className="relative h-11 w-11 shrink-0">
+                            <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke="currentColor"
+                                className="text-muted/50"
+                                strokeWidth="3.5"
+                              />
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke={goal.ringColor}
+                                strokeWidth="3.5"
+                                strokeDasharray={`${dash} ${circumference}`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
+                              {goal.progress}%
+                            </span>
+                          </div>
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">{goal.title}</p>
+                            <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${goal.statusColor}`}>
+                              {goal.statusLabel}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 border-t border-border/60 bg-muted/20 flex items-center justify-between">
+                    <p className="text-[11px] text-muted-foreground">Goal progress syncs with review data</p>
+                    <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
+                      View all <ChevronRight className="h-3 w-3" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Goals & OKRs
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Goals your whole team can see — tracked in real time
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  When goals live separately from reviews, ratings feel arbitrary. Perf ties them together so every performance conversation is grounded in actual work.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Flag,
+                      title: "OKR-style goals, individually owned",
+                      body: "Create goals for individuals or teams. Each has an owner, a due date, and a live tracking status: On Track, At Risk, Delayed, or Achieved. Everyone can see where things stand.",
+                    },
+                    {
+                      icon: Users,
+                      title: "Managers have context in every 1:1",
+                      body: "When your manager opens your profile, your goal progress is right there. No more 'what were you working on this quarter?' at review time — the history is already in Perf.",
+                    },
+                    {
+                      icon: TrendingUp,
+                      title: "Goals roll up into Analytics",
+                      body: "The Analytics dashboard shows what percentage of the org is on track at any moment. Spot patterns before they become problems — which teams are slipping, which are flying.",
+                    },
+                    {
+                      icon: BarChart3,
+                      title: "Goal progress informs performance ratings",
+                      body: "When a review cycle opens, historical goal data is right there. Ratings reflect real work and real outcomes — not just how much the reviewer likes the person.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+
       {/* How it Works — light */}
       <section id="how-it-works" className="max-w-5xl mx-auto px-6 py-28">
         <ScrollReveal className="text-center mb-14">
