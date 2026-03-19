@@ -50,7 +50,7 @@ export default function Home() {
     <div className="min-h-screen bg-background">
 
       {/* Header — dark, with anchor nav */}
-      <header className="border-b border-white/[0.08] backdrop-blur-md bg-[oklch(0.11_0.014_30)]/92 sticky top-0 z-50">
+      <header className="border-b border-white/[0.08] backdrop-blur-md bg-[#0D0425]/92 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
@@ -88,7 +88,7 @@ export default function Home() {
       </header>
 
       {/* Hero — dark, two-column */}
-      <section className="bg-[oklch(0.11_0.014_30)] px-6">
+      <section className="bg-[#0D0425] px-6">
         <div className="max-w-5xl mx-auto">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-end">
 
@@ -143,7 +143,7 @@ export default function Home() {
               <div className="absolute -inset-6 bg-primary/[0.08] blur-3xl rounded-full -z-10 pointer-events-none" />
 
               <div className="rounded-t-2xl border border-white/[0.10] border-b-0 overflow-hidden shadow-2xl shadow-black/50">
-                <div className="bg-[oklch(0.17_0.016_30)] border-b border-white/[0.08] px-4 py-3 flex items-center gap-3">
+                <div className="bg-[#18093c] border-b border-white/[0.08] px-4 py-3 flex items-center gap-3">
                   <div className="flex gap-1.5">
                     <div className="h-3 w-3 rounded-full bg-white/20" />
                     <div className="h-3 w-3 rounded-full bg-white/15" />
@@ -301,7 +301,7 @@ export default function Home() {
       </section>
 
       {/* Slack mockup — show what Perf looks like inside Slack */}
-      <section className="bg-[oklch(0.13_0.014_30)] py-28">
+      <section className="bg-[#0f0530] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="text-center mb-14">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
@@ -319,7 +319,7 @@ export default function Home() {
             {/* Slack-style mockup */}
             <div className="rounded-2xl border border-white/[0.10] bg-white overflow-hidden shadow-2xl shadow-black/30">
               {/* Slack header bar */}
-              <div className="bg-[oklch(0.25_0.02_280)] px-5 py-3 flex items-center gap-3">
+              <div className="bg-[#1e1050] px-5 py-3 flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
                     <span className="text-white text-[8px] font-bold">P</span>
@@ -577,7 +577,7 @@ export default function Home() {
       </section>
 
       {/* Features — dark section */}
-      <section id="features" className="bg-[oklch(0.13_0.014_30)] py-28">
+      <section id="features" className="bg-[#0f0530] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-12">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
@@ -591,7 +591,7 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 gap-px bg-white/[0.06] rounded-2xl overflow-hidden mb-px">
             {heroFeatures.map((f) => (
               <ScrollReveal key={f.title}>
-                <div className="bg-[oklch(0.13_0.014_30)] p-10">
+                <div className="bg-[#0f0530] p-10">
                   <f.icon className="h-6 w-6 text-primary mb-6" />
                   <h3 className="text-2xl font-bold text-white mb-3">{f.title}</h3>
                   <p className="text-white/55 leading-relaxed">{f.description}</p>
@@ -603,7 +603,7 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.06] rounded-b-2xl overflow-hidden">
             {gridFeatures.map((f, i) => (
               <ScrollReveal key={f.title} delay={i * 60}>
-                <div className="bg-[oklch(0.13_0.014_30)] p-7">
+                <div className="bg-[#0f0530] p-7">
                   <f.icon className="h-5 w-5 text-primary/70 mb-4" />
                   <h3 className="text-base font-semibold text-white mb-2">{f.title}</h3>
                   <p className="text-sm text-white/45 leading-relaxed">{f.description}</p>
@@ -615,7 +615,7 @@ export default function Home() {
       </section>
 
       {/* Testimonials — dark */}
-      <section className="bg-[oklch(0.11_0.014_30)] py-28">
+      <section className="bg-[#0D0425] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-14">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
@@ -673,7 +673,7 @@ export default function Home() {
       </section>
 
       {/* Stats strip — meaningful metrics */}
-      <section className="bg-[oklch(0.16_0.016_30)] py-20">
+      <section className="bg-[#160838] py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid sm:grid-cols-3 gap-10 text-center">
             {[
@@ -766,7 +766,7 @@ export default function Home() {
       </section>
 
       {/* CTA — dark, bold */}
-      <section className="bg-[oklch(0.11_0.014_30)] py-28">
+      <section className="bg-[#0D0425] py-28">
         <div className="max-w-5xl mx-auto px-6 text-center">
           <ScrollReveal>
             <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight max-w-2xl mx-auto leading-[1.1]">
@@ -790,7 +790,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[oklch(0.11_0.014_30)] border-t border-white/[0.06]">
+      <footer className="bg-[#0D0425] border-t border-white/[0.06]">
         <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5 text-sm text-white/50">
