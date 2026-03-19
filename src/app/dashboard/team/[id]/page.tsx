@@ -44,6 +44,7 @@ function gradeColor(grade: string | null | undefined): string {
 function getQuarterLabel(dateStr: string | null | undefined): string {
   if (!dateStr) return "—";
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return "—";
   const q = Math.ceil((date.getMonth() + 1) / 3);
   return `Q${q} '${String(date.getFullYear()).slice(2)}`;
 }
@@ -55,15 +56,15 @@ function RatingRing({ rating, size = 80, strokeWidth = 8 }: {
 }) {
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
-  const offset = rating ? circumference - (rating / 5) * circumference : circumference;
+  const offset = rating !== null ? circumference - (rating / 5) * circumference : circumference;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle
         cx={size / 2} cy={size / 2} r={r}
         fill="none" strokeWidth={strokeWidth}
         className="stroke-muted"
       />
-      {rating && (
+      {rating !== null && (
         <circle
           cx={size / 2} cy={size / 2} r={r}
           fill="none" strokeWidth={strokeWidth}
@@ -78,12 +79,12 @@ function RatingRing({ rating, size = 80, strokeWidth = 8 }: {
   );
 }
 
-function GoalRing({ progress, trackingStatus }: {
+function GoalRing({ progress, trackingStatus, size = 32, strokeWidth = 4 }: {
   progress: number;
   trackingStatus: string;
+  size?: number;
+  strokeWidth?: number;
 }) {
-  const size = 32;
-  const strokeWidth = 4;
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
   const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
@@ -92,9 +93,11 @@ function GoalRing({ progress, trackingStatus }: {
       ? "stroke-emerald-500"
       : trackingStatus === "at_risk"
         ? "stroke-amber-500"
-        : "stroke-red-500";
+        : trackingStatus === "behind" || trackingStatus === "delayed"
+          ? "stroke-red-500"
+          : "stroke-muted-foreground/40";
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden="true">
       <circle
         cx={size / 2} cy={size / 2} r={r}
         fill="none" strokeWidth={strokeWidth}
@@ -260,7 +263,7 @@ export default async function EmployeeProfilePage({
       {/* ── 1. Header ──────────────────────────────────────────────────── */}
       <div className="rounded-xl bg-primary/[0.04] p-6">
         <div className="flex items-start gap-5">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild>
+          <Button variant="ghost" size="icon" className="shrink-0 mt-1" asChild>
             <Link href="/dashboard/team">
               <ArrowLeft className="h-4 w-4" />
             </Link>
