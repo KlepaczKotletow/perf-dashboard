@@ -194,158 +194,145 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Problem section — why reviews are broken */}
-      <section className="bg-background py-24">
+      {/* ── Feature Spotlight 1: Reviews ── */}
+      <section id="features" className="bg-white py-28">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-16">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              Performance reviews are broken
-            </h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
-              Most teams know reviews matter. But the tools make them painful enough that people just... don&apos;t do them.
-            </p>
-          </ScrollReveal>
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
 
-          <div className="grid sm:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Flag,
-                problem: "Low completion",
-                detail: "Reviews live in tools nobody opens. Completion rates hover around 40% — and the responses you do get are rushed.",
-              },
-              {
-                icon: CalendarClock,
-                problem: "Weeks of busywork",
-                detail: "Managers chase responses in DMs, build spreadsheets by hand, and spend hours in calibration meetings with stale data.",
-              },
-              {
-                icon: Target,
-                problem: "No context",
-                detail: "By the time the review cycle starts, the actual work is months old. Feedback is generic because nobody remembers the details.",
-              },
-            ].map((item, i) => (
-              <ScrollReveal key={item.problem} delay={i * 80}>
-                <div className="p-6 rounded-2xl border border-border bg-card">
-                  <div className="h-10 w-10 rounded-xl bg-destructive/10 flex items-center justify-center mb-4">
-                    <item.icon className="h-5 w-5 text-destructive" />
+            {/* Left: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  360° Reviews
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Reviews that actually get completed — because they live in Slack
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  Most teams struggle with 40–60% review completion. Perf fixes this by meeting people where they already work.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: MessageSquare,
+                      title: "Slack DMs, not another form",
+                      body: "Perf sends review requests as Slack DMs. Your team responds in the thread — no new tab, no new login, no context switch. Completion rates climb from ~40% to 95%+.",
+                    },
+                    {
+                      icon: Users,
+                      title: "Every angle covered: self, manager, peer, upward",
+                      body: "One cycle covers all reviewer types. Perf auto-assigns based on reporting lines, sends reminders, and tracks who's outstanding — without you chasing anyone.",
+                    },
+                    {
+                      icon: Star,
+                      title: "Calibration built in, not bolted on",
+                      body: "After collection, HR uses the 9-box calibration grid to align grades across managers before releasing results. No more calibration spreadsheets.",
+                    },
+                    {
+                      icon: Shield,
+                      title: "Grade-gated results",
+                      body: "Employees only see their results after HR releases grades. You control the timing — not Slack, not the reviewer.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: Slack DM mockup */}
+            <ScrollReveal scale>
+              <div className="relative">
+                <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
+                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  {/* Slack header */}
+                  <div className="bg-[#3d1f7d] px-5 py-3 flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
+                        <span className="text-white text-[8px] font-bold">P</span>
+                      </div>
+                      <span className="text-white text-sm font-semibold">Perf</span>
+                    </div>
+                    <span className="text-white/40 text-xs">app</span>
                   </div>
-                  <h3 className="font-semibold text-foreground mb-2">{item.problem}</h3>
-                  <p className="text-[13px] leading-relaxed text-muted-foreground">{item.detail}</p>
+
+                  {/* Conversation */}
+                  <div className="p-5 space-y-5 bg-white">
+                    {/* Bot → review request */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">P</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Perf</span>
+                          <span className="text-[11px] text-muted-foreground">10:32 AM</span>
+                        </div>
+                        <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
+                          <p className="text-sm text-foreground leading-relaxed">
+                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
+                          </p>
+                          <div className="mt-3 p-3 rounded-lg bg-background border border-border/60">
+                            <p className="text-xs text-muted-foreground mb-1">Competency: <span className="font-medium text-foreground">Collaboration</span></p>
+                            <p className="text-xs text-muted-foreground">Rating: 1 (Needs improvement) → 5 (Exceptional)</p>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <div className="px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium">Open review form</div>
+                            <div className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium">Remind me later</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* User reply */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+                        <span className="text-chart-2 text-xs font-bold">S</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Sarah Chen</span>
+                          <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          4 — Alex has been great at cross-team coordination this quarter, especially on the platform migration.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bot confirmation */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">P</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Perf</span>
+                          <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          Got it! Collaboration rated <span className="font-semibold text-primary">4/5</span> for Alex Johnson. You have <span className="font-semibold">2 more competencies</span> to rate.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </ScrollReveal>
-            ))}
+                <p className="text-center mt-5 text-sm text-muted-foreground/70">
+                  Reviews take less than 2 minutes per person — right inside Slack.
+                </p>
+              </div>
+            </ScrollReveal>
+
           </div>
-
-          <ScrollReveal className="text-center mt-14">
-            <p className="text-lg font-semibold text-foreground">
-              Perf fixes this by meeting your team where they already work — <span className="text-primary">Slack</span>.
-            </p>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* Slack mockup — light lavender section */}
-      <section className="bg-gradient-to-br from-[#f5f2ff] via-[#f8f5ff] to-[#f3f1ff] py-28">
-        <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
-              Works inside Slack
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
-              Reviews happen in DMs, not another app
-            </h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
-              Perf sends review requests as Slack DMs. Your team responds right there — no new logins, no new tabs, no friction.
-            </p>
-          </ScrollReveal>
-
-          <ScrollReveal className="max-w-2xl mx-auto">
-            {/* Slack-style mockup */}
-            <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
-              {/* Slack header bar */}
-              <div className="bg-[#3d1f7d] px-5 py-3 flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
-                    <span className="text-white text-[8px] font-bold">P</span>
-                  </div>
-                  <span className="text-white text-sm font-semibold">Perf</span>
-                </div>
-                <span className="text-white/40 text-xs">app</span>
-              </div>
-
-              {/* Conversation area */}
-              <div className="p-5 space-y-5 bg-white">
-                {/* Bot message — review request */}
-                <div className="flex gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-white text-xs font-bold">P</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-sm font-bold text-foreground">Perf</span>
-                      <span className="text-[11px] text-muted-foreground">10:32 AM</span>
-                    </div>
-                    <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
-                      <p className="text-sm text-foreground leading-relaxed">
-                        Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
-                      </p>
-                      <div className="mt-3 p-3 rounded-lg bg-background border border-border/60">
-                        <p className="text-xs text-muted-foreground mb-1">Competency: <span className="font-medium text-foreground">Collaboration</span></p>
-                        <p className="text-xs text-muted-foreground">Rating: 1 (Needs improvement) → 5 (Exceptional)</p>
-                      </div>
-                      <p className="text-sm text-foreground mt-3 leading-relaxed">
-                        Reply with a rating (1-5) and a brief comment, or click below to open the full review form.
-                      </p>
-                      <div className="flex gap-2 mt-3">
-                        <div className="px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium">
-                          Open review form
-                        </div>
-                        <div className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium">
-                          Remind me later
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* User reply */}
-                <div className="flex gap-3">
-                  <div className="h-9 w-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
-                    <span className="text-chart-2 text-xs font-bold">S</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-sm font-bold text-foreground">Sarah Chen</span>
-                      <span className="text-[11px] text-muted-foreground">10:34 AM</span>
-                    </div>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      4 — Alex has been great at cross-team coordination this quarter, especially on the platform migration. He proactively looped in the right stakeholders.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Bot confirmation */}
-                <div className="flex gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                    <span className="text-white text-xs font-bold">P</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-sm font-bold text-foreground">Perf</span>
-                      <span className="text-[11px] text-muted-foreground">10:34 AM</span>
-                    </div>
-                    <p className="text-sm text-foreground leading-relaxed">
-                      Got it! Collaboration rated <span className="font-semibold text-primary">4/5</span> for Alex Johnson. You have <span className="font-semibold">2 more competencies</span> to rate. Want to continue?
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-center mt-6 text-sm text-muted-foreground/70">
-              Reviews take less than 2 minutes per person — right inside Slack.
-            </p>
-          </ScrollReveal>
         </div>
       </section>
 
@@ -521,7 +508,7 @@ export default function Home() {
       </section>
 
       {/* Features — light with white cards */}
-      <section id="features" className="bg-white py-28">
+      <section className="bg-white py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-12">
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
