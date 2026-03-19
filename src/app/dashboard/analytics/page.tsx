@@ -364,24 +364,31 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim): Promise<H
   // 1. Fetch users with dimension fields
   const { data: usersRaw } = await supabase
     .from("users")
-    .select("id, role, department, hire_date, level:levels!users_level_id_fkey(name)");
+    .select("id, role, department, hire_date, level:levels!users_level_id_fkey(name, job_family_id)");
 
   const userMap = new Map(
-    (usersRaw || []).map((u: any) => {
-      let groupValue: string;
-      if (dim === "role") groupValue = u.role || "Unknown";
-      else if (dim === "department") groupValue = u.department || "Unknown";
-      else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
-      else groupValue = getTenureBucket(u.hire_date);
-      return [u.id as string, groupValue];
-    })
+    (usersRaw || [])
+      .filter((u: any) => {
+        if (filters.department && u.department !== filters.department) return false;
+        if (filters.functionId && (u.level as any)?.job_family_id !== filters.functionId) return false;
+        return true;
+      })
+      .map((u: any) => {
+        let groupValue: string;
+        if (dim === "role") groupValue = u.role || "Unknown";
+        else if (dim === "department") groupValue = u.department || "Unknown";
+        else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
+        else groupValue = getTenureBucket(u.hire_date);
+        return [u.id as string, groupValue];
+      })
   );
 
   // 2. Fetch responses with competency name and assignment employee_id
   const { data: responsesRaw } = await supabase
     .from("review_responses")
     .select("rating, competency:competencies(name), assignment:review_assignments!inner(employee_id, cycle_id)")
-    .not("rating", "is", null);
+    .not("rating", "is", null)
+    .limit(10000);
 
   const responses = (responsesRaw || []).filter((r: any) => {
     if (filters.cycleId && (r.assignment as any)?.cycle_id !== filters.cycleId) return false;
