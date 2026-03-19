@@ -27,6 +27,92 @@ const feedbackTypeBadge: Record<string, string> = {
   general: "bg-muted text-muted-foreground",
 };
 
+// ── Visual helpers ─────────────────────────────────────────────────────────
+
+function gradeColor(grade: string | null | undefined): string {
+  if (!grade) return "text-foreground";
+  const g = grade.toLowerCase();
+  if (g.includes("exceed") || g.includes("outstanding") || g.includes("exceptional"))
+    return "text-emerald-600 dark:text-emerald-400";
+  if (g.includes("performing") || g.includes("meeting") || g.includes("meets"))
+    return "text-primary";
+  if (g.includes("developing") || g.includes("below") || g.includes("needs"))
+    return "text-amber-600 dark:text-amber-400";
+  return "text-foreground";
+}
+
+function getQuarterLabel(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const date = new Date(dateStr);
+  const q = Math.ceil((date.getMonth() + 1) / 3);
+  return `Q${q} '${String(date.getFullYear()).slice(2)}`;
+}
+
+function RatingRing({ rating, size = 80, strokeWidth = 8 }: {
+  rating: number | null;
+  size?: number;
+  strokeWidth?: number;
+}) {
+  const r = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = rating ? circumference - (rating / 5) * circumference : circumference;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" strokeWidth={strokeWidth}
+        className="stroke-muted"
+      />
+      {rating && (
+        <circle
+          cx={size / 2} cy={size / 2} r={r}
+          fill="none" strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className="stroke-primary transition-all duration-500"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      )}
+    </svg>
+  );
+}
+
+function GoalRing({ progress, trackingStatus }: {
+  progress: number;
+  trackingStatus: string;
+}) {
+  const size = 32;
+  const strokeWidth = 4;
+  const r = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference - (Math.min(progress, 100) / 100) * circumference;
+  const color =
+    trackingStatus === "on_track" || trackingStatus === "achieved"
+      ? "stroke-emerald-500"
+      : trackingStatus === "at_risk"
+        ? "stroke-amber-500"
+        : "stroke-red-500";
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <circle
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" strokeWidth={strokeWidth}
+        className="stroke-muted"
+      />
+      <circle
+        cx={size / 2} cy={size / 2} r={r}
+        fill="none" strokeWidth={strokeWidth}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        className={color}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </svg>
+  );
+}
+
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
 async function getEmployeeDetails(id: string, showAllFeedback: boolean) {
