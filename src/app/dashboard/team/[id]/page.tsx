@@ -258,67 +258,62 @@ export default async function EmployeeProfilePage({
     <div className="space-y-6 max-w-5xl">
 
       {/* ── 1. Header ──────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
-        <Button variant="ghost" size="icon" className="shrink-0 mt-1" asChild>
-          <Link href="/dashboard/team">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
+      <div className="rounded-xl bg-primary/[0.04] p-6">
+        <div className="flex items-start gap-5">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
+            <Link href="/dashboard/team">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
 
-        <Avatar className="h-20 w-20 shrink-0">
-          <AvatarFallback className="text-2xl bg-primary/[0.08] text-primary font-medium">
-            {getInitials(user.slack_name)}
-          </AvatarFallback>
-        </Avatar>
+          <Avatar className="h-24 w-24 shrink-0">
+            <AvatarFallback className="text-3xl bg-primary/[0.08] text-primary font-medium">
+              {getInitials(user.slack_name)}
+            </AvatarFallback>
+          </Avatar>
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-                {user.slack_name || "Unknown"}
-              </h1>
-              {user.job_title && (
-                <p className="text-sm text-muted-foreground mt-0.5">{user.job_title}</p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
+                  {user.slack_name || "Unknown"}
+                </h1>
+                {user.job_title && (
+                  <p className="text-base text-muted-foreground mt-0.5">{user.job_title}</p>
+                )}
+                <p className="text-sm text-muted-foreground mt-2">
+                  {[user.department, levelLabel, user.role || "user"].filter(Boolean).join(" · ")}
+                </p>
+                {manager?.slack_name && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Reports to{" "}
+                    <Link
+                      href={`/dashboard/team/${manager.id}`}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      {manager.slack_name}
+                    </Link>
+                  </p>
+                )}
+                {user.slack_email && (
+                  <a
+                    href={`mailto:${user.slack_email}`}
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mt-1 w-fit"
+                  >
+                    <Mail className="h-3.5 w-3.5" />
+                    {user.slack_email}
+                  </a>
+                )}
+              </div>
+              {canEdit && (
+                <Button variant="outline" size="sm" className="text-xs shrink-0" asChild>
+                  <Link href={`/dashboard/team/${id}/edit`}>
+                    <Pencil className="h-3 w-3 mr-1.5" />
+                    Edit
+                  </Link>
+                </Button>
               )}
             </div>
-            {canEdit && (
-              <Button variant="outline" size="sm" className="text-xs shrink-0" asChild>
-                <Link href={`/dashboard/team/${id}/edit`}>
-                  <Pencil className="h-3 w-3 mr-1.5" />
-                  Edit
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 mt-3">
-            <Badge variant="outline" className="text-[11px]">{user.role || "user"}</Badge>
-            {user.department && (
-              <Badge variant="secondary" className="text-[11px]">{user.department}</Badge>
-            )}
-            {levelLabel && (
-              <Badge variant="secondary" className="text-[11px]">{levelLabel}</Badge>
-            )}
-            {user.slack_email && (
-              <a
-                href={`mailto:${user.slack_email}`}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <Mail className="h-3 w-3" />
-                {user.slack_email}
-              </a>
-            )}
-            {manager?.slack_name && (
-              <span className="text-xs text-muted-foreground">
-                Reports to{" "}
-                <Link
-                  href={`/dashboard/team/${manager.id}`}
-                  className="text-primary hover:underline"
-                >
-                  {manager.slack_name}
-                </Link>
-              </span>
-            )}
           </div>
         </div>
       </div>
