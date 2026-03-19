@@ -49,31 +49,31 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
 
-      {/* Header — dark, with anchor nav */}
-      <header className="border-b border-white/[0.08] backdrop-blur-md bg-[#0D0425]/92 sticky top-0 z-50">
+      {/* Header — light, translucent */}
+      <header className="border-b border-border/60 backdrop-blur-md bg-white/80 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-white text-xs font-bold">P</span>
             </div>
-            <span className="font-semibold tracking-tight text-white">Perf</span>
+            <span className="font-semibold tracking-tight text-foreground">Perf</span>
           </Link>
           <div className="flex items-center gap-3">
             <a
               href="#features"
-              className="hidden sm:inline text-sm text-white/55 hover:text-white transition-colors"
+              className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Features
             </a>
             <Link
               href="#pricing"
-              className="hidden sm:inline text-sm text-white/55 hover:text-white transition-colors"
+              className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Pricing
             </Link>
             <a
               href={signInWithSlackUrl}
-              className="text-sm text-white/55 hover:text-white transition-colors"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Sign in
             </a>
@@ -87,30 +87,33 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero — dark, two-column */}
-      <section className="bg-[#0D0425] px-6">
-        <div className="max-w-5xl mx-auto">
+      {/* Hero — gradient, light, friendly */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#eeeeff] via-[#f2e8ff] to-[#fce8ff] px-6">
+        {/* Decorative gradient blobs */}
+        <div className="absolute top-[-80px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br from-primary/25 to-secondary/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-60px] left-[-80px] w-[350px] h-[350px] bg-gradient-to-tr from-secondary/20 to-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto relative">
           <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-end">
 
             {/* Left: text content */}
             <div className="py-20 lg:py-24">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/15 bg-white/[0.06] text-xs text-white/65 mb-8">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/[0.07] text-xs text-primary/80 mb-8">
                 <Slack className="h-3.5 w-3.5 text-primary" />
                 Built for Slack-first teams
               </div>
 
-              {/* Clear product description */}
               <p className="text-sm font-medium text-primary tracking-wide mb-4">
                 Performance management that lives in Slack
               </p>
 
-              <h1 className="text-5xl sm:text-[60px] lg:text-[64px] font-bold tracking-tight text-white leading-[1.05]">
+              <h1 className="text-5xl sm:text-[60px] lg:text-[64px] font-bold tracking-tight text-foreground leading-[1.05]">
                 Reviews{" "}
                 <span className="text-primary">people</span>
                 <br />actually complete
               </h1>
 
-              <p className="mt-6 text-lg text-white/55 leading-relaxed max-w-[440px]">
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-[440px]">
                 Perf is a Slack-native platform for 360 reviews, continuous feedback,
                 and competency tracking. Your team fills in reviews right from Slack DMs —
                 you get a real-time dashboard with analytics and calibration.
@@ -126,30 +129,30 @@ export default function Home() {
                 <Button
                   size="lg"
                   variant="ghost"
-                  className="h-12 px-7 text-sm text-white/65 hover:text-white hover:bg-white/[0.08] border border-white/15"
+                  className="h-12 px-7 text-sm text-foreground/65 hover:text-foreground hover:bg-foreground/[0.06] border border-foreground/15"
                   asChild
                 >
                   <a href={signInWithSlackUrl}>Sign in with Slack</a>
                 </Button>
               </div>
 
-              <p className="mt-8 text-xs text-white/30 tracking-wide">
+              <p className="mt-8 text-xs text-muted-foreground/60 tracking-wide">
                 Free for up to 10 people · No credit card · Installs in 60 seconds
               </p>
             </div>
 
             {/* Right: mockup — desktop only */}
             <div className="hidden lg:block relative pt-10">
-              <div className="absolute -inset-6 bg-primary/[0.08] blur-3xl rounded-full -z-10 pointer-events-none" />
+              <div className="absolute -inset-6 bg-primary/[0.10] blur-3xl rounded-full -z-10 pointer-events-none" />
 
-              <div className="rounded-t-2xl border border-white/[0.10] border-b-0 overflow-hidden shadow-2xl shadow-black/50">
-                <div className="bg-[#18093c] border-b border-white/[0.08] px-4 py-3 flex items-center gap-3">
+              <div className="rounded-t-2xl border border-border/60 border-b-0 overflow-hidden shadow-2xl shadow-primary/10">
+                <div className="bg-muted/80 border-b border-border/60 px-4 py-3 flex items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-white/20" />
-                    <div className="h-3 w-3 rounded-full bg-white/15" />
-                    <div className="h-3 w-3 rounded-full bg-white/15" />
+                    <div className="h-3 w-3 rounded-full bg-foreground/20" />
+                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
+                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
                   </div>
-                  <div className="flex-1 bg-white/[0.06] rounded-md px-3 py-1 text-[11px] text-white/40 font-mono">
+                  <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
                     app.perf.team/dashboard/cycles
                   </div>
                 </div>
@@ -300,26 +303,26 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Slack mockup — show what Perf looks like inside Slack */}
-      <section className="bg-[#0f0530] py-28">
+      {/* Slack mockup — light lavender section */}
+      <section className="bg-gradient-to-br from-[#f0eaff] via-[#ede8ff] to-[#e8e4ff] py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="text-center mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
               Works inside Slack
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
               Reviews happen in DMs, not another app
             </h2>
-            <p className="mt-3 text-white/50 max-w-lg mx-auto text-[15px]">
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
               Perf sends review requests as Slack DMs. Your team responds right there — no new logins, no new tabs, no friction.
             </p>
           </ScrollReveal>
 
           <ScrollReveal className="max-w-2xl mx-auto">
             {/* Slack-style mockup */}
-            <div className="rounded-2xl border border-white/[0.10] bg-white overflow-hidden shadow-2xl shadow-black/30">
+            <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
               {/* Slack header bar */}
-              <div className="bg-[#1e1050] px-5 py-3 flex items-center gap-3">
+              <div className="bg-[#3d1f7d] px-5 py-3 flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
                     <span className="text-white text-[8px] font-bold">P</span>
@@ -398,7 +401,7 @@ export default function Home() {
               </div>
             </div>
 
-            <p className="text-center mt-6 text-sm text-white/40">
+            <p className="text-center mt-6 text-sm text-muted-foreground/70">
               Reviews take less than 2 minutes per person — right inside Slack.
             </p>
           </ScrollReveal>
@@ -576,37 +579,37 @@ export default function Home() {
         </ScrollReveal>
       </section>
 
-      {/* Features — dark section */}
-      <section id="features" className="bg-[#0f0530] py-28">
+      {/* Features — light with white cards */}
+      <section id="features" className="bg-white py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-12">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
               Everything you need
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
               Built for how teams actually work
             </h2>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-2 gap-px bg-white/[0.06] rounded-2xl overflow-hidden mb-px">
+          <div className="grid sm:grid-cols-2 gap-px bg-border rounded-2xl overflow-hidden mb-px">
             {heroFeatures.map((f) => (
               <ScrollReveal key={f.title}>
-                <div className="bg-[#0f0530] p-10">
+                <div className="bg-background p-10">
                   <f.icon className="h-6 w-6 text-primary mb-6" />
-                  <h3 className="text-2xl font-bold text-white mb-3">{f.title}</h3>
-                  <p className="text-white/55 leading-relaxed">{f.description}</p>
+                  <h3 className="text-2xl font-bold text-foreground mb-3">{f.title}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{f.description}</p>
                 </div>
               </ScrollReveal>
             ))}
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/[0.06] rounded-b-2xl overflow-hidden">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border rounded-b-2xl overflow-hidden">
             {gridFeatures.map((f, i) => (
               <ScrollReveal key={f.title} delay={i * 60}>
-                <div className="bg-[#0f0530] p-7">
+                <div className="bg-background p-7">
                   <f.icon className="h-5 w-5 text-primary/70 mb-4" />
-                  <h3 className="text-base font-semibold text-white mb-2">{f.title}</h3>
-                  <p className="text-sm text-white/45 leading-relaxed">{f.description}</p>
+                  <h3 className="text-base font-semibold text-foreground mb-2">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
                 </div>
               </ScrollReveal>
             ))}
@@ -614,14 +617,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Testimonials — dark */}
-      <section className="bg-[#0D0425] py-28">
+      {/* Testimonials — soft lavender */}
+      <section className="bg-background py-28">
         <div className="max-w-5xl mx-auto px-6">
           <ScrollReveal className="mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-white/[0.08] text-primary text-xs font-semibold mb-5">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-5">
               What teams say
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground tracking-tight">
               Teams that switched don&apos;t go back
             </h2>
           </ScrollReveal>
@@ -651,18 +654,18 @@ export default function Home() {
               },
             ].map((t, i) => (
               <ScrollReveal key={t.name} delay={i * 100}>
-                <figure className="flex flex-col h-full p-7 rounded-2xl border border-white/[0.08] bg-white/[0.04]">
+                <figure className="flex flex-col h-full p-7 rounded-2xl border border-border bg-white shadow-sm shadow-primary/5">
                   <blockquote className="flex-1">
                     <span className="block text-5xl font-serif leading-none text-primary mb-5 select-none">&ldquo;</span>
-                    <p className="text-[15px] leading-relaxed text-white/70">{t.quote}</p>
+                    <p className="text-[15px] leading-relaxed text-muted-foreground">{t.quote}</p>
                   </blockquote>
-                  <figcaption className="mt-6 flex items-center gap-3 pt-5 border-t border-white/[0.08]">
+                  <figcaption className="mt-6 flex items-center gap-3 pt-5 border-t border-border">
                     <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
                       {t.initial}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">{t.name}</p>
-                      <p className="text-xs text-white/45">{t.role} · {t.company}</p>
+                      <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role} · {t.company}</p>
                     </div>
                   </figcaption>
                 </figure>
@@ -672,8 +675,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Stats strip — meaningful metrics */}
-      <section className="bg-[#160838] py-20">
+      {/* Stats strip — vibrant purple gradient */}
+      <section className="bg-gradient-to-r from-primary via-[#8b35d6] to-secondary py-20">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid sm:grid-cols-3 gap-10 text-center">
             {[
@@ -682,8 +685,8 @@ export default function Home() {
               { metric: "1 day", label: "From install to first live review cycle" },
             ].map((stat) => (
               <div key={stat.label}>
-                <p className="text-4xl font-black text-primary">{stat.metric}</p>
-                <p className="mt-2 text-sm text-white/50 max-w-[200px] mx-auto">{stat.label}</p>
+                <p className="text-4xl font-black text-white">{stat.metric}</p>
+                <p className="mt-2 text-sm text-white/75 max-w-[200px] mx-auto">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -765,15 +768,17 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA — dark, bold */}
-      <section className="bg-[#0D0425] py-28">
-        <div className="max-w-5xl mx-auto px-6 text-center">
+      {/* CTA — light gradient, friendly */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f0e8ff] via-background to-[#e8ecff] py-28">
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-5xl mx-auto px-6 text-center relative">
           <ScrollReveal>
-            <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight max-w-2xl mx-auto leading-[1.1]">
+            <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
               Ready to make reviews{" "}
               <span className="text-primary">actually happen?</span>
             </h2>
-            <p className="mt-5 text-white/55 text-lg max-w-md mx-auto">
+            <p className="mt-5 text-muted-foreground text-lg max-w-md mx-auto">
               Add Perf to your Slack workspace in under a minute. Free forever.
             </p>
             <div className="mt-10">
@@ -784,30 +789,30 @@ export default function Home() {
                 </a>
               </Button>
             </div>
-            <p className="mt-6 text-xs text-white/30">No credit card. No setup fee. Cancel anytime.</p>
+            <p className="mt-6 text-xs text-muted-foreground/60">No credit card. No setup fee. Cancel anytime.</p>
           </ScrollReveal>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-[#0D0425] border-t border-white/[0.06]">
+      {/* Footer — light */}
+      <footer className="bg-muted/40 border-t border-border">
         <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2.5 text-sm text-white/50">
+            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
               <div className="h-6 w-6 rounded-md bg-primary flex items-center justify-center">
                 <span className="text-white text-[10px] font-bold">P</span>
               </div>
-              <span className="font-semibold text-white/70">Perf</span>
+              <span className="font-semibold text-foreground">Perf</span>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex gap-6 text-sm">
-              <Link href="/privacy" className="text-white/35 hover:text-white/70 transition-colors">
+              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">
                 Privacy
               </Link>
-              <Link href="/terms" className="text-white/35 hover:text-white/70 transition-colors">
+              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">
                 Terms
               </Link>
-              <Link href="/support" className="text-white/35 hover:text-white/70 transition-colors">
+              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">
                 Support
               </Link>
             </div>
