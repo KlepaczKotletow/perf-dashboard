@@ -493,6 +493,175 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Feature Spotlight 3: Analytics ── */}
+      <section id="analytics" className="bg-white py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Analytics
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Analytics that tell you something — not just pretty charts
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  Most HR tools give you a pie chart and call it analytics. Perf gives you actionable data sliced by role, department, level, and tenure — so you know exactly where to invest.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Grid3X3,
+                      title: "Competency Heatmap — one table, zero spreadsheets",
+                      body: "See which competencies are strong and which need development, broken down by role, department, seniority level, or tenure. Instantly spot that Directors score low on Collaboration, or that new hires are struggling with Execution.",
+                    },
+                    {
+                      icon: Star,
+                      title: "Performance Ranking with tier badges",
+                      body: "Every employee ranked by average rating with a clear tier: Exceptional, Strong, Solid, or Needs Development. Filterable by function and department. Useful for calibration, promotion decisions, and headcount planning.",
+                    },
+                    {
+                      icon: TrendingUp,
+                      title: "Cross-cycle trend analysis",
+                      body: "See whether your org's average rating and completion rate are improving cycle over cycle — not just a snapshot of today. Know if your investment in people is working.",
+                    },
+                    {
+                      icon: Target,
+                      title: "Filter by cycle, function, or department",
+                      body: "Every analytics view is filterable. Compare Engineering vs. Product. Look at just the last cycle. Drill into a specific department. The data adjusts in real time — no waiting for reports to run.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: Heatmap + Ranking mockup — desktop only */}
+            <ScrollReveal scale>
+              <div className="relative hidden lg:block space-y-4">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+                {/* Heatmap table */}
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-primary/8 bg-white">
+                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Competency Heatmap</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Avg ratings × role — Q1 2025</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { label: "≥4.5", color: "bg-emerald-100" },
+                        { label: "≥3.5", color: "bg-primary/10" },
+                        { label: "<3.5", color: "bg-amber-100" },
+                      ].map((l) => (
+                        <div key={l.label} className="flex items-center gap-1">
+                          <div className={`h-2.5 w-2.5 rounded-sm ${l.color}`} />
+                          <span className="text-[9px] text-muted-foreground">{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-border/40 bg-muted/20">
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground w-32">Competency</th>
+                          {["All", "IC", "Manager", "Director"].map((g) => (
+                            <th key={g} className="px-3 py-2 text-center font-medium text-muted-foreground min-w-[60px]">{g}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { name: "Leadership",    scores: [3.9, 3.5, 4.2, 4.8] },
+                          { name: "Execution",     scores: [4.1, 4.3, 4.0, 3.8] },
+                          { name: "Collaboration", scores: [4.4, 4.5, 4.3, 4.6] },
+                          { name: "Communication", scores: [3.6, 3.5, 3.8, 4.1] },
+                        ].map((row) => (
+                          <tr key={row.name} className="border-t border-border/40 hover:bg-muted/10 transition-colors">
+                            <td className="px-4 py-2.5 font-medium text-foreground">{row.name}</td>
+                            {row.scores.map((score, i) => (
+                              <td
+                                key={i}
+                                className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
+                                  score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
+                                  score >= 3.5 ? "bg-primary/5 text-primary" :
+                                  "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {score.toFixed(1)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {/* Overall row */}
+                        <tr className="border-t-2 border-border/60 bg-muted/30 font-semibold">
+                          <td className="px-4 py-2.5 font-semibold text-foreground">Overall</td>
+                          {[4.0, 4.0, 4.1, 4.3].map((score, i) => (
+                            <td key={i} className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
+                              score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
+                              score >= 3.5 ? "bg-primary/5 text-primary" :
+                              "bg-amber-50 text-amber-700"
+                            }`}>
+                              {score.toFixed(1)}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Performance ranking snippet */}
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/5 bg-white">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    <p className="text-[13px] font-semibold text-foreground">Performance Ranking</p>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {[
+                      { name: "Alex Johnson", fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
+                      { name: "Maria Garcia", fn: "Product",     rating: 4.2, tier: "Strong",      tierColor: "text-green-700 bg-green-50" },
+                      { name: "Chris Lee",    fn: "Design",      rating: 3.6, tier: "Solid",       tierColor: "text-sky-700 bg-sky-50" },
+                      { name: "Priya Nair",   fn: "Engineering", rating: 2.8, tier: "Needs Dev",   tierColor: "text-amber-700 bg-amber-50" },
+                    ].map((emp, i) => (
+                      <div key={emp.name} className="px-5 py-3 flex items-center gap-3">
+                        <span className="text-[10px] text-muted-foreground font-mono w-4 shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-medium text-foreground">{emp.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{emp.fn}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
+                          </div>
+                          <span className="text-[11px] font-semibold text-foreground tabular-nums">{emp.rating}</span>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${emp.tierColor}`}>{emp.tier}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+
       {/* How it Works — light */}
       <section id="how-it-works" className="max-w-5xl mx-auto px-6 py-28">
         <ScrollReveal className="text-center mb-14">
