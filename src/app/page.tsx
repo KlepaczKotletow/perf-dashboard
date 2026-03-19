@@ -1,5 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight, Check, X, Clock, FileX, Brain } from "lucide-react";
+import {
+  Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star,
+  ArrowRight, Check, Target, TrendingUp, Flag, ChevronRight,
+  Grid3X3, CalendarClock,
+} from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 
@@ -9,42 +13,6 @@ export default function Home() {
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
-
-  const heroFeatures = [
-    {
-      icon: MessageSquare,
-      title: "Anytime feedback",
-      description: "Give praise or constructive feedback with /feedback — no forms, no friction.",
-    },
-    {
-      icon: Star,
-      title: "360 reviews",
-      description: "Structured multi-rater reviews with competency ratings, built-in calibration, and deadlines.",
-    },
-  ];
-
-  const gridFeatures = [
-    {
-      icon: Users,
-      title: "Performance cycles",
-      description: "Launch org-wide review cycles with automated assignments based on reporting lines.",
-    },
-    {
-      icon: BarChart3,
-      title: "Live analytics",
-      description: "Rating distributions, department benchmarks, 9-box grids, and trend analysis in real time.",
-    },
-    {
-      icon: Shield,
-      title: "Enterprise security",
-      description: "Row-level isolation, cross-tenant validation triggers, and signed Slack payloads.",
-    },
-    {
-      icon: Zap,
-      title: "Zero context-switching",
-      description: "Start reviews in Slack, finish on the web. Or do everything in Slack — your choice.",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -268,17 +236,17 @@ export default function Home() {
           <div className="grid sm:grid-cols-3 gap-6">
             {[
               {
-                icon: FileX,
+                icon: Flag,
                 problem: "Low completion",
                 detail: "Reviews live in tools nobody opens. Completion rates hover around 40% — and the responses you do get are rushed.",
               },
               {
-                icon: Clock,
+                icon: CalendarClock,
                 problem: "Weeks of busywork",
                 detail: "Managers chase responses in DMs, build spreadsheets by hand, and spend hours in calibration meetings with stale data.",
               },
               {
-                icon: Brain,
+                icon: Target,
                 problem: "No context",
                 detail: "By the time the review cycle starts, the actual work is months old. Feedback is generic because nobody remembers the details.",
               },
@@ -592,7 +560,18 @@ export default function Home() {
           </ScrollReveal>
 
           <div className="grid sm:grid-cols-2 gap-px bg-border rounded-2xl overflow-hidden mb-px">
-            {heroFeatures.map((f) => (
+            {[
+              {
+                icon: MessageSquare,
+                title: "Anytime feedback",
+                description: "Give praise or constructive feedback with /feedback — no forms, no friction.",
+              },
+              {
+                icon: Star,
+                title: "360 reviews",
+                description: "Structured multi-rater reviews with competency ratings, built-in calibration, and deadlines.",
+              },
+            ].map((f) => (
               <ScrollReveal key={f.title}>
                 <div className="bg-background p-10">
                   <f.icon className="h-6 w-6 text-primary mb-6" />
@@ -604,7 +583,28 @@ export default function Home() {
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border rounded-b-2xl overflow-hidden">
-            {gridFeatures.map((f, i) => (
+            {[
+              {
+                icon: Users,
+                title: "Performance cycles",
+                description: "Launch org-wide review cycles with automated assignments based on reporting lines.",
+              },
+              {
+                icon: BarChart3,
+                title: "Live analytics",
+                description: "Rating distributions, department benchmarks, 9-box grids, and trend analysis in real time.",
+              },
+              {
+                icon: Shield,
+                title: "Enterprise security",
+                description: "Row-level isolation, cross-tenant validation triggers, and signed Slack payloads.",
+              },
+              {
+                icon: Zap,
+                title: "Zero context-switching",
+                description: "Start reviews in Slack, finish on the web. Or do everything in Slack — your choice.",
+              },
+            ].map((f, i) => (
               <ScrollReveal key={f.title} delay={i * 60}>
                 <div className="bg-background p-7">
                   <f.icon className="h-5 w-5 text-primary/70 mb-4" />
