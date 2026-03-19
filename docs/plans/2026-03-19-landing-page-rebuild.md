@@ -1,0 +1,1050 @@
+# Landing Page Rebuild Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Rewrite `src/app/page.tsx` to position Perf as a full-stack performance platform (reviews + goals + analytics), with three alternating feature spotlights — each with a detailed JSX UI mockup — replacing the current "Slack completion rates" framing.
+
+**Architecture:** Single-file rewrite of `src/app/page.tsx`. All mockups are pure JSX/Tailwind (no images, no new packages). CSS variables and ScrollReveal component are unchanged. The page sections are: Header → Hero (analytics mockup) → Spotlight 1 Reviews (Slack DM mockup) → Spotlight 2 Goals (goal rings mockup) → Spotlight 3 Analytics (heatmap + ranking mockup) → How it works → Stats strip → Pricing → CTA → Footer.
+
+**Tech Stack:** Next.js 15, Tailwind CSS v4, shadcn/ui (Button), lucide-react icons, ScrollReveal component at `@/components/landing/scroll-reveal`
+
+---
+
+### Task 1: Update imports, constants, and feature data arrays
+
+**Files:**
+- Modify: `src/app/pages.tsx` (top of file, lines 1–48)
+
+**Context:** The current file imports `{ Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star, ArrowRight, Check, X, Clock, FileX, Brain }`. We need to add `Target, TrendingUp, Flag, ChevronRight, Grid3X3, Trophy` and remove `FileX, Brain, X, Clock`. The heroFeatures and gridFeatures arrays are replaced with new spotlightFeatures data.
+
+**Step 1: Replace the top of the file (imports + URL vars + feature data)**
+
+Replace everything from line 1 to the `return (` statement with:
+
+```tsx
+import { Button } from "@/components/ui/button";
+import {
+  Slack, Zap, Shield, BarChart3, MessageSquare, Users, Star,
+  ArrowRight, Check, Target, TrendingUp, Flag, ChevronRight,
+  Grid3X3, CalendarClock,
+} from "lucide-react";
+import Link from "next/link";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
+
+export default function Home() {
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://zhfvxfvmdlpdfgxrwtdn.supabase.co").replace(/\/+$/, '');
+  const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
+  const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
+  const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
+```
+
+**Step 2: Verify the file still compiles**
+
+```bash
+cd "/Users/filipnowakowski/Test - Slack/feedback-app" && npx tsc --noEmit 2>&1 | head -20
+```
+
+Expected: no errors related to the imports section.
+
+**Step 3: Commit**
+
+```bash
+git add src/app/page.tsx
+git commit -m "refactor: update landing page imports and remove old feature arrays"
+```
+
+---
+
+### Task 2: Rewrite the Header and Hero section
+
+**Files:**
+- Modify: `src/app/page.tsx` — header + hero sections
+
+**Context:** The hero currently shows a Cycles dashboard mockup on the right. We replace it with an Analytics dashboard mockup (KPI tiles + competency bar chart) to signal "data-rich platform" immediately. The headline changes from "Reviews people actually complete" to "The performance platform your team will actually use."
+
+**Step 1: Replace the header + hero JSX**
+
+The new header adds "Goals" and "Analytics" nav links. The hero right-side mockup shows `app.perf.team/dashboard/analytics` with 4 KPI tiles and a competency ratings bar chart.
+
+```tsx
+  return (
+    <div className="min-h-screen bg-background">
+
+      {/* ── Header ── */}
+      <header className="border-b border-border/60 backdrop-blur-md bg-white/80 sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-white text-xs font-bold">P</span>
+            </div>
+            <span className="font-semibold tracking-tight text-foreground">Perf</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <a href="#features" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
+            <a href="#goals" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Goals</a>
+            <a href="#analytics" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Analytics</a>
+            <Link href="#pricing" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
+            <a href={signInWithSlackUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</a>
+            <Button size="sm" asChild>
+              <a href={addToSlackUrl}>
+                <Slack className="h-3.5 w-3.5 mr-1" />
+                Add to Slack
+              </a>
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f8f7ff] via-[#faf5ff] to-[#fff8ff] px-6">
+        <div className="absolute top-[-80px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br from-primary/10 to-secondary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-[-60px] left-[-80px] w-[350px] h-[350px] bg-gradient-to-tr from-secondary/8 to-primary/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-5xl mx-auto relative">
+          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-end">
+
+            {/* Left: text */}
+            <div className="py-20 lg:py-24">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/[0.07] text-xs text-primary/80 mb-8">
+                <Slack className="h-3.5 w-3.5 text-primary" />
+                Reviews · Goals · Analytics · All in Slack
+              </div>
+
+              <p className="text-sm font-medium text-primary tracking-wide mb-4">
+                Performance management, done right
+              </p>
+
+              <h1 className="text-5xl sm:text-[60px] lg:text-[64px] font-bold tracking-tight text-foreground leading-[1.05]">
+                The performance platform your team will{" "}
+                <span className="text-primary">actually use</span>
+              </h1>
+
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-[440px]">
+                Perf brings 360° reviews, goal tracking, and competency analytics into one place —
+                delivered through Slack so your team actually engages. No new logins. No forms nobody opens.
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-start gap-3 mt-10">
+                <Button size="lg" className="h-12 px-7 text-sm font-semibold" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Add to Slack — free
+                  </a>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  className="h-12 px-7 text-sm text-foreground/65 hover:text-foreground hover:bg-foreground/[0.06] border border-foreground/15"
+                  asChild
+                >
+                  <a href={signInWithSlackUrl}>Sign in with Slack</a>
+                </Button>
+              </div>
+
+              <p className="mt-8 text-xs text-muted-foreground/60 tracking-wide">
+                Free for up to 10 people · No credit card · Installs in 60 seconds
+              </p>
+            </div>
+
+            {/* Right: Analytics dashboard mockup — desktop only */}
+            <div className="hidden lg:block relative pt-10">
+              <div className="absolute -inset-6 bg-primary/[0.10] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+              <div className="rounded-t-2xl border border-border/60 border-b-0 overflow-hidden shadow-2xl shadow-primary/10">
+                {/* Browser chrome */}
+                <div className="bg-muted/80 border-b border-border/60 px-4 py-3 flex items-center gap-3">
+                  <div className="flex gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-foreground/20" />
+                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
+                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
+                  </div>
+                  <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
+                    app.perf.team/dashboard/analytics
+                  </div>
+                </div>
+
+                <div className="bg-white">
+                  <div className="flex h-[340px] sm:h-[380px] overflow-hidden">
+                    {/* Sidebar */}
+                    <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
+                      <div className="px-2 py-1.5 mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
+                            <span className="text-white text-[9px] font-bold">P</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground">Perf</span>
+                        </div>
+                      </div>
+                      {[
+                        { label: "Overview", active: false },
+                        { label: "Cycles", active: false },
+                        { label: "Goals", active: false },
+                        { label: "Team", active: false },
+                        { label: "Analytics", active: true },
+                      ].map((item) => (
+                        <div
+                          key={item.label}
+                          className={`px-2.5 py-1.5 rounded-md text-[12px] ${
+                            item.active
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {item.label}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Analytics content */}
+                    <div className="flex-1 p-5 overflow-hidden">
+                      <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm font-semibold text-foreground">Analytics</p>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-[10px] text-muted-foreground">
+                          Q1 2025
+                        </div>
+                      </div>
+
+                      {/* KPI tiles */}
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        {[
+                          { label: "Overall Rating", value: "4.2/5", color: "text-yellow-500", bg: "bg-yellow-50" },
+                          { label: "Completion", value: "91%", color: "text-emerald-600", bg: "bg-emerald-50" },
+                          { label: "Participants", value: "47", color: "text-primary", bg: "bg-primary/[0.08]" },
+                          { label: "Active Cycles", value: "2", color: "text-orange-500", bg: "bg-orange-50" },
+                        ].map((tile) => (
+                          <div key={tile.label} className="bg-muted/30 rounded-xl p-2.5 border border-border/40">
+                            <p className="text-[10px] text-muted-foreground mb-1">{tile.label}</p>
+                            <p className={`text-base font-bold ${tile.color}`}>{tile.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Competency bar chart */}
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Avg. by Competency</p>
+                      <div className="space-y-2">
+                        {[
+                          { name: "Leadership", score: 4.3, pct: 86 },
+                          { name: "Execution", score: 3.9, pct: 78 },
+                          { name: "Collaboration", score: 4.4, pct: 88 },
+                          { name: "Communication", score: 3.7, pct: 74 },
+                        ].map((c) => (
+                          <div key={c.name} className="flex items-center gap-2">
+                            <p className="text-[10px] text-muted-foreground w-[90px] shrink-0 truncate">{c.name}</p>
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${c.pct}%` }} />
+                            </div>
+                            <span className="text-[10px] font-semibold text-foreground w-5 text-right tabular-nums">{c.score}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+```
+
+**Step 2: Verify in browser — navigate to localhost:3000 and confirm:**
+- New headline renders
+- Badge shows "Reviews · Goals · Analytics · All in Slack"
+- Right side shows Analytics mockup with 4 KPI tiles + bar chart
+
+**Step 3: Commit**
+```bash
+git add src/app/page.tsx
+git commit -m "feat: rewrite landing hero — new headline and analytics dashboard mockup"
+```
+
+---
+
+### Task 3: Add Feature Spotlight 1 — Reviews
+
+**Files:**
+- Modify: `src/app/page.tsx` — add after the hero section, replace the old "Problem section"
+
+**Context:** This replaces the old "Performance reviews are broken" problem section. It's the first feature spotlight: alternating layout with text left, Slack DM mockup right. The copy is specific and persuasive about WHY Perf's approach beats alternatives.
+
+**Step 1: Add the Reviews spotlight section after the closing `</section>` of the hero**
+
+```tsx
+      {/* ── Feature Spotlight 1: Reviews ── */}
+      <section id="features" className="bg-white py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  360° Reviews
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Reviews that actually get completed — because they live in Slack
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  Most teams struggle with 40–60% review completion. Perf fixes this by meeting people where they already work.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: MessageSquare,
+                      title: "Slack DMs, not another form",
+                      body: "Perf sends review requests as Slack DMs. Your team responds in the thread — no new tab, no new login, no context switch. Completion rates climb from ~40% to 95%+.",
+                    },
+                    {
+                      icon: Users,
+                      title: "Every angle covered: self, manager, peer, upward",
+                      body: "One cycle covers all reviewer types. Perf auto-assigns based on reporting lines, sends reminders, and tracks who's outstanding — without you chasing anyone.",
+                    },
+                    {
+                      icon: Star,
+                      title: "Calibration built in, not bolted on",
+                      body: "After collection, HR uses the 9-box calibration grid to align grades across managers before releasing results. No more calibration spreadsheets.",
+                    },
+                    {
+                      icon: Shield,
+                      title: "Grade-gated results",
+                      body: "Employees only see their results after HR releases grades. You control the timing — not Slack, not the reviewer.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: Slack DM mockup */}
+            <ScrollReveal scale>
+              <div className="relative">
+                <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
+                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  {/* Slack header */}
+                  <div className="bg-[#3d1f7d] px-5 py-3 flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
+                        <span className="text-white text-[8px] font-bold">P</span>
+                      </div>
+                      <span className="text-white text-sm font-semibold">Perf</span>
+                    </div>
+                    <span className="text-white/40 text-xs">app</span>
+                  </div>
+
+                  {/* Conversation */}
+                  <div className="p-5 space-y-5 bg-white">
+                    {/* Bot → review request */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">P</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Perf</span>
+                          <span className="text-[11px] text-muted-foreground">10:32 AM</span>
+                        </div>
+                        <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
+                          <p className="text-sm text-foreground leading-relaxed">
+                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
+                          </p>
+                          <div className="mt-3 p-3 rounded-lg bg-background border border-border/60">
+                            <p className="text-xs text-muted-foreground mb-1">Competency: <span className="font-medium text-foreground">Collaboration</span></p>
+                            <p className="text-xs text-muted-foreground">Rating: 1 (Needs improvement) → 5 (Exceptional)</p>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <div className="px-3 py-1.5 rounded-md bg-primary text-white text-xs font-medium">Open review form</div>
+                            <div className="px-3 py-1.5 rounded-md bg-muted border border-border text-foreground text-xs font-medium">Remind me later</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* User reply */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+                        <span className="text-chart-2 text-xs font-bold">S</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Sarah Chen</span>
+                          <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          4 — Alex has been great at cross-team coordination this quarter, especially on the platform migration.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Bot confirmation */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">P</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Perf</span>
+                          <span className="text-[11px] text-muted-foreground">10:34 AM</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed">
+                          Got it! Collaboration rated <span className="font-semibold text-primary">4/5</span> for Alex Johnson. You have <span className="font-semibold">2 more competencies</span> to rate.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-center mt-5 text-sm text-muted-foreground/70">
+                  Reviews take less than 2 minutes per person — right inside Slack.
+                </p>
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+```
+
+**Step 2: Save and verify** — section renders with 4 bullet points on the left and Slack DM mockup on the right.
+
+**Step 3: Commit**
+```bash
+git add src/app/page.tsx
+git commit -m "feat: add reviews spotlight section with persuasive copy and Slack mockup"
+```
+
+---
+
+### Task 4: Add Feature Spotlight 2 — Goals
+
+**Files:**
+- Modify: `src/app/page.tsx` — add after the Reviews spotlight section
+
+**Context:** New section not on the current landing page. Goals mockup on the left side, copy on the right. Shows SVG goal-ring indicators with percentage + status badges, matching the real app's GoalRing pattern. The copy explains why goal visibility at review time matters.
+
+**Step 1: Add Goals spotlight section**
+
+```tsx
+      {/* ── Feature Spotlight 2: Goals ── */}
+      <section id="goals" className="bg-gradient-to-br from-[#f5f2ff] via-[#f8f5ff] to-[#f3f1ff] py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: Goals mockup — desktop only */}
+            <ScrollReveal scale>
+              <div className="relative hidden lg:block">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
+                  {/* Header */}
+                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Goals</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Q1 2025 · 4 active goals</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                      3 on track
+                    </div>
+                  </div>
+
+                  {/* Goal rows */}
+                  <div className="divide-y divide-border/50">
+                    {[
+                      {
+                        title: "Achieve 90%+ review completion org-wide",
+                        progress: 100,
+                        status: "achieved",
+                        statusLabel: "Achieved",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Launch competency framework for all IC levels",
+                        progress: 75,
+                        status: "on_track",
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Reduce time-to-hire for Engineering by 20%",
+                        progress: 38,
+                        status: "at_risk",
+                        statusLabel: "At Risk",
+                        statusColor: "text-amber-700 bg-amber-50",
+                        ringColor: "#f59e0b",
+                      },
+                      {
+                        title: "Complete 360 reviews for all senior ICs",
+                        progress: 88,
+                        status: "on_track",
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                    ].map((goal) => {
+                      const circumference = 2 * Math.PI * 14; // r=14
+                      const dash = (goal.progress / 100) * circumference;
+                      return (
+                        <div key={goal.title} className="px-5 py-4 flex items-center gap-4">
+                          {/* SVG ring indicator */}
+                          <div className="relative h-11 w-11 shrink-0">
+                            <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke="currentColor"
+                                className="text-muted/50"
+                                strokeWidth="3.5"
+                              />
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke={goal.ringColor}
+                                strokeWidth="3.5"
+                                strokeDasharray={`${dash} ${circumference}`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
+                              {goal.progress}%
+                            </span>
+                          </div>
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">{goal.title}</p>
+                            <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${goal.statusColor}`}>
+                              {goal.statusLabel}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 border-t border-border/60 bg-muted/20 flex items-center justify-between">
+                    <p className="text-[11px] text-muted-foreground">Goal progress syncs with review data</p>
+                    <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
+                      View all <ChevronRight className="h-3 w-3" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Goals & OKRs
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Goals your whole team can see — tracked in real time
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  When goals live separately from reviews, ratings feel arbitrary. Perf ties them together so every performance conversation is grounded in actual work.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Flag,
+                      title: "OKR-style goals, individually owned",
+                      body: "Create goals for individuals or teams. Each has an owner, a due date, and a live tracking status: On Track, At Risk, Delayed, or Achieved. Everyone can see where things stand.",
+                    },
+                    {
+                      icon: Users,
+                      title: "Managers have context in every 1:1",
+                      body: "When your manager opens your profile, your goal progress is right there. No more 'what were you working on this quarter?' at review time — the history is already in Perf.",
+                    },
+                    {
+                      icon: TrendingUp,
+                      title: "Goals roll up into Analytics",
+                      body: "The Analytics dashboard shows what percentage of the org is on track at any moment. Spot patterns before they become problems — which teams are slipping, which are flying.",
+                    },
+                    {
+                      icon: BarChart3,
+                      title: "Goal progress informs performance ratings",
+                      body: "When a review cycle opens, historical goal data is right there. Ratings reflect real work and real outcomes — not just how much the reviewer likes the person.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+```
+
+**Step 2: Verify** — Goals section renders with the SVG ring mockup on the left and 4 bullet points on the right. Rings should show green/amber colors with correct progress arcs.
+
+**Step 3: Commit**
+```bash
+git add src/app/page.tsx
+git commit -m "feat: add goals spotlight section with SVG ring mockup"
+```
+
+---
+
+### Task 5: Add Feature Spotlight 3 — Analytics
+
+**Files:**
+- Modify: `src/app/page.tsx` — add after the Goals spotlight section
+
+**Context:** New section showing the analytics depth. Two stacked mockups on the right: (1) Competency Heatmap table with color-coded cells, (2) Performance Ranking snippet with tier badges. Copy is specific about what the data tells you.
+
+**Step 1: Add Analytics spotlight section**
+
+```tsx
+      {/* ── Feature Spotlight 3: Analytics ── */}
+      <section id="analytics" className="bg-white py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: copy */}
+            <ScrollReveal>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Analytics
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Analytics that tell you something — not just pretty charts
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  Most HR tools give you a pie chart and call it analytics. Perf gives you actionable data sliced by role, department, level, and tenure — so you know exactly where to invest.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Grid3X3,
+                      title: "Competency Heatmap — one table, zero spreadsheets",
+                      body: "See which competencies are strong and which need development, broken down by role, department, seniority level, or tenure. Instantly spot that Directors score low on Collaboration, or that new hires are struggling with Execution.",
+                    },
+                    {
+                      icon: Star,
+                      title: "Performance Ranking with tier badges",
+                      body: "Every employee ranked by average rating with a clear tier: Exceptional, Strong, Solid, or Needs Development. Filterable by function and department. Useful for calibration, promotion decisions, and headcount planning.",
+                    },
+                    {
+                      icon: TrendingUp,
+                      title: "Cross-cycle trend analysis",
+                      body: "See whether your org's average rating and completion rate are improving cycle over cycle — not just a snapshot of today. Know if your investment in people is working.",
+                    },
+                    {
+                      icon: Target,
+                      title: "Filter by cycle, function, or department",
+                      body: "Every analytics view is filterable. Compare Engineering vs. Product. Look at just the last cycle. Drill into a specific department. The data adjusts in real time — no waiting for reports to run.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: Heatmap + Ranking mockup — desktop only */}
+            <ScrollReveal scale>
+              <div className="relative hidden lg:block space-y-4">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+                {/* Heatmap table */}
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-primary/8 bg-white">
+                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Competency Heatmap</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Avg ratings × role — Q1 2025</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {[
+                        { label: "≥4.5", color: "bg-emerald-100" },
+                        { label: "≥3.5", color: "bg-primary/10" },
+                        { label: "<3.5", color: "bg-amber-100" },
+                      ].map((l) => (
+                        <div key={l.label} className="flex items-center gap-1">
+                          <div className={`h-2.5 w-2.5 rounded-sm ${l.color}`} />
+                          <span className="text-[9px] text-muted-foreground">{l.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-border/40 bg-muted/20">
+                          <th className="px-4 py-2 text-left font-medium text-muted-foreground w-32">Competency</th>
+                          {["All", "IC", "Manager", "Director"].map((g) => (
+                            <th key={g} className="px-3 py-2 text-center font-medium text-muted-foreground min-w-[60px]">{g}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { name: "Leadership",     scores: [3.9, 3.5, 4.2, 4.8] },
+                          { name: "Execution",      scores: [4.1, 4.3, 4.0, 3.8] },
+                          { name: "Collaboration",  scores: [4.4, 4.5, 4.3, 4.6] },
+                          { name: "Communication",  scores: [3.6, 3.5, 3.8, 4.1] },
+                        ].map((row) => (
+                          <tr key={row.name} className="border-t border-border/40 hover:bg-muted/10 transition-colors">
+                            <td className="px-4 py-2.5 font-medium text-foreground">{row.name}</td>
+                            {row.scores.map((score, i) => (
+                              <td
+                                key={i}
+                                className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
+                                  score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
+                                  score >= 3.5 ? "bg-primary/5 text-primary" :
+                                  "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {score.toFixed(1)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                        {/* Overall row */}
+                        <tr className="border-t-2 border-border/60 bg-muted/30 font-semibold">
+                          <td className="px-4 py-2.5 font-semibold text-foreground">Overall</td>
+                          {[4.0, 4.0, 4.1, 4.3].map((score, i) => (
+                            <td key={i} className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
+                              score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
+                              score >= 3.5 ? "bg-primary/5 text-primary" :
+                              "bg-amber-50 text-amber-700"
+                            }`}>
+                              {score.toFixed(1)}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Performance ranking snippet */}
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/5 bg-white">
+                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    <p className="text-[13px] font-semibold text-foreground">Performance Ranking</p>
+                  </div>
+                  <div className="divide-y divide-border/40">
+                    {[
+                      { name: "Alex Johnson",  fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
+                      { name: "Maria Garcia",  fn: "Product",      rating: 4.2, tier: "Strong",      tierColor: "text-green-700 bg-green-50" },
+                      { name: "Chris Lee",     fn: "Design",       rating: 3.6, tier: "Solid",       tierColor: "text-sky-700 bg-sky-50" },
+                      { name: "Priya Nair",    fn: "Engineering",  rating: 2.8, tier: "Needs Dev",   tierColor: "text-amber-700 bg-amber-50" },
+                    ].map((emp, i) => (
+                      <div key={emp.name} className="px-5 py-3 flex items-center gap-3">
+                        <span className="text-[10px] text-muted-foreground font-mono w-4 shrink-0">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-medium text-foreground">{emp.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{emp.fn}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
+                          </div>
+                          <span className="text-[11px] font-semibold text-foreground tabular-nums">{emp.rating}</span>
+                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${emp.tierColor}`}>{emp.tier}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+```
+
+**Step 2: Verify** — Analytics section renders with 4 bullet points on the left. Right side shows the heatmap table with color-coded cells (emerald ≥4.5, purple/primary ≥3.5, amber <3.5) and the ranking table below with tier badges.
+
+**Step 3: Commit**
+```bash
+git add src/app/page.tsx
+git commit -m "feat: add analytics spotlight section with heatmap and ranking mockup"
+```
+
+---
+
+### Task 6: Update remaining sections — How it works, Stats, Pricing, CTA
+
+**Files:**
+- Modify: `src/app/page.tsx` — everything from "How it works" to the end
+
+**Context:** Remove the old Slack mockup section (now replaced by Spotlight 1), remove the old mobile-only dashboard section, remove the testimonials section. Update "How it works" step 2 copy to mention competencies. Update stats strip copy. Update CTA headline. Keep pricing unchanged.
+
+**Step 1: Replace all remaining sections after the Analytics spotlight**
+
+```tsx
+      {/* ── How It Works ── */}
+      <section id="how-it-works" className="bg-background py-28">
+        <div className="max-w-5xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-14">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              How it works
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
+            <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
+              No lengthy onboarding. No training. No new tool for your team to learn. Just add Perf to Slack and you&apos;re set.
+            </p>
+          </ScrollReveal>
+
+          <div className="relative">
+            <div className="hidden lg:block absolute top-[27px] left-[calc(16.66%+34px)] right-[calc(16.66%+34px)] h-px bg-border" aria-hidden="true" />
+            <ol className="grid sm:grid-cols-3 gap-8 lg:gap-12 relative">
+              {[
+                {
+                  step: 1,
+                  icon: Slack,
+                  title: "Add Perf to Slack",
+                  description: "Click 'Add to Slack' and authorize in your workspace. Takes under 60 seconds. No engineering setup required.",
+                },
+                {
+                  step: 2,
+                  icon: Target,
+                  title: "Set up your team and competencies",
+                  description: "Perf syncs your Slack members automatically. Assign managers, define reporting lines, and set the competencies your org values.",
+                },
+                {
+                  step: 3,
+                  icon: BarChart3,
+                  title: "Launch cycles and read the data",
+                  description: "Pick a template, set a deadline, and Perf handles assignments, DM reminders, and collection. Analytics update in real time.",
+                },
+              ].map((item, i) => (
+                <ScrollReveal key={item.step} delay={i * 120}>
+                  <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
+                    <div className="relative mb-5">
+                      <div className="h-14 w-14 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center">
+                        <item.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
+                        {item.step}
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
+                  </li>
+                </ScrollReveal>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Stats strip ── */}
+      <section className="bg-gradient-to-r from-primary via-[#8b35d6] to-secondary py-20">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid sm:grid-cols-3 gap-10 text-center">
+            {[
+              { metric: "95%+", label: "Average review completion rate — up from ~40% with traditional tools" },
+              { metric: "< 2 min", label: "Time to complete a peer review via Slack — no new tool required" },
+              { metric: "1 day", label: "From install to first live review cycle with real data" },
+            ].map((stat) => (
+              <div key={stat.label}>
+                <p className="text-4xl font-black text-white">{stat.metric}</p>
+                <p className="mt-2 text-sm text-white/75 max-w-[200px] mx-auto">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ── */}
+      <section id="pricing" className="bg-background border-t border-border/30">
+        <div className="max-w-5xl mx-auto px-6 py-24">
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              Pricing
+            </span>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">Simple, transparent pricing</h2>
+            <p className="mt-3 text-muted-foreground text-[15px]">Start free. Upgrade when your team is ready.</p>
+          </ScrollReveal>
+
+          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
+            {/* Free tier */}
+            <ScrollReveal delay={0}>
+              <div className="flex flex-col h-full p-7 rounded-2xl border-2 border-border bg-white">
+                <p className="text-sm font-semibold text-foreground mb-1">Free</p>
+                <p className="text-4xl font-black text-foreground mb-1">$0</p>
+                <p className="text-[12px] text-muted-foreground mb-5">Forever, no credit card</p>
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "Up to 10 team members",
+                    "Slack /feedback command",
+                    "Goals tracking",
+                    "Basic analytics",
+                    "1 active review cycle",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="outline" className="mt-6 w-full" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Get started free
+                  </a>
+                </Button>
+              </div>
+            </ScrollReveal>
+
+            {/* Pro tier */}
+            <ScrollReveal delay={100}>
+              <div className="flex flex-col h-full p-7 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] relative">
+                <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-primary text-white text-[10px] font-semibold uppercase tracking-wider">
+                  Popular
+                </div>
+                <p className="text-sm font-semibold text-foreground mb-1">Pro</p>
+                <p className="text-4xl font-black text-foreground mb-1">$8<span className="text-base font-normal text-muted-foreground">/user/mo</span></p>
+                <p className="text-[12px] text-muted-foreground mb-5">Billed monthly or annually</p>
+                <ul className="space-y-2.5 flex-1">
+                  {[
+                    "Unlimited team members",
+                    "360° review cycles with calibration",
+                    "Competency frameworks + level matrix",
+                    "9-box calibration grid",
+                    "Competency heatmap by role/dept/level",
+                    "Performance ranking + tier badges",
+                    "Cross-cycle trend analytics",
+                    "Upward feedback",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2 text-[13px] text-muted-foreground">
+                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button className="mt-6 w-full" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Start with Pro
+                  </a>
+                </Button>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#f8f5ff] via-background to-[#f5f7ff] py-28">
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/6 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-5xl mx-auto px-6 text-center relative">
+          <ScrollReveal>
+            <h2 className="text-4xl sm:text-5xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
+              Ready for performance management that{" "}
+              <span className="text-primary">actually works?</span>
+            </h2>
+            <p className="mt-5 text-muted-foreground text-lg max-w-lg mx-auto">
+              Add Perf to your Slack workspace in under a minute. Reviews, goals, and analytics — all in one place, free forever for small teams.
+            </p>
+            <div className="mt-10">
+              <Button size="lg" className="h-13 px-8 text-base font-semibold" asChild>
+                <a href={addToSlackUrl}>
+                  <Slack className="h-5 w-5 mr-2" />
+                  Add to Slack — it&apos;s free
+                </a>
+              </Button>
+            </div>
+            <p className="mt-6 text-xs text-muted-foreground/60">No credit card. No setup fee. Cancel anytime.</p>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ── Footer ── */}
+      <footer className="bg-muted/40 border-t border-border">
+        <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              <div className="h-6 w-6 rounded-md bg-primary flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold">P</span>
+              </div>
+              <span className="font-semibold text-foreground">Perf</span>
+              <span>&copy; {new Date().getFullYear()}</span>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
+              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+    </div>
+  );
+}
+```
+
+**Step 2: Verify the file ends correctly — no unclosed JSX tags**
+
+```bash
+cd "/Users/filipnowakowski/Test - Slack/feedback-app" && npx tsc --noEmit 2>&1 | head -30
+```
+
+Expected: no errors.
+
+**Step 3: Commit**
+```bash
+git add src/app/page.tsx
+git commit -m "feat: update how-it-works, stats, pricing, CTA — complete landing page rebuild"
+```
+
+---
+
+### Task 7: Final visual check
+
+**Files:** None — verification only.
+
+**Step 1: Open the app at localhost:3000 and verify all sections**
+
+Scroll through the full page and confirm:
+- [ ] Hero: new headline, "Reviews · Goals · Analytics · All in Slack" badge, Analytics mockup with KPI tiles on the right
+- [ ] Reviews spotlight: 4 bullets left, Slack DM mockup right
+- [ ] Goals spotlight: SVG goal rings with progress % + colored status badges on the left, 4 bullets right
+- [ ] Analytics spotlight: 4 bullets left, heatmap table + ranking table on the right
+- [ ] How it works: 3 steps, Target icon in step 2
+- [ ] Stats strip: purple gradient, 3 metrics
+- [ ] Pricing: Free tier now includes "Goals tracking", Pro tier has 8 items including heatmap + ranking
+- [ ] CTA: updated headline
+- [ ] Footer: unchanged
+- [ ] No dark sections anywhere on the page
+- [ ] Page scrolls smoothly with ScrollReveal animations
+
+**Step 2: Take a screenshot for confirmation**
+
+Use the preview screenshot tool and share with the user.
