@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import {
-  ArrowLeft, Mail, Pencil, Star, FileText,
-  MessageSquare, Target, Users,
+  ArrowLeft, Mail, Pencil, Star,
+  MessageSquare, Users,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
@@ -372,10 +372,7 @@ export default async function EmployeeProfilePage({
         {/* Latest Review */}
         <Card className="border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <FileText className="h-3.5 w-3.5" />
-              Latest Review
-            </CardTitle>
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Latest Review</CardTitle>
           </CardHeader>
           <CardContent>
             {!latestReview ? (
@@ -421,10 +418,7 @@ export default async function EmployeeProfilePage({
         {/* Active Goals snapshot */}
         <Card className="border-border/60">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <Target className="h-3.5 w-3.5" />
-              Active Goals
-            </CardTitle>
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Active Goals</CardTitle>
           </CardHeader>
           <CardContent>
             {activeGoals.length === 0 ? (
@@ -464,7 +458,7 @@ export default async function EmployeeProfilePage({
       {canSeeAllRatings && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Star className="h-4 w-4 text-primary" />
               Competencies
             </CardTitle>
@@ -479,7 +473,7 @@ export default async function EmployeeProfilePage({
                 {skillAverages.map((skill) => (
                   <div
                     key={skill.name}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/60"
+                    className="flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/30 transition-colors"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{skill.name}</p>
@@ -512,7 +506,7 @@ export default async function EmployeeProfilePage({
       {showFeedbackSection && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" />
               Feedback
             </CardTitle>
@@ -527,7 +521,7 @@ export default async function EmployeeProfilePage({
             ) : (
               <div className="space-y-3">
                 {continuousFeedback.map((f: any) => (
-                  <div key={f.id} className="p-3 rounded-lg border border-border/60">
+                  <div key={f.id} className="px-3 py-3 rounded-lg hover:bg-muted/30 transition-colors">
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium text-foreground">
                         {f.is_anonymous ? "Anonymous" : f.from_user?.slack_name || "Unknown"}
@@ -553,10 +547,7 @@ export default async function EmployeeProfilePage({
       {/* ── 6. All Reviews ─────────────────────────────────────────────── */}
       <Card className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4 text-primary" />
-            Performance Reviews
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold">Performance Reviews</CardTitle>
         </CardHeader>
         <CardContent>
           {reviewAssignments.length === 0 ? (
@@ -564,41 +555,46 @@ export default async function EmployeeProfilePage({
               No reviews yet — reviews appear when a performance cycle is launched.
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {reviewAssignments.map((a: any) => {
                 const config = getAssignmentStatus(a.status);
                 return (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-border/60"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {a.cycle?.name || "Unknown Cycle"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {a.manager?.slack_name || "Unassigned"}
-                        {a.cycle?.start_date && (
-                          <> &middot; {format(new Date(a.cycle.start_date), "MMM yyyy")}</>
-                        )}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {a.overall_rating && (canSeeAllRatings || a.cycle?.grades_released) && (
-                        <span className="text-sm font-semibold text-foreground">
-                          {a.overall_rating}/5
+                    <div
+                      key={a.id}
+                      className="flex items-center gap-4 px-3 py-3 rounded-lg hover:bg-muted/30 transition-colors"
+                    >
+                      {/* Quarter chip */}
+                      <div className="w-14 shrink-0">
+                        <span className="inline-block rounded-md bg-muted px-2 py-1 text-xs font-mono font-medium text-foreground">
+                          {getQuarterLabel(a.cycle?.start_date)}
                         </span>
-                      )}
-                      {a.final_grade && (canSeeAllRatings || a.cycle?.grades_released) && (
-                        <Badge variant="outline" className="text-[10px] font-medium">
-                          {a.final_grade}
+                      </div>
+                      {/* Cycle info */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {a.cycle?.name || "Unknown Cycle"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {a.manager?.slack_name || "Unassigned"}
+                        </p>
+                      </div>
+                      {/* Grade + status */}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {a.final_grade && (canSeeAllRatings || a.cycle?.grades_released) && (
+                          <span className={`text-sm font-semibold ${gradeColor(a.final_grade)}`}>
+                            {a.final_grade}
+                          </span>
+                        )}
+                        {!a.final_grade && a.overall_rating && (canSeeAllRatings || a.cycle?.grades_released) && (
+                          <span className="text-sm font-semibold text-foreground">
+                            {a.overall_rating}/5
+                          </span>
+                        )}
+                        <Badge className={`text-[10px] font-medium ${config.badge}`}>
+                          {config.label}
                         </Badge>
-                      )}
-                      <Badge className={`text-[10px] font-medium ${config.badge}`}>
-                        {config.label}
-                      </Badge>
+                      </div>
                     </div>
-                  </div>
                 );
               })}
             </div>
@@ -609,10 +605,7 @@ export default async function EmployeeProfilePage({
       {/* ── 7. All Goals ───────────────────────────────────────────────── */}
       <Card id="goals" className="border-border/60">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Target className="h-4 w-4 text-primary" />
-            Goals
-          </CardTitle>
+          <CardTitle className="text-lg font-semibold">Goals</CardTitle>
         </CardHeader>
         <CardContent>
           {goals.length === 0 ? (
@@ -663,7 +656,7 @@ export default async function EmployeeProfilePage({
       {directReports.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Users className="h-4 w-4 text-primary" />
               Direct Reports ({directReports.length})
             </CardTitle>
