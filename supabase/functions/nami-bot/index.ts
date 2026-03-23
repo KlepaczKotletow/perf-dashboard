@@ -441,6 +441,74 @@ async function handleReminders() {
   let skipped = 0;
 
   // -----------------------------------------------------------------------
+  //  Part 0: Check for scheduled sends (nami_send_at)
+  // -----------------------------------------------------------------------
+
+  // Scheduled cycle launches
+  const { data: scheduledCycles } = await supabase
+    .from("performance_cycles")
+    .select("id")
+    .eq("status", "active")
+    .eq("nami_confirmed", true)
+    .not("nami_send_at", "is", null)
+    .lte("nami_send_at", now.toISOString());
+
+  for (const cycle of scheduledCycles || []) {
+    // Check if initial messages were already sent for any assignment in this cycle
+    const { data: assignments } = await supabase
+      .from("review_assignments")
+      .select("id")
+      .eq("cycle_id", cycle.id)
+      .limit(1);
+
+    if (assignments?.length) {
+      const { data: alreadySent } = await supabase
+        .from("notification_log")
+        .select("id")
+        .eq("event_type", "nami_initial")
+        .eq("reference_id", `self_${assignments[0].id}`)
+        .limit(1);
+
+      if (!alreadySent?.length) {
+        // Not yet sent — launch now
+        const result = await handleCycleLaunch(cycle.id);
+        sent += result.sent;
+      }
+    }
+  }
+
+  // Scheduled survey launches
+  const { data: scheduledSurveys } = await supabase
+    .from("surveys")
+    .select("id")
+    .eq("status", "active")
+    .eq("nami_confirmed", true)
+    .not("nami_send_at", "is", null)
+    .lte("nami_send_at", now.toISOString());
+
+  for (const survey of scheduledSurveys || []) {
+    const { data: participants } = await supabase
+      .from("survey_participants")
+      .select("id")
+      .eq("survey_id", survey.id)
+      .limit(1);
+
+    if (participants?.length) {
+      const { data: alreadySent } = await supabase
+        .from("notification_log")
+        .select("id")
+        .eq("event_type", "nami_initial")
+        .eq("reference_id", `survey_${participants[0].id}`)
+        .limit(1);
+
+      if (!alreadySent?.length) {
+        const result = await handleSurveyLaunch(survey.id);
+        sent += result.sent;
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
   //  Part 1: Review assignment reminders
   // -----------------------------------------------------------------------
   const { data: cycles } = await supabase

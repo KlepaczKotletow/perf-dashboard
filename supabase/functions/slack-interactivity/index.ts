@@ -130,7 +130,7 @@ Deno.serve(async (req) => {
     // Resolve workspace
     // ----------------------------------------------------------------
     const teamId = payload.team?.id || payload.user?.team_id;
-    const ws = (await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token,refresh_token,token_expires_at`))[0];
+    const ws = (await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token,refresh_token,token_expires_at,rating_scale`))[0];
     if (!ws) return json({ response_action: "clear" });
 
     const botToken = await getFreshBotToken(ws);
@@ -1366,6 +1366,9 @@ Deno.serve(async (req) => {
         // Expire existing active conversation_states for this user+assignment
         await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&assignment_id=eq.${assignmentId}&status=eq.active`, { status: "expired" });
 
+        // Get workspace rating scale (default 1-5 if not set)
+        const wsRatingScale = ws.rating_scale || { min: 1, max: 5, labels: { "1": "Needs improvement", "2": "Below expectations", "3": "Meets expectations", "4": "Exceeds expectations", "5": "Exceptional" } };
+
         const convState = await dbInsert("conversation_states", {
           workspace_id: ws.id,
           user_id: user.id,
@@ -1384,6 +1387,7 @@ Deno.serve(async (req) => {
           text_question_ids: textQuestionIds,
           text_question_prompts: textQuestionPrompts,
           text_responses: {},
+          rating_scale: wsRatingScale,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         });
 
@@ -1396,7 +1400,7 @@ Deno.serve(async (req) => {
         }
 
         // Send first competency prompt using Nami blocks
-        const blocks = buildCompetencyPrompt(compNames[0], compDescs[0], 0, compNames.length, convState[0].id, assignmentId);
+        const blocks = buildCompetencyPrompt(compNames[0], compDescs[0], 0, compNames.length, convState[0].id, assignmentId, wsRatingScale);
         await slackApi(botToken, "chat.postMessage", {
           channel: slackUserId,
           text: `Rate ${compNames[0]} (1/${compNames.length})`,
@@ -1406,14 +1410,57 @@ Deno.serve(async (req) => {
       }
 
       // ================================================================
-      //  NAMI: Remind me later
+      //  NAMI: Remind me later (schedules a Slack message in 24h)
       // ================================================================
       if (action?.action_id === "nami_remind_later") {
         const slackUserId = payload.user.id;
+        const value = action.value || "";
+
+        // Schedule a reminder for 24 hours from now
+        const postAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+
+        // Determine if this is a review or survey reminder
+        const isReview = value.startsWith("self_") || value.startsWith("mgr_") || value.startsWith("upward_");
+
+        if (isReview) {
+          await slackApi(botToken, "chat.scheduleMessage", {
+            channel: slackUserId,
+            post_at: postAt,
+            text: "Hey! Just a reminder — you still have a review to complete.",
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: ":bell: *Reminder: You have a pending review*\nReady to get it done?" } },
+              { type: "actions", elements: [
+                { type: "button", text: { type: "plain_text", text: "Start now :rocket:", emoji: true }, style: "primary",
+                  action_id: "nami_start_review", value: value },
+                { type: "button", text: { type: "plain_text", text: "Remind me later", emoji: true },
+                  action_id: "nami_remind_later", value: value },
+              ]},
+            ],
+          });
+        } else {
+          // Survey reminder
+          await slackApi(botToken, "chat.scheduleMessage", {
+            channel: slackUserId,
+            post_at: postAt,
+            text: "Hey! Just a reminder — you still have a survey to complete.",
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: ":bell: *Reminder: You have a pending survey*\nReady to take it?" } },
+              { type: "actions", elements: [
+                { type: "button", text: { type: "plain_text", text: "Start now :memo:", emoji: true }, style: "primary",
+                  action_id: "nami_start_survey", value: value },
+                { type: "button", text: { type: "plain_text", text: "Remind me later", emoji: true },
+                  action_id: "nami_remind_later", value: value },
+              ]},
+            ],
+          });
+        }
+
+        // Send immediate acknowledgment
         await slackApi(botToken, "chat.postMessage", {
           channel: slackUserId,
-          text: "No problem! I'll check back with you tomorrow 🕐",
+          text: ":clock3: No problem! I'll remind you in 24 hours.",
         });
+
         return json({});
       }
 
@@ -1422,7 +1469,7 @@ Deno.serve(async (req) => {
       // ================================================================
       if (action?.action_id?.startsWith("nami_rate_")) {
         const ratingNum = parseInt(action.action_id.replace("nami_rate_", ""));
-        if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) return json({});
+        if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 10) return json({});
 
         const meta = safeParse(action.value);
         const { convId, assignmentId, compName } = meta;
@@ -1473,6 +1520,7 @@ Deno.serve(async (req) => {
         const compIds = conv.competency_ids || [];
         const compNames = conv.competency_names || [];
         const compDescs = compIds.map((_: any, i: number) => "");
+        const convRatingScale = conv.rating_scale || undefined;
         const nextIndex = (conv.current_index || 0) + 1;
 
         if (nextIndex < compIds.length) {
@@ -1482,7 +1530,7 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           });
 
-          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id);
+          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
@@ -1536,7 +1584,7 @@ Deno.serve(async (req) => {
             const tqIds = conv.text_question_ids || [];
             const tqResponses = tqIds.map((id: string) => textResponses[id] || "");
 
-            const blocks = buildReviewSummary(conv.employee_name, compNames, ratingValues, tqPrompts, tqResponses, convId);
+            const blocks = buildReviewSummary(conv.employee_name, compNames, ratingValues, tqPrompts, tqResponses, convId, convRatingScale);
             await slackApi(botToken, "chat.postMessage", {
               channel: payload.user.id,
               text: `Review summary for ${conv.employee_name}`,
@@ -1672,8 +1720,9 @@ Deno.serve(async (req) => {
 
         const compNames = conv.competency_names || [];
         const compIds = conv.competency_ids || [];
+        const editRatingScale = conv.rating_scale || undefined;
         if (compNames.length > 0) {
-          const blocks = buildCompetencyPrompt(compNames[0], "", 0, compNames.length, convId, conv.assignment_id);
+          const blocks = buildCompetencyPrompt(compNames[0], "", 0, compNames.length, convId, conv.assignment_id, editRatingScale);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Editing review \u2014 rate ${compNames[0]} again`,

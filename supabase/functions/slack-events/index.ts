@@ -312,6 +312,7 @@ Deno.serve(async (req) => {
             const currentIdx: number = conv.current_index || 0;
             const currentCompId = compIds[currentIdx];
             const ratings = conv.ratings || {};
+            const evtRatingScale = conv.rating_scale || undefined;
 
             // Save comment for the current competency
             if (currentCompId && ratings[currentCompId]) {
@@ -333,7 +334,7 @@ Deno.serve(async (req) => {
 
               const blocks = buildCompetencyPrompt(
                 compNames[nextIndex], "", nextIndex, compNames.length,
-                conv.id, conv.assignment_id,
+                conv.id, conv.assignment_id, evtRatingScale,
               );
               await sendSlackMessage(
                 slackUserId,
@@ -384,7 +385,7 @@ Deno.serve(async (req) => {
 
                 const blocks = buildReviewSummary(
                   conv.employee_name, compNames, ratingValues,
-                  tqPrompts, tqResponses, conv.id,
+                  tqPrompts, tqResponses, conv.id, evtRatingScale,
                 );
                 await sendSlackMessage(
                   slackUserId,
@@ -446,10 +447,11 @@ Deno.serve(async (req) => {
               const ratings = conv.ratings || {};
               const ratingValues = compIds.map((id: string) => ratings[id]?.rating || 0);
               const tqResponses = textQuestionIds.map((id: string) => textResponses[id] || "");
+              const tqRatingScale = conv.rating_scale || undefined;
 
               const blocks = buildReviewSummary(
                 conv.employee_name, compNames, ratingValues,
-                textQuestionPrompts, tqResponses, conv.id,
+                textQuestionPrompts, tqResponses, conv.id, tqRatingScale,
               );
               await sendSlackMessage(
                 slackUserId,

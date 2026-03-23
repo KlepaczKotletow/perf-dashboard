@@ -193,7 +193,7 @@ export function buildSurveyOpening(
 }
 
 // ---------------------------------------------------------------------------
-//  Competency rating prompt (5 buttons)
+//  Competency rating prompt (dynamic scale, splits into rows of 5 for Slack)
 // ---------------------------------------------------------------------------
 export function buildCompetencyPrompt(
   compName: string,
@@ -202,13 +202,24 @@ export function buildCompetencyPrompt(
   total: number,
   convId: string,
   assignmentId: string,
+  ratingScale?: { min: number; max: number; labels: Record<number | string, string> },
 ) {
-  const ratingButtons = [1, 2, 3, 4, 5].map((n) => ({
-    type: "button" as const,
-    text: { type: "plain_text" as const, text: `${n} - ${RATING_LABELS[n]}` },
-    action_id: `nami_rate_${n}`,
-    value: JSON.stringify({ convId, assignmentId, compName, rating: n }),
-  }));
+  const scale = ratingScale || { min: 1, max: 5, labels: RATING_LABELS };
+  const buttons = [];
+  for (let n = scale.min; n <= scale.max; n++) {
+    buttons.push({
+      type: "button" as const,
+      text: { type: "plain_text" as const, text: `${n} - ${scale.labels[n] || ""}` },
+      action_id: `nami_rate_${n}`,
+      value: JSON.stringify({ convId, assignmentId, compName, rating: n }),
+    });
+  }
+
+  // Split into action blocks of max 5 buttons each (Slack limit)
+  const actionBlocks = [];
+  for (let i = 0; i < buttons.length; i += 5) {
+    actionBlocks.push({ type: "actions" as const, elements: buttons.slice(i, i + 5) });
+  }
 
   return [
     {
@@ -218,10 +229,7 @@ export function buildCompetencyPrompt(
         text: `:bar_chart: *${index + 1}/${total}: ${compName}*\n${compDesc}`,
       },
     },
-    {
-      type: "actions",
-      elements: ratingButtons,
-    },
+    ...actionBlocks,
   ];
 }
 
@@ -290,11 +298,15 @@ export function buildReviewSummary(
   textQuestions: string[],
   textResponses: string[],
   convId: string,
+  ratingScale?: { min: number; max: number; labels: Record<number | string, string> },
 ) {
+  const scale = ratingScale || { min: 1, max: 5, labels: RATING_LABELS };
+  const scaleMax = scale.max;
+
   const lines = compNames.map((name, i) => {
     const r = ratings[i];
-    const label = RATING_LABELS[r] || "N/A";
-    return `\u2022 *${name}*: ${r}/5 (${label})`;
+    const label = scale.labels[r] || "N/A";
+    return `\u2022 *${name}*: ${r}/${scaleMax} (${label})`;
   });
 
   const textLines = textQuestions.map((q, i) => {
@@ -307,7 +319,7 @@ export function buildReviewSummary(
       ? (Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10).toString()
       : "N/A";
 
-  let summaryText = `:clipboard: *Review Summary for ${empName}*\nAverage rating: *${avg}/5*\n\n${lines.join("\n")}`;
+  let summaryText = `:clipboard: *Review Summary for ${empName}*\nAverage rating: *${avg}/${scaleMax}*\n\n${lines.join("\n")}`;
   if (textLines.length > 0) {
     summaryText += `\n\n:writing_hand: *Open-ended responses:*\n${textLines.join("\n")}`;
   }
