@@ -183,20 +183,21 @@ export default function NewSurveyPage() {
         }
       }
 
-      if (participants.length) {
-        // Deduplicate participants by user_id + subject_user_id + role
-        const seen = new Set<string>();
-        const uniqueParticipants = participants.filter(p => {
-          const key = `${p.user_id}:${p.subject_user_id || ""}:${p.role}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
+      // Deduplicate participants by user_id + subject_user_id + role
+      const seen = new Set<string>();
+      const uniqueParticipants = participants.filter(p => {
+        const key = `${p.user_id}:${p.subject_user_id || ""}:${p.role}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (uniqueParticipants.length) {
         const { error: partErr } = await supabase.from("survey_participants").insert(uniqueParticipants);
         if (partErr) throw partErr;
       }
 
-      setNamiParticipantCount(participants.length);
+      setNamiParticipantCount(uniqueParticipants.length);
       setPendingSurveyId(survey.id);
       setShowNamiConfirm(true);
     } catch (e: any) {
@@ -507,7 +508,15 @@ export default function NewSurveyPage() {
                 className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
                 {loading ? "Sending..." : "Confirm & Send"}
               </button>
-              <button onClick={() => { setShowNamiConfirm(false); router.push(`/dashboard/surveys/${pendingSurveyId}`); }}
+              <button onClick={async () => {
+                  setShowNamiConfirm(false);
+                  try {
+                    await supabase.functions.invoke("survey-notifications", {
+                      body: { survey_id: pendingSurveyId, mode: "launch" },
+                    });
+                  } catch (e) { console.error("Notification error:", e); }
+                  router.push(`/dashboard/surveys/${pendingSurveyId}`);
+                }}
                 className="flex-1 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-50 transition-colors">
                 Skip Nami
               </button>

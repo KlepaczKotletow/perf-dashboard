@@ -107,13 +107,17 @@ async function getCycleQuestions(cycleId: string) {
   }));
 }
 
-async function getNamiStatus(cycleId: string, workspaceId: string) {
+async function getNamiStatus(assignmentIds: string[], workspaceId: string) {
+  if (assignmentIds.length === 0) return [];
   const supabase = await createServerSupabaseClient();
+  // Build OR filter for reference_ids containing any assignment ID
+  const refFilters = assignmentIds.map(id => `reference_id.like.%${id}%`).join(',');
   const { data } = await supabase
     .from("notification_log")
     .select("user_id, event_type, reminder_count, sent_at, reference_id")
     .eq("workspace_id", workspaceId)
-    .like("event_type", "nami_%");
+    .like("event_type", "nami_%")
+    .or(refFilters);
   return data || [];
 }
 
@@ -171,7 +175,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     getReviewAssignments(id),
     getCycleQuestions(id),
     getAllCompetencies(workspace?.workspaceId ?? ""),
-    getNamiStatus(id, workspace?.workspaceId ?? ""),
+    getReviewAssignments(id).then(a => getNamiStatus(a.map((x: any) => x.id), workspace?.workspaceId ?? "")),
   ]);
 
   const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");

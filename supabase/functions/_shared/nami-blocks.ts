@@ -375,7 +375,12 @@ export function buildSurveyQuestionPrompt(
       action_id: `nami_survey_rate_${i + 1}`,
       value: JSON.stringify({ convId, surveyId, questionIndex: index, rating: i + 1 }),
     }));
-    return [header, { type: "actions", elements: buttons }];
+    // Slack actions blocks have a max of 5 elements — split into two rows
+    return [
+      header,
+      { type: "actions", elements: buttons.slice(0, 4) },
+      { type: "actions", elements: buttons.slice(4) },
+    ];
   }
 
   if (question.type === "single_select" && question.options) {
@@ -434,7 +439,7 @@ export function buildReminderMessage(
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `Hey ${userName}! ${urgency}\n\nYou still have *${itemName}* to complete.\n:calendar: *${daysLeft} day${daysLeft === 1 ? "" : "s"} left*`,
+        text: `Hey ${userName}! ${urgency}\n\nYou still have *${itemName}* to complete.\n:calendar: *${daysLeft <= 0 ? "overdue!" : daysLeft === 1 ? "1 day left" : `${daysLeft} days left`}*`,
       },
     },
     { type: "divider" },

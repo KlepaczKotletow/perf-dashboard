@@ -374,6 +374,8 @@ export default function NewCyclePage() {
         if (error) {
           console.error("Nami send error:", error);
           setError(`Cycle launched, but Nami messages failed: ${error.message}`);
+          setLoading(false);
+          return;
         }
       }
 
@@ -761,7 +763,17 @@ export default function NewCyclePage() {
                 className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {loading === "launch" ? "Sending..." : "Confirm & Send"}
               </button>
-              <button onClick={() => { setShowNamiConfirm(false); router.push(`/dashboard/cycles/${pendingCycleId}`); router.refresh(); }}
+              <button onClick={async () => {
+                  setShowNamiConfirm(false);
+                  // Still send old-style notifications when skipping Nami
+                  try {
+                    await supabase.functions.invoke("cycle-notifications", {
+                      body: { action: "launch", cycle_id: pendingCycleId },
+                    });
+                  } catch (e) { console.error("Notification error:", e); }
+                  router.push(`/dashboard/cycles/${pendingCycleId}`);
+                  router.refresh();
+                }}
                 className="flex-1 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-50 transition-colors">
                 Skip Nami
               </button>
