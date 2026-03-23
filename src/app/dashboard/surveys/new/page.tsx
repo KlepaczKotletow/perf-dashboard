@@ -41,6 +41,11 @@ export default function NewSurveyPage() {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNamiConfirm, setShowNamiConfirm] = useState(false);
+  const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule">("now");
+  const [namiScheduleDate, setNamiScheduleDate] = useState("");
+  const [pendingSurveyId, setPendingSurveyId] = useState<string | null>(null);
+  const [namiParticipantCount, setNamiParticipantCount] = useState(0);
 
   // Step 1
   const [surveyType, setSurveyType] = useState<SurveyType | null>(null);
@@ -191,15 +196,36 @@ export default function NewSurveyPage() {
         if (partErr) throw partErr;
       }
 
-      const { error: notifErr } = await supabase.functions.invoke("survey-notifications", {
-        body: { survey_id: survey.id, mode: "launch" },
-      });
-      if (notifErr) console.warn("Notification error (non-fatal):", notifErr);
-
-      router.push(`/dashboard/surveys/${survey.id}`);
+      setNamiParticipantCount(uniqueParticipants.length);
+      setPendingSurveyId(survey.id);
+      setShowNamiConfirm(true);
     } catch (e: any) {
       setError(e.message || "Something went wrong");
     } finally {
+      setLoading(false);
+    }
+  }
+
+  async function confirmNamiSend() {
+    if (!pendingSurveyId) return;
+    setLoading(true);
+    try {
+      const sendAt = namiScheduleMode === "schedule" && namiScheduleDate
+        ? new Date(namiScheduleDate).toISOString() : null;
+
+      await supabase.from("surveys").update({
+        nami_send_at: sendAt, nami_confirmed: true
+      }).eq("id", pendingSurveyId);
+
+      if (!sendAt) {
+        await supabase.functions.invoke("nami-bot", {
+          body: { action: "launch_survey", survey_id: pendingSurveyId },
+        });
+      }
+
+      router.push(`/dashboard/surveys/${pendingSurveyId}`);
+    } catch (e: any) {
+      setError(e.message || "Failed to send Nami messages");
       setLoading(false);
     }
   }
@@ -448,6 +474,44 @@ export default function NewSurveyPage() {
             <Button onClick={handleLaunch} disabled={loading}>
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Launching...</> : "Launch Survey 🚀"}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {showNamiConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
+            <h3 className="text-lg font-semibold">🤖 Nami will message:</h3>
+            <p className="text-sm text-zinc-600">
+              <strong>{namiParticipantCount}</strong> participants will receive a Slack DM to complete the survey.
+            </p>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "now"}
+                  onChange={() => setNamiScheduleMode("now")} className="accent-emerald-600" />
+                Send now
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "schedule"}
+                  onChange={() => setNamiScheduleMode("schedule")} className="accent-emerald-600" />
+                Schedule
+              </label>
+            </div>
+            {namiScheduleMode === "schedule" && (
+              <input type="datetime-local" value={namiScheduleDate}
+                onChange={(e) => setNamiScheduleDate(e.target.value)}
+                className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm" />
+            )}
+            <div className="flex gap-3 pt-2">
+              <button onClick={confirmNamiSend} disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}
+                className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                {loading ? "Sending..." : "Confirm & Send"}
+              </button>
+              <button onClick={() => { setShowNamiConfirm(false); router.push(`/dashboard/surveys/${pendingSurveyId}`); }}
+                className="flex-1 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-50 transition-colors">
+                Skip Nami
+              </button>
+            </div>
           </div>
         </div>
       )}
