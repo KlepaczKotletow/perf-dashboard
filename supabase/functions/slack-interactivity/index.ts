@@ -1,3 +1,5 @@
+import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, buildReviewSummary, buildSurveyQuestionPrompt } from "../_shared/nami-blocks.ts";
+
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
@@ -1302,6 +1304,680 @@ Deno.serve(async (req) => {
             blocks: [
               { type: "section", text: { type: "mrkdwn", text: "✅ *Thank you!* Your response has been recorded." } },
             ],
+          });
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Start review (conversational flow with Block Kit buttons)
+      // ================================================================
+      if (action?.action_id === "nami_start_review") {
+        const raw = action.value || "";
+        // Value format: "self_<assignmentId>" | "mgr_<assignmentId>" | "upward_<assignmentId>"
+        const underscoreIdx = raw.indexOf("_");
+        const rolePrefix = raw.slice(0, underscoreIdx);
+        const assignmentId = raw.slice(underscoreIdx + 1);
+        if (!assignmentId) return json({});
+
+        const slackUserId = payload.user.id;
+        const user = await getOrCreateUser(ws.id, slackUserId, botToken);
+        if (!user) return json({});
+
+        const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
+        const assignment = assignments?.[0];
+        if (!assignment) return json({});
+
+        let reviewRole = "manager";
+        if (rolePrefix === "self" || user.id === assignment.employee_id) reviewRole = "self";
+        if (rolePrefix === "upward" || (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id)) reviewRole = "upward";
+
+        // WS3: Send manager context before starting review
+        if (reviewRole === "manager" && assignment.cycle_id) {
+          await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
+        }
+
+        const { competencies, empName, cycleId } = await getCompetenciesForAssignment(assignmentId, assignment.employee_id, ws.id);
+        const cycleName = assignment.performance_cycles?.name || "Review";
+
+        if (competencies.length === 0) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: "No competencies found for this review. Please use the full form instead.",
+          });
+          return json({});
+        }
+
+        const compIds = competencies.map((c: any) => c.id);
+        const compNames = competencies.map((c: any) => c.name);
+        const compDescs = competencies.map((c: any) => c.category ? `Category: ${c.category}` : "");
+
+        // Get text questions from cycle_questions
+        let textQuestionIds: string[] = [];
+        let textQuestionPrompts: string[] = [];
+        if (cycleId) {
+          const tqs = await dbQuery("cycle_questions", `cycle_id=eq.${cycleId}&question_type=eq.text&select=id,prompt&order=sort_order`);
+          if (tqs && tqs.length > 0 && !tqs.error) {
+            textQuestionIds = tqs.map((q: any) => q.id);
+            textQuestionPrompts = tqs.map((q: any) => q.prompt || "Additional comments");
+          }
+        }
+
+        // Expire existing active conversation_states for this user+assignment
+        await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&assignment_id=eq.${assignmentId}&status=eq.active`, { status: "expired" });
+
+        const convState = await dbInsert("conversation_states", {
+          workspace_id: ws.id,
+          user_id: user.id,
+          slack_user_id: slackUserId,
+          assignment_id: assignmentId,
+          review_role: reviewRole,
+          employee_name: empName,
+          cycle_name: cycleName,
+          competency_ids: compIds,
+          competency_names: compNames,
+          current_index: 0,
+          ratings: {},
+          status: "active",
+          phase: "competencies",
+          flow_type: "review",
+          text_question_ids: textQuestionIds,
+          text_question_prompts: textQuestionPrompts,
+          text_responses: {},
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+        if (!convState?.[0]) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: "Something went wrong starting the review. Please try again.",
+          });
+          return json({});
+        }
+
+        // Send first competency prompt using Nami blocks
+        const blocks = buildCompetencyPrompt(compNames[0], compDescs[0], 0, compNames.length, convState[0].id, assignmentId);
+        await slackApi(botToken, "chat.postMessage", {
+          channel: slackUserId,
+          text: `Rate ${compNames[0]} (1/${compNames.length})`,
+          blocks,
+        });
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Remind me later
+      // ================================================================
+      if (action?.action_id === "nami_remind_later") {
+        const slackUserId = payload.user.id;
+        await slackApi(botToken, "chat.postMessage", {
+          channel: slackUserId,
+          text: "No problem! I'll check back with you tomorrow 🕐",
+        });
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Rate competency (1-5)
+      // ================================================================
+      if (action?.action_id?.startsWith("nami_rate_")) {
+        const ratingNum = parseInt(action.action_id.replace("nami_rate_", ""));
+        if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) return json({});
+
+        const meta = safeParse(action.value);
+        const { convId, assignmentId, compName } = meta;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        // Update ratings
+        const ratings = conv.ratings || {};
+        const currentIdx = conv.current_index || 0;
+        const compIds = conv.competency_ids || [];
+        const currentCompId = compIds[currentIdx];
+        if (currentCompId) {
+          ratings[currentCompId] = { rating: ratingNum };
+        }
+
+        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          ratings,
+          updated_at: new Date().toISOString(),
+        });
+
+        // Send comment prompt
+        const compNames = conv.competency_names || [];
+        const currentCompName = compNames[currentIdx] || compName || "this competency";
+        const blocks = buildCommentPrompt(currentCompName, convId);
+        await slackApi(botToken, "chat.postMessage", {
+          channel: payload.user.id,
+          text: `Any comments on ${currentCompName}?`,
+          blocks,
+        });
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Skip comment
+      // ================================================================
+      if (action?.action_id === "nami_skip_comment") {
+        const meta = safeParse(action.value);
+        const { convId } = meta;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        const compIds = conv.competency_ids || [];
+        const compNames = conv.competency_names || [];
+        const compDescs = compIds.map((_: any, i: number) => "");
+        const nextIndex = (conv.current_index || 0) + 1;
+
+        if (nextIndex < compIds.length) {
+          // More competencies to rate
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            current_index: nextIndex,
+            updated_at: new Date().toISOString(),
+          });
+
+          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id);
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
+            blocks,
+          });
+        } else {
+          // No more competencies — check for text questions
+          let textQuestionIds = conv.text_question_ids || [];
+          let textQuestionPrompts = conv.text_question_prompts || [];
+
+          // If text questions not yet loaded, fetch them
+          if (textQuestionIds.length === 0 && conv.assignment_id) {
+            const aData = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=cycle_id`);
+            const cycleId = aData?.[0]?.cycle_id;
+            if (cycleId) {
+              const tqs = await dbQuery("cycle_questions", `cycle_id=eq.${cycleId}&question_type=eq.text&select=id,prompt&order=sort_order`);
+              if (tqs && tqs.length > 0 && !tqs.error) {
+                textQuestionIds = tqs.map((q: any) => q.id);
+                textQuestionPrompts = tqs.map((q: any) => q.prompt || "Additional comments");
+              }
+            }
+          }
+
+          if (textQuestionIds.length > 0) {
+            // Transition to text_questions phase
+            await dbUpdate("conversation_states", `id=eq.${convId}`, {
+              phase: "text_questions",
+              current_index: 0,
+              text_question_ids: textQuestionIds,
+              text_question_prompts: textQuestionPrompts,
+              updated_at: new Date().toISOString(),
+            });
+
+            const blocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionPrompts.length, convId);
+            await slackApi(botToken, "chat.postMessage", {
+              channel: payload.user.id,
+              text: `Question 1/${textQuestionPrompts.length}`,
+              blocks,
+            });
+          } else {
+            // No text questions — go to summary
+            await dbUpdate("conversation_states", `id=eq.${convId}`, {
+              phase: "summary",
+              updated_at: new Date().toISOString(),
+            });
+
+            const ratings = conv.ratings || {};
+            const ratingValues = compIds.map((id: string) => ratings[id]?.rating || 0);
+            const textResponses = conv.text_responses || {};
+            const tqPrompts = conv.text_question_prompts || [];
+            const tqIds = conv.text_question_ids || [];
+            const tqResponses = tqIds.map((id: string) => textResponses[id] || "");
+
+            const blocks = buildReviewSummary(conv.employee_name, compNames, ratingValues, tqPrompts, tqResponses, convId);
+            await slackApi(botToken, "chat.postMessage", {
+              channel: payload.user.id,
+              text: `Review summary for ${conv.employee_name}`,
+              blocks,
+            });
+          }
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Submit review (from summary)
+      // ================================================================
+      if (action?.action_id === "nami_submit_review") {
+        const convId = action.value;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        // Mark as completed
+        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          status: "completed",
+          phase: "completed",
+          updated_at: new Date().toISOString(),
+        });
+
+        // Save competency ratings to review_responses
+        const ratings = conv.ratings || {};
+        const compIds = conv.competency_ids || [];
+        const compNames = conv.competency_names || [];
+        const reviewRole = conv.review_role || "manager";
+        let totalRating = 0;
+        let ratedCount = 0;
+
+        for (const [compId, data] of Object.entries(ratings)) {
+          const { rating, comment } = data as any;
+          if (!rating) continue;
+          totalRating += rating;
+          ratedCount++;
+          await dbInsert("review_responses", {
+            assignment_id: conv.assignment_id,
+            reviewer_id: conv.user_id,
+            reviewer_role: reviewRole,
+            competency_id: compId,
+            rating: rating,
+            ...(comment ? { comment } : {}),
+          });
+        }
+
+        // Save text responses
+        const textResponses = conv.text_responses || {};
+        const textQuestionIds = conv.text_question_ids || [];
+        const textQuestionPrompts = conv.text_question_prompts || [];
+        for (let i = 0; i < textQuestionIds.length; i++) {
+          const answer = textResponses[textQuestionIds[i]];
+          if (answer) {
+            await dbInsert("review_responses", {
+              assignment_id: conv.assignment_id,
+              reviewer_id: conv.user_id,
+              reviewer_role: reviewRole,
+              comment: `[${textQuestionPrompts[i] || ""}] ${answer}`,
+            });
+          }
+        }
+
+        // Update assignment status
+        const avgRating = ratedCount > 0 ? Math.round((totalRating / ratedCount) * 100) / 100 : 0;
+        if ((reviewRole === "manager" || reviewRole === "upward") && ratedCount > 0) {
+          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+            status: "completed",
+            overall_rating: avgRating,
+            updated_at: new Date().toISOString(),
+          });
+        } else if (reviewRole === "self") {
+          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+            status: "in_progress",
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        // Send confirmation
+        const avgStr = ratedCount > 0 ? (Math.round((totalRating / ratedCount) * 10) / 10).toString() : "N/A";
+        const summaryLines = compIds.map((id: string, i: number) => {
+          const r = ratings[id];
+          if (r?.rating) {
+            return `\u2022 ${compNames[i]} \u2014 *${r.rating}*/5${r.comment ? `  _${r.comment.slice(0, 50)}${r.comment.length > 50 ? "..." : ""}_` : ""}`;
+          }
+          return `\u2022 ${compNames[i]} \u2014 skipped`;
+        }).join("\n");
+
+        await slackApi(botToken, "chat.postMessage", {
+          channel: payload.user.id,
+          text: `Review submitted \u2014 ${conv.employee_name}`,
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Review submitted \u2014 ${conv.employee_name}*` } },
+            { type: "divider" },
+            { type: "section", text: { type: "mrkdwn", text: summaryLines } },
+            { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/5* \u00b7 ${ratedCount} of ${compIds.length} rated` }] },
+            { type: "actions", elements: [
+              { type: "button", text: { type: "plain_text", text: "View on Dashboard \ud83d\udd17", emoji: true },
+                url: `${DASHBOARD_URL}/dashboard`, action_id: "open_dashboard" },
+            ]},
+          ],
+        });
+
+        // WS4 + WS5: Update notification & check completions
+        updateOriginalNotification(conv.assignment_id).catch(console.error);
+        const aData = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=cycle_id`);
+        if (aData?.[0]?.cycle_id) {
+          checkAndNotifyCompletion(conv.assignment_id, aData[0].cycle_id, conv.workspace_id).catch(console.error);
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Edit review (go back to first competency)
+      // ================================================================
+      if (action?.action_id === "nami_edit_review") {
+        const convId = action.value;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          phase: "competencies",
+          current_index: 0,
+          updated_at: new Date().toISOString(),
+        });
+
+        const compNames = conv.competency_names || [];
+        const compIds = conv.competency_ids || [];
+        if (compNames.length > 0) {
+          const blocks = buildCompetencyPrompt(compNames[0], "", 0, compNames.length, convId, conv.assignment_id);
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Editing review \u2014 rate ${compNames[0]} again`,
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: `:pencil2: *Editing review for ${conv.employee_name}*\nStarting from the first competency.` } },
+              { type: "divider" },
+              ...blocks,
+            ],
+          });
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Cancel review
+      // ================================================================
+      if (action?.action_id === "nami_cancel_review") {
+        const convId = action.value;
+        if (!convId) return json({});
+
+        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          status: "expired",
+          updated_at: new Date().toISOString(),
+        });
+
+        await slackApi(botToken, "chat.postMessage", {
+          channel: payload.user.id,
+          text: "Review cancelled. You can start again anytime with /review.",
+        });
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Start survey (conversational flow)
+      // ================================================================
+      if (action?.action_id === "nami_start_survey") {
+        const meta = safeParse(action.value);
+        const { participantId, surveyId } = meta;
+        if (!participantId || !surveyId) return json({});
+
+        const slackUserId = payload.user.id;
+        const user = await getOrCreateUser(ws.id, slackUserId, botToken);
+        if (!user) return json({});
+
+        const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,name,config,workspace_id`);
+        const survey = surveys?.[0];
+        if (!survey || survey.workspace_id !== ws.id) return json({});
+
+        const questions: any[] = survey.config?.questions || [];
+        if (questions.length === 0) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: "This survey has no questions configured.",
+          });
+          return json({});
+        }
+
+        const questionIds = questions.map((q: any) => q.id);
+
+        // Expire existing active survey conversation_states
+        await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active&flow_type=eq.survey`, { status: "expired" });
+
+        const convState = await dbInsert("conversation_states", {
+          workspace_id: ws.id,
+          user_id: user.id,
+          slack_user_id: slackUserId,
+          status: "active",
+          flow_type: "survey",
+          phase: "survey_questions",
+          survey_id: surveyId,
+          survey_participant_id: participantId,
+          survey_question_ids: questionIds,
+          survey_answers: {},
+          current_index: 0,
+          // Store full questions config for sending prompts
+          survey_questions_config: questions,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        });
+
+        if (!convState?.[0]) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: "Something went wrong starting the survey. Please try again.",
+          });
+          return json({});
+        }
+
+        // Send first question
+        const firstQ = questions[0];
+        const blocks = buildSurveyQuestionPrompt(
+          { prompt: firstQ.label || firstQ.prompt, type: firstQ.type, options: firstQ.options },
+          0, questions.length, convState[0].id, surveyId,
+        );
+        await slackApi(botToken, "chat.postMessage", {
+          channel: slackUserId,
+          text: `Question 1/${questions.length}`,
+          blocks,
+        });
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Survey rating answer (1-7)
+      // ================================================================
+      if (action?.action_id?.startsWith("nami_survey_rate_")) {
+        const meta = safeParse(action.value);
+        const { convId, surveyId, questionIndex, rating } = meta;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        const questions: any[] = conv.survey_questions_config || [];
+        const questionIds = conv.survey_question_ids || [];
+        const answers = conv.survey_answers || {};
+        const currentIdx = questionIndex ?? conv.current_index ?? 0;
+
+        // Save answer
+        if (questionIds[currentIdx]) {
+          answers[questionIds[currentIdx]] = rating;
+        }
+
+        const nextIndex = currentIdx + 1;
+        if (nextIndex < questions.length) {
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            survey_answers: answers,
+            current_index: nextIndex,
+            updated_at: new Date().toISOString(),
+          });
+
+          const nextQ = questions[nextIndex];
+          const blocks = buildSurveyQuestionPrompt(
+            { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
+            nextIndex, questions.length, convId, surveyId,
+          );
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Question ${nextIndex + 1}/${questions.length}`,
+            blocks,
+          });
+        } else {
+          // Survey complete — save responses
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            survey_answers: answers,
+            status: "completed",
+            phase: "completed",
+            updated_at: new Date().toISOString(),
+          });
+
+          const participantId = conv.survey_participant_id;
+          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const participant = participants?.[0];
+
+          await dbInsert("survey_responses", {
+            survey_id: conv.survey_id,
+            participant_id: participantId,
+            subject_user_id: participant?.subject_user_id || null,
+            answers,
+          });
+          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          });
+
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: Thank you! Your survey response has been submitted.",
+          });
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Survey select answer (0-4)
+      // ================================================================
+      if (action?.action_id?.startsWith("nami_survey_select_")) {
+        const meta = safeParse(action.value);
+        const { convId, surveyId, questionIndex, selected } = meta;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        const questions: any[] = conv.survey_questions_config || [];
+        const questionIds = conv.survey_question_ids || [];
+        const answers = conv.survey_answers || {};
+        const currentIdx = questionIndex ?? conv.current_index ?? 0;
+
+        // Save answer
+        if (questionIds[currentIdx]) {
+          answers[questionIds[currentIdx]] = selected;
+        }
+
+        const nextIndex = currentIdx + 1;
+        if (nextIndex < questions.length) {
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            survey_answers: answers,
+            current_index: nextIndex,
+            updated_at: new Date().toISOString(),
+          });
+
+          const nextQ = questions[nextIndex];
+          const blocks = buildSurveyQuestionPrompt(
+            { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
+            nextIndex, questions.length, convId, surveyId,
+          );
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Question ${nextIndex + 1}/${questions.length}`,
+            blocks,
+          });
+        } else {
+          // Survey complete — save responses
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            survey_answers: answers,
+            status: "completed",
+            phase: "completed",
+            updated_at: new Date().toISOString(),
+          });
+
+          const participantId = conv.survey_participant_id;
+          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const participant = participants?.[0];
+
+          await dbInsert("survey_responses", {
+            survey_id: conv.survey_id,
+            participant_id: participantId,
+            subject_user_id: participant?.subject_user_id || null,
+            answers,
+          });
+          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          });
+
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: Thank you! Your survey response has been submitted.",
+          });
+        }
+        return json({});
+      }
+
+      // ================================================================
+      //  NAMI: Skip survey question
+      // ================================================================
+      if (action?.action_id === "nami_survey_skip") {
+        const meta = safeParse(action.value);
+        const { convId, surveyId, questionIndex } = meta;
+        if (!convId) return json({});
+
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const conv = convStates?.[0];
+        if (!conv) return json({});
+
+        const questions: any[] = conv.survey_questions_config || [];
+        const currentIdx = questionIndex ?? conv.current_index ?? 0;
+        const nextIndex = currentIdx + 1;
+
+        if (nextIndex < questions.length) {
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            current_index: nextIndex,
+            updated_at: new Date().toISOString(),
+          });
+
+          const nextQ = questions[nextIndex];
+          const blocks = buildSurveyQuestionPrompt(
+            { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
+            nextIndex, questions.length, convId, surveyId,
+          );
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Question ${nextIndex + 1}/${questions.length}`,
+            blocks,
+          });
+        } else {
+          // Survey complete — save responses (with skipped questions omitted)
+          const answers = conv.survey_answers || {};
+          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            status: "completed",
+            phase: "completed",
+            updated_at: new Date().toISOString(),
+          });
+
+          const participantId = conv.survey_participant_id;
+          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const participant = participants?.[0];
+
+          await dbInsert("survey_responses", {
+            survey_id: conv.survey_id,
+            participant_id: participantId,
+            subject_user_id: participant?.subject_user_id || null,
+            answers,
+          });
+          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          });
+
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: Thank you! Your survey response has been submitted.",
           });
         }
         return json({});
