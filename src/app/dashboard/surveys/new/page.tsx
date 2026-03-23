@@ -196,7 +196,7 @@ export default function NewSurveyPage() {
         if (partErr) throw partErr;
       }
 
-      setNamiParticipantCount(uniqueParticipants.length);
+      setNamiParticipantCount(participants.length);
       setPendingSurveyId(survey.id);
       setShowNamiConfirm(true);
     } catch (e: any) {
