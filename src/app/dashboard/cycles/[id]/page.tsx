@@ -16,6 +16,7 @@ import {
   Circle,
   ExternalLink,
   TrendingUp,
+  Bot,
 } from "lucide-react";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
@@ -106,6 +107,16 @@ async function getCycleQuestions(cycleId: string) {
   }));
 }
 
+async function getNamiStatus(cycleId: string, workspaceId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("notification_log")
+    .select("user_id, event_type, reminder_count, sent_at, reference_id")
+    .eq("workspace_id", workspaceId)
+    .like("event_type", "nami_%");
+  return data || [];
+}
+
 function getAllCompetencies(workspaceId: string) {
   return unstable_cache(
     async () => {
@@ -153,13 +164,14 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     );
   }
 
-  const [employees, allUsers, phases, assignments, cycleQuestions, allCompetencies] = await Promise.all([
+  const [employees, allUsers, phases, assignments, cycleQuestions, allCompetencies, namiLogs] = await Promise.all([
     getCycleEmployees(id),
     getWorkspaceUsers(workspace!.workspaceId!),
     getCyclePhases(id),
     getReviewAssignments(id),
     getCycleQuestions(id),
     getAllCompetencies(workspace?.workspaceId ?? ""),
+    getNamiStatus(id, workspace?.workspaceId ?? ""),
   ]);
 
   const standardAssignments = assignments.filter((a: any) => a.assignment_type !== "upward");
@@ -597,6 +609,152 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           </CardContent>
         </Card>
       )}
+
+      {/* ── Nami Status Tracker ──────────────────────────────────────────── */}
+      {cycle.nami_confirmed && (() => {
+        // Build a map of nami logs per user
+        const namiByUser = new Map<string, { event_type: string; reminder_count: number; sent_at: string }[]>();
+        for (const log of namiLogs) {
+          if (!namiByUser.has(log.user_id)) namiByUser.set(log.user_id, []);
+          namiByUser.get(log.user_id)!.push(log);
+        }
+
+        // Build participant rows from assignments
+        type NamiRow = { userId: string; name: string; role: string; completed: boolean; reminderCount: number; escalated: boolean; sentAt: string | null };
+        const namiRows: NamiRow[] = [];
+
+        for (const a of standardAssignments) {
+          const userId = (a as any).employee?.id;
+          const name = (a as any).employee?.slack_name || "Unknown";
+          const logs = userId ? namiByUser.get(userId) || [] : [];
+          const selfLogs = logs.filter((l: any) => l.event_type.includes("self"));
+          const maxReminder = selfLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
+          const selfDone = (a as any).status === "in_progress" || (a as any).status === "completed";
+          namiRows.push({
+            userId: userId || "",
+            name,
+            role: "Self-review",
+            completed: selfDone,
+            reminderCount: maxReminder,
+            escalated: maxReminder >= 3,
+            sentAt: selfLogs.length > 0 ? selfLogs[selfLogs.length - 1].sent_at : null,
+          });
+
+          if ((a as any).manager_id) {
+            const mgrName = (a as any).manager?.slack_name || "Unknown";
+            const mgrLogs = (a as any).manager_id ? namiByUser.get((a as any).manager_id) || [] : [];
+            const mgrReviewLogs = mgrLogs.filter((l: any) => l.event_type.includes("manager"));
+            const mgrMaxReminder = mgrReviewLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
+            const mgrDone = (a as any).status === "completed";
+            namiRows.push({
+              userId: (a as any).manager_id,
+              name: mgrName,
+              role: `Manager review (${name})`,
+              completed: mgrDone,
+              reminderCount: mgrMaxReminder,
+              escalated: mgrMaxReminder >= 3,
+              sentAt: mgrReviewLogs.length > 0 ? mgrReviewLogs[mgrReviewLogs.length - 1].sent_at : null,
+            });
+          }
+        }
+
+        for (const a of upwardAssignments) {
+          const reviewerName = (a as any).reviewer?.slack_name || "Unknown";
+          const targetName = (a as any).employee?.slack_name || "Unknown";
+          const reviewerId = (a as any).reviewer_id;
+          const logs = reviewerId ? namiByUser.get(reviewerId) || [] : [];
+          const upLogs = logs.filter((l: any) => l.event_type.includes("upward"));
+          const maxReminder = upLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
+          const done = (a as any).status === "completed";
+          namiRows.push({
+            userId: reviewerId || "",
+            name: reviewerName,
+            role: `Upward feedback (${targetName})`,
+            completed: done,
+            reminderCount: maxReminder,
+            escalated: maxReminder >= 3,
+            sentAt: upLogs.length > 0 ? upLogs[upLogs.length - 1].sent_at : null,
+          });
+        }
+
+        const completedCount = namiRows.filter(r => r.completed).length;
+        const remindedCount = namiRows.filter(r => !r.completed && r.reminderCount > 0 && !r.escalated).length;
+        const escalatedCount = namiRows.filter(r => r.escalated && !r.completed).length;
+
+        return (
+          <Card className="border-border/60">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <Bot className="h-4 w-4 text-primary" />
+                    Nami Status
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    {completedCount}/{namiRows.length} completed
+                    {remindedCount > 0 && <> &middot; {remindedCount} reminded</>}
+                    {escalatedCount > 0 && <> &middot; {escalatedCount} escalated</>}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              {/* Column headers */}
+              <div className="grid grid-cols-[1fr_120px_80px_80px] items-center px-6 pb-2 border-b border-border/60 min-w-[500px]">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Participant</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Role</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Status</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Reminders</p>
+              </div>
+
+              {/* Rows */}
+              <div className="divide-y divide-border/50 min-w-[500px]">
+                {namiRows.map((row, idx) => (
+                  <div
+                    key={`${row.userId}-${row.role}-${idx}`}
+                    className="grid grid-cols-[1fr_120px_80px_80px] items-center px-6 py-3 hover:bg-muted/30 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-foreground truncate">{row.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{row.role}</p>
+                    <div className="flex justify-center">
+                      {row.completed ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Done
+                        </span>
+                      ) : row.escalated ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-600 dark:text-red-400">
+                          <TriangleAlert className="h-3.5 w-3.5" />
+                          Escalated
+                        </span>
+                      ) : row.reminderCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          <Clock className="h-3.5 w-3.5" />
+                          Reminded
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                          <Circle className="h-3.5 w-3.5" />
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-center">
+                      <span className={`text-xs font-medium ${
+                        row.escalated ? "text-red-600 dark:text-red-400" :
+                        row.reminderCount > 0 ? "text-amber-600 dark:text-amber-400" :
+                        "text-muted-foreground"
+                      }`}>
+                        {row.reminderCount}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* ── Add Employees (draft only) ────────────────────────────────────── */}
       {cycle.status === "draft" && (

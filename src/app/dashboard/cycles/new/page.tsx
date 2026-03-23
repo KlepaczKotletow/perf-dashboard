@@ -171,6 +171,13 @@ export default function NewCyclePage() {
   const [error, setError] = useState<string | null>(null);
   const [showLaunchConfirm, setShowLaunchConfirm] = useState(false);
 
+  // Nami confirmation
+  const [showNamiConfirm, setShowNamiConfirm] = useState(false);
+  const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule">("now");
+  const [namiScheduleDate, setNamiScheduleDate] = useState("");
+  const [pendingCycleId, setPendingCycleId] = useState<string | null>(null);
+  const [namiSendCounts, setNamiSendCounts] = useState({ employees: 0, managers: 0, upward: 0 });
+
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -333,24 +340,47 @@ export default function NewCyclePage() {
       await supabase.from("performance_cycle_employees")
         .update({ status: "in_progress" }).eq("performance_cycle_id", cycleId);
 
-      // Send Slack notifications — awaited so they complete before redirect
-      const { error: notifError } = await supabase.functions.invoke("cycle-notifications", {
-        body: { action: "launch", cycle_id: cycleId },
-      });
-      if (notifError) {
-        // Notifications failed but cycle is live — show warning, don't block
-        console.error("Notification error:", notifError);
-        setError(`Cycle launched, but Slack notifications failed: ${notifError.message}. You can re-trigger them from the cycle page.`);
-        setLoading(false);
-        router.push(`/dashboard/cycles/${cycleId}`);
-        router.refresh();
-        return;
-      }
-
-      router.push(`/dashboard/cycles/${cycleId}`);
-      router.refresh();
+      // Calculate send counts and show Nami confirmation modal
+      const employeeCount = standardAssignments.length;
+      const managerCount = standardAssignments.filter(a => a.manager_id).length;
+      const upwardCount = upwardAssignments.length;
+      setNamiSendCounts({ employees: employeeCount, managers: managerCount, upward: upwardCount });
+      setPendingCycleId(cycleId);
+      setShowNamiConfirm(true);
+      setLoading(false);
     } catch (err: any) {
       setError(err.message || "Failed to launch cycle");
+      setLoading(false);
+    }
+  }
+
+  // ── Nami confirmation ─────────────────────────────────────────────────────
+  async function confirmNamiSend() {
+    if (!pendingCycleId) return;
+    setLoading("launch");
+    try {
+      const sendAt = namiScheduleMode === "schedule" && namiScheduleDate
+        ? new Date(namiScheduleDate).toISOString() : null;
+
+      await supabase.from("performance_cycles").update({
+        nami_send_at: sendAt, nami_confirmed: true
+      }).eq("id", pendingCycleId);
+
+      // If send now, invoke nami-bot immediately
+      if (!sendAt) {
+        const { error } = await supabase.functions.invoke("nami-bot", {
+          body: { action: "launch_cycle", cycle_id: pendingCycleId },
+        });
+        if (error) {
+          console.error("Nami send error:", error);
+          setError(`Cycle launched, but Nami messages failed: ${error.message}`);
+        }
+      }
+
+      router.push(`/dashboard/cycles/${pendingCycleId}`);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "Failed to send Nami messages");
       setLoading(false);
     }
   }
@@ -699,6 +729,46 @@ export default function NewCyclePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showNamiConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-zinc-900">Nami will message:</h3>
+            <ul className="space-y-1 text-sm text-zinc-600">
+              <li>&bull; <strong>{namiSendCounts.employees}</strong> employees (self-review)</li>
+              <li>&bull; <strong>{namiSendCounts.managers}</strong> managers (manager review)</li>
+              <li>&bull; <strong>{namiSendCounts.upward}</strong> direct reports (upward feedback)</li>
+            </ul>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "now"}
+                  onChange={() => setNamiScheduleMode("now")} className="accent-emerald-600" />
+                Send now
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "schedule"}
+                  onChange={() => setNamiScheduleMode("schedule")} className="accent-emerald-600" />
+                Schedule
+              </label>
+            </div>
+            {namiScheduleMode === "schedule" && (
+              <input type="datetime-local" value={namiScheduleDate}
+                onChange={(e) => setNamiScheduleDate(e.target.value)}
+                className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
+            )}
+            <div className="flex gap-3 pt-2">
+              <button onClick={confirmNamiSend} disabled={loading === "launch" || (namiScheduleMode === "schedule" && !namiScheduleDate)}
+                className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                {loading === "launch" ? "Sending..." : "Confirm & Send"}
+              </button>
+              <button onClick={() => { setShowNamiConfirm(false); router.push(`/dashboard/cycles/${pendingCycleId}`); router.refresh(); }}
+                className="flex-1 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-50 transition-colors">
+                Skip Nami
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
