@@ -1,4 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildCompetencyPrompt,
+  buildCommentPrompt,
+  buildTextQuestionPrompt,
+  buildReviewSummary,
+  buildSurveyQuestionPrompt,
+} from "../_shared/nami-blocks.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -237,6 +244,315 @@ Deno.serve(async (req) => {
 
     const blocks = await buildHomeBlocks(appUser);
     await publishHomeTab(workspace.bot_token, slackUserId, blocks);
+  }
+
+  // ================================================================
+  //  Nami: Handle free-text DM replies for active conversations
+  // ================================================================
+  if (
+    innerEvent?.type === "message" &&
+    innerEvent.channel_type === "im" &&
+    !innerEvent.bot_id &&
+    !innerEvent.subtype
+  ) {
+    // Respond to Slack immediately — process in background
+    const slackUserId = innerEvent.user;
+    const text = (innerEvent.text || "").trim();
+    const teamId = event.team_id;
+
+    if (!text) {
+      return new Response("OK", { status: 200 });
+    }
+
+    // Fire-and-forget: Slack needs a 200 within 3 seconds
+    const processing = (async () => {
+      try {
+        // Look up active conversation for this user
+        const { data: convRows, error: convErr } = await supabase
+          .from("conversation_states")
+          .select("*")
+          .eq("slack_user_id", slackUserId)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (convErr || !convRows || convRows.length === 0) return;
+        const conv = convRows[0];
+
+        // Look up workspace bot_token
+        const { data: ws } = await supabase
+          .from("workspaces")
+          .select("id, bot_token")
+          .eq("team_id", teamId)
+          .single();
+
+        if (!ws?.bot_token) return;
+        const botToken = ws.bot_token;
+
+        async function sendSlackMessage(channel: string, msgText: string, msgBlocks?: unknown[]) {
+          const payload: any = { channel, text: msgText };
+          if (msgBlocks) payload.blocks = msgBlocks;
+          await fetch("https://slack.com/api/chat.postMessage", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${botToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+        }
+
+        // ── Review flow ──────────────────────────────────────────────
+        if (conv.flow_type === "review") {
+
+          // -- Phase: competencies (user is typing a comment for current competency) --
+          if (conv.phase === "competencies") {
+            const compIds: string[] = conv.competency_ids || [];
+            const compNames: string[] = conv.competency_names || [];
+            const currentIdx: number = conv.current_index || 0;
+            const currentCompId = compIds[currentIdx];
+            const ratings = conv.ratings || {};
+
+            // Save comment for the current competency
+            if (currentCompId && ratings[currentCompId]) {
+              ratings[currentCompId].comment = text;
+            }
+
+            const nextIndex = currentIdx + 1;
+
+            if (nextIndex < compIds.length) {
+              // More competencies — advance and send next prompt
+              await supabase
+                .from("conversation_states")
+                .update({
+                  ratings,
+                  current_index: nextIndex,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", conv.id);
+
+              const blocks = buildCompetencyPrompt(
+                compNames[nextIndex], "", nextIndex, compNames.length,
+                conv.id, conv.assignment_id,
+              );
+              await sendSlackMessage(
+                slackUserId,
+                `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
+                blocks,
+              );
+            } else {
+              // No more competencies — check for text questions
+              const textQuestionIds: string[] = conv.text_question_ids || [];
+              const textQuestionPrompts: string[] = conv.text_question_prompts || [];
+
+              if (textQuestionIds.length > 0) {
+                // Transition to text_questions phase
+                await supabase
+                  .from("conversation_states")
+                  .update({
+                    ratings,
+                    phase: "text_questions",
+                    current_index: 0,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", conv.id);
+
+                const blocks = buildTextQuestionPrompt(
+                  textQuestionPrompts[0], 0, textQuestionPrompts.length, conv.id,
+                );
+                await sendSlackMessage(
+                  slackUserId,
+                  `Question 1/${textQuestionPrompts.length}`,
+                  blocks,
+                );
+              } else {
+                // No text questions — go to summary
+                await supabase
+                  .from("conversation_states")
+                  .update({
+                    ratings,
+                    phase: "summary",
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", conv.id);
+
+                const ratingValues = compIds.map((id: string) => ratings[id]?.rating || 0);
+                const textResponses = conv.text_responses || {};
+                const tqIds: string[] = conv.text_question_ids || [];
+                const tqPrompts: string[] = conv.text_question_prompts || [];
+                const tqResponses = tqIds.map((id: string) => textResponses[id] || "");
+
+                const blocks = buildReviewSummary(
+                  conv.employee_name, compNames, ratingValues,
+                  tqPrompts, tqResponses, conv.id,
+                );
+                await sendSlackMessage(
+                  slackUserId,
+                  `Review summary for ${conv.employee_name}`,
+                  blocks,
+                );
+              }
+            }
+            return;
+          }
+
+          // -- Phase: text_questions (user is answering a text question) --
+          if (conv.phase === "text_questions") {
+            const textQuestionIds: string[] = conv.text_question_ids || [];
+            const textQuestionPrompts: string[] = conv.text_question_prompts || [];
+            const textResponses = conv.text_responses || {};
+            const currentIdx: number = conv.current_index || 0;
+            const currentQId = textQuestionIds[currentIdx];
+
+            // Save answer
+            if (currentQId) {
+              textResponses[currentQId] = text;
+            }
+
+            const nextIndex = currentIdx + 1;
+
+            if (nextIndex < textQuestionIds.length) {
+              // More questions
+              await supabase
+                .from("conversation_states")
+                .update({
+                  text_responses: textResponses,
+                  current_index: nextIndex,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", conv.id);
+
+              const blocks = buildTextQuestionPrompt(
+                textQuestionPrompts[nextIndex], nextIndex, textQuestionPrompts.length, conv.id,
+              );
+              await sendSlackMessage(
+                slackUserId,
+                `Question ${nextIndex + 1}/${textQuestionPrompts.length}`,
+                blocks,
+              );
+            } else {
+              // Done — go to summary
+              await supabase
+                .from("conversation_states")
+                .update({
+                  text_responses: textResponses,
+                  phase: "summary",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", conv.id);
+
+              const compIds: string[] = conv.competency_ids || [];
+              const compNames: string[] = conv.competency_names || [];
+              const ratings = conv.ratings || {};
+              const ratingValues = compIds.map((id: string) => ratings[id]?.rating || 0);
+              const tqResponses = textQuestionIds.map((id: string) => textResponses[id] || "");
+
+              const blocks = buildReviewSummary(
+                conv.employee_name, compNames, ratingValues,
+                textQuestionPrompts, tqResponses, conv.id,
+              );
+              await sendSlackMessage(
+                slackUserId,
+                `Review summary for ${conv.employee_name}`,
+                blocks,
+              );
+            }
+            return;
+          }
+
+          // Other review phases (summary, completed) — ignore text
+          return;
+        }
+
+        // ── Survey flow ──────────────────────────────────────────────
+        if (conv.flow_type === "survey") {
+          if (conv.phase !== "survey_questions") return;
+
+          const questions: any[] = conv.survey_questions_config || [];
+          const questionIds: string[] = conv.survey_question_ids || [];
+          const answers = conv.survey_answers || {};
+          const currentIdx: number = conv.current_index || 0;
+          const currentQ = questions[currentIdx];
+
+          // Only handle text-type survey questions via free-text
+          if (!currentQ || currentQ.type !== "text") return;
+
+          // Save answer
+          if (questionIds[currentIdx]) {
+            answers[questionIds[currentIdx]] = text;
+          }
+
+          const nextIndex = currentIdx + 1;
+
+          if (nextIndex < questions.length) {
+            await supabase
+              .from("conversation_states")
+              .update({
+                survey_answers: answers,
+                current_index: nextIndex,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", conv.id);
+
+            const nextQ = questions[nextIndex];
+            const blocks = buildSurveyQuestionPrompt(
+              { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
+              nextIndex, questions.length, conv.id, conv.survey_id,
+            );
+            await sendSlackMessage(
+              slackUserId,
+              `Question ${nextIndex + 1}/${questions.length}`,
+              blocks,
+            );
+          } else {
+            // Survey complete — save responses
+            await supabase
+              .from("conversation_states")
+              .update({
+                survey_answers: answers,
+                status: "completed",
+                phase: "completed",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", conv.id);
+
+            // Save to survey_responses table
+            const participantId = conv.survey_participant_id;
+            const { data: participant } = await supabase
+              .from("survey_participants")
+              .select("subject_user_id")
+              .eq("id", participantId)
+              .single();
+
+            await supabase.from("survey_responses").insert({
+              survey_id: conv.survey_id,
+              participant_id: participantId,
+              subject_user_id: participant?.subject_user_id || null,
+              answers,
+            });
+
+            await supabase
+              .from("survey_participants")
+              .update({
+                status: "completed",
+                completed_at: new Date().toISOString(),
+              })
+              .eq("id", participantId);
+
+            await sendSlackMessage(
+              slackUserId,
+              ":white_check_mark: Thank you! Your survey response has been submitted.",
+            );
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Error handling Nami DM text:", err);
+      }
+    })();
+
+    // Don't await — return 200 immediately, Deno keeps the promise alive
+    void processing;
   }
 
   return new Response("OK", { status: 200 });
