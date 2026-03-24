@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ArrowRight, AlertTriangle, Loader2, Plus, X, Target, MessageSquare,
-  Users, CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot,
+  Users, CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot, Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
@@ -60,6 +60,13 @@ interface Competency {
 interface TextQuestion {
   prompt: string;
   required: boolean;
+}
+interface Template {
+  id: string;
+  name: string;
+  description: string | null;
+  questions: { type: string; prompt: string; required?: boolean }[];
+  is_system: boolean;
 }
 
 // ── Reusable date picker field ─────────────────────────────────────────────────
@@ -201,6 +208,8 @@ export default function NewCyclePage() {
   ]);
   const [newPrompt, setNewPrompt] = useState("");
   const [tqOpen, setTqOpen] = useState(true);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateApplied, setTemplateApplied] = useState<string | null>(null);
 
   // Nami config (Step 4)
   const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule">("now");
@@ -227,14 +236,16 @@ export default function NewCyclePage() {
       const wsId = user?.user_metadata?.workspace_id;
       if (!wsId) return;
 
-      const [{ data: usersData }, { data: compsData }] = await Promise.all([
+      const [{ data: usersData }, { data: compsData }, { data: tplData }] = await Promise.all([
         supabase.from("users").select("id, slack_name, slack_email, slack_user_id, manager_id").eq("workspace_id", wsId).order("slack_name"),
         supabase.from("competencies").select("id, name, category").eq("workspace_id", wsId).order("category").order("name"),
+        supabase.from("templates").select("id, name, description, questions, is_system").eq("workspace_id", wsId).order("is_system", { ascending: false }).order("name"),
       ]);
       const loadedUsers = usersData || [];
       const loadedComps = compsData || [];
       setUsers(loadedUsers);
       setCompetencies(loadedComps);
+      setTemplates((tplData || []) as Template[]);
 
       // ── Restore draft if ?draft=<id> ──
       const draftId = searchParams.get("draft");
@@ -613,6 +624,17 @@ export default function NewCyclePage() {
     });
   }
 
+  // ── Template picker ────────────────────────────────────────────────────────
+  function applyTemplate(tpl: Template) {
+    const mapped: TextQuestion[] = (tpl.questions || []).map((q) => ({
+      prompt: q.prompt,
+      required: q.required !== false,
+    }));
+    setTextQuestions(mapped);
+    setTemplateApplied(tpl.name);
+    setTimeout(() => setTemplateApplied(null), 2500);
+  }
+
   // ── Questions summary ───────────────────────────────────────────────────────
   const questionsSummary = [
     selectedCompIds.size > 0 ? `${selectedCompIds.size} competenc${selectedCompIds.size !== 1 ? "ies" : "y"}` : null,
@@ -845,6 +867,37 @@ export default function NewCyclePage() {
           <p className="text-sm text-muted-foreground">
             Configure the review questions. Select competencies for rating-based assessments and add open-ended text questions for qualitative feedback.
           </p>
+
+          {/* Template picker */}
+          {templates.length > 0 && (
+            <div className="border border-border/60 rounded-lg p-4 bg-muted/20 space-y-2.5">
+              <div>
+                <p className="text-xs font-medium text-foreground">Start from a template</p>
+                <p className="text-[11px] text-muted-foreground">Pre-fill questions from an existing template, then customize as needed.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {templates.map((tpl) => (
+                  <Button
+                    key={tpl.id}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => applyTemplate(tpl)}
+                  >
+                    {tpl.is_system && <Sparkles className="h-3 w-3 text-amber-500" />}
+                    {tpl.name}
+                    <span className="text-muted-foreground">({Array.isArray(tpl.questions) ? tpl.questions.length : 0})</span>
+                  </Button>
+                ))}
+              </div>
+              {templateApplied && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  Applied &ldquo;{templateApplied}&rdquo; &mdash; {textQuestions.length} question{textQuestions.length !== 1 ? "s" : ""} loaded
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Competencies */}
           <div className="border border-border/60 rounded-lg overflow-hidden">
