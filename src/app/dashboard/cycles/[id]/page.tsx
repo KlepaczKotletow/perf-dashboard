@@ -164,7 +164,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     );
   }
 
-  const ratingMax = workspace!.ratingScale?.max || 5;
+  const ratingMax = (workspace as any)?.ratingScale?.max || 5;
   const cycle = await getCycle(id, workspace!.workspaceId);
 
   if (!cycle) {
