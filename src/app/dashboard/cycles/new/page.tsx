@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ArrowRight, AlertTriangle, Loader2, Plus, X, Target, MessageSquare,
   Users, CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot, Sparkles,
+  FileText,
 } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
@@ -66,6 +67,19 @@ interface Template {
   name: string;
   description: string | null;
   questions: { type: string; prompt: string; required?: boolean }[];
+  is_system: boolean;
+}
+interface CycleProfile {
+  id: string;
+  name: string;
+  description: string | null;
+  content: {
+    cycle_type?: string;
+    suggested_description?: string;
+    suggested_competency_categories?: string[];
+    review_template_name?: string;
+    phase_weights?: number[];
+  };
   is_system: boolean;
 }
 
@@ -210,6 +224,8 @@ export default function NewCyclePage() {
   const [tqOpen, setTqOpen] = useState(true);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateApplied, setTemplateApplied] = useState<string | null>(null);
+  const [cycleProfiles, setCycleProfiles] = useState<CycleProfile[]>([]);
+  const [appliedProfileId, setAppliedProfileId] = useState<string | null>(null);
 
   // Nami config (Step 4)
   const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule">("now");
@@ -236,16 +252,19 @@ export default function NewCyclePage() {
       const wsId = user?.user_metadata?.workspace_id;
       if (!wsId) return;
 
-      const [{ data: usersData }, { data: compsData }, { data: tplData }] = await Promise.all([
+      const [{ data: usersData }, { data: compsData }, { data: tplData }, { data: profileData }] = await Promise.all([
         supabase.from("users").select("id, slack_name, slack_email, slack_user_id, manager_id").eq("workspace_id", wsId).order("slack_name"),
         supabase.from("competencies").select("id, name, category").eq("workspace_id", wsId).order("category").order("name"),
         supabase.from("templates").select("id, name, description, questions, is_system").eq("workspace_id", wsId).order("is_system", { ascending: false }).order("name"),
+        supabase.from("templates").select("id, name, description, content, is_system").eq("workspace_id", wsId).eq("template_type", "cycle_profile"),
       ]);
       const loadedUsers = usersData || [];
       const loadedComps = compsData || [];
       setUsers(loadedUsers);
       setCompetencies(loadedComps);
       setTemplates((tplData || []) as Template[]);
+      const loadedProfiles = (profileData || []) as CycleProfile[];
+      setCycleProfiles(loadedProfiles);
 
       // ── Restore draft if ?draft=<id> ──
       const draftId = searchParams.get("draft");
@@ -298,6 +317,15 @@ export default function NewCyclePage() {
       // Default selection when not restoring a draft
       setSelectedPeopleIds(loadedUsers.map((u: User) => u.id));
       setSelectedCompIds(new Set(loadedComps.map((c: Competency) => c.id)));
+
+      // ── Auto-apply cycle profile if ?profile=<id> ──
+      const profileId = searchParams.get("profile");
+      if (profileId && loadedProfiles.length > 0) {
+        const profile = loadedProfiles.find((p) => p.id === profileId);
+        if (profile) {
+          applyCycleProfileFromContent(profile);
+        }
+      }
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,6 +652,17 @@ export default function NewCyclePage() {
     });
   }
 
+  // ── Cycle profile helpers ───────────────────────────────────────────────────
+  function applyCycleProfileFromContent(profile: CycleProfile) {
+    const content = profile.content;
+    if (content.cycle_type) setCycleType(content.cycle_type);
+    if (content.suggested_description) {
+      setDescription(content.suggested_description);
+      setShowDescription(true);
+    }
+    setAppliedProfileId(profile.id);
+  }
+
   // ── Template picker ────────────────────────────────────────────────────────
   function applyTemplate(tpl: Template) {
     const mapped: TextQuestion[] = (tpl.questions || []).map((q) => ({
@@ -682,6 +721,48 @@ export default function NewCyclePage() {
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 1 && (
         <div className="space-y-4">
+          {/* Cycle profile picker */}
+          {cycleProfiles.length > 0 && (
+            <div className="border border-border/60 rounded-lg p-4 bg-muted/20 space-y-2.5">
+              <div>
+                <p className="text-xs font-medium text-foreground">Start from a profile</p>
+                <p className="text-[11px] text-muted-foreground">Pre-fill cycle type and description from a saved profile.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {cycleProfiles.map((profile) => {
+                  const isApplied = appliedProfileId === profile.id;
+                  return (
+                    <Button
+                      key={profile.id}
+                      variant={isApplied ? "default" : "outline"}
+                      size="sm"
+                      className="h-auto py-1.5 px-3 text-xs gap-1.5"
+                      onClick={() => applyCycleProfileFromContent(profile)}
+                    >
+                      {profile.is_system && <Sparkles className="h-3 w-3 text-amber-500" />}
+                      {!profile.is_system && <FileText className="h-3 w-3 text-muted-foreground" />}
+                      <span className="flex flex-col items-start">
+                        <span className="font-medium">{profile.name}</span>
+                        {profile.content.cycle_type && (
+                          <span className={`text-[10px] ${isApplied ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                            {CYCLE_TYPES.find(t => t.value === profile.content.cycle_type)?.label || profile.content.cycle_type}
+                          </span>
+                        )}
+                      </span>
+                      {isApplied && <Check className="h-3 w-3 ml-1" />}
+                    </Button>
+                  );
+                })}
+              </div>
+              {appliedProfileId && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  Profile applied &mdash; type and description pre-filled
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Name + Type */}
           <div className="flex gap-3">
             <div className="flex-1 space-y-1.5">
