@@ -26,52 +26,57 @@ import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
 
-async function getCycle(id: string) {
+async function getCycle(id: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("performance_cycles")
     .select(`
       *,
       creator:users!performance_cycles_created_by_fkey(slack_name)
     `)
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .single();
+  if (error) console.error("Failed to fetch cycle:", error.message);
   return data;
 }
 
 async function getCyclePhases(cycleId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("cycle_phases")
     .select("*")
     .eq("cycle_id", cycleId)
     .order("sort_order");
+  if (error) console.error("Failed to fetch cycle phases:", error.message);
   return data || [];
 }
 
 async function getReviewAssignments(cycleId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("review_assignments")
     .select(`
       *,
-      employee:users!review_assignments_employee_id_fkey(id, slack_name, department),
-      manager:users!review_assignments_manager_id_fkey(slack_name),
-      reviewer:users!review_assignments_reviewer_id_fkey(slack_name)
+      employee:users!review_assignments_employee_id_fkey(id, slack_name, department, slack_user_id),
+      manager:users!review_assignments_manager_id_fkey(id, slack_name, slack_user_id),
+      reviewer:users!review_assignments_reviewer_id_fkey(id, slack_name, slack_user_id)
     `)
     .eq("cycle_id", cycleId);
+  if (error) console.error("Failed to fetch review assignments:", error.message);
   return data || [];
 }
 
 async function getCycleEmployees(cycleId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("performance_cycle_employees")
     .select(`
       *,
-      employee:users!performance_cycle_employees_employee_id_fkey(id, slack_name, slack_email)
+      employee:users!performance_cycle_employees_employee_id_fkey(id, slack_name, slack_email, slack_user_id)
     `)
     .eq("performance_cycle_id", cycleId);
+  if (error) console.error("Failed to fetch cycle employees:", error.message);
   return data || [];
 }
 
@@ -79,11 +84,12 @@ async function getWorkspaceUsers(workspaceId: string) {
   return unstable_cache(
     async () => {
       const supabase = await createServerSupabaseClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("users")
         .select("id, slack_name, slack_email")
         .eq("workspace_id", workspaceId)
         .order("slack_name");
+      if (error) console.error("Failed to fetch workspace users:", error.message);
       return data || [];
     },
     [`workspace-users-${workspaceId}`],
@@ -93,7 +99,7 @@ async function getWorkspaceUsers(workspaceId: string) {
 
 async function getCycleQuestions(cycleId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("cycle_questions")
     .select(`
       id, question_type, competency_id, prompt, sort_order, required,
@@ -101,6 +107,7 @@ async function getCycleQuestions(cycleId: string) {
     `)
     .eq("cycle_id", cycleId)
     .order("sort_order");
+  if (error) console.error("Failed to fetch cycle questions:", error.message);
   return (data || []).map((q: any) => ({
     ...q,
     competency: Array.isArray(q.competency) ? q.competency[0] || null : q.competency,
@@ -110,14 +117,15 @@ async function getCycleQuestions(cycleId: string) {
 async function getNamiStatus(assignmentIds: string[], workspaceId: string) {
   if (assignmentIds.length === 0) return [];
   const supabase = await createServerSupabaseClient();
-  // Build OR filter for reference_ids containing any assignment ID
-  const refFilters = assignmentIds.map(id => `reference_id.like.%${id}%`).join(',');
-  const { data } = await supabase
+  // Match reference_ids ending with _{assignmentId} (e.g. self_abc, mgr_abc, escal_self_abc)
+  const refFilters = assignmentIds.map(id => `reference_id.like.%_${id}`).join(',');
+  const { data, error } = await supabase
     .from("notification_log")
     .select("user_id, event_type, reminder_count, sent_at, reference_id")
     .eq("workspace_id", workspaceId)
     .like("event_type", "nami_%")
     .or(refFilters);
+  if (error) console.error("Failed to fetch nami status:", error.message);
   return data || [];
 }
 
@@ -125,12 +133,13 @@ function getAllCompetencies(workspaceId: string) {
   return unstable_cache(
     async () => {
       const supabase = await createServerSupabaseClient();
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("competencies")
         .select("id, name, category, description")
         .eq("workspace_id", workspaceId)
         .order("category")
         .order("name");
+      if (error) console.error("Failed to fetch competencies:", error.message);
       return data || [];
     },
     [`all-competencies-${workspaceId}`],
@@ -155,7 +164,8 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
     );
   }
 
-  const cycle = await getCycle(id);
+  const ratingMax = workspace!.ratingScale?.max || 5;
+  const cycle = await getCycle(id, workspace!.workspaceId);
 
   if (!cycle) {
     notFound();
@@ -465,8 +475,13 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                   >
                     {/* Employee */}
                     <div className="min-w-0 pr-3">
-                      <p className="text-sm font-medium text-foreground truncate">
+                      <p className="text-sm font-medium text-foreground truncate flex items-center">
                         {assignment.employee?.slack_name || "Unknown"}
+                        {!assignment.employee?.slack_user_id && (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 ml-2 shrink-0">
+                            No Slack
+                          </Badge>
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
                         {[
@@ -514,7 +529,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                     <div className="text-right">
                       {assignment.overall_rating ? (
                         <span className="text-xs font-bold text-foreground">
-                          {assignment.overall_rating}/5
+                          {assignment.overall_rating}/{ratingMax}
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
@@ -597,7 +612,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                         </span>
                       )}
                       {assignment.overall_rating && (
-                        <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/5</span>
+                        <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/{ratingMax}</span>
                       )}
                       <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
                         <Link href={`/dashboard/reviews/${assignment.id}?from=cycle&cycleId=${id}`}>
@@ -624,12 +639,13 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         }
 
         // Build participant rows from assignments
-        type NamiRow = { userId: string; name: string; role: string; completed: boolean; reminderCount: number; escalated: boolean; sentAt: string | null };
+        type NamiRow = { userId: string; name: string; role: string; completed: boolean; reminderCount: number; escalated: boolean; sentAt: string | null; slackUserId: string | null };
         const namiRows: NamiRow[] = [];
 
         for (const a of standardAssignments) {
           const userId = (a as any).employee?.id;
           const name = (a as any).employee?.slack_name || "Unknown";
+          const empSlackUserId = (a as any).employee?.slack_user_id || null;
           const logs = userId ? namiByUser.get(userId) || [] : [];
           const selfLogs = logs.filter((l: any) => l.event_type.includes("self"));
           const maxReminder = selfLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
@@ -642,10 +658,12 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             reminderCount: maxReminder,
             escalated: maxReminder >= 3,
             sentAt: selfLogs.length > 0 ? selfLogs[selfLogs.length - 1].sent_at : null,
+            slackUserId: empSlackUserId,
           });
 
           if ((a as any).manager_id) {
             const mgrName = (a as any).manager?.slack_name || "Unknown";
+            const mgrSlackUserId = (a as any).manager?.slack_user_id || null;
             const mgrLogs = (a as any).manager_id ? namiByUser.get((a as any).manager_id) || [] : [];
             const mgrReviewLogs = mgrLogs.filter((l: any) => l.event_type.includes("manager"));
             const mgrMaxReminder = mgrReviewLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
@@ -658,6 +676,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
               reminderCount: mgrMaxReminder,
               escalated: mgrMaxReminder >= 3,
               sentAt: mgrReviewLogs.length > 0 ? mgrReviewLogs[mgrReviewLogs.length - 1].sent_at : null,
+              slackUserId: mgrSlackUserId,
             });
           }
         }
@@ -666,6 +685,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           const reviewerName = (a as any).reviewer?.slack_name || "Unknown";
           const targetName = (a as any).employee?.slack_name || "Unknown";
           const reviewerId = (a as any).reviewer_id;
+          const reviewerSlackUserId = (a as any).reviewer?.slack_user_id || null;
           const logs = reviewerId ? namiByUser.get(reviewerId) || [] : [];
           const upLogs = logs.filter((l: any) => l.event_type.includes("upward"));
           const maxReminder = upLogs.reduce((m: number, l: any) => Math.max(m, l.reminder_count || 0), 0);
@@ -678,6 +698,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             reminderCount: maxReminder,
             escalated: maxReminder >= 3,
             sentAt: upLogs.length > 0 ? upLogs[upLogs.length - 1].sent_at : null,
+            slackUserId: reviewerSlackUserId,
           });
         }
 
@@ -704,19 +725,20 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               {/* Column headers */}
-              <div className="grid grid-cols-[1fr_120px_80px_80px] items-center px-6 pb-2 border-b border-border/60 min-w-[500px]">
+              <div className="grid grid-cols-[1fr_120px_80px_80px_80px] items-center px-6 pb-2 border-b border-border/60 min-w-[580px]">
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Participant</p>
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Role</p>
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Status</p>
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Delivery</p>
                 <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide text-center">Reminders</p>
               </div>
 
               {/* Rows */}
-              <div className="divide-y divide-border/50 min-w-[500px]">
+              <div className="divide-y divide-border/50 min-w-[580px]">
                 {namiRows.map((row, idx) => (
                   <div
                     key={`${row.userId}-${row.role}-${idx}`}
-                    className="grid grid-cols-[1fr_120px_80px_80px] items-center px-6 py-3 hover:bg-muted/30 transition-colors"
+                    className="grid grid-cols-[1fr_120px_80px_80px_80px] items-center px-6 py-3 hover:bg-muted/30 transition-colors"
                   >
                     <p className="text-sm font-medium text-foreground truncate">{row.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{row.role}</p>
@@ -741,6 +763,15 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                           <Circle className="h-3.5 w-3.5" />
                           Pending
                         </span>
+                      )}
+                    </div>
+                    <div className="flex justify-center">
+                      {!row.slackUserId ? (
+                        <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">Skipped</Badge>
+                      ) : row.sentAt ? (
+                        <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">Sent</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] text-zinc-500 border-zinc-300">Pending</Badge>
                       )}
                     </div>
                     <div className="flex justify-center">

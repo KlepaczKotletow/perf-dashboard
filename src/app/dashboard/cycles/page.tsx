@@ -7,9 +7,9 @@ import { format, differenceInDays } from "date-fns";
 import { isManagerOrAbove } from "@/lib/roles";
 import { getCycleStatus } from "@/lib/status";
 
-async function getPerformanceCycles() {
+async function getPerformanceCycles(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("performance_cycles")
     .select(`
       *,
@@ -17,7 +17,9 @@ async function getPerformanceCycles() {
       employees:performance_cycle_employees(count),
       assignments:review_assignments(status)
     `)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
+  if (error) console.error("Failed to fetch performance cycles:", error.message);
   return data || [];
 }
 
@@ -41,7 +43,7 @@ export default async function CyclesPage() {
     );
   }
 
-  const cycles = await getPerformanceCycles();
+  const cycles = await getPerformanceCycles(workspace!.workspaceId);
 
   return (
     <div className="space-y-6">
@@ -121,10 +123,12 @@ export default async function CyclesPage() {
               : daysLeft <= 7 ? "text-amber-600 dark:text-amber-400"
               : "text-muted-foreground";
 
+            const isDraft = cycle.status === "draft";
+
             return (
               <Link
                 key={cycle.id}
-                href={`/dashboard/cycles/${cycle.id}`}
+                href={isDraft ? `/dashboard/cycles/new?draft=${cycle.id}` : `/dashboard/cycles/${cycle.id}`}
                 className="grid grid-cols-[1fr_100px_100px_160px_180px_40px] items-center gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors group"
               >
                 {/* Name + description */}

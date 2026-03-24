@@ -29,6 +29,7 @@ interface CycleActionsProps {
     name: string;
     status: string;
     grades_released?: boolean;
+    workspace_id: string;
   };
   employeeCount: number;
   submittedCount?: number;
@@ -62,7 +63,8 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const { error } = await supabase
         .from("performance_cycles")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
-        .eq("id", cycle.id);
+        .eq("id", cycle.id)
+        .eq("workspace_id", cycle.workspace_id);
 
       if (error) throw error;
       router.refresh();
@@ -75,19 +77,45 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
     }
   }
 
-  async function sendNotifications() {
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
+
+  async function sendNotifications(mode: "all" | "missed" = "all") {
     setNotificationError(false);
     setNotificationSent(false);
+    setNotificationMessage(null);
     try {
-      const { error: notifError } = await supabase.functions.invoke("cycle-notifications", {
-        body: { action: "launch", cycle_id: cycle.id },
+      const { data, error: notifError } = await supabase.functions.invoke("nami-bot", {
+        body: { action: "launch_cycle", cycle_id: cycle.id, mode },
       });
       if (notifError) {
         console.error("Failed to send Slack notifications:", notifError);
         setNotificationError(true);
-      } else {
+        return;
+      }
+
+      const result = data as { sent?: number; skipped?: number; failed?: number; failedUsers?: string[] } | null;
+      const sent = result?.sent ?? 0;
+      const skipped = result?.skipped ?? 0;
+      const failed = result?.failed ?? 0;
+
+      if (sent > 0) {
+        const parts = [`Sent ${sent} notification${sent !== 1 ? "s" : ""}`];
+        if (skipped > 0) parts.push(`${skipped} skipped`);
+        if (failed > 0) parts.push(`${failed} failed`);
+        setNotificationMessage(parts.join(", ") + ".");
         setNotificationSent(true);
-        setTimeout(() => setNotificationSent(false), 5000);
+        setTimeout(() => { setNotificationSent(false); setNotificationMessage(null); }, 5000);
+      } else if (failed > 0) {
+        setNotificationMessage(`All sends failed (${failed} error${failed !== 1 ? "s" : ""}). Check Slack bot configuration.`);
+        setNotificationError(true);
+      } else if (skipped > 0) {
+        setNotificationMessage(`${skipped} notification${skipped !== 1 ? "s" : ""} skipped (already sent or no Slack account).`);
+        setNotificationSent(true);
+        setTimeout(() => { setNotificationSent(false); setNotificationMessage(null); }, 5000);
+      } else {
+        setNotificationMessage("All employees already notified.");
+        setNotificationSent(true);
+        setTimeout(() => { setNotificationSent(false); setNotificationMessage(null); }, 5000);
       }
     } catch (notifErr) {
       console.error("Failed to send Slack notifications:", notifErr);
@@ -102,6 +130,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
     setNotificationSent(false);
     try {
       // 1. Fetch employees enrolled in this cycle
+      // Safe: performance_cycle_employees scoped through cycle_id (workspace-verified cycle)
       const { data: cycleEmployees, error: empError } = await supabase
         .from("performance_cycle_employees")
         .select("employee_id")
@@ -114,7 +143,8 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const { data: users, error: usersError } = await supabase
         .from("users")
         .select("id, manager_id")
-        .in("id", employeeIds);
+        .in("id", employeeIds)
+        .eq("workspace_id", cycle.workspace_id);
 
       if (usersError) throw usersError;
 
@@ -159,6 +189,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const allAssignments = [...standardAssignments, ...upwardAssignments];
 
       // Delete existing rows only once we have a valid replacement set ready
+      // Safe: review_assignments scoped through cycle_id (workspace-verified cycle)
       const { error: deleteError } = await supabase
         .from("review_assignments")
         .delete()
@@ -175,6 +206,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       }
 
       // 4. Activate the first phase if any exist
+      // Safe: cycle_phases scoped through cycle_id (workspace-verified cycle)
       const { data: phases } = await supabase
         .from("cycle_phases")
         .select("id")
@@ -193,11 +225,13 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const { error: statusError } = await supabase
         .from("performance_cycles")
         .update({ status: "active", updated_at: new Date().toISOString() })
-        .eq("id", cycle.id);
+        .eq("id", cycle.id)
+        .eq("workspace_id", cycle.workspace_id);
 
       if (statusError) throw statusError;
 
       // 6. Update performance_cycle_employees to in_progress
+      // Safe: performance_cycle_employees scoped through cycle_id (workspace-verified cycle)
       await supabase
         .from("performance_cycle_employees")
         .update({ status: "in_progress" })
@@ -224,7 +258,8 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const { error } = await supabase
         .from("performance_cycles")
         .delete()
-        .eq("id", cycle.id);
+        .eq("id", cycle.id)
+        .eq("workspace_id", cycle.workspace_id);
 
       if (error) throw error;
       router.push("/dashboard/cycles");
@@ -245,7 +280,8 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       const { error } = await supabase
         .from("performance_cycles")
         .update({ grades_released: true, updated_at: new Date().toISOString() })
-        .eq("id", cycle.id);
+        .eq("id", cycle.id)
+        .eq("workspace_id", cycle.workspace_id);
 
       if (error) throw error;
       router.refresh();
@@ -269,13 +305,13 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       {notificationError && (
         <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 px-3 py-1.5 rounded-md">
           <BellOff className="h-3.5 w-3.5 shrink-0" />
-          Slack notifications failed — use &quot;Re-send Slack Notifications&quot; to retry.
+          {notificationMessage || "Slack notifications failed \u2014 use \"Re-send Slack Notifications\" to retry."}
         </div>
       )}
       {notificationSent && (
         <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-400/10 border border-emerald-200 dark:border-emerald-400/20 px-3 py-1.5 rounded-md">
           <Bell className="h-3.5 w-3.5 shrink-0" />
-          Slack notifications sent successfully.
+          {notificationMessage || "Slack notifications sent successfully."}
         </div>
       )}
       <DropdownMenu>
@@ -309,7 +345,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
               disabled={loading}
               onClick={async () => {
                 setLoading(true);
-                await sendNotifications();
+                await sendNotifications("missed");
                 setLoading(false);
               }}
             >

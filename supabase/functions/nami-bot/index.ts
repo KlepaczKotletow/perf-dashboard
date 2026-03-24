@@ -172,7 +172,7 @@ async function getManagerContext(
 //  Handle cycle launch
 // =============================================================================
 
-async function handleCycleLaunch(cycleId: string) {
+async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all") {
   // Fetch cycle + workspace bot token
   const { data: cycle } = await supabase
     .from("performance_cycles")
@@ -211,81 +211,138 @@ async function handleCycleLaunch(cycleId: string) {
     )
     .eq("cycle_id", cycleId);
 
-  if (!assignments) return { sent: 0, skipped: 0 };
+  if (!assignments) return { sent: 0, skipped: 0, failed: 0, failedUsers: [] as string[] };
+
+  // --- "missed" mode: filter to only assignments without existing notification_log entries ---
+  let filteredAssignments = assignments;
+  if (mode === "missed") {
+    // Build all possible ref IDs for each assignment
+    const refIdMap = new Map<string, any>(); // refId -> assignment
+    for (const a of assignments) {
+      if (a.assignment_type === "standard") {
+        refIdMap.set(`self_${a.id}`, a);
+        refIdMap.set(`mgr_${a.id}`, a);
+      } else if (a.assignment_type === "upward") {
+        refIdMap.set(`upward_${a.id}`, a);
+      }
+    }
+
+    const allRefIds = Array.from(refIdMap.keys());
+    // Query notification_log for existing entries for this cycle's assignments
+    const { data: existingLogs } = await supabase
+      .from("notification_log")
+      .select("reference_id")
+      .eq("workspace_id", workspaceId)
+      .eq("event_type", "nami_initial")
+      .in("reference_id", allRefIds);
+
+    const sentRefIds = new Set((existingLogs || []).map((l: any) => l.reference_id));
+
+    // Keep only assignments that have at least one unsent notification
+    const missedAssignmentIds = new Set<string>();
+    for (const a of assignments) {
+      if (a.assignment_type === "standard") {
+        if (!sentRefIds.has(`self_${a.id}`) || !sentRefIds.has(`mgr_${a.id}`)) {
+          missedAssignmentIds.add(a.id);
+        }
+      } else if (a.assignment_type === "upward") {
+        if (!sentRefIds.has(`upward_${a.id}`)) {
+          missedAssignmentIds.add(a.id);
+        }
+      }
+    }
+    filteredAssignments = assignments.filter((a: any) => missedAssignmentIds.has(a.id));
+  }
 
   let sent = 0;
   let skipped = 0;
+  let failed = 0;
+  const failedUsers: string[] = [];
 
-  for (const a of assignments) {
+  for (const a of filteredAssignments) {
     const emp = (a as any).employee;
     const mgr = (a as any).manager;
 
     // --- Employee self-review ---
     if (emp?.slack_user_id && a.assignment_type === "standard") {
-      const refId = `self_${a.id}`;
-      const canSend = await logNotification(
-        workspaceId,
-        emp.id,
-        "nami_initial",
-        refId,
-      );
-      if (canSend) {
-        const blocks = buildSelfReviewOpening(
-          emp.slack_name || "there",
-          cycle.name,
-          deadline,
-          a.id,
+      try {
+        const refId = `self_${a.id}`;
+        const canSend = await logNotification(
+          workspaceId,
+          emp.id,
+          "nami_initial",
+          refId,
         );
-        const ok = await sendSlackBlocks(
-          botToken,
-          emp.slack_user_id,
-          `Your self-review for ${cycle.name} is ready`,
-          blocks,
-        );
-        if (ok) {
-          sent++;
+        if (canSend) {
+          const blocks = buildSelfReviewOpening(
+            emp.slack_name || "there",
+            cycle.name,
+            deadline,
+            a.id,
+          );
+          const ok = await sendSlackBlocks(
+            botToken,
+            emp.slack_user_id,
+            `Your self-review for ${cycle.name} is ready`,
+            blocks,
+          );
+          if (ok) {
+            sent++;
+          } else {
+            await rollbackNotification(workspaceId, emp.id, "nami_initial", refId);
+            failed++;
+            failedUsers.push(emp.slack_name || emp.id);
+          }
         } else {
-          await rollbackNotification(workspaceId, emp.id, "nami_initial", refId);
           skipped++;
         }
-      } else {
-        skipped++;
+      } catch (err) {
+        console.error(`Error sending self-review notification to ${emp.slack_name || emp.id}:`, err);
+        failed++;
+        failedUsers.push(emp.slack_name || emp.id);
       }
     }
 
     // --- Manager review ---
     if (mgr?.slack_user_id && a.assignment_type === "standard") {
-      const refId = `mgr_${a.id}`;
-      const canSend = await logNotification(
-        workspaceId,
-        mgr.id,
-        "nami_initial",
-        refId,
-      );
-      if (canSend) {
-        const context = await getManagerContext(a.employee_id, cycleId);
-        const blocks = buildManagerReviewOpening(
-          mgr.slack_name || "there",
-          emp?.slack_name || "a team member",
-          cycle.name,
-          deadline,
-          a.id,
-          context,
+      try {
+        const refId = `mgr_${a.id}`;
+        const canSend = await logNotification(
+          workspaceId,
+          mgr.id,
+          "nami_initial",
+          refId,
         );
-        const ok = await sendSlackBlocks(
-          botToken,
-          mgr.slack_user_id,
-          `Time to review ${emp?.slack_name || "a team member"} for ${cycle.name}`,
-          blocks,
-        );
-        if (ok) {
-          sent++;
+        if (canSend) {
+          const context = await getManagerContext(a.employee_id, cycleId);
+          const blocks = buildManagerReviewOpening(
+            mgr.slack_name || "there",
+            emp?.slack_name || "a team member",
+            cycle.name,
+            deadline,
+            a.id,
+            context,
+          );
+          const ok = await sendSlackBlocks(
+            botToken,
+            mgr.slack_user_id,
+            `Time to review ${emp?.slack_name || "a team member"} for ${cycle.name}`,
+            blocks,
+          );
+          if (ok) {
+            sent++;
+          } else {
+            await rollbackNotification(workspaceId, mgr.id, "nami_initial", refId);
+            failed++;
+            failedUsers.push(mgr.slack_name || mgr.id);
+          }
         } else {
-          await rollbackNotification(workspaceId, mgr.id, "nami_initial", refId);
           skipped++;
         }
-      } else {
-        skipped++;
+      } catch (err) {
+        console.error(`Error sending manager-review notification to ${mgr.slack_name || mgr.id}:`, err);
+        failed++;
+        failedUsers.push(mgr.slack_name || mgr.id);
       }
     }
 
@@ -293,40 +350,47 @@ async function handleCycleLaunch(cycleId: string) {
     if (a.assignment_type === "upward") {
       const reviewer = (a as any).reviewer;
       if (reviewer?.slack_user_id) {
-        const refId = `upward_${a.id}`;
-        const canSend = await logNotification(
-          workspaceId,
-          reviewer.id,
-          "nami_initial",
-          refId,
-        );
-        if (canSend) {
-          const blocks = buildUpwardFeedbackOpening(
-            reviewer.slack_name || "there",
-            emp?.slack_name || "your manager",
-            cycle.name,
-            deadline,
-            a.id,
+        try {
+          const refId = `upward_${a.id}`;
+          const canSend = await logNotification(
+            workspaceId,
+            reviewer.id,
+            "nami_initial",
+            refId,
           );
-          const ok = await sendSlackBlocks(
-            botToken,
-            reviewer.slack_user_id,
-            `Upward feedback requested for ${emp?.slack_name || "your manager"}`,
-            blocks,
-          );
-          if (ok) {
-            sent++;
-          } else {
-            await rollbackNotification(
-              workspaceId,
-              reviewer.id,
-              "nami_initial",
-              refId,
+          if (canSend) {
+            const blocks = buildUpwardFeedbackOpening(
+              reviewer.slack_name || "there",
+              emp?.slack_name || "your manager",
+              cycle.name,
+              deadline,
+              a.id,
             );
+            const ok = await sendSlackBlocks(
+              botToken,
+              reviewer.slack_user_id,
+              `Upward feedback requested for ${emp?.slack_name || "your manager"}`,
+              blocks,
+            );
+            if (ok) {
+              sent++;
+            } else {
+              await rollbackNotification(
+                workspaceId,
+                reviewer.id,
+                "nami_initial",
+                refId,
+              );
+              failed++;
+              failedUsers.push(reviewer.slack_name || reviewer.id);
+            }
+          } else {
             skipped++;
           }
-        } else {
-          skipped++;
+        } catch (err) {
+          console.error(`Error sending upward-feedback notification to ${reviewer.slack_name || reviewer.id}:`, err);
+          failed++;
+          failedUsers.push(reviewer.slack_name || reviewer.id);
         }
       }
     }
@@ -338,7 +402,7 @@ async function handleCycleLaunch(cycleId: string) {
     .update({ nami_confirmed: true })
     .eq("id", cycleId);
 
-  return { sent, skipped };
+  return { sent, skipped, failed, failedUsers };
 }
 
 // =============================================================================
@@ -1051,11 +1115,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { action, cycle_id, survey_id } = body;
+    const { action, cycle_id, survey_id, mode } = body;
 
     let result;
     if (action === "launch_cycle" && cycle_id) {
-      result = await handleCycleLaunch(cycle_id);
+      result = await handleCycleLaunch(cycle_id, mode === "missed" ? "missed" : "all");
     } else if (action === "launch_survey" && survey_id) {
       result = await handleSurveyLaunch(survey_id);
     } else if (action === "run_reminders") {
