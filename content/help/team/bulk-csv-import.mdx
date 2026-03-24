@@ -1,0 +1,54 @@
+---
+title: "Bulk CSV Import"
+category: "Team Management"
+roles: ["admin"]
+order: 4
+---
+
+# Bulk CSV Import
+
+<RoleTag role="admin" />
+
+Import team members in bulk by uploading a CSV file. This is the fastest way to onboard a large group or update existing records.
+
+## CSV Format
+
+Your file should include the following columns:
+
+| Column | Required | Description |
+|---|---|---|
+| `email` | Yes | Work email (must match Slack profile) |
+| `first_name` | Yes | First name |
+| `last_name` | Yes | Last name |
+| `role` | No | Perf role: `admin`, `hr`, `manager`, or `member` |
+| `department` | No | Department name (must already exist in Perf) |
+| `function` | No | Job family / function name |
+| `level` | No | Career level (e.g., Senior, Staff) |
+| `manager_email` | No | Email of the direct manager |
+
+<Callout type="tip">
+Download the sample CSV template from the import page to ensure your columns are formatted correctly.
+</Callout>
+
+## Column Mapping
+
+After uploading, Perf shows a mapping screen where you confirm which CSV columns correspond to which Perf fields. Unrecognized columns are ignored.
+
+## Validation
+
+Before applying, Perf checks for:
+
+- Duplicate emails.
+- Invalid email formats.
+- References to departments or functions that do not exist.
+- Circular manager relationships.
+
+Errors are displayed inline so you can fix and re-upload.
+
+<Callout type="warning">
+Manager resolution uses the `manager_email` column. Make sure managers are included in the same CSV or already exist in Perf, otherwise the relationship will not be set.
+</Callout>
+
+## Preview & Apply
+
+After validation passes, you see a preview of all changes (new members, updates, skipped rows). Review carefully, then click **Apply Import** to finalize.

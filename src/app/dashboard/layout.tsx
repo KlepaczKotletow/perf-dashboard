@@ -16,6 +16,7 @@ import {
   Flag,
   SlidersHorizontal,
   Settings2,
+  HelpCircle,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { FooterDropdown } from "./footer-dropdown";
@@ -137,6 +138,15 @@ export default async function DashboardLayout({
               </div>
             </div>
           ))}
+
+          <div className="my-2 mx-2 h-px bg-sidebar-border/60" />
+          <div className="space-y-0.5">
+            <NavLink
+              href="/dashboard/help"
+              label="Help"
+              icon={<HelpCircle className="h-4 w-4 shrink-0" />}
+            />
+          </div>
         </nav>
 
         {/* User Footer */}

@@ -1,0 +1,66 @@
+---
+title: "Understanding Roles & Permissions"
+description: "What each role can see and do in Perf"
+category: "Getting Started"
+audience: ["admin"]
+order: 3
+icon: "Shield"
+---
+
+# Understanding Roles & Permissions
+
+<RoleTag role="admin">Admin only</RoleTag>
+
+Perf uses a four-role hierarchy to control access to data and features across the dashboard. Every user in your workspace is assigned exactly one role. Understanding what each role can and cannot do is essential for maintaining data privacy and ensuring the right people have the right level of access.
+
+## Role Hierarchy
+
+Roles follow a top-down hierarchy: **Admin > HR > Manager > Employee**. Higher roles inherit all permissions of the roles below them.
+
+## Permissions Comparison
+
+| Feature | Admin | HR | Manager | Employee |
+|---------|-------|----|---------|----------|
+| View & edit workspace settings | Yes | No | No | No |
+| Manage billing & subscription | Yes | No | No | No |
+| Create & launch cycles | Yes | Yes | No | No |
+| Manage templates & competencies | Yes | Yes | No | No |
+| View all reviews across workspace | Yes | Yes | No | No |
+| Run calibration sessions | Yes | Yes | No | No |
+| View workspace-wide analytics | Yes | Yes | No | No |
+| Manage departments & functions | Yes | Yes | No | No |
+| Assign user roles | Yes | No | No | No |
+| Import users via CSV | Yes | Yes | No | No |
+| View direct report reviews | Yes | Yes | Yes | No |
+| Manage direct report goals | Yes | Yes | Yes | No |
+| View team analytics | Yes | Yes | Yes | No |
+| Complete own reviews | Yes | Yes | Yes | Yes |
+| Manage own goals | Yes | Yes | Yes | Yes |
+| View own review history | Yes | Yes | Yes | Yes |
+| Give & receive feedback | Yes | Yes | Yes | Yes |
+
+## How to Assign Roles
+
+1. Navigate to **Dashboard > Team**
+2. Click on a user's name to open their profile
+3. Use the **Role** dropdown to select Admin, HR, Manager, or Employee
+4. Click **Save**
+
+You can also assign roles in bulk through the CSV import feature by including a `role` column with values: `admin`, `hr`, `manager`, or `employee`.
+
+<Callout type="warning">
+Only Admins can change user roles. Be cautious when granting Admin or HR access, as these roles can view all review data across the entire workspace.
+</Callout>
+
+## Why Roles Matter for Data Visibility
+
+The most sensitive data in Perf is review content. Roles ensure that:
+
+- **Employees** only see their own reviews and goals, never their peers' assessments
+- **Managers** see reviews for their direct reports but not for other teams
+- **HR** can access all reviews for calibration and compliance but cannot change billing or workspace settings
+- **Admins** have unrestricted access and are responsible for overall workspace configuration
+
+<Callout type="tip">
+Audit your role assignments quarterly. As people change teams or get promoted, their Perf role may need to be updated to reflect new responsibilities.
+</Callout>

@@ -1,0 +1,48 @@
+---
+title: "Security & Privacy"
+category: "Admin & Billing"
+roles: ["all"]
+order: 3
+---
+
+# Security & Privacy
+
+<RoleTag role="all" />
+
+Perf takes the security and privacy of your performance data seriously. Here is how your information is protected.
+
+## Who Can See What
+
+| Data | Employee | Manager | HR / Admin |
+|---|---|---|---|
+| Own review & rating | After Communication phase | Yes | Yes |
+| Direct report reviews | -- | Yes | Yes |
+| Peer feedback (attributed) | -- | Yes | Yes |
+| Peer feedback (anonymous) | Aggregated only | Aggregated only | Aggregated only |
+| Calibration data | -- | -- | Yes |
+| Analytics (org-wide) | -- | Own team only | Full access |
+| Continuous feedback received | Yes | Direct reports | All |
+
+<Callout type="info">
+Visibility rules are enforced at the API level, not just the UI. Even if someone manipulates a URL, they cannot access data outside their permissions.
+</Callout>
+
+## Workspace Isolation
+
+Each Slack workspace maps to a single Perf tenant. Data is strictly isolated between tenants -- no cross-workspace access is possible.
+
+## Where Data Is Stored
+
+All application data is stored in **Supabase** (PostgreSQL) with row-level security policies ensuring tenant isolation. Data is encrypted at rest and in transit.
+
+## Slack Token Handling
+
+When you sign in via Slack OAuth, Perf receives an access token scoped to the permissions it needs (identity, messaging via Nami). Tokens are stored encrypted and are never exposed in client-side code or logs.
+
+<Callout type="warning">
+Perf never accesses your Slack message history, files, or channels. The Slack integration is limited to authentication and Nami bot messaging.
+</Callout>
+
+## Data Retention
+
+Review and feedback data is retained for the lifetime of your workspace. If you cancel your subscription, you can request a full data export before your workspace is deactivated.

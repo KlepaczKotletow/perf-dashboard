@@ -1,0 +1,69 @@
+---
+title: "Initial Workspace Setup Guide"
+description: "Complete guide to setting up your Perf workspace after installation"
+category: "Team Management"
+audience: ["admin"]
+order: 1
+icon: "Settings"
+---
+
+# Initial Workspace Setup Guide
+
+<RoleTag role="admin">Admin only</RoleTag>
+
+After installing Perf from the Slack App Directory and signing in with Slack OAuth, follow this recommended order of operations to get your workspace ready for your first performance cycle.
+
+## Step 1: Sync Your Slack Workspace
+
+Navigate to **Dashboard > Team** and click the **Sync from Slack** button. Perf automatically imports all active members from your Slack workspace, pulling in display names and profile photos.
+
+<Callout type="info">
+Slack sync only imports active users. Deactivated Slack accounts are skipped. You can re-sync at any time to pick up new hires.
+</Callout>
+
+## Step 2: Create Departments
+
+Go to **Dashboard > Admin > Departments** and create your organizational departments (e.g., Engineering, Marketing, Sales, People). Every user should belong to a department for accurate analytics and cycle scoping.
+
+## Step 3: Define Job Levels
+
+Set up your leveling framework under **Dashboard > Admin > Functions**. Job levels (e.g., IC1 through IC6, M1 through M3) are used in competency matrices and calibration views. Common structures include:
+
+- **Individual Contributor track:** IC1 (Junior) through IC6 (Principal)
+- **Management track:** M1 (Team Lead) through M3 (Director)
+
+## Step 4: Assign Managers
+
+For each team member, assign their direct manager via the user edit page or through a CSV import. Manager assignments determine:
+
+- Who receives manager review assignments during cycles
+- Who can view direct report goals and review history
+- The org chart hierarchy
+
+<Callout type="warning">
+Manager assignments must be in place before launching a cycle. Without them, manager and upward reviews cannot be generated.
+</Callout>
+
+## Step 5: Assign Roles
+
+Each user needs one of four roles: **Admin**, **HR**, **Manager**, or **Employee**. Roles control what data a user can see and which dashboard features are available. Assign roles on each user's profile page or in bulk via CSV.
+
+<Callout type="tip">
+Start by assigning Admin to yourself and HR to your People team. Managers are automatically suggested based on who has direct reports, but you should confirm these manually.
+</Callout>
+
+## Step 6: Import via CSV (Optional)
+
+If you need to set departments, job titles, levels, and managers in bulk, use **Dashboard > Team > Import**. Prepare a CSV with columns for email, department, job title, level, and manager email. The importer validates data before applying changes.
+
+## Recommended Setup Checklist
+
+1. Sync users from Slack
+2. Create departments
+3. Define job levels and functions
+4. Assign managers to every team member
+5. Set user roles (Admin, HR, Manager, Employee)
+6. Run a test CSV import if using bulk data
+7. Verify the org chart looks correct
+
+Once these steps are complete, your workspace is ready to create competency frameworks and launch your first performance cycle.

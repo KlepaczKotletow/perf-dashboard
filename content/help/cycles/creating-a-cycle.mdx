@@ -1,0 +1,81 @@
+---
+title: "Creating & Launching a Performance Cycle"
+description: "Step-by-step guide to the 5-step cycle creation wizard"
+category: "Cycles"
+audience: ["hr", "admin"]
+order: 1
+icon: "CalendarClock"
+---
+
+# Creating & Launching a Performance Cycle
+
+<RoleTag role="admin">Admin</RoleTag> <RoleTag role="hr">HR</RoleTag>
+
+Performance cycles are the core unit of review management in Perf. Use the 5-step creation wizard to configure everything from participants to questions before launching.
+
+## Cycle Types
+
+Before creating a cycle, choose the type that matches your review cadence:
+
+| Type | Typical Duration | Use Case |
+|------|-----------------|----------|
+| Annual | 12 months | Comprehensive year-end review |
+| Mid-Year | 6 months | Check-in at the halfway point |
+| Quarterly | 3 months | Frequent, lightweight reviews |
+| Probation | 1-6 months | New hire evaluation period |
+| Custom | Any duration | Ad-hoc or project-based reviews |
+
+## The 5-Step Wizard
+
+Navigate to **Dashboard > Cycles** and click **Create Cycle** to open the wizard.
+
+### Step 1: Basics & Dates
+
+Set the cycle name, type, and key dates:
+
+- **Cycle name** -- e.g., "Q1 2026 Performance Review"
+- **Review period** -- the start and end of the period being evaluated
+- **Self-review deadline** -- when employees must complete self-assessments
+- **Manager review deadline** -- when managers must finish their reviews
+- **Cycle close date** -- when results become final
+
+### Step 2: People
+
+Select who participates. You can include people by:
+
+- Department (e.g., all of Engineering)
+- Individual selection
+- Entire workspace
+
+Choose which review types to enable: **Self**, **Manager**, **Peer**, and/or **Upward**.
+
+### Step 3: Questions & Templates
+
+Pick a template from the template library or build a custom question set. Templates include pre-built competency frameworks. You can mix rating questions (1-5 scale) with open-ended text questions.
+
+<Callout type="tip">
+Start with a built-in template for your first cycle. You can duplicate and customize it later once you understand how questions flow through Nami.
+</Callout>
+
+### Step 4: Nami Bot Configuration
+
+Configure how Nami delivers reviews in Slack:
+
+- **Send schedule** -- deliver all DMs immediately on launch, or stagger over hours
+- **Reminder frequency** -- how often Nami nudges users who have not started
+- **Tone** -- adjust Nami's conversational style (professional, friendly, concise)
+
+### Step 5: Review & Launch
+
+Preview a summary of all settings. Check participant count, question count, deadlines, and review types. You can save as **Draft** to return later or click **Launch** to activate the cycle.
+
+<Callout type="warning">
+Launching a cycle is not reversible. Once launched, Nami begins sending DMs to participants. Double-check all settings, especially deadlines and participant lists, before clicking Launch.
+</Callout>
+
+## Draft vs. Active Status
+
+- **Draft** -- the cycle is saved but invisible to participants. Edit freely.
+- **Active** -- the cycle is live. Nami is sending and collecting reviews. Limited edits are available (e.g., extending deadlines).
+
+After all reviews are submitted and deadlines pass, the cycle moves to calibration (if enabled) and eventually to **Closed** status, at which point results are shared with employees.

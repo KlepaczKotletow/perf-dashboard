@@ -1,0 +1,76 @@
+---
+title: "Team Management: Adding & Managing Users"
+description: "How to add, edit, and organize team members in your workspace"
+category: "Team Management"
+audience: ["admin"]
+order: 2
+icon: "Users"
+---
+
+# Team Management: Adding & Managing Users
+
+<RoleTag role="admin">Admin only</RoleTag>
+
+The Team page is your central hub for managing everyone in your Perf workspace. From here you can sync users from Slack, edit individual profiles, organize people into departments, and perform bulk updates via CSV.
+
+## Syncing Users from Slack
+
+The fastest way to populate your workspace is to sync directly from Slack.
+
+1. Navigate to **Dashboard > Team**
+2. Click the **Sync from Slack** button in the top-right corner
+3. Perf pulls in all active Slack workspace members
+
+The sync imports each user's display name and profile photo. It does not overwrite fields you have already edited (department, job title, level, manager, or role).
+
+<Callout type="info">
+New employees who join your Slack workspace are not added to Perf automatically. Run the Slack sync again or add them manually whenever you onboard someone new.
+</Callout>
+
+## Editing a User Profile
+
+Click on any user's name in the team list to open their edit page. You can update the following fields:
+
+- **Display name** -- how they appear across Perf
+- **Department** -- their organizational unit (select from departments you have created)
+- **Job title** -- their current position (e.g., "Senior Software Engineer")
+- **Job level** -- their level within your leveling framework (e.g., IC3, M1)
+- **Manager** -- their direct manager (selected from existing users)
+- **Role** -- their Perf permission level: Admin, HR, Manager, or Employee
+
+<Callout type="tip">
+Setting the manager field correctly is critical. It determines who receives manager review assignments, who can view the employee's goals, and how the org chart is structured.
+</Callout>
+
+## Bulk CSV Import
+
+For large teams or initial setup, use the CSV import tool at **Dashboard > Team > Import**. Prepare a CSV file with the following columns:
+
+| Column | Required | Example |
+|--------|----------|---------|
+| email | Yes | jane@company.com |
+| name | No | Jane Smith |
+| department | No | Engineering |
+| job_title | No | Senior Engineer |
+| level | No | IC3 |
+| manager_email | No | alex@company.com |
+| role | No | manager |
+
+The importer matches users by email address. Existing users are updated; unknown emails are skipped (users must exist in Slack first).
+
+<Callout type="warning">
+Always preview the import results before confirming. The importer shows a diff of what will change so you can catch errors before they are applied.
+</Callout>
+
+## Viewing Your Org Structure
+
+The Team page supports two views:
+
+- **List view** -- a searchable, filterable table of all users with department, role, and manager columns
+- **Org chart view** -- a visual hierarchy based on manager assignments showing reporting lines
+
+Use the org chart to verify that manager chains are correct before launching a cycle. Broken or missing manager links appear as disconnected nodes at the top level.
+
+## Bulk Actions
+
+Select multiple users from the list view to perform bulk actions such as changing department, updating role, or reassigning managers. This is useful during team restructures or when onboarding a new department.

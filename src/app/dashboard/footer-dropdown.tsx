@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { LogOut, User, Settings, ChevronUp } from "lucide-react";
+import { LogOut, User, Settings, ChevronUp, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -64,6 +64,11 @@ export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
             Settings
           </DropdownMenuItem>
         )}
+
+        <DropdownMenuItem onClick={() => router.push("/dashboard/help")}>
+          <HelpCircle className="h-4 w-4 mr-2" />
+          Help Center
+        </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
