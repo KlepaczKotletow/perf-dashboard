@@ -359,13 +359,14 @@ Deno.serve(async (req) => {
       if (cycleId) {
         const cqs = await dbQuery(
           "cycle_questions",
-          `cycle_id=eq.${cycleId}&question_type=eq.competency&select=id,competency_id,prompt,sort_order,competencies(id,name,category)&order=sort_order`
+          `cycle_id=eq.${cycleId}&question_type=eq.competency&select=id,competency_id,prompt,sort_order,competencies(id,name,category,description)&order=sort_order`
         );
         if (cqs && cqs.length > 0 && !cqs.error) {
           competencies = cqs.map((q: any) => ({
             id: q.competencies.id,
             name: q.competencies.name,
             category: q.competencies.category,
+            description: q.competencies.description || "",
           }));
         }
       }
@@ -373,13 +374,14 @@ Deno.serve(async (req) => {
       if (competencies.length === 0 && emp?.level_id) {
         const lc = await dbQuery(
           "level_competencies",
-          `level_id=eq.${emp.level_id}&workspace_id=eq.${wsId}&select=competency_id,competencies(id,name,category)&order=competencies(category),competencies(name)`
+          `level_id=eq.${emp.level_id}&workspace_id=eq.${wsId}&select=competency_id,competencies(id,name,category,description)&order=competencies(category),competencies(name)`
         );
         if (lc && lc.length > 0 && !lc.error) {
           competencies = lc.map((row: any) => ({
             id: row.competencies.id,
             name: row.competencies.name,
             category: row.competencies.category,
+            description: row.competencies.description || "",
           }));
         }
       }
@@ -1350,7 +1352,7 @@ Deno.serve(async (req) => {
 
         const compIds = competencies.map((c: any) => c.id);
         const compNames = competencies.map((c: any) => c.name);
-        const compDescs = competencies.map((c: any) => c.category ? `Category: ${c.category}` : "");
+        const compDescs = competencies.map((c: any) => c.description || (c.category ? `Category: ${c.category}` : ""));
 
         // Get text questions from cycle_questions
         let textQuestionIds: string[] = [];
@@ -1379,6 +1381,7 @@ Deno.serve(async (req) => {
           cycle_name: cycleName,
           competency_ids: compIds,
           competency_names: compNames,
+          competency_descriptions: compDescs,
           current_index: 0,
           ratings: {},
           status: "active",
@@ -1519,7 +1522,7 @@ Deno.serve(async (req) => {
 
         const compIds = conv.competency_ids || [];
         const compNames = conv.competency_names || [];
-        const compDescs = compIds.map((_: any, i: number) => "");
+        const compDescs = conv.competency_descriptions || compIds.map(() => "");
         const convRatingScale = conv.rating_scale || undefined;
         const nextIndex = (conv.current_index || 0) + 1;
 

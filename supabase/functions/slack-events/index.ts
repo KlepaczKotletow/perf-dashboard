@@ -332,8 +332,9 @@ Deno.serve(async (req) => {
                 })
                 .eq("id", conv.id);
 
+              const compDescs: string[] = conv.competency_descriptions || [];
               const blocks = buildCompetencyPrompt(
-                compNames[nextIndex], "", nextIndex, compNames.length,
+                compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length,
                 conv.id, conv.assignment_id, evtRatingScale,
               );
               await sendSlackMessage(
