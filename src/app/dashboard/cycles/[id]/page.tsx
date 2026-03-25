@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,20 +80,14 @@ async function getCycleEmployees(cycleId: string) {
 }
 
 async function getWorkspaceUsers(workspaceId: string) {
-  return unstable_cache(
-    async () => {
-      const supabase = await createServerSupabaseClient();
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, slack_name, slack_email")
-        .eq("workspace_id", workspaceId)
-        .order("slack_name");
-      if (error) console.error("Failed to fetch workspace users:", error.message);
-      return data || [];
-    },
-    [`workspace-users-${workspaceId}`],
-    { revalidate: 30 }
-  )();
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, slack_name, slack_email")
+    .eq("workspace_id", workspaceId)
+    .order("slack_name");
+  if (error) console.error("Failed to fetch workspace users:", error.message);
+  return data || [];
 }
 
 async function getCycleQuestions(cycleId: string) {
@@ -129,22 +122,16 @@ async function getNamiStatus(assignmentIds: string[], workspaceId: string) {
   return data || [];
 }
 
-function getAllCompetencies(workspaceId: string) {
-  return unstable_cache(
-    async () => {
-      const supabase = await createServerSupabaseClient();
-      const { data, error } = await supabase
-        .from("competencies")
-        .select("id, name, category, description")
-        .eq("workspace_id", workspaceId)
-        .order("category")
-        .order("name");
-      if (error) console.error("Failed to fetch competencies:", error.message);
-      return data || [];
-    },
-    [`all-competencies-${workspaceId}`],
-    { revalidate: 300 } // revalidate every 5 minutes — competencies rarely change
-  )();
+async function getAllCompetencies(workspaceId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("competencies")
+    .select("id, name, category, description")
+    .eq("workspace_id", workspaceId)
+    .order("category")
+    .order("name");
+  if (error) console.error("Failed to fetch competencies:", error.message);
+  return data || [];
 }
 
 
