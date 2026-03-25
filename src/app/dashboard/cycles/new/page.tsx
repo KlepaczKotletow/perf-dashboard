@@ -569,7 +569,7 @@ export default function NewCyclePage() {
 
       // Enroll employees
       await supabase.from("performance_cycle_employees").insert(
-        selectedPeopleIds.map((id) => ({ performance_cycle_id: cycleId, employee_id: id, status: "pending", workspace_id: workspaceId }))
+        selectedPeopleIds.map((id) => ({ performance_cycle_id: cycleId, employee_id: id, status: "pending" }))
       );
 
       // Build assignments
