@@ -13,7 +13,6 @@ export function FeedbackFilter() {
   
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const type = searchParams.get("type") || "all";
-  const source = searchParams.get("source") || "all";
 
   const updateFilters = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -34,7 +33,7 @@ export function FeedbackFilter() {
     router.push("/dashboard/feedback");
   };
 
-  const hasFilters = searchParams.get("search") || searchParams.get("type") || searchParams.get("source");
+  const hasFilters = searchParams.get("search") || searchParams.get("type");
 
   return (
     <div className="flex flex-wrap gap-4 mb-6">
@@ -51,17 +50,6 @@ export function FeedbackFilter() {
         </Button>
       </div>
       
-      <Select value={source} onValueChange={(value) => updateFilters("source", value)}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Feedback source" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Sources</SelectItem>
-          <SelectItem value="review">360 Reviews</SelectItem>
-          <SelectItem value="continuous">Continuous</SelectItem>
-        </SelectContent>
-      </Select>
-
       <Select value={type} onValueChange={(value) => updateFilters("type", value)}>
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Feedback type" />
