@@ -203,14 +203,27 @@ export default async function PerformancePage({
   const pendingManagerReviews = sortedManagerReviews.filter((r: any) => r.status !== "completed");
   const pendingUpwardReviews = sortedUpwardReviews.filter((r: any) => r.status !== "completed");
 
-  // ── Build cycle-over-cycle timeline ──
-  const cycleTimeline = (myAssignments || [])
+  // ── Apply cycle filter to ALL sections ──
+  const filterByCycle = (items: any[], cycleKey = "cycle") =>
+    selectedCycleId
+      ? items.filter((a: any) => a[cycleKey]?.id === selectedCycleId || a.cycle_id === selectedCycleId)
+      : items;
+
+  const filteredSelfReviews = filterByCycle(pendingSelfReviews);
+  const filteredCompletedSelf = filterByCycle(completedSelfReviewAssignments);
+  const filteredManagerReviews = filterByCycle(sortedManagerReviews);
+  const filteredPendingManager = filterByCycle(pendingManagerReviews);
+  const filteredUpwardReviews = filterByCycle(sortedUpwardReviews);
+  const filteredPendingUpward = filterByCycle(pendingUpwardReviews);
+
+  // ── Build cycle-over-cycle timeline (deduplicated by cycleId) ──
+  const cycleTimelineRaw = (myAssignments || [])
     .map((a: any) => {
       const gradesVisible = a.cycle?.grades_released === true;
       const isCurrent = a.cycle?.status === "active" || a.cycle?.status === "in_review";
       return {
         id: a.id,
-        cycleId: a.cycle?.id,
+        cycleId: a.cycle?.id as string,
         cycleName: a.cycle?.name || "Unknown",
         startDate: a.cycle?.start_date,
         endDate: a.cycle?.end_date,
@@ -229,6 +242,14 @@ export default async function PerformancePage({
       if (!a.startDate || !b.startDate) return 0;
       return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
     });
+
+  // Deduplicate by cycleId — keep first (best data) per cycle
+  const seenCycleIds = new Set<string>();
+  const cycleTimeline = cycleTimelineRaw.filter((c) => {
+    if (!c.cycleId || seenCycleIds.has(c.cycleId)) return false;
+    seenCycleIds.add(c.cycleId);
+    return true;
+  });
 
   const currentCycleEntry = cycleTimeline.find((c) => c.isCurrent);
 
@@ -292,42 +313,41 @@ export default async function PerformancePage({
         <p className="text-sm text-muted-foreground mt-1">Your review cycles, actions, and ratings</p>
       </div>
 
-      {/* ── My Performance ── */}
+      {/* ── Cycle Selector + Progress ── */}
       {cycleTimeline.length > 0 && (
-        <div className="space-y-3">
-          {/* Cycle chips — compact horizontal row, click to filter */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
-            {/* "All" chip to clear filter */}
+        <div className="space-y-4">
+          {/* Cycle filter tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             <Link
               href="/dashboard/performance"
-              className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
+              className={`shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent ${
                 !selectedCycleId
-                  ? "border-primary/30 bg-primary/5 font-medium"
-                  : "border-border/60 bg-card"
+                  ? "border-primary bg-primary/5 font-semibold text-foreground"
+                  : "border-border/60 bg-card text-muted-foreground"
               }`}
             >
-              All
+              All cycles
             </Link>
             {cycleTimeline.map((entry) => {
               const isSelected = selectedCycleId === entry.cycleId;
               return (
                 <Link
-                  key={entry.id}
+                  key={entry.cycleId}
                   href={`/dashboard/performance?cycle=${entry.cycleId}`}
-                  className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
+                  className={`shrink-0 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent ${
                     isSelected
-                      ? "border-primary/30 bg-primary/5 ring-1 ring-primary/20"
+                      ? "border-primary bg-primary/5 font-semibold text-foreground"
                       : entry.isCurrent
-                      ? "border-primary/30 bg-primary/5"
-                      : "border-border/60 bg-card"
+                      ? "border-primary/30 bg-primary/5 text-foreground"
+                      : "border-border/60 bg-card text-muted-foreground"
                   }`}
                 >
-                  <span className="font-mono font-medium text-foreground">{entry.quarterLabel}</span>
+                  <span className="font-mono font-semibold">{entry.quarterLabel}</span>
                   {entry.grade ? (
                     <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
                   ) : entry.isCurrent ? (
-                    <span className="flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
                       <span className="text-muted-foreground">{entry.cycleStatus === "in_review" ? "In Review" : "Active"}</span>
                     </span>
                   ) : (
@@ -341,65 +361,82 @@ export default async function PerformancePage({
             })}
           </div>
 
-          {/* Current cycle progress — compact inline stepper with deadlines */}
+          {/* Current cycle progress stepper — Leapsome-inspired full-width bar */}
           {currentCycleEntry && progressSteps.length > 0 && (
             <Card className="border-border/60">
-              <CardContent className="py-3 px-4">
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-xs font-semibold text-foreground">{currentCycleEntry.cycleName}</span>
+              <CardContent className="py-4 px-5">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-semibold text-foreground">{currentCycleEntry.cycleName}</span>
                   {currentCycleEntry.endDate && (
-                    <span className="text-[10px] text-muted-foreground">
-                      Ends {format(new Date(currentCycleEntry.endDate), "MMM d")}
+                    <span className="text-xs text-muted-foreground">
+                      Ends {format(new Date(currentCycleEntry.endDate), "MMM d, yyyy")}
                     </span>
                   )}
                 </div>
 
-                {/* Stepper */}
-                <div className="flex items-center gap-0">
+                {/* Full-width stepper */}
+                <div className="flex items-start w-full">
                   {progressSteps.map((step, idx) => {
                     const isActive = step.active || (!step.done && (idx === 0 || progressSteps[idx - 1].done));
                     const deadlineDate = step.deadline ? new Date(step.deadline) : null;
                     const isOverdue = deadlineDate && isPast(deadlineDate) && !step.done;
 
                     return (
-                      <div key={step.label} className="flex items-center flex-1 min-w-0">
-                        {/* Step */}
-                        <div className="flex flex-col items-center gap-0.5 min-w-0">
-                          <div
-                            className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold ${
-                              step.done
-                                ? "bg-emerald-500 text-white dark:bg-emerald-500"
-                                : isActive
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {step.done ? (
-                              <Check className="h-3 w-3" />
-                            ) : (
-                              idx + 1
+                      <div key={step.label} className="flex items-start flex-1">
+                        {/* Step column */}
+                        <div className="flex flex-col items-center w-full">
+                          {/* Dot + connector row */}
+                          <div className="flex items-center w-full">
+                            {/* Left connector */}
+                            {idx > 0 && (
+                              <div className={`flex-1 h-0.5 ${
+                                progressSteps[idx - 1].done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
+                              }`} />
                             )}
+                            {idx === 0 && <div className="flex-1" />}
+
+                            {/* Dot */}
+                            <div
+                              className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${
+                                step.done
+                                  ? "bg-emerald-500 text-white"
+                                  : isActive
+                                  ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {step.done ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : (
+                                idx + 1
+                              )}
+                            </div>
+
+                            {/* Right connector */}
+                            {idx < progressSteps.length - 1 && (
+                              <div className={`flex-1 h-0.5 ${
+                                step.done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
+                              }`} />
+                            )}
+                            {idx === progressSteps.length - 1 && <div className="flex-1" />}
                           </div>
-                          <span className={`text-[10px] leading-tight text-center whitespace-nowrap ${
-                            isActive ? "font-medium text-foreground" : step.done ? "text-foreground" : "text-muted-foreground"
+
+                          {/* Label */}
+                          <span className={`mt-2 text-xs text-center whitespace-nowrap ${
+                            isActive ? "font-semibold text-foreground" : step.done ? "font-medium text-foreground" : "text-muted-foreground"
                           }`}>
                             {step.label}
                           </span>
+
+                          {/* Deadline */}
                           {deadlineDate && (
-                            <span className={`text-[9px] leading-none ${
-                              isOverdue ? "text-red-500 font-medium" : "text-muted-foreground/60"
+                            <span className={`mt-0.5 text-[11px] text-center ${
+                              isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground/70"
                             }`}>
-                              {isOverdue ? "Overdue" : format(deadlineDate, "MMM d")}
+                              {isOverdue ? `Overdue · ${format(deadlineDate, "MMM d")}` : format(deadlineDate, "MMM d")}
                             </span>
                           )}
                         </div>
-
-                        {/* Connector */}
-                        {idx < progressSteps.length - 1 && (
-                          <div className={`flex-1 h-px mx-1 mt-[-14px] ${
-                            step.done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
-                          }`} />
-                        )}
                       </div>
                     );
                   })}
@@ -410,24 +447,22 @@ export default async function PerformancePage({
         </div>
       )}
 
-      {/* Active Cycles Overview removed — cycle chips above serve this purpose */}
-
       <div className="space-y-2">
 
         {/* ── Self-Review ── */}
         <CollapsibleSection
           title="Self-Review"
-          pendingCount={pendingSelfReviews.length}
-          allDone={completedSelfReviewAssignments.length > 0 && pendingSelfReviews.length === 0}
-          defaultOpen={pendingSelfReviews.length > 0}
+          pendingCount={filteredSelfReviews.length}
+          allDone={filteredCompletedSelf.length > 0 && filteredSelfReviews.length === 0}
+          defaultOpen={filteredSelfReviews.length > 0}
         >
-          {pendingSelfReviews.length === 0 ? (
+          {filteredSelfReviews.length === 0 ? (
             <SectionEmptyNote message="No self-reviews due" />
           ) : (
             <Card className="border-border/60">
               <CardContent>
                 <div className="divide-y divide-border">
-                  {pendingSelfReviews.map((a: any) => (
+                  {filteredSelfReviews.map((a: any) => (
                     <div key={`self-${a.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium text-foreground">
@@ -455,17 +490,17 @@ export default async function PerformancePage({
         {/* ── Reviews to Give ── */}
         <CollapsibleSection
           title="Reviews to Give"
-          pendingCount={pendingManagerReviews.length}
-          allDone={sortedManagerReviews.length > 0 && pendingManagerReviews.length === 0}
-          defaultOpen={pendingManagerReviews.length > 0}
+          pendingCount={filteredPendingManager.length}
+          allDone={filteredManagerReviews.length > 0 && filteredPendingManager.length === 0}
+          defaultOpen={filteredPendingManager.length > 0}
         >
-          {sortedManagerReviews.length === 0 ? (
+          {filteredManagerReviews.length === 0 ? (
             <SectionEmptyNote message="No reviews to give" />
           ) : (
             <Card className="border-border/60">
               <CardContent>
                 <div className="divide-y divide-border">
-                  {sortedManagerReviews.map((review: any) => {
+                  {filteredManagerReviews.map((review: any) => {
                     const isDone = review.status === "completed";
                     return (
                       <div
@@ -515,17 +550,17 @@ export default async function PerformancePage({
         {/* ── Upward Feedback ── */}
         <CollapsibleSection
           title="Upward Feedback"
-          pendingCount={pendingUpwardReviews.length}
-          allDone={sortedUpwardReviews.length > 0 && pendingUpwardReviews.length === 0}
-          defaultOpen={pendingUpwardReviews.length > 0}
+          pendingCount={filteredPendingUpward.length}
+          allDone={filteredUpwardReviews.length > 0 && filteredPendingUpward.length === 0}
+          defaultOpen={filteredPendingUpward.length > 0}
         >
-          {sortedUpwardReviews.length === 0 ? (
+          {filteredUpwardReviews.length === 0 ? (
             <SectionEmptyNote message="No upward feedback assigned" />
           ) : (
             <Card className="border-border/60">
               <CardContent>
                 <div className="divide-y divide-border">
-                  {sortedUpwardReviews.map((review: any) => {
+                  {filteredUpwardReviews.map((review: any) => {
                     const isDone = review.status === "completed";
                     return (
                       <div
