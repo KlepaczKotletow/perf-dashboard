@@ -445,36 +445,42 @@ export default async function PerformancePage({
         </div>
       )}
 
-      <div className="space-y-2">
+      {/* ═══ TO DO — Pending actions ═══ */}
+      {(filteredSelfReviews.length > 0 || filteredPendingManager.length > 0 || filteredPendingUpward.length > 0) && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <span className="h-5 w-5 rounded bg-amber-100 dark:bg-amber-400/10 flex items-center justify-center">
+              <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+            </span>
+            To Do
+            <Badge className="text-[10px] h-4 px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400 font-medium">
+              {filteredSelfReviews.length + filteredPendingManager.length + filteredPendingUpward.length}
+            </Badge>
+          </h2>
 
-        {/* ── Self-Review ── */}
-        <CollapsibleSection
-          title="Self-Review"
-          pendingCount={filteredSelfReviews.length}
-          allDone={filteredCompletedSelf.length > 0 && filteredSelfReviews.length === 0}
-          defaultOpen={filteredSelfReviews.length > 0}
-        >
-          {filteredSelfReviews.length === 0 ? (
-            <SectionEmptyNote message="No self-reviews due" />
-          ) : (
+          {/* Self-Review */}
+          {filteredSelfReviews.length > 0 && (
             <Card className="border-border/60">
               <CardContent>
                 <div className="divide-y divide-border">
                   {filteredSelfReviews.map((a: any) => (
                     <div key={`self-${a.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-foreground">
-                          {a.cycle?.name || "Unknown Cycle"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-[10px] font-medium text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10">Self-Review</Badge>
+                          <span className="text-sm font-medium text-foreground">
+                            {a.cycle?.name || "Unknown Cycle"}
+                          </span>
+                        </div>
                         {a.cycle?.review_deadline && (
                           <p className="text-xs text-muted-foreground/70 mt-0.5">
-                            Deadline: {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
+                            Due {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
                           </p>
                         )}
                       </div>
                       <Button size="sm" className="text-xs h-8 shrink-0" asChild>
                         <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
-                          Start Self-Review <ArrowRight className="h-3 w-3 ml-1" />
+                          Start <ArrowRight className="h-3 w-3 ml-1" />
                         </Link>
                       </Button>
                     </div>
@@ -483,143 +489,148 @@ export default async function PerformancePage({
               </CardContent>
             </Card>
           )}
-        </CollapsibleSection>
 
-        {/* ── Reviews to Give ── */}
-        <CollapsibleSection
-          title="Reviews to Give"
-          pendingCount={filteredPendingManager.length}
-          allDone={filteredManagerReviews.length > 0 && filteredPendingManager.length === 0}
-          defaultOpen={filteredPendingManager.length > 0}
-        >
-          {filteredManagerReviews.length === 0 ? (
-            <SectionEmptyNote message="No reviews to give" />
-          ) : (
+          {/* Manager Reviews to Give */}
+          {filteredPendingManager.length > 0 && (
             <Card className="border-border/60">
               <CardContent>
                 <div className="divide-y divide-border">
-                  {filteredManagerReviews.map((review: any) => {
-                    const isDone = review.status === "completed";
-                    return (
-                      <div
-                        key={`mgr-${review.id}`}
-                        className={`py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4 ${isDone ? "opacity-60" : ""}`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-medium text-primary">
-                              {review.employee?.slack_name?.[0]?.toUpperCase() || "?"}
-                            </span>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium text-foreground truncate">
-                                {review.employee?.slack_name || "Unknown"}
-                              </span>
-                              <Badge className={`shrink-0 text-[10px] font-medium ${isDone ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" : "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10"}`}>
-                                {isDone ? "Completed" : review.status === "in_progress" ? "In Progress" : "Pending"}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {review.cycle?.name || "Unknown cycle"}
-                            </p>
-                          </div>
+                  {filteredPendingManager.map((review: any) => (
+                    <div key={`mgr-${review.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-medium text-primary">
+                            {review.employee?.slack_name?.[0]?.toUpperCase() || "?"}
+                          </span>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isDone ? "ghost" : "default"}
-                          className="text-xs h-8 shrink-0"
-                          asChild
-                        >
-                          <Link href={`/dashboard/reviews/${review.id}`}>
-                            {isDone ? "View" : "Review Now"}
-                            <ChevronRight className="h-3 w-3 ml-1" />
-                          </Link>
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </CollapsibleSection>
-
-        {/* ── Upward Feedback ── */}
-        <CollapsibleSection
-          title="Upward Feedback"
-          pendingCount={filteredPendingUpward.length}
-          allDone={filteredUpwardReviews.length > 0 && filteredPendingUpward.length === 0}
-          defaultOpen={filteredPendingUpward.length > 0}
-        >
-          {filteredUpwardReviews.length === 0 ? (
-            <SectionEmptyNote message="No upward feedback assigned" />
-          ) : (
-            <Card className="border-border/60">
-              <CardContent>
-                <div className="divide-y divide-border">
-                  {filteredUpwardReviews.map((review: any) => {
-                    const isDone = review.status === "completed";
-                    return (
-                      <div
-                        key={`upward-${review.id}`}
-                        className={`py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4 ${isDone ? "opacity-60" : ""}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge className="text-[10px] font-medium text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">Manager Review</Badge>
                             <span className="text-sm font-medium text-foreground truncate">
                               {review.employee?.slack_name || "Unknown"}
                             </span>
-                            <Badge className={`shrink-0 text-[10px] font-medium ${isDone ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" : "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10"}`}>
-                              {isDone ? "Submitted" : review.status === "in_progress" ? "In Progress" : "Pending"}
-                            </Badge>
                           </div>
                           <p className="text-xs text-muted-foreground truncate">
                             {review.cycle?.name || "Unknown cycle"}
                           </p>
                         </div>
-                        <Button
-                          size="sm"
-                          variant={isDone ? "ghost" : "default"}
-                          className="text-xs h-8 shrink-0"
-                          asChild
-                        >
-                          <Link
-                            href={
-                              isDone
-                                ? `/dashboard/reviews/${review.id}`
-                                : `/dashboard/cycles/${review.cycle?.id}/review/${review.id}`
-                            }
-                          >
-                            {isDone ? "View" : "Give Feedback"}
-                            <ChevronRight className="h-3 w-3 ml-1" />
-                          </Link>
-                        </Button>
                       </div>
-                    );
-                  })}
+                      <Button size="sm" className="text-xs h-8 shrink-0" asChild>
+                        <Link href={`/dashboard/reviews/${review.id}`}>
+                          Review <ChevronRight className="h-3 w-3 ml-1" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           )}
-        </CollapsibleSection>
 
-      </div>
+          {/* Upward Feedback to Give */}
+          {filteredPendingUpward.length > 0 && (
+            <Card className="border-border/60">
+              <CardContent>
+                <div className="divide-y divide-border">
+                  {filteredPendingUpward.map((review: any) => (
+                    <div key={`upward-${review.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge className="text-[10px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">Upward</Badge>
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {review.employee?.slack_name || "Unknown"}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {review.cycle?.name || "Unknown cycle"}
+                        </p>
+                      </div>
+                      <Button size="sm" className="text-xs h-8 shrink-0" asChild>
+                        <Link href={`/dashboard/cycles/${review.cycle?.id}/review/${review.id}`}>
+                          Give Feedback <ChevronRight className="h-3 w-3 ml-1" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ═══ COMPLETED — What you've already done ═══ */}
+      {(filteredCompletedSelf.length > 0 || filteredManagerReviews.filter((r: any) => r.status === "completed").length > 0 || filteredUpwardReviews.filter((r: any) => r.status === "completed").length > 0) && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <span className="h-5 w-5 rounded bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center">
+              <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+            </span>
+            Completed
+          </h2>
+
+          <Card className="border-border/60">
+            <CardContent>
+              <div className="divide-y divide-border">
+                {filteredCompletedSelf.map((a: any) => (
+                  <div key={`done-self-${a.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Self ✓</Badge>
+                      <span className="text-sm text-foreground">{a.cycle?.name || "Unknown"}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Submitted</span>
+                  </div>
+                ))}
+                {filteredManagerReviews.filter((r: any) => r.status === "completed").map((review: any) => (
+                  <div key={`done-mgr-${review.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Review ✓</Badge>
+                      <span className="text-sm text-foreground">{review.employee?.slack_name || "Unknown"}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-xs h-7 shrink-0" asChild>
+                      <Link href={`/dashboard/reviews/${review.id}`}>
+                        View <ChevronRight className="h-3 w-3 ml-0.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+                {filteredUpwardReviews.filter((r: any) => r.status === "completed").map((review: any) => (
+                  <div key={`done-up-${review.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Upward ✓</Badge>
+                      <span className="text-sm text-foreground">{review.employee?.slack_name || "Unknown"}</span>
+                    </div>
+                    <Button size="sm" variant="ghost" className="text-xs h-7 shrink-0" asChild>
+                      <Link href={`/dashboard/reviews/${review.id}`}>
+                        View <ChevronRight className="h-3 w-3 ml-0.5" />
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ═══ RECEIVED — Ratings & feedback received from others ═══ */}
 
       {/* ── Review Ratings ── */}
       {displayRatings.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <span className="h-5 w-5 rounded bg-sky-100 dark:bg-sky-400/10 flex items-center justify-center">
+              <Star className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+            </span>
+            Received
+            <Badge className="text-[10px] h-4 px-1.5 bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-400 font-medium">
+              {displayRatings.length}
+            </Badge>
+          </h2>
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
               Review Ratings
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {displayRatings.length}
-                {selectedCycleId && (
-                  <span className="ml-1">
-                    — {cycleTimeline.find(c => c.cycleId === selectedCycleId)?.cycleName || "Selected cycle"}
-                  </span>
-                )}
-              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -702,6 +713,7 @@ export default async function PerformancePage({
             </div>
           </CardContent>
         </Card>
+        </div>
       )}
     </div>
   );
