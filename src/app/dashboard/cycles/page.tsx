@@ -101,15 +101,11 @@ export default async function CyclesPage() {
 
             const allAssignments: any[] = cycle.assignments || [];
             const standardAssignments = allAssignments.filter((a: any) => a.assignment_type !== "upward");
-            const totalAssignments = standardAssignments.length;
-            const completedAssignments = standardAssignments.filter((a: any) => a.status === "completed").length;
-            const selfDoneAssignments = standardAssignments.filter((a: any) => a.status === "in_progress").length;
-            const completionPct = totalAssignments > 0
-              ? Math.round((completedAssignments / totalAssignments) * 100)
-              : null;
-            const progressPct = totalAssignments > 0
-              ? Math.round(((completedAssignments + selfDoneAssignments) / totalAssignments) * 100)
-              : null;
+            const totalPeople = standardAssignments.length;
+            const selfDone = standardAssignments.filter((a: any) => a.status === "in_progress" || a.status === "completed").length;
+            const mgrDone = standardAssignments.filter((a: any) => a.status === "completed").length;
+            const selfPct = totalPeople > 0 ? Math.round((selfDone / totalPeople) * 100) : null;
+            const mgrPct = totalPeople > 0 ? Math.round((mgrDone / totalPeople) * 100) : null;
 
             const isActive = cycle.status === "active";
             const endDate = cycle.end_date ? new Date(cycle.end_date) : null;
@@ -172,35 +168,34 @@ export default async function CyclesPage() {
 
                 {/* Completion progress */}
                 <div>
-                  {completionPct !== null ? (
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{completedAssignments}/{totalAssignments} done</span>
-                        <span className="font-medium tabular-nums">{progressPct}%</span>
-                      </div>
-                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden relative">
-                        {/* Self-review done (in_progress) — lighter color behind */}
-                        {progressPct! > 0 && (
+                  {selfPct !== null ? (
+                    <div className="space-y-1.5">
+                      {/* Self-review progress */}
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>Self</span>
+                          <span className="font-medium tabular-nums">{selfDone}/{totalPeople}</span>
+                        </div>
+                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
                           <div
-                            className="absolute inset-y-0 left-0 rounded-full bg-sky-300 dark:bg-sky-400/40 transition-all"
-                            style={{ width: `${progressPct}%` }}
+                            className={`h-full rounded-full transition-all ${selfPct === 100 ? "bg-emerald-500" : "bg-sky-400"}`}
+                            style={{ width: `${selfPct}%` }}
                           />
-                        )}
-                        {/* Fully completed — solid color on top */}
-                        {completionPct > 0 && (
-                          <div
-                            className={`absolute inset-y-0 left-0 rounded-full transition-all ${
-                              completionPct === 100 ? "bg-emerald-500" : "bg-emerald-500"
-                            }`}
-                            style={{ width: `${completionPct}%` }}
-                          />
-                        )}
+                        </div>
                       </div>
-                      {selfDoneAssignments > 0 && completionPct < 100 && (
-                        <p className="text-[10px] text-sky-600 dark:text-sky-400">
-                          {selfDoneAssignments} self done, awaiting manager
-                        </p>
-                      )}
+                      {/* Manager review progress */}
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>Manager</span>
+                          <span className="font-medium tabular-nums">{mgrDone}/{totalPeople}</span>
+                        </div>
+                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${mgrPct === 100 ? "bg-emerald-500" : "bg-primary"}`}
+                            style={{ width: `${mgrPct!}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground/50">No assignments</span>
