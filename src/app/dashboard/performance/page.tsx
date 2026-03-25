@@ -15,7 +15,6 @@ export default async function PerformancePage({
   searchParams: Promise<{ cycle?: string }>;
 }) {
   const params = await searchParams;
-  // Default to newest cycle (last in chronologically sorted timeline), allow override via ?cycle=
   const explicitCycleId = params.cycle || null;
 
   const workspace = await getUserWorkspace();
@@ -194,6 +193,16 @@ export default async function PerformancePage({
   const pendingManagerReviews = sortedManagerReviews.filter((r: any) => r.status !== "completed");
   const pendingUpwardReviews = sortedUpwardReviews.filter((r: any) => r.status !== "completed");
 
+  // Default to newest cycle by start_date from myAssignments
+  const newestAssignmentCycleId = (myAssignments || [])
+    .slice()
+    .sort((a: any, b: any) => {
+      const da = a.cycle?.start_date ? new Date(a.cycle.start_date).getTime() : 0;
+      const db = b.cycle?.start_date ? new Date(b.cycle.start_date).getTime() : 0;
+      return db - da; // newest first
+    })[0]?.cycle?.id || null;
+  const selectedCycleId = explicitCycleId || newestAssignmentCycleId;
+
   // ── Apply cycle filter to ALL sections ──
   const filterByCycle = (items: any[], cycleKey = "cycle") =>
     selectedCycleId
@@ -241,10 +250,6 @@ export default async function PerformancePage({
     seenCycleIds.add(c.cycleId);
     return true;
   });
-
-  // Default to newest cycle if none explicitly selected
-  const newestCycleId = cycleTimeline.length > 0 ? cycleTimeline[cycleTimeline.length - 1].cycleId : null;
-  const selectedCycleId = explicitCycleId || newestCycleId;
 
   // Filter ratings by selected cycle
   const displayRatings = selectedCycleId
