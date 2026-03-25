@@ -15,7 +15,7 @@ async function getPerformanceCycles(workspaceId: string) {
       *,
       creator:users!performance_cycles_created_by_fkey(slack_name),
       employees:performance_cycle_employees(count),
-      assignments:review_assignments(status)
+      assignments:review_assignments(status, assignment_type)
     `)
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
@@ -100,11 +100,15 @@ export default async function CyclesPage() {
             const employeeCount = cycle.employees?.[0]?.count || 0;
 
             const allAssignments: any[] = cycle.assignments || [];
-            const totalAssignments = allAssignments.length;
-            const completedAssignments = allAssignments.filter((a: any) => a.status === "completed").length;
-            const inProgressAssignments = allAssignments.filter((a: any) => a.status === "in_progress").length;
+            const standardAssignments = allAssignments.filter((a: any) => a.assignment_type !== "upward");
+            const totalAssignments = standardAssignments.length;
+            const completedAssignments = standardAssignments.filter((a: any) => a.status === "completed").length;
+            const selfDoneAssignments = standardAssignments.filter((a: any) => a.status === "in_progress").length;
             const completionPct = totalAssignments > 0
               ? Math.round((completedAssignments / totalAssignments) * 100)
+              : null;
+            const progressPct = totalAssignments > 0
+              ? Math.round(((completedAssignments + selfDoneAssignments) / totalAssignments) * 100)
               : null;
 
             const isActive = cycle.status === "active";
@@ -172,23 +176,29 @@ export default async function CyclesPage() {
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>{completedAssignments}/{totalAssignments} done</span>
-                        <span className="font-medium tabular-nums">{completionPct}%</span>
+                        <span className="font-medium tabular-nums">{progressPct}%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            completionPct === 100
-                              ? "bg-emerald-500"
-                              : completionPct >= 60
-                              ? "bg-sky-500"
-                              : "bg-amber-500"
-                          }`}
-                          style={{ width: `${completionPct}%` }}
-                        />
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden relative">
+                        {/* Self-review done (in_progress) — lighter color behind */}
+                        {progressPct! > 0 && (
+                          <div
+                            className="absolute inset-y-0 left-0 rounded-full bg-sky-300 dark:bg-sky-400/40 transition-all"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        )}
+                        {/* Fully completed — solid color on top */}
+                        {completionPct > 0 && (
+                          <div
+                            className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                              completionPct === 100 ? "bg-emerald-500" : "bg-emerald-500"
+                            }`}
+                            style={{ width: `${completionPct}%` }}
+                          />
+                        )}
                       </div>
-                      {inProgressAssignments > 0 && completionPct < 100 && (
+                      {selfDoneAssignments > 0 && completionPct < 100 && (
                         <p className="text-[10px] text-sky-600 dark:text-sky-400">
-                          {inProgressAssignments} awaiting manager review
+                          {selfDoneAssignments} self done, awaiting manager
                         </p>
                       )}
                     </div>
