@@ -26,11 +26,18 @@ interface ActionTask {
   assignmentId: string;
 }
 
+interface SubmittedResponse {
+  competencyName: string;
+  category: string | null;
+  rating: number | null;
+  comment: string | null;
+}
+
 interface CompletedItem {
   id: string;
   type: "self" | "manager-review" | "upward";
   label: string;
-  href: string;
+  assignmentId: string;
   completedAt: string | null;
 }
 
@@ -311,6 +318,39 @@ export default async function PerformancePage({
     });
   }
 
+  // Fetch the user's own submitted responses (for inline "View" in completed section)
+  const allCompletedAssignmentIds = [
+    ...myAssignmentIds,
+    ...(managerReviews || []).filter((r: any) => r.status === "completed").map((r: any) => r.id),
+    ...(upwardReviews || []).filter((r: any) => r.status === "completed").map((r: any) => r.id),
+  ];
+
+  const submittedResponsesByAssignment: Record<string, SubmittedResponse[]> = {};
+  if (allCompletedAssignmentIds.length > 0) {
+    const { data: fullResponses } = await supabase
+      .from("review_responses")
+      .select(`
+        assignment_id, rating, comment,
+        competency:competencies(name, category)
+      `)
+      .eq("reviewer_id", userId)
+      .in("assignment_id", allCompletedAssignmentIds)
+      .order("created_at", { ascending: true });
+
+    for (const r of (fullResponses || [])) {
+      const aid = r.assignment_id;
+      if (!submittedResponsesByAssignment[aid]) {
+        submittedResponsesByAssignment[aid] = [];
+      }
+      submittedResponsesByAssignment[aid].push({
+        competencyName: (r as any).competency?.name || "General",
+        category: (r as any).competency?.category || null,
+        rating: r.rating != null ? Number(r.rating) : null,
+        comment: r.comment || null,
+      });
+    }
+  }
+
   const enrichedAssignments = (myAssignments || []).map((a: any) => {
     const selfSubmitted = mySubmissions[a.id]?.has("self") || false;
     const cycleEnded = a.cycle?.status === "closed" || a.cycle?.status === "completed";
@@ -512,7 +552,7 @@ export default async function PerformancePage({
             id: `done-self-${a.id}`,
             type: "self",
             label: meta.name,
-            href: `/dashboard/cycles/${cid}/review/${a.id}`,
+            assignmentId: a.id,
             completedAt: a.updated_at || a.created_at || null,
           });
         }
@@ -525,7 +565,7 @@ export default async function PerformancePage({
             id: `done-mgr-${r.id}`,
             type: "manager-review",
             label: r.employee?.slack_name || "Unknown",
-            href: `/dashboard/reviews/${r.id}`,
+            assignmentId: r.id,
             completedAt: r.updated_at || r.created_at || null,
           });
         }
@@ -538,7 +578,7 @@ export default async function PerformancePage({
             id: `done-up-${r.id}`,
             type: "upward",
             label: r.employee?.slack_name || "Unknown",
-            href: `/dashboard/reviews/${r.id}`,
+            assignmentId: r.id,
             completedAt: r.updated_at || r.created_at || null,
           });
         }
@@ -707,7 +747,11 @@ export default async function PerformancePage({
                 </div>
               )}
               <ActionRequiredSection tasks={cycle.pendingTasks} />
-              <CompletedSection items={cycle.completedItems} />
+              <CompletedSection
+                items={cycle.completedItems}
+                responsesByAssignment={submittedResponsesByAssignment}
+                ratingMax={ratingMax}
+              />
               <ResultsSection
                 overallRating={cycle.rating}
                 grade={cycle.grade}
