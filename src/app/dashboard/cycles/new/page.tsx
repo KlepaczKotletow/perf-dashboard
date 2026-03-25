@@ -579,7 +579,7 @@ export default function NewCyclePage() {
       // Standard (self + manager review per employee)
       const standardAssignments = enrolledUsers.map((u) => ({
         cycle_id: cycleId, employee_id: u.id, manager_id: u.manager_id || null,
-        assignment_type: "standard", status: "pending", workspace_id: workspaceId,
+        assignment_type: "standard", status: "pending",
       }));
       if (standardAssignments.length > 0) {
         const { error: e } = await supabase.from("review_assignments").insert(standardAssignments);
@@ -591,7 +591,7 @@ export default function NewCyclePage() {
         .filter((u) => u.manager_id && enrolledIds.has(u.manager_id))
         .map((u) => ({
           cycle_id: cycleId, employee_id: u.manager_id, reviewer_id: u.id,
-          manager_id: null, assignment_type: "upward", status: "pending", workspace_id: workspaceId,
+          manager_id: null, assignment_type: "upward", status: "pending",
         }));
       if (upwardAssignments.length > 0) {
         const { error: e } = await supabase.from("review_assignments").insert(upwardAssignments);
