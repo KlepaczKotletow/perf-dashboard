@@ -710,7 +710,7 @@ Deno.serve(async (req) => {
         if (cId) {
           const remaining = await dbQuery("review_assignments", `cycle_id=eq.${cId}&status=in.(pending,in_progress)&or=(manager_id.eq.${reviewer.id},reviewer_id.eq.${reviewer.id})&select=id`);
           const remCount = Array.isArray(remaining) ? remaining.length : 0;
-          remainingText = remCount > 0 ? `You have *${remCount} more review${remCount > 1 ? "s" : ""}* in this cycle. Use \`/review\` to continue.` : ":tada: *All caught up!* No more reviews in this cycle.";
+          remainingText = remCount > 0 ? `You have *${remCount} more review${remCount > 1 ? "s" : ""}* in this cycle. Check the Nami app Home Tab to continue.` : ":tada: *All caught up!* No more reviews in this cycle.";
         }
 
         // Compact confirmation message
@@ -816,7 +816,7 @@ Deno.serve(async (req) => {
               { type: "section", text: { type: "mrkdwn", text: `${typeEmoji} *New feedback from ${sender}*` } },
               { type: "divider" },
               { type: "section", text: { type: "mrkdwn", text: displayMsg } },
-              { type: "context", elements: [{ type: "mrkdwn", text: `Received just now · via /feedback` }] },
+              { type: "context", elements: [{ type: "mrkdwn", text: `Received just now · via /kudos` }] },
             ],
           });
         }
@@ -1224,7 +1224,7 @@ Deno.serve(async (req) => {
 
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
-          text: "Review cancelled. You can start again anytime with /review.",
+          text: "Review cancelled. You can start again anytime from the Nami app Home Tab.",
         });
       }
 
@@ -1774,7 +1774,7 @@ Deno.serve(async (req) => {
 
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
-          text: "Review cancelled. You can start again anytime with /review.",
+          text: "Review cancelled. You can start again anytime from the Nami app Home Tab.",
         });
         return json({});
       }

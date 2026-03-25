@@ -228,7 +228,7 @@ export default async function FeedbackPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Feedback</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Kudos</h1>
         <p className="text-sm text-muted-foreground mt-1">{pageDescription}</p>
       </div>
 
@@ -242,9 +242,9 @@ export default async function FeedbackPage({
             <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
               <MessageSquare className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-foreground mb-1">No feedback yet</p>
+            <p className="text-sm font-medium text-foreground mb-1">No kudos yet</p>
             <p className="text-sm text-muted-foreground">
-              Feedback from performance reviews and Slack will appear here.
+              Kudos from performance reviews and Slack will appear here.
             </p>
           </CardContent>
         </Card>
@@ -341,7 +341,7 @@ export default async function FeedbackPage({
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
-              Continuous Feedback
+              Kudos
               <span className="ml-2 text-xs font-normal text-muted-foreground">
                 {continuousFeedback.length}{continuousFeedback.length === 50 ? " (showing first 50)" : ""}
               </span>
@@ -389,11 +389,11 @@ export default async function FeedbackPage({
       {showContinuous && continuousFeedback.length === 0 && !hasNoFeedback && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Continuous Feedback</CardTitle>
+            <CardTitle className="text-base font-semibold">Kudos</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground text-center py-6">
-              No continuous feedback yet. Use <code className="text-xs bg-muted px-1.5 py-0.5 rounded">/feedback @user message</code> in Slack.
+              No continuous feedback yet. Use <code className="text-xs bg-muted px-1.5 py-0.5 rounded">/kudos</code> in Slack to send feedback to a teammate.
             </p>
           </CardContent>
         </Card>

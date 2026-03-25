@@ -551,7 +551,7 @@ export default async function DashboardPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent feedback
+                Recent kudos
               </h2>
               <Link
                 href="/dashboard/feedback"
@@ -818,13 +818,13 @@ export default async function DashboardPage() {
   const metrics = [
     { label: "Active Cycles", value: stats.activeCycles, icon: TrendingUp, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
     { label: "Review Assignments", value: stats.totalReviews, icon: FileText, color: "text-primary bg-primary/[0.08]" },
-    { label: "Feedback Given", value: stats.totalFeedback, icon: MessageSquare, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
+    { label: "Kudos Given", value: stats.totalFeedback, icon: MessageSquare, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
     { label: "Team Members", value: stats.totalUsers, icon: Users, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
   ];
 
   const quickLinks = [
     { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, description: "View your performance reviews and pending actions" },
-    { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, description: "See feedback you've given and received" },
+    { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, description: "See kudos you've given and received" },
     { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, description: "Manage performance review cycles" },
     { href: "/dashboard/competencies", label: "Competencies", icon: Target, description: "Define and track competency frameworks" },
   ];

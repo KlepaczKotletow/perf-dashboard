@@ -59,7 +59,7 @@ export default async function DashboardLayout({
       items: [
         { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/feedback", label: "Feedback", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
         { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
       ],
     },

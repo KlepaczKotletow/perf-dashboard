@@ -27,8 +27,7 @@ export default function SupportPage() {
               <div>
                 <h4 className="font-medium mb-2">Quick Commands</h4>
                 <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-400">
-                  <li><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/review</code> - Start a 360 review</li>
-                  <li><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/feedback @user</code> - Give quick feedback</li>
+                  <li><code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/kudos</code> - Give quick feedback to a teammate</li>
                 </ul>
               </div>
             </CardContent>
@@ -61,9 +60,9 @@ export default function SupportPage() {
                 How do I start a 360 review?
               </h4>
               <p className="text-slate-600 dark:text-slate-400">
-                Type <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">/review</code> in any Slack channel. 
-                A modal will appear where you can select the employee being reviewed, 
-                add reviewers, and set a due date.
+                Nami bot will message you directly in Slack when a review cycle begins.
+                Follow the guided conversation to rate competencies and answer questions.
+                You can also check your pending reviews in the Nami app Home Tab.
               </p>
             </div>
 

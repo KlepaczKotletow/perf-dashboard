@@ -33,7 +33,7 @@ export default function PrivacyPolicyPage() {
               <ul className="list-disc pl-6 space-y-2">
                 <li>Workspace ID and name</li>
                 <li>User IDs, display names, and email addresses</li>
-                <li>Messages sent through our slash commands (/review, /feedback)</li>
+                <li>Messages sent through our slash commands (/kudos)</li>
               </ul>
               
               <h3 className="font-semibold text-slate-900 dark:text-slate-50 mt-4">User-Provided Information:</h3>
