@@ -34,6 +34,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Deadline reminders are now handled by nami-bot with escalation logic.
+    // This function is deprecated to prevent duplicate notifications.
+    console.warn("send-deadline-reminders is deprecated — nami-bot handles reminders with escalation");
+    return new Response(JSON.stringify({ ok: true, sent: 0, skipped: 0, deprecated: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+
     const today = new Date();
     const daysToCheck = [3, 7];
 

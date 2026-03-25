@@ -17,7 +17,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-export function SurveyActions({ surveyId }: { surveyId: string }) {
+export function SurveyActions({ surveyId, workspaceId }: { surveyId: string; workspaceId: string }) {
   const [loading, setLoading] = useState<"remind" | "close" | null>(null);
   const [reminderSuccess, setReminderSuccess] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
@@ -53,7 +53,8 @@ export function SurveyActions({ surveyId }: { surveyId: string }) {
       const { error } = await supabase
         .from("surveys")
         .update({ status: "closed", updated_at: new Date().toISOString() })
-        .eq("id", surveyId);
+        .eq("id", surveyId)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
       router.refresh();
     } catch (e: any) {

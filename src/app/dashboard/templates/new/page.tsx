@@ -58,7 +58,18 @@ export default function NewTemplatePage() {
 
     try {
       const supabase = createClient();
+
+      // Get workspace_id for tenant scoping
+      const { data: { user } } = await supabase.auth.getUser();
+      const wsId = user?.user_metadata?.workspace_id;
+      if (!wsId) {
+        setSubmitError("Workspace not found. Please re-authenticate.");
+        setSaving(false);
+        return;
+      }
+
       const { error } = await supabase.from("templates").insert({
+        workspace_id: wsId,
         name,
         description,
         is_default: isDefault,

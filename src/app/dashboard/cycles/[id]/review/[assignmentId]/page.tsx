@@ -51,6 +51,7 @@ export default function ReviewFormPage({
   const [hasCycleQuestions, setHasCycleQuestions] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [maxRating, setMaxRating] = useState(5);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const supabase = createBrowserClient(
@@ -70,6 +71,19 @@ export default function ReviewFormPage({
         }
         const appUserId = authUser.user_metadata?.app_user_id;
         setCurrentUser({ id: appUserId, ...authUser.user_metadata });
+
+        // Fetch workspace rating scale
+        const wsId = authUser.user_metadata?.workspace_id;
+        if (wsId) {
+          const { data: wsData } = await supabase
+            .from("workspaces")
+            .select("rating_scale")
+            .eq("id", wsId)
+            .single();
+          if (wsData?.rating_scale?.max) {
+            setMaxRating(wsData.rating_scale.max);
+          }
+        }
 
         // Load assignment
         const { data: assignmentData, error: assignmentError } = await supabase
@@ -93,6 +107,20 @@ export default function ReviewFormPage({
 
         setAssignment(assignmentData);
         setEmployee(assignmentData.employee);
+
+        // Verify assignment belongs to current workspace
+        if (wsId) {
+          const { data: cycleWs } = await supabase
+            .from("performance_cycles")
+            .select("workspace_id")
+            .eq("id", cycleId)
+            .single();
+          if (cycleWs && cycleWs.workspace_id !== wsId) {
+            setError("You don't have access to this review.");
+            setLoading(false);
+            return;
+          }
+        }
 
         // Block submission if cycle is no longer active
         const cycleStatus = (assignmentData as any).cycle?.status;
@@ -155,7 +183,8 @@ export default function ReviewFormPage({
             const { data: levelComps } = await supabase
               .from("level_competencies")
               .select("competency_id, expected_level, behavioral_indicators")
-              .eq("level_id", levelId);
+              .eq("level_id", levelId)
+              .eq("workspace_id", wsId);
             if (levelComps) {
               for (const lc of levelComps) {
                 expectedMap[lc.competency_id] = lc.expected_level;
@@ -232,7 +261,8 @@ export default function ReviewFormPage({
                 expected_level, behavioral_indicators,
                 competency:competencies!level_competencies_competency_id_fkey(id, name, category)
               `)
-              .eq("level_id", levelId);
+              .eq("level_id", levelId)
+              .eq("workspace_id", wsId);
 
             if (levelComps && levelComps.length > 0) {
               competencyData = levelComps.map((lc: any) => ({
@@ -247,10 +277,11 @@ export default function ReviewFormPage({
             }
           }
 
-          if (competencyData.length === 0) {
+          if (competencyData.length === 0 && wsId) {
             const { data: allComps } = await supabase
               .from("competencies")
               .select("id, name, category")
+              .eq("workspace_id", wsId)
               .order("category, name");
 
             competencyData = (allComps || []).map((c: any) => ({
@@ -578,7 +609,7 @@ export default function ReviewFormPage({
                       </Label>
                       {comp.expected_level && (
                         <Badge variant="secondary" className="text-[10px] shrink-0">
-                          Target: {comp.expected_level}/5
+                          Target: {comp.expected_level}/{maxRating}
                         </Badge>
                       )}
                     </div>
@@ -588,13 +619,13 @@ export default function ReviewFormPage({
                     />
                     {/* Stars — larger tap targets for mobile */}
                     <div className="flex items-center gap-0.5">
-                      {[1, 2, 3, 4, 5].map((star) => (
+                      {Array.from({ length: maxRating }, (_, i) => i + 1).map((star) => (
                         <button
                           key={star}
                           type="button"
                           onClick={() => setRating(compIdx, star)}
                           className="p-1 focus:outline-none transition-colors rounded"
-                          aria-label={`Rate ${star} out of 5`}
+                          aria-label={`Rate ${star} out of ${maxRating}`}
                         >
                           <Star
                             className={`h-8 w-8 ${
@@ -607,7 +638,7 @@ export default function ReviewFormPage({
                       ))}
                       {comp.rating && (
                         <span className="ml-2 text-sm font-medium text-muted-foreground">
-                          {["Below expectations", "Developing", "Meets expectations", "Exceeds expectations", "Outstanding"][comp.rating - 1]}
+                          {["Below expectations", "Developing", "Meets expectations", "Exceeds expectations", "Outstanding"][comp.rating - 1] || ""}
                         </span>
                       )}
                     </div>

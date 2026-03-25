@@ -34,7 +34,8 @@ const feedbackTypeConfig: Record<string, { label: string; className: string }> =
 
 async function getScope(
   role: string | undefined,
-  currentUserId: string | null
+  currentUserId: string | null,
+  workspaceId: string | undefined
 ): Promise<FeedbackScope> {
   // HR / Admin — unrestricted
   if (isHROrAbove(role)) {
@@ -43,26 +44,30 @@ async function getScope(
 
   const supabase = await createServerSupabaseClient();
 
-  if (!currentUserId) {
+  if (!currentUserId || !workspaceId) {
     return { assignmentIds: [], userIds: [] };
   }
 
   // Manager — direct reports + self
   if (isManagerOrAbove(role)) {
-    const { data: reports } = await supabase
+    const { data: reports, error: reportsErr } = await supabase
       .from("users")
       .select("id")
-      .eq("manager_id", currentUserId);
+      .eq("manager_id", currentUserId)
+      .eq("workspace_id", workspaceId);
+    if (reportsErr) console.error("Failed to fetch manager reports:", reportsErr.message);
 
     const allUserIds = [
       currentUserId,
       ...((reports || []).map((r: any) => r.id)),
     ];
 
-    const { data: assignments } = await supabase
+    const { data: assignments, error: assignmentsErr } = await supabase
       .from("review_assignments")
       .select("id")
-      .in("employee_id", allUserIds);
+      .in("employee_id", allUserIds)
+      .eq("workspace_id", workspaceId);
+    if (assignmentsErr) console.error("Failed to fetch manager assignments:", assignmentsErr.message);
 
     return {
       assignmentIds: (assignments || []).map((a: any) => a.id),
@@ -71,10 +76,12 @@ async function getScope(
   }
 
   // Employee — themselves only (feedback received)
-  const { data: myAssignments } = await supabase
+  const { data: myAssignments, error: myAssignmentsErr } = await supabase
     .from("review_assignments")
     .select("id")
-    .eq("employee_id", currentUserId);
+    .eq("employee_id", currentUserId)
+    .eq("workspace_id", workspaceId);
+  if (myAssignmentsErr) console.error("Failed to fetch employee assignments:", myAssignmentsErr.message);
 
   return {
     assignmentIds: (myAssignments || []).map((a: any) => a.id),
@@ -82,7 +89,7 @@ async function getScope(
   };
 }
 
-async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope) {
+async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope, workspaceId: string | undefined) {
   // If scope is an empty array we know there's nothing to return
   if (scope.assignmentIds !== null && scope.assignmentIds.length === 0) return [];
 
@@ -103,11 +110,16 @@ async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope)
     .order("created_at", { ascending: false })
     .limit(100);
 
+  if (workspaceId) {
+    query = query.eq("workspace_id", workspaceId);
+  }
+
   if (scope.assignmentIds !== null) {
     query = query.in("assignment_id", scope.assignmentIds);
   }
 
-  const { data } = await query;
+  const { data, error: reviewFeedbackErr } = await query;
+  if (reviewFeedbackErr) console.error("Failed to fetch review feedback:", reviewFeedbackErr.message);
   let results = data || [];
 
   if (filters.search) {
@@ -124,7 +136,7 @@ async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope)
   return results;
 }
 
-async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackScope) {
+async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackScope, workspaceId: string | undefined) {
   // If scope is an empty array we know there's nothing to return
   if (scope.userIds !== null && scope.userIds.length === 0) return [];
 
@@ -136,6 +148,10 @@ async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackSc
     .order("created_at", { ascending: false })
     .limit(50);
 
+  if (workspaceId) {
+    query = query.eq("workspace_id", workspaceId);
+  }
+
   if (scope.userIds !== null) {
     query = query.in("to_user_id", scope.userIds);
   }
@@ -144,7 +160,8 @@ async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackSc
     query = query.eq("feedback_type", filters.type);
   }
 
-  const { data } = await query;
+  const { data, error: continuousFeedbackErr } = await query;
+  if (continuousFeedbackErr) console.error("Failed to fetch continuous feedback:", continuousFeedbackErr.message);
   let results = data || [];
 
   if (filters.search) {
@@ -159,10 +176,10 @@ async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackSc
   return results;
 }
 
-function StarRating({ rating }: { rating: number }) {
+function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
   return (
     <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
+      {Array.from({ length: max }, (_, i) => i + 1).map((star) => (
         <Star
           key={star}
           className={`h-3.5 w-3.5 ${
@@ -172,7 +189,7 @@ function StarRating({ rating }: { rating: number }) {
           }`}
         />
       ))}
-      <span className="ml-1.5 text-xs font-medium text-muted-foreground">{rating}/5</span>
+      <span className="ml-1.5 text-xs font-medium text-muted-foreground">{rating}/{max}</span>
     </div>
   );
 }
@@ -187,7 +204,7 @@ export default async function FeedbackPage({
   const role = workspace?.role;
   const currentUserId = workspace?.appUserId ?? null;
 
-  const scope = await getScope(role, currentUserId);
+  const scope = await getScope(role, currentUserId, workspace?.workspaceId);
 
   const pageDescription = isHROrAbove(role)
     ? "All review ratings and continuous feedback across the organisation"
@@ -198,9 +215,12 @@ export default async function FeedbackPage({
   const showReview = !params.source || params.source === "all" || params.source === "review";
   const showContinuous = !params.source || params.source === "all" || params.source === "continuous";
 
+  const workspaceId = workspace?.workspaceId;
+  const ratingMax = workspace?.ratingScale?.max || 5;
+
   const [reviewFeedback, continuousFeedback] = await Promise.all([
-    showReview ? getReviewFeedback(params, scope) : Promise.resolve([]),
-    showContinuous ? getContinuousFeedback(params, scope) : Promise.resolve([]),
+    showReview ? getReviewFeedback(params, scope, workspaceId) : Promise.resolve([]),
+    showContinuous ? getContinuousFeedback(params, scope, workspaceId) : Promise.resolve([]),
   ]);
 
   const hasNoFeedback = reviewFeedback.length === 0 && continuousFeedback.length === 0;
@@ -272,7 +292,7 @@ export default async function FeedbackPage({
                               {item.competency.name}
                             </span>
                           )}
-                          {item.rating && <StarRating rating={item.rating} />}
+                          {item.rating && <StarRating rating={item.rating} max={ratingMax} />}
                         </div>
 
                         {item.comment && (

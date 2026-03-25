@@ -160,6 +160,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                   userId={user.id}
                   currentRole={user.role || "user"}
                   canEdit={isAdmin && user.id !== currentUserId}
+                  workspaceId={workspaceId}
                 />
                 <Link
                   href={`/dashboard/team/${user.id}`}

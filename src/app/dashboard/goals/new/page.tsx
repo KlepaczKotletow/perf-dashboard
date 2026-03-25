@@ -34,10 +34,14 @@ export default function NewGoalPage() {
 
   useEffect(() => {
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const wsId = user?.user_metadata?.workspace_id;
+      if (!wsId) return;
+
       const [{ data: users }, { data: perfCycles }, { data: goals }] = await Promise.all([
-        supabase.from("users").select("id, slack_name").order("slack_name"),
-        supabase.from("performance_cycles").select("id, name").order("created_at", { ascending: false }),
-        supabase.from("goals").select("id, title").order("title"),
+        supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).order("slack_name"),
+        supabase.from("performance_cycles").select("id, name").eq("workspace_id", wsId).order("created_at", { ascending: false }),
+        supabase.from("goals").select("id, title").eq("workspace_id", wsId).order("title"),
       ]);
       setEmployees(users || []);
       setCycles(perfCycles || []);

@@ -49,14 +49,15 @@ function getQuarterLabel(dateStr: string | null | undefined): string {
   return `Q${q} '${String(date.getFullYear()).slice(2)}`;
 }
 
-function RatingRing({ rating, size = 80, strokeWidth = 8 }: {
+function RatingRing({ rating, max = 5, size = 80, strokeWidth = 8 }: {
   rating: number | null;
+  max?: number;
   size?: number;
   strokeWidth?: number;
 }) {
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
-  const offset = rating !== null ? circumference - (rating / 5) * circumference : circumference;
+  const offset = rating !== null ? circumference - (rating / max) * circumference : circumference;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
       <circle
@@ -118,13 +119,14 @@ function GoalRing({ progress, trackingStatus, size = 32, strokeWidth = 4 }: {
 
 // ── Data Fetching ──────────────────────────────────────────────────────────
 
-async function getEmployeeDetails(id: string, showAllFeedback: boolean) {
+async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedback: boolean) {
   const supabase = await createServerSupabaseClient();
 
   const { data: user, error } = await supabase
     .from("users")
     .select(`*, level:levels!users_level_id_fkey(name, grade, job_family:job_families(name))`)
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
 
   if (error || !user) return null;
@@ -136,6 +138,7 @@ async function getEmployeeDetails(id: string, showAllFeedback: boolean) {
       .from("users")
       .select("id, slack_name")
       .eq("id", user.manager_id)
+      .eq("workspace_id", workspaceId)
       .maybeSingle();
     manager = managerData;
   }
@@ -149,16 +152,19 @@ async function getEmployeeDetails(id: string, showAllFeedback: boolean) {
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")
       .select("id, slack_name, job_title")
       .eq("manager_id", id)
+      .eq("workspace_id", workspaceId)
       .order("slack_name"),
     supabase
       .from("goals")
       .select("id, title, description, status, progress, weight, metric_start, metric_current, metric_target, metric_unit, tracking_status, scope, due_date")
       .eq("employee_id", id)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -180,6 +186,7 @@ async function getEmployeeDetails(id: string, showAllFeedback: boolean) {
     .from("continuous_feedback")
     .select(`id, message, feedback_type, is_anonymous, shared_with_employee, created_at, from_user:users!continuous_feedback_from_user_id_fkey(slack_name)`)
     .eq("to_user_id", id)
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(20);
   if (!showAllFeedback) {
@@ -236,10 +243,12 @@ export default async function EmployeeProfilePage({
 
   const canSeeAllRatings = isManagerOrAbove(workspace?.role);
   const canEdit = isHROrAbove(workspace?.role);
+  const ratingMax = workspace?.ratingScale?.max || 5;
   const isViewingOwnProfile = workspace?.appUserId === id;
   const showFeedbackSection = canSeeAllRatings || isViewingOwnProfile;
 
-  const data = await getEmployeeDetails(id, canSeeAllRatings);
+  if (!workspace?.workspaceId) notFound();
+  const data = await getEmployeeDetails(id, workspace.workspaceId, canSeeAllRatings);
   if (!data) notFound();
 
   const { user, manager, reviewAssignments, continuousFeedback, directReports, goals, skillAverages, overallAvg } = data;
@@ -327,7 +336,7 @@ export default async function EmployeeProfilePage({
           <div className="flex items-center gap-8">
             {/* Circular rating ring */}
             <div className="relative shrink-0 flex items-center justify-center" style={{ width: 80, height: 80 }}>
-              <RatingRing rating={showRating && overallAvg ? parseFloat(overallAvg) : null} />
+              <RatingRing rating={showRating && overallAvg ? parseFloat(overallAvg) : null} max={ratingMax} />
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-xl font-bold text-foreground leading-none">
                   {showRating && overallAvg ? overallAvg : "—"}
@@ -399,7 +408,7 @@ export default async function EmployeeProfilePage({
                     {latestReview.overall_rating &&
                       (canSeeAllRatings || latestReview.cycle?.grades_released) && (
                         <span className="text-sm font-semibold text-foreground">
-                          {latestReview.overall_rating}/5
+                          {latestReview.overall_rating}/{ratingMax}
                         </span>
                       )}
                     {latestReview.final_grade &&
@@ -482,7 +491,7 @@ export default async function EmployeeProfilePage({
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0 ml-2">
-                      {[1, 2, 3, 4, 5].map((s) => (
+                      {Array.from({ length: ratingMax }, (_, i) => i + 1).map((s) => (
                         <Star
                           key={s}
                           className={`h-3.5 w-3.5 ${
@@ -587,7 +596,7 @@ export default async function EmployeeProfilePage({
                         )}
                         {!a.final_grade && a.overall_rating && (canSeeAllRatings || a.cycle?.grades_released) && (
                           <span className="text-sm font-semibold text-foreground">
-                            {a.overall_rating}/5
+                            {a.overall_rating}/{ratingMax}
                           </span>
                         )}
                         <Badge className={`text-[10px] font-medium ${config.badge}`}>

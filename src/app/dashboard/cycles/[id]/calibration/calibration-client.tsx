@@ -232,6 +232,7 @@ function useRowSave(assignmentId: string, supabase: ReturnType<typeof createBrow
   async function save(grade: string) {
     setSaving(true);
     setSaveError(null);
+    // Safe: assignment was loaded from a workspace-scoped cycle page; no direct workspace_id on review_assignments
     const { error } = await supabase
       .from("review_assignments")
       .update({ final_grade: grade || null })

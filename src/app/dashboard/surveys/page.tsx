@@ -6,12 +6,14 @@ import { Plus, ChevronRight, Lock, ClipboardList } from "lucide-react";
 import { format } from "date-fns";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 
-async function getSurveys() {
+async function getSurveys(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("surveys")
     .select("id, type, name, status, closes_at, created_at, survey_participants(status)")
+    .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
+  if (error) console.error("Failed to fetch surveys:", error.message);
   return (data || []).map((s: any) => ({
     ...s,
     totalParticipants: s.survey_participants?.length ?? 0,
@@ -46,7 +48,7 @@ export default async function SurveysPage() {
     );
   }
 
-  const surveys = await getSurveys();
+  const surveys = await getSurveys(workspace!.workspaceId);
   const isAdminOrHR = isHROrAbove(workspace?.role);
 
   return (

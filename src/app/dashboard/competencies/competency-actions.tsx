@@ -57,9 +57,10 @@ interface CompetencyActionsProps {
     category: string | null;
     is_core: boolean;
   };
+  workspaceId: string;
 }
 
-export function CompetencyActions({ competency }: CompetencyActionsProps) {
+export function CompetencyActions({ competency, workspaceId }: CompetencyActionsProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -89,7 +90,8 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
           is_core: editIsCore,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", competency.id);
+        .eq("id", competency.id)
+        .eq("workspace_id", workspaceId);
 
       if (error) throw error;
       router.refresh();
@@ -109,7 +111,8 @@ export function CompetencyActions({ competency }: CompetencyActionsProps) {
       const { error } = await supabase
         .from("competencies")
         .delete()
-        .eq("id", competency.id);
+        .eq("id", competency.id)
+        .eq("workspace_id", workspaceId);
 
       if (error) throw error;
       router.refresh();

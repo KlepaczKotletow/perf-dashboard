@@ -99,7 +99,9 @@ async function handleCycleLaunch(cycleId: string) {
     const mgr = (a as any).manager;
 
     // Notify manager to complete review for employee
-    if (mgr?.slack_user_id) {
+    // Skip for upward assignments — the manager is the SUBJECT being reviewed, not the reviewer.
+    // The upward reviewer (direct report) is notified separately below.
+    if (mgr?.slack_user_id && a.assignment_type !== "upward") {
       const canSend = await logNotification(workspaceId, mgr.id, "review_assigned", a.id);
       if (canSend) {
         const text = `📋 *Review cycle started: ${cycle.name}*\nYou have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/cycles/${cycleId}`;
@@ -268,7 +270,10 @@ Deno.serve(async (req) => {
 
     let result;
     if (action === "launch" && cycle_id) {
-      result = await handleCycleLaunch(cycle_id);
+      // Cycle launch notifications are now handled by nami-bot with rich Block Kit messages.
+      // This endpoint is kept for backwards compatibility but returns a no-op.
+      console.warn("cycle-notifications 'launch' action is deprecated — use nami-bot instead");
+      result = { sent: 0, skipped: 0, deprecated: true };
     } else if (action === "goal_status" && goal_id && new_status && employee_id) {
       result = await handleGoalStatusUpdate(goal_id, new_status, employee_id);
     } else if (action === "self_submitted" && assignment_id) {

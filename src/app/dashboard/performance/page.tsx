@@ -19,6 +19,7 @@ export default async function PerformancePage() {
 
   const supabase = await createServerSupabaseClient();
   const userId = workspace.appUserId;
+  const workspaceId = workspace.workspaceId;
 
   const [
     { data: myAssignments },
@@ -29,11 +30,12 @@ export default async function PerformancePage() {
       .from("review_assignments")
       .select(`
         *,
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, review_deadline),
+        cycle:performance_cycles!inner(id, name, status, review_deadline),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", userId)
       .eq("assignment_type", "standard")
+      .eq("cycle.workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
 
     supabase
@@ -41,11 +43,12 @@ export default async function PerformancePage() {
       .select(`
         *,
         employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
+        cycle:performance_cycles!inner(id, name, status)
       `)
       .eq("manager_id", userId)
       .eq("assignment_type", "standard")
       .neq("employee_id", userId)
+      .eq("cycle.workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
 
     supabase
@@ -53,10 +56,11 @@ export default async function PerformancePage() {
       .select(`
         *,
         employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title),
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status)
+        cycle:performance_cycles!inner(id, name, status)
       `)
       .eq("reviewer_id", userId)
       .eq("assignment_type", "upward")
+      .eq("cycle.workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
   ]);
 

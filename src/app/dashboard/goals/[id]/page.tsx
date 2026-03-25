@@ -54,6 +54,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
       canEdit={canEdit}
       cycles={cycles || []}
       employees={employees || []}
+      workspaceId={workspace?.workspaceId ?? ""}
     />
   );
 }

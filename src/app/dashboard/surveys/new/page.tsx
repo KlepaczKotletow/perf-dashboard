@@ -81,7 +81,10 @@ export default function NewSurveyPage() {
 
   useEffect(() => {
     async function loadTeam() {
-      const { data } = await supabase.from("users").select("id, slack_name, job_title").order("slack_name");
+      const { data: { user } } = await supabase.auth.getUser();
+      const wsId = user?.user_metadata?.workspace_id;
+      if (!wsId) return;
+      const { data } = await supabase.from("users").select("id, slack_name, job_title").eq("workspace_id", wsId).order("slack_name");
       setSubjects(data || []);
     }
     loadTeam();
@@ -160,6 +163,8 @@ export default function NewSurveyPage() {
 
         for (const subjectId of selectedSubjects) {
           const subjectData = wsUsers?.find(u => u.id === subjectId);
+          // Collect peer candidates separately so we can cap them
+          const peerCandidates: string[] = [];
           for (const wu of (wsUsers || [])) {
             if (wu.id === subjectId) {
               if (raterGroups.has("self")) {
@@ -170,8 +175,14 @@ export default function NewSurveyPage() {
             } else if (raterGroups.has("direct_report") && wu.manager_id === subjectId) {
               participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "direct_report" });
             } else if (raterGroups.has("peer")) {
-              participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "peer" });
+              peerCandidates.push(wu.id);
             }
+          }
+          // Limit peers to 5 random per subject to avoid row explosion in large workspaces
+          const MAX_PEERS = 5;
+          const shuffled = peerCandidates.sort(() => Math.random() - 0.5);
+          for (const peerId of shuffled.slice(0, MAX_PEERS)) {
+            participants.push({ survey_id: survey.id, user_id: peerId, subject_user_id: subjectId, role: "peer" });
           }
           // Always add subject tracking entry
           participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "subject" });
@@ -214,9 +225,12 @@ export default function NewSurveyPage() {
       const sendAt = namiScheduleMode === "schedule" && namiScheduleDate
         ? new Date(namiScheduleDate).toISOString() : null;
 
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const wsId = authUser?.user_metadata?.workspace_id;
+
       await supabase.from("surveys").update({
         nami_send_at: sendAt, nami_confirmed: true
-      }).eq("id", pendingSurveyId);
+      }).eq("id", pendingSurveyId).eq("workspace_id", wsId);
 
       if (!sendAt) {
         await supabase.functions.invoke("nami-bot", {
@@ -481,9 +495,9 @@ export default function NewSurveyPage() {
 
       {showNamiConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
+          <div className="bg-card rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
             <h3 className="text-lg font-semibold">🤖 Nami will message:</h3>
-            <p className="text-sm text-zinc-600">
+            <p className="text-sm text-muted-foreground">
               <strong>{namiParticipantCount}</strong> participants will receive a Slack DM to complete the survey.
             </p>
             <div className="flex gap-4">

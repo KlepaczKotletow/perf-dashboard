@@ -36,16 +36,19 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
 
   useEffect(() => {
     async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      const wsId = user?.user_metadata?.workspace_id;
+      if (!wsId) return;
       const [
         { data: usersData },
         { data: functionsData },
         { data: levelsData },
         { data: deptsData },
       ] = await Promise.all([
-        supabase.from("users").select("id, slack_name").order("slack_name"),
-        supabase.from("job_families").select("id, name").order("name"),
-        supabase.from("levels").select("id, name, grade, job_family_id").order("sort_order"),
-        supabase.from("departments").select("id, name").order("name"),
+        supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).order("slack_name"),
+        supabase.from("job_families").select("id, name").eq("workspace_id", wsId).order("name"),
+        supabase.from("levels").select("id, name, grade, job_family_id").eq("workspace_id", wsId).order("sort_order"),
+        supabase.from("departments").select("id, name").eq("workspace_id", wsId).order("name"),
       ]);
       setAllUsers(usersData || []);
       setFunctions(functionsData || []);
@@ -65,17 +68,22 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
     setApplying(true);
     setApplyError(null);
 
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const wsId = authUser?.user_metadata?.workspace_id;
+
     // Guard: prevent removing all admins
     if (action === "role" && value !== "admin") {
       const { count: adminCount } = await supabase
         .from("users")
         .select("*", { count: "exact", head: true })
-        .eq("role", "admin");
+        .eq("role", "admin")
+        .eq("workspace_id", wsId);
 
       const { data: selectedUserRoles } = await supabase
         .from("users")
         .select("id, role")
-        .in("id", selectedIds);
+        .in("id", selectedIds)
+        .eq("workspace_id", wsId);
 
       const selectedAdminCount = (selectedUserRoles || []).filter(
         (u: any) => u.role === "admin"
@@ -104,6 +112,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
           .from("users")
           .select("manager_id")
           .eq("id", currentId)
+          .eq("workspace_id", wsId)
           .single();
         const mgrRow = result.data as { manager_id: string | null } | null;
         currentId = mgrRow?.manager_id || null;
@@ -123,7 +132,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
     if (action === "role") updateData.role = value;
 
     const results = await Promise.all(
-      selectedIds.map((id) => supabase.from("users").update(updateData).eq("id", id))
+      selectedIds.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
     );
 
     const failed = results.filter((r) => r.error).length;

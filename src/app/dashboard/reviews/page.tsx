@@ -1,10 +1,20 @@
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { ReviewsFilter } from "./reviews-filter";
 import { ReviewsContent } from "./reviews-content";
 import { Suspense } from "react";
 
-async function getReviewAssignments(status?: string, search?: string) {
+async function getReviewAssignments(workspaceId: string, status?: string, search?: string) {
   const supabase = await createServerSupabaseClient();
+
+  // Get cycle IDs belonging to this workspace first
+  const { data: cycles, error: cyclesErr } = await supabase
+    .from("performance_cycles")
+    .select("id")
+    .eq("workspace_id", workspaceId);
+  if (cyclesErr) console.error("Failed to fetch review cycles:", cyclesErr.message);
+  const cycleIds = (cycles || []).map((c: any) => c.id);
+  if (cycleIds.length === 0) return [];
+
   let query = supabase
     .from("review_assignments")
     .select(`
@@ -14,6 +24,7 @@ async function getReviewAssignments(status?: string, search?: string) {
       reviewer:users!review_assignments_reviewer_id_fkey(id, slack_name),
       cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date)
     `)
+    .in("cycle_id", cycleIds)
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -21,7 +32,8 @@ async function getReviewAssignments(status?: string, search?: string) {
     query = query.eq("status", status);
   }
 
-  const { data } = await query;
+  const { data, error: assignmentsErr } = await query;
+  if (assignmentsErr) console.error("Failed to fetch review assignments:", assignmentsErr.message);
   let results = (data || []) as any[];
 
   if (search) {
@@ -42,7 +54,8 @@ export default async function ReviewsPage({
   searchParams: Promise<{ status?: string; search?: string }>;
 }) {
   const params = await searchParams;
-  const assignments = await getReviewAssignments(params.status, params.search);
+  const workspace = await getUserWorkspace();
+  const assignments = await getReviewAssignments(workspace!.workspaceId, params.status, params.search);
 
   // Group by cycle, then by assignment_type within each cycle
   const cycleMap = new Map<string, { cycle: any; standard: any[]; upward: any[] }>();

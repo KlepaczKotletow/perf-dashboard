@@ -37,6 +37,7 @@ export default async function MyTeamPage() {
       level:levels!users_level_id_fkey(name, grade)
     `)
     .eq("manager_id", userId)
+    .eq("workspace_id", workspace.workspaceId)
     .order("slack_name");
 
   const reportIds = (directReports || []).map((r: any) => r.id);
@@ -63,6 +64,7 @@ export default async function MyTeamPage() {
       .from("goals")
       .select("id, title, status, progress, employee_id, due_date")
       .in("employee_id", reportIds)
+      .eq("workspace_id", workspace.workspaceId)
       .in("status", ["active", "draft"])
       .order("due_date");
     teamGoals = data || [];

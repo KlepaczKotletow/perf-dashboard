@@ -47,30 +47,44 @@ export async function proxy(request: NextRequest) {
 
     // Subscription enforcement for dashboard routes
     if (request.nextUrl.pathname.startsWith('/dashboard') && user) {
-      const workspaceId = user.user_metadata?.workspace_id
-
       // Allow billing page always (so admin can fix subscription)
       const isBillingPage = request.nextUrl.pathname.startsWith('/dashboard/settings/billing')
 
-      if (workspaceId && !isBillingPage) {
-        // Check subscription status
-        const { data: subscription } = await supabase
-          .from('subscriptions')
-          .select('status')
-          .eq('workspace_id', workspaceId)
-          .maybeSingle()
+      if (!isBillingPage) {
+        // SECURITY: Derive workspace from DB via slack_user_id, NOT from user_metadata.
+        // user_metadata.workspace_id is user-editable via supabase.auth.updateUser().
+        const slackUserId = user.user_metadata?.slack_user_id
+        if (slackUserId) {
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('workspace_id')
+            .eq('slack_user_id', slackUserId)
+            .single()
 
-        // Only block if subscription exists AND is explicitly canceled/past_due
-        // Missing subscription = free tier (allowed)
-        if (subscription && subscription.status !== 'active' && subscription.status !== 'trialing') {
-          const billingUrl = new URL('/dashboard/settings/billing', request.url)
-          billingUrl.searchParams.set('inactive', 'true')
-          return NextResponse.redirect(billingUrl)
+          if (dbUser?.workspace_id) {
+            // RLS ensures we can only read our own workspace's subscription
+            const { data: subscription } = await supabase
+              .from('subscriptions')
+              .select('status')
+              .eq('workspace_id', dbUser.workspace_id)
+              .maybeSingle()
+
+            // Only block if subscription exists AND is explicitly canceled/past_due
+            // Missing subscription = free tier (allowed)
+            if (subscription && subscription.status !== 'active' && subscription.status !== 'trialing') {
+              const billingUrl = new URL('/dashboard/settings/billing', request.url)
+              billingUrl.searchParams.set('inactive', 'true')
+              return NextResponse.redirect(billingUrl)
+            }
+          }
         }
       }
     }
   } catch (e) {
-    console.error('Proxy error:', e)
+    console.error('Proxy error (subscription enforcement may be degraded):', e)
+    // On error, allow request through to avoid blocking users during outages.
+    // This is a deliberate fail-open for availability — subscription enforcement
+    // is defense-in-depth, not the sole access control mechanism.
   }
 
   return response

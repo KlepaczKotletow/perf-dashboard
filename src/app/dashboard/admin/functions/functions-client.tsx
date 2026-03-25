@@ -423,7 +423,8 @@ export function FunctionsClient({
     const { count } = await supabase
       .from("users")
       .select("id", { count: "exact", head: true })
-      .eq("level_id", id);
+      .eq("level_id", id)
+      .eq("workspace_id", workspaceId);
     if ((count ?? 0) > 0) {
       if (!confirm(`${count} ${count !== 1 ? "people are" : "person is"} at this level. Deleting it will unassign them. Continue?`)) return;
     }

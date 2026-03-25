@@ -17,12 +17,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // Slack HMAC-SHA256 signature verification (same pattern as slack-interactivity)
 async function verifySlackSignature(req: Request, body: string): Promise<boolean> {
   if (!SLACK_SIGNING_SECRET) {
-    console.warn("SLACK_SIGNING_SECRET not set — skipping signature verification");
-    return true; // only acceptable in local dev
+    console.error("SLACK_SIGNING_SECRET not set — rejecting request for security");
+    return false;
   }
   const timestamp = req.headers.get("x-slack-request-timestamp") || "";
   const slackSig = req.headers.get("x-slack-signature") || "";
-  if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > 300) return false;
+  const parsedTs = parseInt(timestamp);
+  if (isNaN(parsedTs) || Math.abs(Date.now() / 1000 - parsedTs) > 300) return false;
   const baseString = `v0:${timestamp}:${body}`;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(

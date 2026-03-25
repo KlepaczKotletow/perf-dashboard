@@ -16,9 +16,10 @@ interface RoleSelectorProps {
   userId: string;
   currentRole: string;
   canEdit: boolean;
+  workspaceId?: string;
 }
 
-export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps) {
+export function RoleSelector({ userId, currentRole, canEdit, workspaceId }: RoleSelectorProps) {
   const router = useRouter();
   const [updating, setUpdating] = useState(false);
   const [localRole, setLocalRole] = useState(currentRole);
@@ -32,10 +33,14 @@ export function RoleSelector({ userId, currentRole, canEdit }: RoleSelectorProps
     setUpdating(true);
     try {
       const supabase = createClient();
-      const { error } = await supabase
+      let query = supabase
         .from("users")
         .update({ role: newRole })
         .eq("id", userId);
+      if (workspaceId) {
+        query = query.eq("workspace_id", workspaceId);
+      }
+      const { error } = await query;
 
       if (error) throw error;
       router.refresh();

@@ -60,16 +60,17 @@ export function buildManagerReviewOpening(
   deadline: string,
   assignmentId: string,
   context: { selfAvg?: number; prevRating?: number; goalsCount?: number },
+  ratingMax: number = 5,
 ) {
   const contextLines: string[] = [];
   if (context.selfAvg != null) {
     contextLines.push(
-      `Self-Assessment avg: :star: *${(Math.round(context.selfAvg * 10) / 10).toString()}/5*`,
+      `Self-Assessment avg: :star: *${(Math.round(context.selfAvg * 10) / 10).toString()}/${ratingMax}*`,
     );
   }
   if (context.prevRating != null) {
     contextLines.push(
-      `Previous cycle rating: :star: *${(Math.round(context.prevRating * 10) / 10).toString()}/5*`,
+      `Previous cycle rating: :star: *${(Math.round(context.prevRating * 10) / 10).toString()}/${ratingMax}*`,
     );
   }
   if (context.goalsCount != null && context.goalsCount > 0) {

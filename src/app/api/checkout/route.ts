@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { getUserWorkspace } from "@/lib/supabase-server";
+import { isAdmin } from "@/lib/roles";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -20,12 +22,23 @@ const PLAN_LOOKUP_KEYS: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const workspace = await getUserWorkspace();
+
+    if (!workspace || !isAdmin(workspace.role)) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
-    const { plan, email, annual } = body as {
+    const { plan, annual } = body as {
       plan: string;
-      email: string;
       annual?: boolean;
     };
+
+    // Use the authenticated user's email, not the request body
+    const email = workspace.email;
 
     if (!plan || !email) {
       return NextResponse.json(

@@ -61,6 +61,7 @@ interface GoalDetailClientProps {
   canEdit: boolean;
   cycles: Array<{ id: string; name: string }>;
   employees: Array<{ id: string; slack_name: string }>;
+  workspaceId: string;
 }
 
 interface EditForm {
@@ -137,6 +138,7 @@ export default function GoalDetailClient({
   canEdit,
   cycles,
   employees,
+  workspaceId,
 }: GoalDetailClientProps) {
   const router = useRouter();
   const supabase = createBrowserClient(
@@ -196,7 +198,7 @@ export default function GoalDetailClient({
       weight: Number(form.weight),
     };
 
-    const { error } = await supabase.from("goals").update(payload).eq("id", goal.id);
+    const { error } = await supabase.from("goals").update(payload).eq("id", goal.id).eq("workspace_id", workspaceId);
 
     setSaving(false);
 

@@ -8,20 +8,24 @@ import { format } from "date-fns";
 import { isAdmin } from "@/lib/roles";
 import { UpgradeButton } from "./upgrade-button";
 
-async function getSubscription() {
+async function getSubscription(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .select("*")
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if (error) console.error("Failed to fetch subscription:", error.message);
   return data;
 }
 
-async function getUserCount() {
+async function getUserCount(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("users")
-    .select("*", { count: "exact", head: true });
+    .select("*", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId);
+  if (error) console.error("Failed to fetch user count:", error.message);
   return count || 0;
 }
 
@@ -76,8 +80,8 @@ export default async function BillingPage() {
     );
   }
 
-  const subscription = await getSubscription();
-  const userCount = await getUserCount();
+  const subscription = await getSubscription(workspace!.workspaceId);
+  const userCount = await getUserCount(workspace!.workspaceId);
   const plan = subscription?.plan || "free";
   const planInfo = planDetails[plan] || planDetails.free;
 

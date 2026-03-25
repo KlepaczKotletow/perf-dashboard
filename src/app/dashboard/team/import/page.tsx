@@ -124,18 +124,21 @@ export default function ImportPage() {
   // Load DB data once
   useEffect(() => {
     async function load() {
+      // Get workspace_id from auth user metadata
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const wsId = authUser?.user_metadata?.workspace_id;
+      if (wsId) {
+        setWorkspaceId(wsId);
+      }
+
+      if (!wsId) return;
+
       const [{ data: users }, { data: levels }] = await Promise.all([
-        supabase.from("users").select("id, slack_email, slack_name"),
-        supabase.from("levels").select("id, name, grade, job_family:job_families(name)"),
+        supabase.from("users").select("id, slack_email, slack_name").eq("workspace_id", wsId),
+        supabase.from("levels").select("id, name, grade, job_family:job_families(name)").eq("workspace_id", wsId),
       ]);
       setDbUsers(users || []);
       setDbLevels(levels || []);
-
-      // Get workspace_id from auth user metadata
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser?.user_metadata?.workspace_id) {
-        setWorkspaceId(authUser.user_metadata.workspace_id);
-      }
     }
     load();
   }, []);

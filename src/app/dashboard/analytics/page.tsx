@@ -62,22 +62,27 @@ function heatmapCellClass(avg: number | null): string {
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
-async function getFilterOptions() {
+async function getFilterOptions(workspaceId: string | undefined) {
   const supabase = await createServerSupabaseClient();
 
-  const [{ data: cycles }, { data: functions }, { data: users }] = await Promise.all([
-    supabase
-      .from("performance_cycles")
-      .select("id, name, status")
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("job_families")
-      .select("id, name")
-      .order("name"),
-    supabase
-      .from("users")
-      .select("department"),
+  let cyclesQ = supabase.from("performance_cycles").select("id, name, status").order("created_at", { ascending: false });
+  let functionsQ = supabase.from("job_families").select("id, name").order("name");
+  let usersQ = supabase.from("users").select("department");
+
+  if (workspaceId) {
+    cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+    functionsQ = functionsQ.eq("workspace_id", workspaceId);
+    usersQ = usersQ.eq("workspace_id", workspaceId);
+  }
+
+  const [{ data: cycles, error: cyclesErr }, { data: functions, error: functionsErr }, { data: users, error: usersErr }] = await Promise.all([
+    cyclesQ,
+    functionsQ,
+    usersQ,
   ]);
+  if (cyclesErr) console.error("Failed to fetch filter cycles:", cyclesErr.message);
+  if (functionsErr) console.error("Failed to fetch filter functions:", functionsErr.message);
+  if (usersErr) console.error("Failed to fetch filter users:", usersErr.message);
 
   const departments = [...new Set((users || []).map((u: any) => u.department).filter(Boolean))].sort() as string[];
 
@@ -88,13 +93,16 @@ async function getFilterOptions() {
   };
 }
 
-async function getAnalyticsData(filters: FilterParams) {
+async function getAnalyticsData(filters: FilterParams, workspaceId: string | undefined) {
   const supabase = await createServerSupabaseClient();
 
   // 1. Users — with level → job_family join for function breakdown
-  const { data: usersData } = await supabase
+  let usersQ = supabase
     .from("users")
     .select("id, department, slack_name, level_id, level:levels!users_level_id_fkey(name, job_family_id, job_family:job_families(name))");
+  if (workspaceId) usersQ = usersQ.eq("workspace_id", workspaceId);
+  const { data: usersData, error: usersDataErr } = await usersQ;
+  if (usersDataErr) console.error("Failed to fetch analytics users:", usersDataErr.message);
 
   const allUsers = usersData || [];
 
@@ -111,38 +119,58 @@ async function getAnalyticsData(filters: FilterParams) {
   const filteredUserIds = new Set(functionFilteredUsers.map((u: any) => u.id));
   const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
 
-  // 2. Assignments — optionally filtered by cycle
-  let assignmentsQuery = supabase
-    .from("review_assignments")
-    .select("id, status, employee_id, cycle_id");
+  // 2. Assignments — scoped to workspace cycles, optionally filtered by specific cycle
+  // First get workspace cycle IDs to scope assignments
+  let wsCyclesQ = supabase.from("performance_cycles").select("id");
+  if (workspaceId) wsCyclesQ = wsCyclesQ.eq("workspace_id", workspaceId);
+  const { data: wsCyclesData, error: wsCyclesErr } = await wsCyclesQ;
+  if (wsCyclesErr) console.error("Failed to fetch workspace cycles:", wsCyclesErr.message);
+  const wsCycleIds = (wsCyclesData || []).map((c: any) => c.id);
 
-  if (filters.cycleId) {
-    assignmentsQuery = assignmentsQuery.eq("cycle_id", filters.cycleId);
+  let assignments: any[] = [];
+  if (wsCycleIds.length > 0) {
+    let assignmentsQuery = supabase
+      .from("review_assignments")
+      .select("id, status, employee_id, cycle_id");
+
+    if (filters.cycleId) {
+      assignmentsQuery = assignmentsQuery.eq("cycle_id", filters.cycleId);
+    } else {
+      assignmentsQuery = assignmentsQuery.in("cycle_id", wsCycleIds);
+    }
+
+    const { data: assignmentsRaw, error: assignmentsErr } = await assignmentsQuery;
+    if (assignmentsErr) console.error("Failed to fetch analytics assignments:", assignmentsErr.message);
+    assignments = (assignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
   }
-
-  const { data: assignmentsRaw } = await assignmentsQuery;
-  const assignments = (assignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
 
   const assignmentIds = new Set(assignments.map((a: any) => a.id));
   const assignmentEmployeeMap = new Map(assignments.map((a: any) => [a.id, a.employee_id]));
 
   // 3. Review responses for those assignments
-  const { data: responsesRaw } = await supabase
-    .from("review_responses")
-    .select("id, rating, assignment_id, competency:competencies(name, category)")
-    .not("rating", "is", null);
-
-  const responses = (responsesRaw || []).filter((r: any) => assignmentIds.has(r.assignment_id));
+  let responses: any[] = [];
+  const assignmentIdList = [...assignmentIds];
+  if (assignmentIdList.length > 0) {
+    const { data: responsesRaw, error: responsesErr } = await supabase
+      .from("review_responses")
+      .select("id, rating, assignment_id, competency:competencies(name, category)")
+      .in("assignment_id", assignmentIdList)
+      .not("rating", "is", null);
+    if (responsesErr) console.error("Failed to fetch analytics responses:", responsesErr.message);
+    responses = responsesRaw || [];
+  }
 
   // 4. Goals (not filtered by cycle — workspace-wide)
-  const { data: goalsData } = await supabase
-    .from("goals")
-    .select("id, tracking_status, status");
+  let goalsQ = supabase.from("goals").select("id, tracking_status, status");
+  if (workspaceId) goalsQ = goalsQ.eq("workspace_id", workspaceId);
+  const { data: goalsData, error: goalsErr } = await goalsQ;
+  if (goalsErr) console.error("Failed to fetch analytics goals:", goalsErr.message);
 
   // 5. All cycles (for cycle stats tile)
-  const { data: allCycles } = await supabase
-    .from("performance_cycles")
-    .select("id, status");
+  let allCyclesQ = supabase.from("performance_cycles").select("id, status");
+  if (workspaceId) allCyclesQ = allCyclesQ.eq("workspace_id", workspaceId);
+  const { data: allCycles, error: allCyclesErr } = await allCyclesQ;
+  if (allCyclesErr) console.error("Failed to fetch all cycles:", allCyclesErr.message);
 
   // ── Derived metrics ──
 
@@ -271,23 +299,29 @@ async function getAnalyticsData(filters: FilterParams) {
   };
 }
 
-async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<TrendsData> {
+async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId: string | undefined): Promise<TrendsData> {
   const supabase = await createServerSupabaseClient();
 
-  const { data: cycles } = await supabase
+  let cyclesQ = supabase
     .from("performance_cycles")
     .select("id, name, status")
     .in("status", ["completed", "active"])
     .order("created_at", { ascending: false })
     .limit(6);
+  if (workspaceId) cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+  const { data: cycles, error: trendCyclesErr } = await cyclesQ;
+  if (trendCyclesErr) console.error("Failed to fetch trend cycles:", trendCyclesErr.message);
 
   const recentCycles = (cycles || []).reverse();
 
   if (recentCycles.length === 0) return { ratingTrend: [], completionTrend: [] };
 
-  const { data: usersData } = await supabase
+  let trendsUsersQ = supabase
     .from("users")
     .select("id, department, level:levels!users_level_id_fkey(job_family_id)");
+  if (workspaceId) trendsUsersQ = trendsUsersQ.eq("workspace_id", workspaceId);
+  const { data: usersData, error: trendsUsersErr } = await trendsUsersQ;
+  if (trendsUsersErr) console.error("Failed to fetch trends users:", trendsUsersErr.message);
 
   const filteredUserIds = new Set(
     (usersData || [])
@@ -299,12 +333,13 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
       .map((u: any) => u.id)
   );
 
-  // Batch: fetch all assignments for all cycles at once
+  // Batch: fetch all assignments for all cycles at once (already workspace-scoped via cycles)
   const cycleIds = recentCycles.map((c: any) => c.id);
-  const { data: allAssignmentsRaw } = await supabase
+  const { data: allAssignmentsRaw, error: trendAssignmentsErr } = await supabase
     .from("review_assignments")
     .select("id, status, employee_id, cycle_id")
     .in("cycle_id", cycleIds);
+  if (trendAssignmentsErr) console.error("Failed to fetch trend assignments:", trendAssignmentsErr.message);
 
   const allAssignments = (allAssignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
   const allAssignmentIds = allAssignments.map((a: any) => a.id);
@@ -312,11 +347,12 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
   // Batch: fetch all responses for all assignments at once
   let allResponses: any[] = [];
   if (allAssignmentIds.length > 0) {
-    const { data: responsesRaw } = await supabase
+    const { data: responsesRaw, error: trendResponsesErr } = await supabase
       .from("review_responses")
       .select("rating, assignment_id")
       .in("assignment_id", allAssignmentIds)
       .not("rating", "is", null);
+    if (trendResponsesErr) console.error("Failed to fetch trend responses:", trendResponsesErr.message);
     allResponses = responsesRaw || [];
   }
 
@@ -358,13 +394,16 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">): Promise<Tr
   return { ratingTrend, completionTrend };
 }
 
-async function getHeatmapData(filters: FilterParams, dim: HeatmapDim): Promise<HeatmapData> {
+async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceId: string | undefined): Promise<HeatmapData> {
   const supabase = await createServerSupabaseClient();
 
   // 1. Fetch users with dimension fields
-  const { data: usersRaw } = await supabase
+  let heatmapUsersQ = supabase
     .from("users")
     .select("id, role, department, hire_date, level:levels!users_level_id_fkey(name, job_family_id)");
+  if (workspaceId) heatmapUsersQ = heatmapUsersQ.eq("workspace_id", workspaceId);
+  const { data: usersRaw, error: heatmapUsersErr } = await heatmapUsersQ;
+  if (heatmapUsersErr) console.error("Failed to fetch heatmap users:", heatmapUsersErr.message);
 
   const userMap = new Map(
     (usersRaw || [])
@@ -383,15 +422,24 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim): Promise<H
       })
   );
 
-  // 2. Fetch responses with competency name and assignment employee_id
-  const { data: responsesRaw } = await supabase
+  // 2. Scope responses to workspace cycles
+  let hmCyclesQ = supabase.from("performance_cycles").select("id");
+  if (workspaceId) hmCyclesQ = hmCyclesQ.eq("workspace_id", workspaceId);
+  const { data: hmCyclesData, error: hmCyclesErr } = await hmCyclesQ;
+  if (hmCyclesErr) console.error("Failed to fetch heatmap cycles:", hmCyclesErr.message);
+  const hmCycleIdSet = new Set((hmCyclesData || []).map((c: any) => c.id));
+
+  const { data: responsesRaw, error: hmResponsesErr } = await supabase
     .from("review_responses")
     .select("rating, competency:competencies(name), assignment:review_assignments!inner(employee_id, cycle_id)")
     .not("rating", "is", null)
     .limit(10000);
+  if (hmResponsesErr) console.error("Failed to fetch heatmap responses:", hmResponsesErr.message);
 
   const responses = (responsesRaw || []).filter((r: any) => {
-    if (filters.cycleId && (r.assignment as any)?.cycle_id !== filters.cycleId) return false;
+    const cycleId = (r.assignment as any)?.cycle_id;
+    if (!cycleId || !hmCycleIdSet.has(cycleId)) return false;
+    if (filters.cycleId && cycleId !== filters.cycleId) return false;
     const empId = (r.assignment as any)?.employee_id;
     if (!empId) return false;
     return userMap.has(empId);
@@ -486,13 +534,14 @@ export default async function AnalyticsPage({
     ? params.heatmap_dim
     : "role") as HeatmapDim;
 
+  const wsId = workspace?.workspaceId;
   const [filterOptions, analytics, trends] = await Promise.all([
-    getFilterOptions(),
-    getAnalyticsData(filters),
-    getTrendsData({ functionId: filters.functionId, department: filters.department }),
+    getFilterOptions(wsId),
+    getAnalyticsData(filters, wsId),
+    getTrendsData({ functionId: filters.functionId, department: filters.department }, wsId),
   ]);
   const heatmapData = activeTab === "heatmap"
-    ? await getHeatmapData(filters, heatmapDim)
+    ? await getHeatmapData(filters, heatmapDim, wsId)
     : null;
 
   return (

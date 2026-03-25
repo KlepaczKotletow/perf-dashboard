@@ -55,11 +55,20 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
     async function load() {
       setLoading(true);
       try {
+        // Get workspace_id for tenant scoping
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const wsId = authUser?.user_metadata?.workspace_id;
+        if (!wsId) {
+          setError("Workspace not found");
+          return;
+        }
+
         // Load the user
         const { data: userData, error: userError } = await supabase
           .from("users")
           .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role, is_department_head")
           .eq("id", id)
+          .eq("workspace_id", wsId)
           .single();
 
         if (userError || !userData) {
@@ -77,9 +86,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setIsDeptHead(userData.is_department_head || false);
 
         const [{ data: usersData }, { data: levelsData }, { data: familiesData }] = await Promise.all([
-          supabase.from("users").select("id, slack_name").neq("id", id).order("slack_name"),
-          supabase.from("levels").select("id, name, grade, job_family_id, job_family:job_families(name)").order("sort_order"),
-          supabase.from("job_families").select("id, name").order("name"),
+          supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).neq("id", id).order("slack_name"),
+          supabase.from("levels").select("id, name, grade, job_family_id, job_family:job_families(name)").eq("workspace_id", wsId).order("sort_order"),
+          supabase.from("job_families").select("id, name").eq("workspace_id", wsId).order("name"),
         ]);
 
         setAllUsers(usersData || []);
@@ -114,6 +123,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
     setError(null);
 
     try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const wsId = authUser?.user_metadata?.workspace_id;
+
       const { error: updateError } = await supabase
         .from("users")
         .update({
@@ -125,7 +137,8 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           role,
           is_department_head: isDeptHead,
         })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("workspace_id", wsId);
 
       if (updateError) {
         setError(updateError.message);

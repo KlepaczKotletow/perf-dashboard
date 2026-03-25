@@ -39,39 +39,40 @@ export const getUserWorkspace = cache(async () => {
   const user = await getUser()
   if (!user) return null
 
-  const workspaceId = user.user_metadata?.workspace_id
-  const appUserId = user.user_metadata?.app_user_id
+  const slackUserId = user.user_metadata?.slack_user_id
+  if (!slackUserId) return null
 
   const supabase = await createServerSupabaseClient()
 
-  // Fetch role and workspace settings in parallel — both only depend on user
-  const [dbUserRes, wsDataRes] = await Promise.all([
-    appUserId
-      ? supabase.from('users').select('role').eq('id', appUserId).single()
-      : Promise.resolve({ data: null }),
-    workspaceId
-      ? supabase
-          .from("workspaces")
-          .select("onboarding_completed")
-          .eq("id", workspaceId)
-          .single()
-      : Promise.resolve({ data: null }),
-  ])
+  // SECURITY: Look up the user by slack_user_id (from JWT, not editable by user).
+  // Never trust app_user_id or workspace_id from user_metadata — those can be
+  // modified by calling supabase.auth.updateUser().
+  const { data: dbUser } = await supabase
+    .from('users')
+    .select('id, workspace_id, role, slack_name, department')
+    .eq('slack_user_id', slackUserId)
+    .single()
 
-  // Use DB role if available (more authoritative than user_metadata)
-  const role = dbUserRes.data?.role || user.user_metadata?.role || 'user'
-  const wsData = wsDataRes.data
+  if (!dbUser) return null
+
+  // Now fetch workspace settings using the DB-verified workspace_id
+  const { data: wsData } = await supabase
+    .from("workspaces")
+    .select("team_name, onboarding_completed, rating_scale")
+    .eq("id", dbUser.workspace_id)
+    .single()
 
   return {
     userId: user.id,
     email: user.email,
-    workspaceId,
-    workspaceName: user.user_metadata?.workspace_name,
-    name: user.user_metadata?.name,
-    role,
-    slackUserId: user.user_metadata?.slack_user_id,
-    appUserId,
+    workspaceId: dbUser.workspace_id,
+    workspaceName: wsData?.team_name || user.user_metadata?.workspace_name,
+    name: dbUser.slack_name || user.user_metadata?.name,
+    role: dbUser.role || 'user',
+    slackUserId,
+    appUserId: dbUser.id,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
+    ratingScale: wsData?.rating_scale as { min: number; max: number; labels: Record<string, string> } | null,
   }
 })
 

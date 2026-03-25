@@ -42,14 +42,16 @@ export default async function ReviewDetailPage({
     .eq("workspace_id", workspace.workspaceId)
     .single();
 
+  if (!assignment) notFound();
+
   // Determine reviewer role and edit permission based on the assignment relationship
   const currentUserId = workspace.appUserId;
-  const isAssignmentManager = (assignment as any)?.manager_id === currentUserId;
-  const isAssignmentEmployee = (assignment as any)?.employee_id === currentUserId;
+  const isAssignmentManager = assignment.manager_id === currentUserId;
+  const isAssignmentEmployee = assignment.employee_id === currentUserId;
   const isWorkspaceManager = isManagerOrAbove(workspace.role as any);
   const isUpwardReviewer =
-    (assignment as any)?.assignment_type === "upward" &&
-    (assignment as any)?.reviewer_id === currentUserId;
+    assignment.assignment_type === "upward" &&
+    assignment.reviewer_id === currentUserId;
 
   // Can edit if: you are the upward reviewer, the assigned manager, or an HR/admin-level role
   const canEdit =
@@ -64,8 +66,6 @@ export default async function ReviewDetailPage({
       : isAssignmentEmployee
       ? "self"
       : "manager";
-
-  if (!assignment) notFound();
 
   const employee = assignment.employee as any;
   const levelId = employee?.level_id;
@@ -174,7 +174,7 @@ export default async function ReviewDetailPage({
             </Badge>
             {assignment.overall_rating && (
               <Badge variant="outline" className="text-xs font-semibold">
-                {assignment.overall_rating}/5
+                {assignment.overall_rating}/{workspace.ratingScale?.max || 5}
               </Badge>
             )}
           </div>
@@ -220,6 +220,7 @@ export default async function ReviewDetailPage({
           existingOverallRating={assignment.overall_rating}
           canEdit={canEdit}
           status={assignment.status}
+          maxRating={workspace.ratingScale?.max || 5}
         />
       </div>
     </div>

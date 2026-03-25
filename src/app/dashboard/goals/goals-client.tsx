@@ -89,6 +89,7 @@ interface GoalsClientProps {
   goals: GoalRow[];
   cycles: Cycle[];
   role?: string;
+  workspaceId: string;
 }
 
 // ─── Tracking status config ─────────────────────────────
@@ -158,7 +159,7 @@ function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
 
 // ─── Component ──────────────────────────────────────────
 
-export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClientProps) {
+export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId }: GoalsClientProps) {
   const router = useRouter();
   const supabase = useMemo(
     () => createBrowserClient(
@@ -307,7 +308,8 @@ export default function GoalsClient({ goals: rawGoals, cycles, role }: GoalsClie
     const { error } = await supabase
       .from("goals")
       .update({ tracking_status: status })
-      .eq("id", goalId);
+      .eq("id", goalId)
+      .eq("workspace_id", workspaceId);
 
     setUpdatingIds((prev) => { const next = new Set(prev); next.delete(goalId); return next; });
 

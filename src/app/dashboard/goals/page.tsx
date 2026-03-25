@@ -26,36 +26,41 @@ async function getGoals(
 
   // HR / Admin — unrestricted
   if (isHROrAbove(role)) {
-    const { data } = await query;
+    const { data, error } = await query;
+    if (error) console.error("Failed to fetch goals (HR):", error.message);
     return data || [];
   }
 
   if (!currentUserId) {
     // Unauthenticated — only public company-level goals
-    const { data } = await query.eq("scope", "company");
+    const { data, error } = await query.eq("scope", "company");
+    if (error) console.error("Failed to fetch goals (public):", error.message);
     return data || [];
   }
 
   if (isManagerOrAbove(role)) {
     // Manager — company goals + team goals + individual goals for self and direct reports
-    const { data: reports } = await supabase
+    const { data: reports, error: reportsErr } = await supabase
       .from("users")
       .select("id")
       .eq("manager_id", currentUserId);
+    if (reportsErr) console.error("Failed to fetch manager reports for goals:", reportsErr.message);
 
     const allIds = [currentUserId, ...((reports || []).map((r: any) => r.id))];
     const idsStr = allIds.join(",");
 
-    const { data } = await query.or(
+    const { data, error } = await query.or(
       `scope.eq.company,scope.eq.team,employee_id.in.(${idsStr})`
     );
+    if (error) console.error("Failed to fetch goals (manager):", error.message);
     return data || [];
   }
 
   // Employee — company goals + their own individual goals
-  const { data } = await query.or(
+  const { data, error } = await query.or(
     `scope.eq.company,employee_id.eq.${currentUserId}`
   );
+  if (error) console.error("Failed to fetch goals (employee):", error.message);
   return data || [];
 }
 
@@ -70,7 +75,8 @@ async function getCycles(workspaceId: string | undefined) {
     query = query.eq("workspace_id", workspaceId);
   }
 
-  const { data } = await query;
+  const { data, error } = await query;
+  if (error) console.error("Failed to fetch cycles for goals:", error.message);
   return data || [];
 }
 
@@ -84,5 +90,5 @@ export default async function GoalsPage() {
     getCycles(workspace?.workspaceId),
   ]);
 
-  return <GoalsClient goals={goals} cycles={cycles} role={role} />;
+  return <GoalsClient goals={goals} cycles={cycles} role={role} workspaceId={workspace?.workspaceId ?? ""} />;
 }

@@ -205,6 +205,7 @@ export function CalibrationView({
       }
 
       // Update each assignment
+      // Safe: assignments were loaded from a workspace-scoped cycle page; no direct workspace_id on review_assignments
       for (const update of updates) {
         const { error: updateError } = await supabase
           .from("review_assignments")

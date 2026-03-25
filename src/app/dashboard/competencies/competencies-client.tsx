@@ -300,7 +300,8 @@ export function CompetenciesClient({
             await supabase
               .from("level_competencies")
               .delete()
-              .eq("id", existing.id);
+              .eq("id", existing.id)
+              .eq("workspace_id", workspaceId);
             delete matrixLookup[key];
             count++;
           }
@@ -309,7 +310,8 @@ export function CompetenciesClient({
           await supabase
             .from("level_competencies")
             .update({ expected_level: proficiency })
-            .eq("id", existing.id);
+            .eq("id", existing.id)
+            .eq("workspace_id", workspaceId);
           matrixLookup[key] = { ...existing, expected_level: proficiency };
           count++;
         } else {
@@ -737,7 +739,7 @@ export function CompetenciesClient({
                                 </span>
                               )}
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <CompetencyActions competency={comp} />
+                                <CompetencyActions competency={comp} workspaceId={workspaceId} />
                               </div>
                             </div>
                           </div>

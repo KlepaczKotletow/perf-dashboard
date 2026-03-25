@@ -71,7 +71,7 @@ export function EditableCell({
       if (newValue === null) {
         // Remove the entry
         if (rowId) {
-          await supabase.from("level_competencies").delete().eq("id", rowId);
+          await supabase.from("level_competencies").delete().eq("id", rowId).eq("workspace_id", workspaceId);
           setRowId(null);
           setBehaviors([]);
         }
@@ -81,7 +81,8 @@ export function EditableCell({
         await supabase
           .from("level_competencies")
           .update({ expected_level: newValue })
-          .eq("id", rowId);
+          .eq("id", rowId)
+          .eq("workspace_id", workspaceId);
         setValue(newValue);
       } else {
         // Insert new
@@ -97,6 +98,7 @@ export function EditableCell({
           .select("id")
           .eq("level_id", levelId)
           .eq("competency_id", competencyId)
+          .eq("workspace_id", workspaceId)
           .single();
         if (newRow) setRowId(newRow.id);
         setValue(newValue);
@@ -118,7 +120,8 @@ export function EditableCell({
       await supabase
         .from("level_competencies")
         .update({ behavioral_indicators: behaviors })
-        .eq("id", rowId);
+        .eq("id", rowId)
+        .eq("workspace_id", workspaceId);
       setShowBehaviorsDialog(false);
     } catch (err) {
       console.error("Error saving behaviors:", err);

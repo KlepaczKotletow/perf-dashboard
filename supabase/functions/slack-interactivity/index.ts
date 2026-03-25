@@ -11,12 +11,17 @@ Deno.serve(async (req) => {
   try {
     const body = await req.text();
 
-    // Slack signature verification
-    if (SLACK_SIGNING_SECRET) {
+    // Slack signature verification — always required
+    if (!SLACK_SIGNING_SECRET) {
+      console.error("SLACK_SIGNING_SECRET not set — rejecting request for security");
+      return new Response("Server misconfiguration", { status: 500 });
+    }
+    {
       const timestamp = req.headers.get("x-slack-request-timestamp") || "";
       const slackSig = req.headers.get("x-slack-signature") || "";
       const fiveMin = 5 * 60;
-      if (Math.abs(Date.now() / 1000 - parseInt(timestamp)) > fiveMin) {
+      const parsedTs = parseInt(timestamp);
+      if (isNaN(parsedTs) || Math.abs(Date.now() / 1000 - parsedTs) > fiveMin) {
         return new Response("Request too old", { status: 403 });
       }
       const baseString = `v0:${timestamp}:${body}`;
@@ -118,10 +123,11 @@ Deno.serve(async (req) => {
       return created[0];
     }
 
-    const ratingLabels = ["Needs improvement", "Below expectations", "Meets expectations", "Exceeds expectations", "Exceptional"];
-    function ratingOptions() {
-      return [1, 2, 3, 4, 5].map(n => ({
-        text: { type: "plain_text" as const, text: `${n} - ${ratingLabels[n - 1]}` },
+    const defaultRatingLabels: Record<number, string> = { 1: "Needs improvement", 2: "Below expectations", 3: "Meets expectations", 4: "Exceeds expectations", 5: "Exceptional" };
+    function ratingOptions(scale?: { min: number; max: number; labels: Record<string | number, string> }) {
+      const s = scale || { min: 1, max: 5, labels: defaultRatingLabels };
+      return Array.from({ length: s.max - s.min + 1 }, (_, i) => s.min + i).map(n => ({
+        text: { type: "plain_text" as const, text: `${n} - ${s.labels[n] || ""}` },
         value: String(n),
       }));
     }
@@ -136,6 +142,23 @@ Deno.serve(async (req) => {
     const botToken = await getFreshBotToken(ws);
     const cbId = payload.view?.callback_id;
     console.log("[interactivity] type:", payload.type, "callback:", cbId);
+
+    // ----------------------------------------------------------------
+    // SECURITY: Workspace validation helpers for multi-tenant isolation.
+    // Edge functions use service_role (bypasses RLS), so we MUST verify
+    // that entities belong to the resolved workspace before operating.
+    // ----------------------------------------------------------------
+    async function validateAssignmentWorkspace(assignmentId: string): Promise<boolean> {
+      const res = await dbQuery("review_assignments",
+        `id=eq.${assignmentId}&select=cycle:performance_cycles!inner(workspace_id)`);
+      return res?.[0]?.cycle?.workspace_id === ws.id;
+    }
+
+    async function validateConversationWorkspace(convId: string): Promise<boolean> {
+      const res = await dbQuery("conversation_states",
+        `id=eq.${convId}&workspace_id=eq.${ws.id}&select=id`);
+      return res?.length > 0;
+    }
 
     // ================================================================
     //  WS4: Update original Slack notification after review submit
@@ -157,7 +180,7 @@ Deno.serve(async (req) => {
           const name = s.employee?.slack_name || "Employee";
           if (s.status === "completed") {
             const r = s.overall_rating ? (Math.round(s.overall_rating * 10) / 10).toString() : "N/A";
-            return `✅ ${name} — ⭐ ${r}/5`;
+            return `✅ ${name} — ⭐ ${r}/${ws.rating_scale?.max || 5}`;
           }
           if (s.status === "in_progress") return `🔄 ${name} — in progress`;
           return `⬜ ${name} — pending`;
@@ -212,11 +235,11 @@ Deno.serve(async (req) => {
         // Check: all reviews for this employee in this cycle
         const empAssignments = await dbQuery("review_assignments",
           `cycle_id=eq.${cycleId}&employee_id=eq.${empId}&select=id,status,overall_rating`);
-        const pendingForEmp = empAssignments.filter((a: any) => a.status === "pending");
         const completedForEmp = empAssignments.filter((a: any) => a.status === "completed" && a.overall_rating);
+        const nonCompletedForEmp = empAssignments.filter((a: any) => a.status !== "completed");
 
-        // Notify if NO pending reviews remain for this employee
-        if (pendingForEmp.length === 0 && completedForEmp.length > 0) {
+        // Notify only when ALL reviews for this employee are completed (not pending or in_progress)
+        if (nonCompletedForEmp.length === 0 && completedForEmp.length > 0) {
           const avgOverall = completedForEmp.reduce((s: number, a: any) => s + a.overall_rating, 0) / completedForEmp.length;
           const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=in.(admin,hr)&select=slack_user_id`);
 
@@ -227,7 +250,7 @@ Deno.serve(async (req) => {
               text: `All reviews for ${empName} are complete`,
               blocks: [
                 { type: "section", text: { type: "mrkdwn", text: `:tada: *All reviews for ${empName} are complete!*` } },
-                { type: "context", elements: [{ type: "mrkdwn", text: `Overall: ⭐ *${(Math.round(avgOverall * 10) / 10).toString()}/5* · ${completedForEmp.length} reviews` }] },
+                { type: "context", elements: [{ type: "mrkdwn", text: `Overall: ⭐ *${(Math.round(avgOverall * 10) / 10).toString()}/${ws.rating_scale?.max || 5}* · ${completedForEmp.length} reviews` }] },
                 { type: "actions", elements: [
                   { type: "button", text: { type: "plain_text", text: "View Results 🔗", emoji: true },
                     url: `${DASHBOARD_URL}/dashboard/cycles/${cycleId}`, action_id: "view_dashboard" },
@@ -237,10 +260,10 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Check: all reviews in the ENTIRE cycle
-        const allPending = await dbQuery("review_assignments",
-          `cycle_id=eq.${cycleId}&status=eq.pending&select=id`);
-        if (Array.isArray(allPending) && allPending.length === 0) {
+        // Check: all reviews in the ENTIRE cycle (must all be "completed", not just "not pending")
+        const allNonCompleted = await dbQuery("review_assignments",
+          `cycle_id=eq.${cycleId}&status=neq.completed&select=id`);
+        if (Array.isArray(allNonCompleted) && allNonCompleted.length === 0) {
           const allCompleted = await dbQuery("review_assignments",
             `cycle_id=eq.${cycleId}&status=eq.completed&select=id,overall_rating`);
           const cycleAvg = allCompleted.length > 0
@@ -257,7 +280,7 @@ Deno.serve(async (req) => {
               text: `All reviews for "${cycleName}" are complete!`,
               blocks: [
                 { type: "section", text: { type: "mrkdwn", text: `:checkered_flag: *All reviews for "${cycleName}" are complete!*` } },
-                { type: "context", elements: [{ type: "mrkdwn", text: `${allCompleted.length} reviews · Average: ⭐ *${(Math.round(cycleAvg * 10) / 10).toString()}/5*` }] },
+                { type: "context", elements: [{ type: "mrkdwn", text: `${allCompleted.length} reviews · Average: ⭐ *${(Math.round(cycleAvg * 10) / 10).toString()}/${ws.rating_scale?.max || 5}*` }] },
                 { type: "actions", elements: [
                   { type: "button", text: { type: "plain_text", text: "View Results", emoji: true }, style: "primary",
                     url: `${DASHBOARD_URL}/dashboard/cycles/${cycleId}`, action_id: "view_dashboard" },
@@ -311,7 +334,7 @@ Deno.serve(async (req) => {
 
         // 3. Goals
         const goals = await dbQuery("goals",
-          `user_id=eq.${employeeId}&status=eq.active&select=id,progress`);
+          `employee_id=eq.${employeeId}&status=eq.active&select=id,progress`);
         if (goals?.length > 0 && !goals.error) {
           const avgProgress = Math.round(goals.reduce((s: number, g: any) => s + (g.progress || 0), 0) / goals.length);
           contextLines.push(`Goals: ${goals.length} active (${avgProgress}% avg progress)`);
@@ -321,7 +344,7 @@ Deno.serve(async (req) => {
         const prevAssignments = await dbQuery("review_assignments",
           `employee_id=eq.${employeeId}&status=eq.completed&cycle_id=neq.${cycleId}&select=overall_rating,updated_at&order=updated_at.desc&limit=1`);
         if (prevAssignments?.[0]?.overall_rating) {
-          contextLines.push(`Previous Rating: ⭐ *${(Math.round(prevAssignments[0].overall_rating * 10) / 10).toString()}/5*`);
+          contextLines.push(`Previous Rating: ⭐ *${(Math.round(prevAssignments[0].overall_rating * 10) / 10).toString()}/${ws.rating_scale?.max || 5}*`);
         }
 
         if (contextLines.length === 0) return; // No context available
@@ -387,18 +410,14 @@ Deno.serve(async (req) => {
       }
 
       if (competencies.length === 0) {
-        let all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
-        if (!all || all.length === 0 || all.error) {
-          all = [
-            { id: "fallback_comm", name: "Communication", category: "Core" },
-            { id: "fallback_team", name: "Teamwork", category: "Core" },
-            { id: "fallback_prob", name: "Problem Solving", category: "Core" },
-          ];
+        const all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
+        if (all && all.length > 0 && !all.error) {
+          const core = all.filter((c: any) => c.is_core);
+          competencies = (core.length >= 3 ? core : all).map((c: any) => ({
+            id: c.id, name: c.name, category: c.category,
+          }));
         }
-        const core = all.filter((c: any) => c.is_core);
-        competencies = (core.length >= 3 ? core : all).map((c: any) => ({
-          id: c.id, name: c.name, category: c.category,
-        }));
+        // If still empty, workspace has no competencies — review will proceed with text questions only
       }
 
       return { competencies, empName, cycleId };
@@ -508,16 +527,12 @@ Deno.serve(async (req) => {
           }
         }
         if (competencies.length === 0) {
-          let all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
-          if (!all || all.length === 0 || all.error) {
-            all = [
-              { id: "fallback_comm", name: "Communication", category: "Core" },
-              { id: "fallback_team", name: "Teamwork", category: "Core" },
-              { id: "fallback_prob", name: "Problem Solving", category: "Core" },
-            ];
+          const all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
+          if (all && all.length > 0 && !all.error) {
+            const core = all.filter((c: any) => c.is_core);
+            competencies = (core.length >= 3 ? core : all).map((c: any) => ({ id: c.id, name: c.name, category: c.category, expected: null }));
           }
-          const core = all.filter((c: any) => c.is_core);
-          competencies = (core.length >= 3 ? core : all).map((c: any) => ({ id: c.id, name: c.name, category: c.category, expected: null }));
+          // If still empty, workspace has no competencies — review will proceed with text questions only
         }
       }
 
@@ -529,11 +544,12 @@ Deno.serve(async (req) => {
         }
       }
 
-      const opts = ratingOptions();
+      const wsRatingScaleForModal = ws.rating_scale || { min: 1, max: 5, labels: defaultRatingLabels };
+      const opts = ratingOptions(wsRatingScaleForModal);
       const compBlocks = competencies.slice(0, 60).map((c: any) => {
         let label = c.name;
         if (c.category) label += ` (${c.category})`;
-        if (c.expected) label += ` - expected: ${c.expected}/5`;
+        if (c.expected) label += ` - expected: ${c.expected}/${wsRatingScaleForModal.max}`;
         if (label.length > 200) label = label.slice(0, 197) + "...";
         return {
           type: "input", block_id: `comp_${c.id}`,
@@ -710,7 +726,7 @@ Deno.serve(async (req) => {
             },
             {
               type: "context",
-              elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/5* · ${ratings.length} competencies rated` }],
+              elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${ws.rating_scale?.max || 5}* · ${ratings.length} competencies rated` }],
             },
             ...(remainingText ? [
               { type: "divider" },
@@ -912,6 +928,7 @@ Deno.serve(async (req) => {
       // -- Open cycle review modal --
       if (action?.action_id === "open_cycle_review") {
         const assignmentId = action.value;
+        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
         const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=id,employee_id,manager_id,status,assignment_type,reviewer_id,cycle_id`);
         const assignment = assignments?.[0];
         if (!assignment) return json({});
@@ -986,6 +1003,7 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const assignmentId = meta.assignmentId;
         if (!assignmentId) return json({});
+        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
 
         const slackUserId = payload.user.id;
         const user = await getOrCreateUser(ws.id, slackUserId, botToken);
@@ -1066,12 +1084,12 @@ Deno.serve(async (req) => {
         if (!convId) return json({});
 
         // Fetch the conversation state
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
         // Mark as completed
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           status: "completed",
           phase: "completed",
           updated_at: new Date().toISOString(),
@@ -1133,10 +1151,11 @@ Deno.serve(async (req) => {
 
         // Send confirmation
         const avgStr = ratedCount > 0 ? (Math.round((totalRating / ratedCount) * 10) / 10).toString() : "N/A";
+        const convScaleMax = conv.rating_scale?.max || 5;
         const summaryLines = compIds.map((id: string, i: number) => {
           const r = ratings[id];
           if (r?.rating) {
-            return `• ${compNames[i]} — *${r.rating}*/5${r.comment ? `  _${r.comment.slice(0, 50)}${r.comment.length > 50 ? "..." : ""}_` : ""}`;
+            return `• ${compNames[i]} — *${r.rating}*/${convScaleMax}${r.comment ? `  _${r.comment.slice(0, 50)}${r.comment.length > 50 ? "..." : ""}_` : ""}`;
           }
           return `• ${compNames[i]} — skipped`;
         }).join("\n");
@@ -1148,7 +1167,7 @@ Deno.serve(async (req) => {
             { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Review submitted — ${conv.employee_name}*` } },
             { type: "divider" },
             { type: "section", text: { type: "mrkdwn", text: summaryLines } },
-            { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/5* · ${ratedCount} of ${compIds.length} rated` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${convScaleMax}* · ${ratedCount} of ${compIds.length} rated` }] },
             { type: "actions", elements: [
               { type: "button", text: { type: "plain_text", text: "View on Dashboard 🔗", emoji: true },
                 url: `${DASHBOARD_URL}/dashboard`, action_id: "open_dashboard" },
@@ -1170,13 +1189,13 @@ Deno.serve(async (req) => {
         const convId = meta.convId;
         if (!convId) return json({});
 
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           phase: "competencies",
           current_index: 0,
           updated_at: new Date().toISOString(),
         });
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=competency_names,competency_ids,employee_name,cycle_name,assignment_id`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=competency_names,competency_ids,employee_name,cycle_name,assignment_id`);
         const conv = convStates?.[0];
         if (conv) {
           const compNames = conv.competency_names || [];
@@ -1198,7 +1217,7 @@ Deno.serve(async (req) => {
         const convId = meta.convId;
         if (!convId) return json({});
 
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           status: "expired",
           updated_at: new Date().toISOString(),
         });
@@ -1321,6 +1340,7 @@ Deno.serve(async (req) => {
         const rolePrefix = raw.slice(0, underscoreIdx);
         const assignmentId = raw.slice(underscoreIdx + 1);
         if (!assignmentId) return json({});
+        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
 
         const slackUserId = payload.user.id;
         const user = await getOrCreateUser(ws.id, slackUserId, botToken);
@@ -1478,7 +1498,7 @@ Deno.serve(async (req) => {
         const { convId, assignmentId, compName } = meta;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1491,7 +1511,7 @@ Deno.serve(async (req) => {
           ratings[currentCompId] = { rating: ratingNum };
         }
 
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           ratings,
           updated_at: new Date().toISOString(),
         });
@@ -1516,7 +1536,7 @@ Deno.serve(async (req) => {
         const { convId } = meta;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1528,7 +1548,7 @@ Deno.serve(async (req) => {
 
         if (nextIndex < compIds.length) {
           // More competencies to rate
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
           });
@@ -1559,7 +1579,7 @@ Deno.serve(async (req) => {
 
           if (textQuestionIds.length > 0) {
             // Transition to text_questions phase
-            await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
               phase: "text_questions",
               current_index: 0,
               text_question_ids: textQuestionIds,
@@ -1575,7 +1595,7 @@ Deno.serve(async (req) => {
             });
           } else {
             // No text questions — go to summary
-            await dbUpdate("conversation_states", `id=eq.${convId}`, {
+            await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
               phase: "summary",
               updated_at: new Date().toISOString(),
             });
@@ -1605,12 +1625,12 @@ Deno.serve(async (req) => {
         const convId = action.value;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
         // Mark as completed
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           status: "completed",
           phase: "completed",
           updated_at: new Date().toISOString(),
@@ -1672,10 +1692,11 @@ Deno.serve(async (req) => {
 
         // Send confirmation
         const avgStr = ratedCount > 0 ? (Math.round((totalRating / ratedCount) * 10) / 10).toString() : "N/A";
+        const namiScaleMax = conv.rating_scale?.max || 5;
         const summaryLines = compIds.map((id: string, i: number) => {
           const r = ratings[id];
           if (r?.rating) {
-            return `\u2022 ${compNames[i]} \u2014 *${r.rating}*/5${r.comment ? `  _${r.comment.slice(0, 50)}${r.comment.length > 50 ? "..." : ""}_` : ""}`;
+            return `\u2022 ${compNames[i]} \u2014 *${r.rating}*/${namiScaleMax}${r.comment ? `  _${r.comment.slice(0, 50)}${r.comment.length > 50 ? "..." : ""}_` : ""}`;
           }
           return `\u2022 ${compNames[i]} \u2014 skipped`;
         }).join("\n");
@@ -1687,7 +1708,7 @@ Deno.serve(async (req) => {
             { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Review submitted \u2014 ${conv.employee_name}*` } },
             { type: "divider" },
             { type: "section", text: { type: "mrkdwn", text: summaryLines } },
-            { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/5* \u00b7 ${ratedCount} of ${compIds.length} rated` }] },
+            { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${namiScaleMax}* \u00b7 ${ratedCount} of ${compIds.length} rated` }] },
             { type: "actions", elements: [
               { type: "button", text: { type: "plain_text", text: "View on Dashboard \ud83d\udd17", emoji: true },
                 url: `${DASHBOARD_URL}/dashboard`, action_id: "open_dashboard" },
@@ -1711,11 +1732,11 @@ Deno.serve(async (req) => {
         const convId = action.value;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           phase: "competencies",
           current_index: 0,
           updated_at: new Date().toISOString(),
@@ -1746,7 +1767,7 @@ Deno.serve(async (req) => {
         const convId = action.value;
         if (!convId) return json({});
 
-        await dbUpdate("conversation_states", `id=eq.${convId}`, {
+        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
           status: "expired",
           updated_at: new Date().toISOString(),
         });
@@ -1835,7 +1856,7 @@ Deno.serve(async (req) => {
         const { convId, surveyId, questionIndex, rating } = meta;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1851,7 +1872,7 @@ Deno.serve(async (req) => {
 
         const nextIndex = currentIdx + 1;
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             survey_answers: answers,
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
@@ -1869,7 +1890,7 @@ Deno.serve(async (req) => {
           });
         } else {
           // Survey complete — save responses
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             survey_answers: answers,
             status: "completed",
             phase: "completed",
@@ -1907,7 +1928,7 @@ Deno.serve(async (req) => {
         const { convId, surveyId, questionIndex, selected } = meta;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1923,7 +1944,7 @@ Deno.serve(async (req) => {
 
         const nextIndex = currentIdx + 1;
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             survey_answers: answers,
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
@@ -1941,7 +1962,7 @@ Deno.serve(async (req) => {
           });
         } else {
           // Survey complete — save responses
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             survey_answers: answers,
             status: "completed",
             phase: "completed",
@@ -1979,7 +2000,7 @@ Deno.serve(async (req) => {
         const { convId, surveyId, questionIndex } = meta;
         if (!convId) return json({});
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1988,7 +2009,7 @@ Deno.serve(async (req) => {
         const nextIndex = currentIdx + 1;
 
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
           });
@@ -2006,7 +2027,7 @@ Deno.serve(async (req) => {
         } else {
           // Survey complete — save responses (with skipped questions omitted)
           const answers = conv.survey_answers || {};
-          await dbUpdate("conversation_states", `id=eq.${convId}`, {
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
             status: "completed",
             phase: "completed",
             updated_at: new Date().toISOString(),

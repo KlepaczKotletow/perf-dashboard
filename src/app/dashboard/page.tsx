@@ -31,7 +31,7 @@ import { STATUS_COLORS } from "@/components/charts/chart-utils";
 
 // ─── Data fetchers ─────────────────────────────────────────────────────────────
 
-async function getPersonalData(userId: string) {
+async function getPersonalData(userId: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
   const [assignmentsRes, feedbackRes] = await Promise.all([
@@ -39,7 +39,8 @@ async function getPersonalData(userId: string) {
       .from("review_assignments")
       .select(`
         *,
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, review_deadline, grades_released)
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, review_deadline, grades_released),
+        manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", userId)
       .eq("assignment_type", "standard")
@@ -48,9 +49,13 @@ async function getPersonalData(userId: string) {
       .from("continuous_feedback")
       .select(`*, sender:users!continuous_feedback_from_user_id_fkey(slack_name, job_title)`)
       .eq("to_user_id", userId)
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);
+
+  if (assignmentsRes.error) console.error("Failed to fetch personal assignments:", assignmentsRes.error.message);
+  if (feedbackRes.error) console.error("Failed to fetch personal feedback:", feedbackRes.error.message);
 
   // Filter to assignments in active cycles only
   const allAssignments = assignmentsRes.data || [];
@@ -62,12 +67,13 @@ async function getPersonalData(userId: string) {
   const assignmentIds = activeAssignments.map((a: any) => a.id);
   let selfSubmitted: Set<string> = new Set();
   if (assignmentIds.length > 0) {
-    const { data: responses } = await supabase
+    const { data: responses, error: responsesErr } = await supabase
       .from("review_responses")
       .select("assignment_id, reviewer_role")
       .eq("reviewer_id", userId)
       .eq("reviewer_role", "self")
       .in("assignment_id", assignmentIds);
+    if (responsesErr) console.error("Failed to fetch self-review responses:", responsesErr.message);
     (responses || []).forEach((r: any) => selfSubmitted.add(r.assignment_id));
   }
 
@@ -83,7 +89,7 @@ async function getPersonalData(userId: string) {
   };
 }
 
-async function getManagerData(userId: string) {
+async function getManagerData(userId: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
   const [reportsRes, cyclesRes] = await Promise.all([
@@ -95,9 +101,13 @@ async function getManagerData(userId: string) {
       .from("performance_cycles")
       .select("id, name, status, review_deadline")
       .eq("status", "active")
+      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);
+
+  if (reportsRes.error) console.error("Failed to fetch direct reports:", reportsRes.error.message);
+  if (cyclesRes.error) console.error("Failed to fetch active cycles:", cyclesRes.error.message);
 
   const reports = reportsRes.data || [];
   const activeCycles = cyclesRes.data || [];
@@ -107,12 +117,13 @@ async function getManagerData(userId: string) {
   if (reports.length > 0 && activeCycles.length > 0) {
     const reportIds = reports.map((r: any) => r.id);
     const cycleIds = activeCycles.map((c: any) => c.id);
-    const { data: assignments } = await supabase
+    const { data: assignments, error: assignmentsErr } = await supabase
       .from("review_assignments")
       .select("id, employee_id, manager_id, status, cycle_id")
       .eq("assignment_type", "standard")
       .in("employee_id", reportIds)
       .in("cycle_id", cycleIds);
+    if (assignmentsErr) console.error("Failed to fetch team assignments:", assignmentsErr.message);
     teamAssignments = assignments || [];
   }
 
@@ -170,21 +181,65 @@ async function getOrgData(workspaceId: string | undefined) {
         Promise.resolve({ count: 0 }),
       ];
 
-  const [reviewsRes, feedbackRes, usersRes, activeRes, usersSetup, compRes, cyclesRes, managersRes, activeCyclesRes] =
+  // Build workspace-filtered count queries for the top-level stats
+  const reviewsQuery = (() => {
+    // review_assignments has no direct workspace_id — count via workspace cycles
+    let q = supabase.from("performance_cycles").select("id").eq("status", "active");
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const feedbackQuery = (() => {
+    let q = supabase.from("continuous_feedback").select("*", { count: "exact", head: true });
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const usersQuery = (() => {
+    let q = supabase.from("users").select("*", { count: "exact", head: true });
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const activeQuery = (() => {
+    let q = supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active");
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const [wsCyclesForCount, feedbackRes, usersRes, activeRes, usersSetup, compRes, cyclesRes, managersRes, activeCyclesRes] =
     await Promise.all([
-      supabase.from("review_assignments").select("*", { count: "exact", head: true }),
-      supabase.from("continuous_feedback").select("*", { count: "exact", head: true }),
-      supabase.from("users").select("*", { count: "exact", head: true }),
-      supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active"),
+      reviewsQuery,
+      feedbackQuery,
+      usersQuery,
+      activeQuery,
       ...workspacedQueries,
       activeCyclesQuery,
     ]);
+
+  if ((wsCyclesForCount as any).error) console.error("Failed to fetch workspace cycles for count:", (wsCyclesForCount as any).error.message);
+  if ((feedbackRes as any).error) console.error("Failed to fetch feedback count:", (feedbackRes as any).error.message);
+  if ((usersRes as any).error) console.error("Failed to fetch users count:", (usersRes as any).error.message);
+  if ((activeRes as any).error) console.error("Failed to fetch active cycles count:", (activeRes as any).error.message);
+  if ((activeCyclesRes as any).error) console.error("Failed to fetch active cycles:", (activeCyclesRes as any).error.message);
+
+  // Count review_assignments scoped to workspace cycles
+  let totalReviewAssignments = 0;
+  const wsCycleIds = (wsCyclesForCount.data || []).map((c: any) => c.id);
+  if (wsCycleIds.length > 0) {
+    const { count, error: reviewCountErr } = await supabase
+      .from("review_assignments")
+      .select("*", { count: "exact", head: true })
+      .in("cycle_id", wsCycleIds);
+    if (reviewCountErr) console.error("Failed to count review assignments:", reviewCountErr.message);
+    totalReviewAssignments = count || 0;
+  }
 
   const activeCycles = (activeCyclesRes as any).data || [];
 
   return {
     stats: {
-      totalReviews: reviewsRes.count || 0,
+      totalReviews: totalReviewAssignments,
       activeCycles: activeRes.count || 0,
       totalFeedback: feedbackRes.count || 0,
       totalUsers: usersRes.count || 0,
@@ -202,24 +257,64 @@ async function getOrgData(workspaceId: string | undefined) {
 async function getChartData(workspaceId: string | undefined): Promise<DashboardChartData> {
   const supabase = await createServerSupabaseClient();
 
-  const [assignmentsRes, goalsRes, responsesRes, usersRes, cyclesRes] = await Promise.all([
-    supabase.from("review_assignments").select("id, status, cycle_id"),
-    supabase.from("goals").select("id, tracking_status, status"),
-    supabase
-      .from("review_responses")
-      .select(`id, rating, created_at, assignment:review_assignments!review_responses_assignment_id_fkey(employee_id)`)
-      .not("rating", "is", null),
-    supabase.from("users").select("id, department"),
-    supabase.from("performance_cycles").select("id, name, status, created_at").order("created_at", { ascending: false }),
+  // Scope all queries to the workspace
+  const goalsQuery = (() => {
+    let q = supabase.from("goals").select("id, tracking_status, status");
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const usersQuery2 = (() => {
+    let q = supabase.from("users").select("id, department");
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const cyclesQuery = (() => {
+    let q = supabase.from("performance_cycles").select("id, name, status, created_at").order("created_at", { ascending: false });
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q;
+  })();
+
+  const [goalsRes, usersRes, cyclesRes] = await Promise.all([
+    goalsQuery,
+    usersQuery2,
+    cyclesQuery,
   ]);
+
+  if (goalsRes.error) console.error("Failed to fetch goals for chart:", goalsRes.error.message);
+  if (usersRes.error) console.error("Failed to fetch users for chart:", usersRes.error.message);
+  if (cyclesRes.error) console.error("Failed to fetch cycles for chart:", cyclesRes.error.message);
+
+  const cycles = cyclesRes.data || [];
+
+  // Fetch assignments scoped to workspace cycles
+  const allCycleIds = cycles.map((c: any) => c.id);
+  let assignmentsRes: { data: any[] | null; error?: any } = { data: [] };
+  let responsesRes: { data: any[] | null; error?: any } = { data: [] };
+  if (allCycleIds.length > 0) {
+    [assignmentsRes, responsesRes] = await Promise.all([
+      supabase.from("review_assignments").select("id, status, cycle_id").in("cycle_id", allCycleIds),
+      supabase
+        .from("review_responses")
+        .select(`id, rating, created_at, assignment:review_assignments!review_responses_assignment_id_fkey(employee_id, cycle_id)`)
+        .not("rating", "is", null),
+    ]);
+    if (assignmentsRes.error) console.error("Failed to fetch chart assignments:", assignmentsRes.error.message);
+    if (responsesRes.error) console.error("Failed to fetch chart responses:", responsesRes.error.message);
+    // Filter responses to only those belonging to workspace cycles
+    const cycleIdSet = new Set(allCycleIds);
+    responsesRes.data = (responsesRes.data || []).filter(
+      (r: any) => r.assignment?.cycle_id && cycleIdSet.has(r.assignment.cycle_id)
+    );
+  }
 
   const assignments = assignmentsRes.data || [];
   const goals = goalsRes.data || [];
   const responses = responsesRes.data || [];
   const users = usersRes.data || [];
-  const cycles = cyclesRes.data || [];
 
-  const activeCycle = cycles.find((c) => c.status === "active");
+  const activeCycle = cycles.find((c: any) => c.status === "active");
   const completedCycles = cycles.filter((c) => c.status === "completed");
   const previousCycle = completedCycles[0] || null;
   const currentCycleAssignments = activeCycle ? assignments.filter((a) => a.cycle_id === activeCycle.id) : assignments;
@@ -293,14 +388,14 @@ export default async function DashboardPage() {
   const workspace = await getUserWorkspace();
   const role = workspace?.role || "user";
   const isAdminOrHR = isHROrAbove(role);
-  const isManager = role === "manager";
+  const hasManagerRole = isManagerOrAbove(role);
   const firstName = workspace?.name?.split(" ")[0] || "there";
   const userId = workspace?.appUserId;
 
-  // Fetch what each role needs
+  // Fetch what each role needs — managers, HR, and admins all get manager data if they have reports
   const [personal, managerData, orgData, chartData] = await Promise.all([
-    userId ? getPersonalData(userId) : null,
-    isManager && userId ? getManagerData(userId) : null,
+    userId && workspace?.workspaceId ? getPersonalData(userId, workspace.workspaceId) : null,
+    hasManagerRole && userId && workspace?.workspaceId ? getManagerData(userId, workspace.workspaceId) : null,
     isAdminOrHR ? getOrgData(workspace?.workspaceId) : null,
     isAdminOrHR ? getChartData(workspace?.workspaceId) : null,
   ]);
@@ -479,7 +574,7 @@ export default async function DashboardPage() {
                         {f.sender?.slack_name || "Anonymous"}{" "}
                         <span className="text-muted-foreground font-normal">· {f.sender?.job_title || ""}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{f.content}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{f.message}</p>
                     </div>
                   </div>
                 </div>
@@ -491,7 +586,7 @@ export default async function DashboardPage() {
     );
   }
 
-  // ── Manager dashboard ──────────────────────────────────────────────────────
+  // ── Manager dashboard (for users with role=manager, not HR/admin) ───────────
   if (role === "manager" && managerData) {
     const { teamSize, pendingMgrReviews, waitingOnSelf, activeCycles, teamStatus } = managerData;
     const assignments = personal?.assignments || [];
@@ -804,6 +899,27 @@ export default async function DashboardPage() {
       </div>
 
       {!showOnboarding && chartData && <DashboardCharts data={chartData} />}
+
+      {/* Manager team section for HR/Admins who also manage people */}
+      {managerData && managerData.teamSize > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">My Direct Reports</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Card><CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">Team Size</p>
+              <p className="text-2xl font-bold text-foreground">{managerData.teamSize}</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">Pending Your Review</p>
+              <p className="text-2xl font-bold text-amber-600">{managerData.pendingMgrReviews.length}</p>
+            </CardContent></Card>
+            <Card><CardContent className="pt-4 pb-3">
+              <p className="text-xs text-muted-foreground">Waiting on Self-Review</p>
+              <p className="text-2xl font-bold text-foreground">{managerData.waitingOnSelf.length}</p>
+            </CardContent></Card>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Quick access</h2>

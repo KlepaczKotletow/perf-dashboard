@@ -67,6 +67,8 @@ interface ReviewDetailClientProps {
   status: string;
   /** Where to navigate after successful submission. Defaults to /dashboard/reviews */
   redirectTo?: string;
+  /** Maximum rating value from workspace rating_scale. Defaults to 5. */
+  maxRating?: number;
 }
 
 export function ReviewDetailClient({
@@ -79,6 +81,7 @@ export function ReviewDetailClient({
   canEdit,
   status,
   redirectTo = "/dashboard/reviews",
+  maxRating = 5,
 }: ReviewDetailClientProps) {
   const router = useRouter();
   const supabase = useMemo(
@@ -141,6 +144,7 @@ export function ReviewDetailClient({
         if (rating === null) continue;
 
         if (comp.existingResponseId) {
+          // Safe: review_responses scoped through assignment loaded from workspace-verified server component
           const { error } = await supabase
             .from("review_responses")
             .update({ rating, comment: comment || null, updated_at: new Date().toISOString() })
@@ -163,6 +167,7 @@ export function ReviewDetailClient({
       if (complete && allRated) {
         const rated = Object.values(ratings).filter((r) => r.rating !== null);
         const avg = rated.reduce((sum, r) => sum + (r.rating ?? 0), 0) / rated.length;
+        // Safe: review_assignments scoped through assignment loaded from workspace-verified server component
         const { error } = await supabase
           .from("review_assignments")
           .update({
@@ -179,6 +184,7 @@ export function ReviewDetailClient({
         router.refresh();
         return;
       } else if (status === "pending") {
+        // Safe: review_assignments scoped through assignment loaded from workspace-verified server component
         const { error } = await supabase
           .from("review_assignments")
           .update({ status: "in_progress", updated_at: new Date().toISOString() })
@@ -292,17 +298,17 @@ export function ReviewDetailClient({
                         Rating
                       </p>
                       <div className="flex gap-1.5">
-                        {[1, 2, 3, 4, 5].map((v) => (
+                        {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
                           <button
                             key={v}
                             disabled={!canEdit}
                             onClick={() => setRating(comp.competencyId, rating === v ? null : v)}
                             className={`flex-1 h-9 rounded-md text-xs font-semibold border transition-all ${
                               rating === v
-                                ? selectedRatingColors[v]
-                                : `${ratingColors[v]} ${!canEdit ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`
+                                ? (selectedRatingColors[v] || "bg-primary text-white border-primary")
+                                : `${ratingColors[v] || "bg-muted text-foreground border-border hover:bg-muted/80"} ${!canEdit ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`
                             }`}
-                            title={`${v} · ${PROFICIENCY_LABELS[v]}`}
+                            title={`${v}${PROFICIENCY_LABELS[v] ? ` · ${PROFICIENCY_LABELS[v]}` : ""}`}
                           >
                             {v}
                           </button>

@@ -7,13 +7,13 @@ import { ArrowLeft, Lock } from "lucide-react";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 import { EditableCell } from "./editable-cell";
 
-async function getMatrixData() {
+async function getMatrixData(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
   const [{ data: levels }, { data: competencies }, { data: levelCompetencies }] = await Promise.all([
-    supabase.from("levels").select("*, job_family:job_families(name)").order("sort_order"),
-    supabase.from("competencies").select("*").order("category").order("name"),
-    supabase.from("level_competencies").select("*"),
+    supabase.from("levels").select("*, job_family:job_families(name)").eq("workspace_id", workspaceId).order("sort_order"),
+    supabase.from("competencies").select("*").eq("workspace_id", workspaceId).order("category").order("name"),
+    supabase.from("level_competencies").select("*").eq("workspace_id", workspaceId),
   ]);
 
   return {
@@ -53,9 +53,17 @@ export default async function CompetencyMatrixPage() {
     );
   }
 
-  const { levels, competencies, levelCompetencies } = await getMatrixData();
+  const workspaceId = workspace?.workspaceId;
+  if (!workspaceId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+        <p className="text-muted-foreground">Workspace not found.</p>
+      </div>
+    );
+  }
+
+  const { levels, competencies, levelCompetencies } = await getMatrixData(workspaceId);
   const canEdit = isHROrAbove(workspace?.role);
-  const workspaceId = workspace?.workspaceId || "";
 
   // Build a lookup: levelId-competencyId -> { expected_level, id, behavioral_indicators }
   const matrixLookup: Record<string, { expected_level: number; id: string; behavioral_indicators: string[] }> = {};
@@ -75,7 +83,7 @@ export default async function CompetencyMatrixPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/competencies"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href="/dashboard/admin/functions"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold text-foreground">Competency Matrix</h1>

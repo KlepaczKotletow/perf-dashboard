@@ -8,7 +8,7 @@ import { canManageUsers } from "@/lib/roles";
 import { Users, Upload, List, Network } from "lucide-react";
 import { OrgChart } from "./org-chart";
 
-async function getUsers() {
+async function getUsers(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
   // Fetch users with level info (avoid self-join which causes PostgREST 400)
@@ -18,6 +18,7 @@ async function getUsers() {
       *,
       level:levels!users_level_id_fkey(name, grade, job_family:job_families(name))
     `)
+    .eq("workspace_id", workspaceId)
     .order("department", { ascending: true })
     .order("slack_name", { ascending: true });
 
@@ -27,6 +28,7 @@ async function getUsers() {
     const { data: simple } = await supabase
       .from("users")
       .select("*")
+      .eq("workspace_id", workspaceId)
       .order("department", { ascending: true })
       .order("slack_name", { ascending: true });
     const users = simple || [];
@@ -46,12 +48,14 @@ async function getUsers() {
   }));
 }
 
-async function getSubscription() {
+async function getSubscription(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .select("plan, user_limit, status")
+    .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if (error) console.error("Failed to fetch subscription:", error.message);
   return data;
 }
 
@@ -64,10 +68,15 @@ export default async function TeamPage({
   const filterUnassigned = params.filter === "unassigned";
   const viewChart = params.view === "chart";
 
-  const [users, workspace, subscription] = await Promise.all([
-    getUsers(),
-    getUserWorkspace(),
-    getSubscription(),
+  const workspace = await getUserWorkspace();
+  const workspaceId = workspace?.workspaceId;
+  if (!workspaceId) {
+    return <div className="p-8 text-center text-muted-foreground">Workspace not found.</div>;
+  }
+
+  const [users, subscription] = await Promise.all([
+    getUsers(workspaceId),
+    getSubscription(workspaceId),
   ]);
   const isAdmin = canManageUsers(workspace?.role);
   const seatLimit = subscription?.user_limit || 5;

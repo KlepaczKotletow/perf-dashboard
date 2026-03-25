@@ -10,7 +10,7 @@ import { isHROrAbove } from "@/lib/roles";
 import { SurveyActions } from "./survey-actions";
 import { SurveyResults } from "./survey-results";
 
-async function getSurvey(id: string) {
+async function getSurvey(id: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
     .from("surveys")
@@ -19,16 +19,18 @@ async function getSurvey(id: string) {
       survey_participants(id, user_id, subject_user_id, role, status)
     `)
     .eq("id", id)
+    .eq("workspace_id", workspaceId)
     .single();
   return data;
 }
 
-async function getSurveyResponses(surveyId: string) {
+async function getSurveyResponses(surveyId: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
   const { data } = await supabase
     .from("survey_responses")
     .select("id, participant_id, subject_user_id, answers, submitted_at")
-    .eq("survey_id", surveyId);
+    .eq("survey_id", surveyId)
+    .eq("workspace_id", workspaceId);
   return data || [];
 }
 
@@ -46,7 +48,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [survey, workspace, responses] = await Promise.all([getSurvey(id), getUserWorkspace(), getSurveyResponses(id)]);
+  const workspace = await getUserWorkspace();
+  const [survey, responses] = await Promise.all([getSurvey(id, workspace!.workspaceId), getSurveyResponses(id, workspace!.workspaceId)]);
   if (!survey) notFound();
 
   const participants = (survey.survey_participants || []) as any[];
@@ -66,7 +69,8 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
     const { data: subjectUsers } = await supabase
       .from("users")
       .select("id, slack_name")
-      .in("id", subjectUserIds);
+      .in("id", subjectUserIds)
+      .eq("workspace_id", workspace!.workspaceId);
     subjectNames = Object.fromEntries((subjectUsers || []).map((u: any) => [u.id, u.slack_name || u.id]));
   }
 
@@ -101,7 +105,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
           </div>
         </div>
         {canManage && survey.status === "active" && (
-          <SurveyActions surveyId={id} />
+          <SurveyActions surveyId={id} workspaceId={workspace!.workspaceId} />
         )}
       </div>
 
