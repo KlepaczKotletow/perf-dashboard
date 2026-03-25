@@ -153,7 +153,8 @@ async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackSc
   }
 
   if (scope.userIds !== null) {
-    query = query.in("to_user_id", scope.userIds);
+    // Show kudos received by scoped users OR sent by the current user
+    query = query.or(`to_user_id.in.(${scope.userIds.join(",")}),from_user_id.in.(${scope.userIds.join(",")})`);
   }
 
   if (filters.type && filters.type !== "all") {
@@ -207,10 +208,10 @@ export default async function FeedbackPage({
   const scope = await getScope(role, currentUserId, workspace?.workspaceId);
 
   const pageDescription = isHROrAbove(role)
-    ? "All review ratings and continuous feedback across the organisation"
+    ? "All review ratings and kudos across the organisation"
     : isManagerOrAbove(role)
-    ? "Review ratings and continuous feedback for you and your direct reports"
-    : "Review ratings and feedback you have received";
+    ? "Review ratings and kudos for you and your direct reports"
+    : "Kudos you've sent and received";
 
   const showReview = !params.source || params.source === "all" || params.source === "review";
   const showContinuous = !params.source || params.source === "all" || params.source === "continuous";

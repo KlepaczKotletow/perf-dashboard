@@ -6,6 +6,8 @@
  *   /kudos  – opens the dynamic feedback modal built via the Form Builder
  */
 
+const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
+const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -45,6 +47,46 @@ async function dbQuery(table: string, query: string) {
   ).json();
 }
 
+async function dbUpdate(table: string, query: string, data: Record<string, unknown>) {
+  return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(data),
+  });
+}
+
+async function getFreshBotToken(ws: any): Promise<string> {
+  if (ws.token_expires_at) {
+    const expiresAt = new Date(ws.token_expires_at).getTime();
+    if (Date.now() < expiresAt - 5 * 60 * 1000) return ws.bot_token;
+  }
+  if (!ws.refresh_token) return ws.bot_token;
+  const res = await fetch("https://slack.com/api/oauth.v2.access", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: SLACK_CLIENT_ID, client_secret: SLACK_CLIENT_SECRET,
+      grant_type: "refresh_token", refresh_token: ws.refresh_token,
+    }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    await dbUpdate("workspaces", `id=eq.${ws.id}`, {
+      bot_token: data.access_token, refresh_token: data.refresh_token,
+      token_expires_at: new Date(Date.now() + (data.expires_in || 43200) * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    return data.access_token;
+  }
+  console.error("Token refresh failed:", data.error);
+  return ws.bot_token;
+}
+
 async function slackApi(token: string, method: string, body: Record<string, unknown>) {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
@@ -61,6 +103,7 @@ async function slackApi(token: string, method: string, body: Record<string, unkn
 
 interface FormField {
   id: string;
+  blockId?: string; // If set, used as block_id (action_id stays as id)
   type: string;
   label: string;
   required: boolean;
@@ -75,7 +118,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
     if (field.type === "user_select") {
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: !field.required,
         element: {
           type: "users_select",
@@ -87,7 +130,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
     } else if (field.type === "text") {
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: !field.required,
         element: {
           type: field.multiline ? "plain_text_input" : "plain_text_input",
@@ -100,7 +143,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
     } else if (field.type === "single_select" && field.options?.length) {
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: !field.required,
         element: {
           type: "static_select",
@@ -116,7 +159,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
     } else if (field.type === "multi_select" && field.options?.length) {
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: !field.required,
         element: {
           type: "multi_static_select",
@@ -133,7 +176,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
       // Rating as a 1-5 static select
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: !field.required,
         element: {
           type: "static_select",
@@ -149,7 +192,7 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
     } else if (field.type === "checkbox" && field.options?.length) {
       blocks.push({
         type: "input",
-        block_id: field.id,
+        block_id: field.blockId || field.id,
         optional: true,
         element: {
           type: "checkboxes",
@@ -168,17 +211,13 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
 }
 
 // Default fields if no config exists in DB
+// IDs must match the hardcoded fallback in slack-interactivity's feedback_modal handler.
+// block_id = "<name>_block", action_id = "<name>"
 const DEFAULT_FIELDS: FormField[] = [
-  { id: "recipient", type: "user_select", label: "Who is this feedback for?", required: true },
-  {
-    id: "feedback_type",
-    type: "single_select",
-    label: "Feedback Type",
-    required: true,
-    options: ["Praise", "Constructive", "General"],
-  },
-  { id: "message", type: "text", label: "Your Feedback", required: true, multiline: true },
-  { id: "anonymous", type: "checkbox", label: "Privacy", required: false, options: ["Send anonymously"] },
+  { id: "recipient", blockId: "recipient_block", type: "user_select", label: "Who is this feedback for?", required: true },
+  { id: "feedback_type", blockId: "feedback_type_block", type: "single_select", label: "Feedback Type", required: true, options: ["Praise", "Constructive", "General"] },
+  { id: "message", blockId: "message_block", type: "text", label: "Your Feedback", required: true, multiline: true },
+  { id: "anonymous", blockId: "anonymous_block", type: "checkbox", label: "Privacy", required: false, options: ["Send anonymously"] },
 ];
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -204,7 +243,7 @@ Deno.serve(async (req) => {
   // ── /kudos ───────────────────────────────────────────────────────────────
   if (command === "/kudos") {
     // Look up workspace
-    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token&limit=1`);
+    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token,refresh_token,token_expires_at&limit=1`);
     const ws = wsRows?.[0];
     if (!ws?.bot_token) {
       return new Response(
@@ -218,7 +257,8 @@ Deno.serve(async (req) => {
       "feedback_form_configs",
       `workspace_id=eq.${ws.id}&select=fields&limit=1`,
     );
-    const fields: FormField[] = configRows?.[0]?.fields || DEFAULT_FIELDS;
+    const hasConfig = configRows?.[0]?.fields?.length > 0;
+    const fields: FormField[] = hasConfig ? configRows[0].fields : DEFAULT_FIELDS;
     const blocks = buildFeedbackModalBlocks(fields);
 
     const view = {
@@ -227,11 +267,13 @@ Deno.serve(async (req) => {
       title: { type: "plain_text" as const, text: "Give Kudos" },
       submit: { type: "plain_text" as const, text: "Send" },
       close: { type: "plain_text" as const, text: "Cancel" },
-      private_metadata: JSON.stringify({ usedConfig: true }),
+      private_metadata: JSON.stringify({ usedConfig: hasConfig }),
       blocks,
     };
 
-    const result = await slackApi(ws.bot_token, "views.open", {
+    const botToken = await getFreshBotToken(ws);
+
+    const result = await slackApi(botToken, "views.open", {
       trigger_id: triggerId,
       view,
     });
