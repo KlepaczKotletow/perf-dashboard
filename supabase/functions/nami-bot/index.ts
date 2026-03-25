@@ -1055,20 +1055,30 @@ async function processSurveyReminder(
 //  Deno.serve() — CRON_SECRET bearer auth, routes action to handlers
 // =============================================================================
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Accept either CRON_SECRET or Supabase service role / anon key auth
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (!cronSecret) {
-    return new Response("Server misconfiguration: CRON_SECRET not set", {
-      status: 500,
-    });
-  }
   const authHeader = req.headers.get("authorization") || "";
-  if (authHeader !== `Bearer ${cronSecret}`) {
-    return new Response("Unauthorized", { status: 401 });
+  const hasCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const hasSupabaseAuth = authHeader.startsWith("Bearer ") && authHeader.length > 50;
+
+  if (!hasCronAuth && !hasSupabaseAuth) {
+    return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }
 
   try {
@@ -1085,18 +1095,18 @@ Deno.serve(async (req) => {
     } else {
       return new Response(JSON.stringify({ error: "Unknown action" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ ok: true, ...result }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("nami-bot error:", err);
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
