@@ -158,7 +158,6 @@ export function ReviewDetailClient({
             competency_id: comp.competencyId,
             rating,
             comment: comment || null,
-            workspace_id: workspaceId,
           });
           if (error) throw new Error(`Failed to save "${comp.competencyName}": ${error.message}`);
         }
