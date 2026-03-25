@@ -1,17 +1,17 @@
 ---
-title: "Viewing Your Performance & Feedback"
-description: "How to find and understand all your feedback in one place"
+title: "Viewing Your Performance & Kudos"
+description: "How to find and understand all your kudos and review feedback in one place"
 category: "Reviews"
 audience: ["all"]
 order: 4
 icon: "Eye"
 ---
 
-# Viewing Your Performance & Feedback
+# Viewing Your Performance & Kudos
 
 <RoleTag role="all">Everyone</RoleTag>
 
-The **Feedback** page in the Perf dashboard is your single destination for everything people have said about your work — from formal review responses to informal continuous feedback.
+The **Kudos** page in the Perf dashboard is your single destination for everything people have said about your work — from formal review responses to informal kudos sent via `/kudos`.
 
 ## Review Responses
 
@@ -22,9 +22,9 @@ Ratings and comments collected during formal review cycles. Each card shows:
 - **Written comments** — qualitative feedback for each question
 - **Cycle name and date**
 
-## Continuous Feedback
+## Kudos
 
-Ad-hoc feedback sent outside of formal cycles, tagged with one of three types:
+Ad-hoc feedback sent outside of formal cycles via the `/kudos` slash command, tagged with one of three types:
 
 | Type | Description |
 |---|---|
@@ -36,8 +36,8 @@ Ad-hoc feedback sent outside of formal cycles, tagged with one of three types:
 
 Use the filter bar to narrow results:
 
-- **Source** — filter by reviewer role (Self, Manager, Peer, Upward)
-- **Type** — filter continuous feedback by Praise, Constructive, or General
+- **Source** — filter by Review Ratings or Kudos
+- **Type** — filter kudos by Praise, Constructive, or General
 - **Search** — free-text search across all comments
 
 <Callout type="tip">
@@ -48,28 +48,28 @@ Combine filters to quickly find what you need. For example, select "Manager" sou
 
 | Score | Label |
 |---|---|
-| 1 | Needs improvement |
-| 2 | Below expectations |
+| 1 | Below expectations |
+| 2 | Developing |
 | 3 | Meets expectations |
 | 4 | Exceeds expectations |
-| 5 | Exceptional |
+| 5 | Outstanding |
 
 ## Anonymous Feedback Indicator
 
-Some feedback displays an **anonymous** badge. This applies to upward feedback (always anonymized) and peer feedback when the cycle is configured for anonymous peers.
+Some feedback displays an **anonymous** badge. This applies to upward feedback (always anonymized), anonymous kudos, and peer feedback when the cycle is configured for anonymous peers.
 
 ## Who Can See What
 
 | Role | Visibility |
 |---|---|
-| **Employee** | Own review responses and feedback received |
-| **Manager** | Own feedback plus all feedback for direct reports |
-| **HR / Admin** | All feedback across the workspace |
+| **Employee** | Own sent kudos + received kudos (only if sender chose "Share with recipient") |
+| **Manager** | Own kudos plus all kudos for direct reports |
+| **HR / Admin** | All kudos across the workspace |
 
 <Callout type="info">
-Managers can view direct reports' feedback but cannot see individual upward responses about themselves — only the aggregated summary.
+Managers can view direct reports' kudos regardless of the "Share with recipient" setting. However, they cannot see individual upward review responses about themselves — only the aggregated summary.
 </Callout>
 
 <Callout type="warning">
-If you see no feedback, confirm that a review cycle has been completed and your assignments were submitted. Draft responses do not appear until the reviewer submits them.
+If you see no kudos, try sending one via `/kudos` in Slack. For review responses, confirm that a review cycle has been completed and your assignments were submitted.
 </Callout>

@@ -1,47 +1,63 @@
 ---
-title: "Continuous Feedback"
+title: "Kudos (Continuous Feedback)"
 category: "Reviews"
-roles: ["all"]
+audience: ["all"]
 order: 5
+icon: "MessageCircle"
 ---
 
-# Continuous Feedback
+# Kudos (Continuous Feedback)
 
 <RoleTag role="all" />
 
-Continuous feedback in Perf lets you share recognition and constructive input with colleagues at any time, not just during formal review cycles.
+Kudos in Perf lets you share recognition and constructive input with colleagues at any time, not just during formal review cycles. Use the `/kudos` slash command in Slack to send kudos instantly.
 
-## What Is Continuous Feedback?
+## What Are Kudos?
 
-Unlike cycle-based reviews, continuous feedback is ongoing and informal. It captures real-time observations so nothing is forgotten when review season arrives. All feedback is stored in the recipient's profile and can be referenced during formal assessments.
+Unlike cycle-based reviews, kudos are ongoing and informal. They capture real-time observations so nothing is forgotten when review season arrives. All kudos are stored in the recipient's profile and can be referenced during formal assessments.
 
-## Feedback Types
+## Kudos Types
 
 | Type | When to use |
 |---|---|
 | **Praise** | Recognize a job well done or a positive behavior |
 | **Constructive** | Suggest a specific improvement with actionable advice |
 | **General** | Share an observation that does not fit neatly into praise or constructive |
-| **Improvement** | Flag a recurring pattern that needs attention |
-| **Question** | Ask for clarification or context about someone's work |
 
-## Sending Feedback via Slack
+## Sending Kudos via Slack
 
-1. Open a DM with **Nami** in Slack.
-2. Tell Nami you want to give feedback, or use the shortcut from the Perf dashboard.
-3. Select the recipient, choose a type, and write your message.
-4. Optionally mark the feedback as **anonymous**.
+Type `/kudos` in any Slack channel to open the kudos form. Fill in:
+
+1. **Recipient** -- select the teammate you want to send kudos to.
+2. **Feedback Type** -- choose Praise, Constructive, or General.
+3. **Your message** -- write your kudos.
+4. **Privacy options:**
+   - **Send anonymously** -- hides your identity from everyone except HR/Admin.
+   - **Share with recipient** (checked by default) -- controls whether the recipient can see this kudos. Uncheck to send private kudos visible only to the recipient's manager and HR.
+
+## Visibility Rules
+
+| Who | What they see |
+|---|---|
+| **Sender** | Always sees their own sent kudos |
+| **Recipient** | Only sees kudos where "Share with recipient" was checked |
+| **Recipient's manager** | Always sees all kudos for their direct reports |
+| **HR / Admin** | Always sees all kudos across the workspace |
 
 <Callout type="info">
-Anonymous feedback hides your identity from the recipient and their manager. Admins cannot reveal the sender either.
+Anonymous kudos hide your identity from the recipient and their manager. The `from_user` field is not stored in the database, so anonymity cannot be reversed -- even by admins.
 </Callout>
 
-## How Recipients See Feedback
+<Callout type="warning">
+When "Share with recipient" is unchecked, the recipient will not receive a Slack notification and will not see the kudos on their dashboard. This is useful for constructive feedback intended only for the manager.
+</Callout>
 
-Recipients receive a Slack DM from Nami with the feedback content and type. They can also view all received feedback on their **Dashboard > Feedback** page, organized by date and type.
+## How Recipients See Kudos
+
+If "Share with recipient" is checked, the recipient receives a Slack DM from Nami with the kudos content and type. They can also view all received kudos on their **Dashboard > Kudos** page, organized by date and type.
 
 <Callout type="tip">
-Make feedback specific and timely. "Great job on the Q3 launch presentation -- your data storytelling really landed with the board" is far more useful than "Nice work."
+Make kudos specific and timely. "Great job on the Q3 launch presentation -- your data storytelling really landed with the board" is far more useful than "Nice work."
 </Callout>
 
-Managers can see feedback given to their direct reports, helping them build a fuller picture ahead of formal reviews.
+Managers can see all kudos given to their direct reports (regardless of the "Share with recipient" setting), helping them build a fuller picture ahead of formal reviews.
