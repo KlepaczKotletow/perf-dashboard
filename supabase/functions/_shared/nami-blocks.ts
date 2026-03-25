@@ -537,3 +537,121 @@ export function buildFinalWarning(
     },
   ];
 }
+
+// ---------------------------------------------------------------------------
+//  Deadline reminder (7d, 3d, 1d before deadline)
+// ---------------------------------------------------------------------------
+export function buildDeadlineReminder(
+  userName: string,
+  itemName: string,
+  daysLeft: number,
+  actionValue: string,
+  actionId: string,
+) {
+  const urgency =
+    daysLeft <= 1
+      ? ":rotating_light: Last call!"
+      : daysLeft <= 3
+        ? ":hourglass_flowing_sand: Getting close!"
+        : ":wave: Heads up!";
+
+  const dueText = daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`;
+  const buttonText = daysLeft <= 1 ? "Complete now :zap:" : "Let's do it :muscle:";
+
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `Hey ${userName}! ${urgency}\n\nYour *${itemName}* is *${dueText}*.`,
+      },
+    },
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: buttonText, emoji: true },
+          style: "primary",
+          action_id: actionId,
+          value: actionValue,
+        },
+      ],
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+//  Overdue notice (1+ day past deadline)
+// ---------------------------------------------------------------------------
+export function buildOverdueNotice(
+  userName: string,
+  itemName: string,
+  actionValue: string,
+  actionId: string,
+) {
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `:warning: Hey ${userName}, your *${itemName}* is now *overdue*.\n\nPlease complete ASAP — your team is counting on your input.`,
+      },
+    },
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Submit now :zap:", emoji: true },
+          style: "primary",
+          action_id: actionId,
+          value: actionValue,
+        },
+      ],
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+//  Consolidated manager deadline alert
+// ---------------------------------------------------------------------------
+export function buildManagerDeadlineAlert(
+  mgrName: string,
+  reports: { name: string; itemName: string; status: string }[],
+  isOverdue: boolean,
+) {
+  const emoji = isOverdue ? ":warning:" : ":wave:";
+  const headline = isOverdue
+    ? `${emoji} Hey ${mgrName}, the following team members have *overdue reviews*:`
+    : `${emoji} Hey ${mgrName}, the following team members haven't completed reviews and the *deadline is tomorrow*:`;
+
+  const bulletPoints = reports
+    .map((r) => `• *${r.name}* — ${r.itemName} (${r.status})`)
+    .join("\n");
+
+  const footer = isOverdue
+    ? "You may want to follow up directly to get these completed."
+    : "A quick nudge might help them wrap up on time.";
+
+  return [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `${headline}\n\n${bulletPoints}\n\n${footer}`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: "Automated alert from Nami.",
+        },
+      ],
+    },
+  ];
+}
