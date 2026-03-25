@@ -689,6 +689,96 @@ async function handleReminders() {
           skipped += result.skipped;
         }
       }
+
+      // -----------------------------------------------------------------
+      //  Consolidated manager deadline alerts (1d warning + overdue)
+      // -----------------------------------------------------------------
+      if (assignments && (daysLeft <= 1 || daysLeft < 0)) {
+        const isOverdue = daysLeft < 0;
+        const alertType = isOverdue ? "overdue" : "warning";
+        const eventType = isOverdue ? "nami_mgr_overdue" : "nami_mgr_warning";
+
+        // Group incomplete assignments by their employee's manager_id
+        const mgrReports = new Map<
+          string,
+          { name: string; itemName: string; status: string }[]
+        >();
+
+        for (const a of assignments) {
+          const emp = (a as any).employee;
+          const managerId = emp?.manager_id;
+          if (!managerId) continue;
+
+          // Check if this assignment's self-review is actually incomplete
+          const { data: responses } = await supabase
+            .from("review_responses")
+            .select("id")
+            .eq("assignment_id", a.id)
+            .eq("reviewer_role", "self")
+            .limit(1);
+
+          const selfDone = (responses && responses.length > 0);
+
+          // For standard assignments, report if self-review not done
+          if (a.assignment_type === "standard" && !selfDone) {
+            if (!mgrReports.has(managerId)) {
+              mgrReports.set(managerId, []);
+            }
+            mgrReports.get(managerId)!.push({
+              name: emp.slack_name || "Team member",
+              itemName: `self-review for ${cycle.name}`,
+              status: a.status || "pending",
+            });
+          }
+        }
+
+        // Send one consolidated DM per manager
+        for (const [managerId, reports] of mgrReports) {
+          const mgrAlertRef = `mgr_alert_${cycle.id}_${alertType}`;
+
+          const canSend = await logNotification(
+            workspaceId,
+            managerId,
+            eventType,
+            mgrAlertRef,
+          );
+          if (!canSend) continue; // already sent for this cycle + type
+
+          // Fetch manager's Slack info
+          const { data: mgrUser } = await supabase
+            .from("users")
+            .select("id, slack_user_id, slack_name")
+            .eq("id", managerId)
+            .single();
+
+          if (!mgrUser?.slack_user_id) {
+            await rollbackNotification(workspaceId, managerId, eventType, mgrAlertRef);
+            continue;
+          }
+
+          const blocks = buildManagerDeadlineAlert(
+            mgrUser.slack_name || "there",
+            reports,
+            isOverdue,
+          );
+          const fallbackText = isOverdue
+            ? `${reports.length} team member(s) have overdue reviews for ${cycle.name}`
+            : `${reports.length} team member(s) haven't completed reviews — deadline is tomorrow`;
+
+          const ok = await sendSlackBlocks(
+            botToken,
+            mgrUser.slack_user_id,
+            fallbackText,
+            blocks,
+          );
+          if (ok) {
+            sent++;
+          } else {
+            await rollbackNotification(workspaceId, managerId, eventType, mgrAlertRef);
+            skipped++;
+          }
+        }
+      }
     }
   }
 
