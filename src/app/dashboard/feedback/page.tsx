@@ -136,7 +136,13 @@ async function getReviewFeedback(filters: FeedbackFilters, scope: FeedbackScope,
   return results;
 }
 
-async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackScope, workspaceId: string | undefined) {
+async function getContinuousFeedback(
+  filters: FeedbackFilters,
+  scope: FeedbackScope,
+  workspaceId: string | undefined,
+  currentUserId: string | null,
+  role: string | undefined,
+) {
   // If scope is an empty array we know there's nothing to return
   if (scope.userIds !== null && scope.userIds.length === 0) return [];
 
@@ -153,9 +159,17 @@ async function getContinuousFeedback(filters: FeedbackFilters, scope: FeedbackSc
   }
 
   if (scope.userIds !== null) {
-    // Show kudos received by scoped users OR sent by the current user
-    query = query.or(`to_user_id.in.(${scope.userIds.join(",")}),from_user_id.in.(${scope.userIds.join(",")})`);
+    if (isManagerOrAbove(role)) {
+      // Managers: see all kudos for their reports (regardless of shared flag) + own sent
+      query = query.or(`to_user_id.in.(${scope.userIds.join(",")}),from_user_id.in.(${scope.userIds.join(",")})`);
+    } else if (currentUserId) {
+      // Employees: see kudos they sent + kudos they received IF shared_with_employee=true
+      query = query.or(
+        `from_user_id.eq.${currentUserId},and(to_user_id.eq.${currentUserId},shared_with_employee.eq.true)`
+      );
+    }
   }
+  // HR/Admin: scope.userIds === null, no filter applied — sees everything
 
   if (filters.type && filters.type !== "all") {
     query = query.eq("feedback_type", filters.type);
@@ -221,7 +235,7 @@ export default async function FeedbackPage({
 
   const [reviewFeedback, continuousFeedback] = await Promise.all([
     showReview ? getReviewFeedback(params, scope, workspaceId) : Promise.resolve([]),
-    showContinuous ? getContinuousFeedback(params, scope, workspaceId) : Promise.resolve([]),
+    showContinuous ? getContinuousFeedback(params, scope, workspaceId, currentUserId, role) : Promise.resolve([]),
   ]);
 
   const hasNoFeedback = reviewFeedback.length === 0 && continuousFeedback.length === 0;

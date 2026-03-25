@@ -50,6 +50,7 @@ async function getPersonalData(userId: string, workspaceId: string) {
       .select(`*, sender:users!continuous_feedback_from_user_id_fkey(slack_name, job_title)`)
       .eq("to_user_id", userId)
       .eq("workspace_id", workspaceId)
+      .eq("shared_with_employee", true)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);

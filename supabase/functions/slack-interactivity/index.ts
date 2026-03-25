@@ -788,11 +788,16 @@ Deno.serve(async (req) => {
           toId = vals.recipient_block?.recipient?.selected_user;
           type = vals.feedback_type_block?.feedback_type?.selected_option?.value || "general";
           msg = vals.message_block?.message?.value || "";
-          anon = (vals.anonymous_block?.anonymous?.selected_options?.length ?? 0) > 0;
+          const selectedPrivacyOpts = (vals.anonymous_block?.anonymous?.selected_options || []).map((o: any) => o.value);
+          anon = selectedPrivacyOpts.includes("send_anonymously");
+          var sharedWithEmployee = selectedPrivacyOpts.includes("share_with_recipient");
         }
 
         const from = await getOrCreateUser(ws.id, payload.user.id, botToken);
         const to = toId! ? await getOrCreateUser(ws.id, toId!, botToken) : null;
+
+        // Determine shared_with_employee: for dynamic config, default to true unless explicitly set
+        const isShared = typeof sharedWithEmployee !== "undefined" ? sharedWithEmployee : true;
 
         if (from && to) {
           await dbInsert("continuous_feedback", {
@@ -802,23 +807,27 @@ Deno.serve(async (req) => {
             message: msg || JSON.stringify(customFields),
             feedback_type: type,
             is_anonymous: anon,
+            shared_with_employee: isShared,
             ...(Object.keys(customFields).length > 0 ? { custom_fields: customFields } : {}),
           });
 
-          const sender = anon ? "Someone" : from.slack_name;
-          const typeEmoji = type === "praise" ? ":star:" : type === "constructive" ? ":bulb:" : ":speech_balloon:";
-          const displayMsg = msg || "Feedback received";
+          // Only notify the recipient if shared_with_employee is true
+          if (isShared) {
+            const sender = anon ? "Someone" : from.slack_name;
+            const typeEmoji = type === "praise" ? ":star:" : type === "constructive" ? ":bulb:" : ":speech_balloon:";
+            const displayMsg = msg || "Feedback received";
 
-          await slackApi(botToken, "chat.postMessage", {
-            channel: toId!,
-            text: `New feedback from ${sender}`,
-            blocks: [
-              { type: "section", text: { type: "mrkdwn", text: `${typeEmoji} *New feedback from ${sender}*` } },
-              { type: "divider" },
-              { type: "section", text: { type: "mrkdwn", text: displayMsg } },
-              { type: "context", elements: [{ type: "mrkdwn", text: `Received just now · via /kudos` }] },
-            ],
-          });
+            await slackApi(botToken, "chat.postMessage", {
+              channel: toId!,
+              text: `New kudos from ${sender}`,
+              blocks: [
+                { type: "section", text: { type: "mrkdwn", text: `${typeEmoji} *New kudos from ${sender}*` } },
+                { type: "divider" },
+                { type: "section", text: { type: "mrkdwn", text: displayMsg } },
+                { type: "context", elements: [{ type: "mrkdwn", text: `Received just now · via /kudos` }] },
+              ],
+            });
+          }
         }
         return json({ response_action: "clear" });
       }

@@ -109,6 +109,7 @@ interface FormField {
   required: boolean;
   multiline?: boolean;
   options?: string[];
+  initialOptions?: string[]; // Pre-selected checkbox options
 }
 
 function buildFeedbackModalBlocks(fields: FormField[]) {
@@ -190,18 +191,26 @@ function buildFeedbackModalBlocks(fields: FormField[]) {
         label: { type: "plain_text", text: field.label },
       });
     } else if (field.type === "checkbox" && field.options?.length) {
+      const allOpts = field.options.map((o) => ({
+        text: { type: "plain_text" as const, text: o },
+        value: o.toLowerCase().replace(/\s+/g, "_"),
+      }));
+      const element: any = {
+        type: "checkboxes",
+        action_id: field.id,
+        options: allOpts,
+      };
+      // Pre-select specific options (e.g. "Share with recipient")
+      if (field.initialOptions?.length) {
+        element.initial_options = allOpts.filter((o) =>
+          field.initialOptions!.some((init) => init.toLowerCase().replace(/\s+/g, "_") === o.value)
+        );
+      }
       blocks.push({
         type: "input",
         block_id: field.blockId || field.id,
         optional: true,
-        element: {
-          type: "checkboxes",
-          action_id: field.id,
-          options: field.options.map((o) => ({
-            text: { type: "plain_text", text: o },
-            value: o.toLowerCase().replace(/\s+/g, "_"),
-          })),
-        },
+        element,
         label: { type: "plain_text", text: field.label },
       });
     }
@@ -217,7 +226,7 @@ const DEFAULT_FIELDS: FormField[] = [
   { id: "recipient", blockId: "recipient_block", type: "user_select", label: "Who is this feedback for?", required: true },
   { id: "feedback_type", blockId: "feedback_type_block", type: "single_select", label: "Feedback Type", required: true, options: ["Praise", "Constructive", "General"] },
   { id: "message", blockId: "message_block", type: "text", label: "Your Feedback", required: true, multiline: true },
-  { id: "anonymous", blockId: "anonymous_block", type: "checkbox", label: "Privacy", required: false, options: ["Send anonymously"] },
+  { id: "anonymous", blockId: "anonymous_block", type: "checkbox", label: "Privacy", required: false, options: ["Send anonymously", "Share with recipient"], initialOptions: ["Share with recipient"] },
 ];
 
 // ── Main handler ─────────────────────────────────────────────────────────────
