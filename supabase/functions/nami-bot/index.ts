@@ -12,6 +12,9 @@ import {
   buildReminderMessage,
   buildManagerEscalation,
   buildFinalWarning,
+  buildDeadlineReminder,
+  buildOverdueNotice,
+  buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -596,8 +599,8 @@ async function handleReminders() {
           )
         : 999;
 
-      // Skip if deadline already passed
-      if (daysLeft < 0) continue;
+      // Skip very stale cycles (>30 days past deadline) but allow overdue processing
+      if (daysLeft < -30) continue;
 
       // Get incomplete assignments
       const { data: assignments } = await supabase
@@ -644,10 +647,8 @@ async function handleReminders() {
               refPrefix: `self_${a.id}`,
               itemName: `self-review for ${cycle.name}`,
               daysLeft,
-              now,
               actionId: "nami_start_review",
               actionValue: `self_${a.id}`,
-              cycle,
             });
             sent += selfResult.sent;
             skipped += selfResult.skipped;
@@ -662,11 +663,8 @@ async function handleReminders() {
               refPrefix: `mgr_${a.id}`,
               itemName: `manager review of ${(a as any).employee?.slack_name || "team member"} for ${cycle.name}`,
               daysLeft,
-              now,
               actionId: "nami_start_review",
               actionValue: `mgr_${a.id}`,
-              cycle,
-              escalationManagerId: null, // manager IS the target, no escalation to self
             });
             sent += mgrResult.sent;
             skipped += mgrResult.skipped;
@@ -684,10 +682,8 @@ async function handleReminders() {
             refPrefix,
             itemName: `upward feedback on ${(a as any).employee?.slack_name || "your manager"} for ${cycle.name}`,
             daysLeft,
-            now,
             actionId,
             actionValue: refPrefix,
-            cycle,
           });
           sent += result.sent;
           skipped += result.skipped;
@@ -771,11 +767,8 @@ interface AssignmentReminderParams {
   refPrefix: string;
   itemName: string;
   daysLeft: number;
-  now: Date;
   actionId: string;
   actionValue: string;
-  cycle: any;
-  escalationManagerId?: string | null;
 }
 
 async function processAssignmentReminder(
@@ -788,204 +781,79 @@ async function processAssignmentReminder(
     refPrefix,
     itemName,
     daysLeft,
-    now,
     actionId,
     actionValue,
-    cycle,
   } = params;
 
   let sent = 0;
   let skipped = 0;
 
-  // Count existing reminders for this user + assignment
-  const { data: existingLogs } = await supabase
-    .from("notification_log")
-    .select("id, event_type, sent_at")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", targetUser.id)
-    .like("reference_id", refPrefix)
-    .like("event_type", "nami_%")
-    .order("sent_at", { ascending: false });
+  // Deadline-anchored events: each fires at most once via notification_log dedup
+  const deadlineEvents = [
+    { eventType: "nami_reminder_7d", threshold: 7 },
+    { eventType: "nami_reminder_3d", threshold: 3 },
+    { eventType: "nami_reminder_1d", threshold: 1 },
+    { eventType: "nami_overdue",     threshold: -1 },
+  ];
 
-  const reminderEntries = (existingLogs || []).filter(
-    (l: any) =>
-      l.event_type.startsWith("nami_reminder_") ||
-      l.event_type === "nami_initial",
-  );
-  const reminderCount = reminderEntries.filter((l: any) =>
-    l.event_type.startsWith("nami_reminder_"),
-  ).length;
-  const lastSentAt = reminderEntries[0]?.sent_at
-    ? new Date(reminderEntries[0].sent_at)
-    : null;
-  const daysSinceLast = lastSentAt
-    ? (now.getTime() - lastSentAt.getTime()) / (1000 * 60 * 60 * 24)
-    : 999;
+  for (const { eventType, threshold } of deadlineEvents) {
+    // For overdue: fires when daysLeft < 0 (past deadline)
+    // For reminders: fires when daysLeft <= threshold
+    const shouldFire =
+      eventType === "nami_overdue"
+        ? daysLeft < 0
+        : daysLeft <= threshold;
 
-  // --- Final warning: deadline is 1 day away ---
-  if (daysLeft <= 1) {
-    const fwRef = refPrefix;
-    const canSend = await logNotification(
-      workspaceId,
-      targetUser.id,
-      "nami_final_warning",
-      fwRef,
-    );
-    if (canSend) {
-      const blocks = buildFinalWarning(
-        targetUser.slack_name || "there",
-        itemName,
-        actionValue,
-        actionId,
-      );
-      const ok = await sendSlackBlocks(
-        botToken,
-        targetUser.slack_user_id,
-        `Final warning: ${itemName} is due tomorrow`,
-        blocks,
-      );
-      if (ok) {
-        sent++;
-      } else {
-        await rollbackNotification(
-          workspaceId,
-          targetUser.id,
-          "nami_final_warning",
-          fwRef,
-        );
-        skipped++;
-      }
-    }
+    if (!shouldFire) continue;
 
-    // Also notify their manager
-    const mgrId = targetUser.manager_id;
-    if (mgrId) {
-      const { data: mgrUser } = await supabase
-        .from("users")
-        .select("id, slack_user_id, slack_name")
-        .eq("id", mgrId)
-        .single();
-
-      if (mgrUser?.slack_user_id) {
-        const escalRef = `fw_mgr_${refPrefix}`;
-        const canEscalate = await logNotification(
-          workspaceId,
-          mgrUser.id,
-          "nami_final_warning",
-          escalRef,
-        );
-        if (canEscalate) {
-          const blocks = buildManagerEscalation(
-            mgrUser.slack_name || "there",
-            targetUser.slack_name || "a team member",
-            itemName,
-          );
-          const ok = await sendSlackBlocks(
-            botToken,
-            mgrUser.slack_user_id,
-            `${targetUser.slack_name || "A team member"}'s ${itemName} is due tomorrow`,
-            blocks,
-          );
-          if (!ok) {
-            await rollbackNotification(
-              workspaceId,
-              mgrUser.id,
-              "nami_final_warning",
-              escalRef,
-            );
-          } else {
-            sent++;
-          }
-        }
-      }
-    }
-    return { sent, skipped };
-  }
-
-  // --- Escalation: 3+ reminders sent, escalate to manager ---
-  if (reminderCount >= 3) {
-    const mgrId = targetUser.manager_id;
-    if (mgrId) {
-      const escalRef = `escal_${refPrefix}`;
-      const canEscalate = await logNotification(
-        workspaceId,
-        mgrId,
-        "nami_escalation_manager",
-        escalRef,
-      );
-      if (canEscalate) {
-        const { data: mgrUser } = await supabase
-          .from("users")
-          .select("id, slack_user_id, slack_name")
-          .eq("id", mgrId)
-          .single();
-
-        if (mgrUser?.slack_user_id) {
-          const blocks = buildManagerEscalation(
-            mgrUser.slack_name || "there",
-            targetUser.slack_name || "a team member",
-            itemName,
-          );
-          const ok = await sendSlackBlocks(
-            botToken,
-            mgrUser.slack_user_id,
-            `${targetUser.slack_name || "A team member"} needs a nudge on ${itemName}`,
-            blocks,
-          );
-          if (ok) {
-            sent++;
-          } else {
-            await rollbackNotification(
-              workspaceId,
-              mgrId,
-              "nami_escalation_manager",
-              escalRef,
-            );
-            skipped++;
-          }
-        }
-      }
-    }
-    return { sent, skipped };
-  }
-
-  // --- Regular reminder: < 3 reminders AND 3+ days since last ---
-  if (reminderCount < 3 && daysSinceLast >= 3) {
-    const nextNum = reminderCount + 1;
-    const eventType = `nami_reminder_${nextNum}`;
     const canSend = await logNotification(
       workspaceId,
       targetUser.id,
       eventType,
       refPrefix,
     );
-    if (canSend) {
-      const blocks = buildReminderMessage(
+    if (!canSend) {
+      // Already sent this event for this assignment — dedup working
+      continue;
+    }
+
+    let blocks: any[];
+    let fallbackText: string;
+
+    if (eventType === "nami_overdue") {
+      blocks = buildOverdueNotice(
         targetUser.slack_name || "there",
         itemName,
-        nextNum,
+        actionValue,
+        actionId,
+      );
+      fallbackText = `Overdue: ${itemName}`;
+    } else {
+      blocks = buildDeadlineReminder(
+        targetUser.slack_name || "there",
+        itemName,
         daysLeft,
         actionValue,
         actionId,
       );
-      const ok = await sendSlackBlocks(
-        botToken,
-        targetUser.slack_user_id,
-        `Reminder ${nextNum}: ${itemName}`,
-        blocks,
-      );
-      if (ok) {
-        sent++;
-      } else {
-        await rollbackNotification(
-          workspaceId,
-          targetUser.id,
-          eventType,
-          refPrefix,
-        );
-        skipped++;
-      }
+      fallbackText = `Reminder: ${itemName} — ${daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`}`;
+    }
+
+    const ok = await sendSlackBlocks(
+      botToken,
+      targetUser.slack_user_id,
+      fallbackText,
+      blocks,
+    );
+    if (ok) {
+      sent++;
     } else {
+      await rollbackNotification(
+        workspaceId,
+        targetUser.id,
+        eventType,
+        refPrefix,
+      );
       skipped++;
     }
   }
