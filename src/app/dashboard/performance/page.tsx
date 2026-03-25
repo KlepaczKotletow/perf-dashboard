@@ -1,6 +1,6 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { Badge } from "@/components/ui/badge";
-import { isPast } from "date-fns";
+import { isPast, format } from "date-fns";
 import { Check, Star } from "lucide-react";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { gradeColor } from "@/lib/status";
@@ -100,19 +100,34 @@ function CycleCardHeader({
       ? "bg-primary/10 text-primary"
       : "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-400";
 
+  // Format date range
+  const dateRange =
+    cycle.startDate && cycle.endDate
+      ? `${format(new Date(cycle.startDate), "MMM d")} – ${format(new Date(cycle.endDate), "MMM d, yyyy")}`
+      : cycle.startDate
+      ? `Started ${format(new Date(cycle.startDate), "MMM d, yyyy")}`
+      : null;
+
   return (
     <div className="flex items-center gap-3 flex-wrap">
       {/* Pulse dot or check icon */}
       {cycle.isCurrent ? (
         <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse shrink-0" />
       ) : (
-        <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
       )}
 
-      {/* Cycle name */}
-      <span className="text-sm font-semibold text-foreground">
-        {cycle.cycleName}
-      </span>
+      {/* Cycle name + date range */}
+      <div className="min-w-0">
+        <span className="text-base font-semibold text-foreground">
+          {cycle.cycleName}
+        </span>
+        {dateRange && (
+          <span className="text-xs text-muted-foreground ml-2">
+            {dateRange}
+          </span>
+        )}
+      </div>
 
       {/* Status badge */}
       <Badge className={`text-[10px] font-medium ${statusBadgeClass}`}>
@@ -704,9 +719,9 @@ export default async function PerformancePage({
         if (!t.dueDate) return false;
         return isPast(new Date(t.dueDate));
       });
-      return hasOverdue ? "border-l-amber-500" : "border-l-primary";
+      return hasOverdue ? "border-l-amber-400" : "border-l-primary/60";
     }
-    return "border-l-emerald-500";
+    return "border-l-emerald-400/60";
   }
 
   return (

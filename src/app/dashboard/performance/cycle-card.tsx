@@ -20,7 +20,7 @@ export function CycleCard({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <Card className={`border-border/60 border-l-4 ${borderColor}`}>
+    <Card className={`border-border/60 border-l-2 ${borderColor}`}>
       <CardContent className="py-0 px-0">
         {/* Clickable header row */}
         <button
