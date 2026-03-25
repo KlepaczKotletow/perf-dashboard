@@ -103,9 +103,9 @@ export default async function PerformancePage() {
   if (isManagerOrAbove(role)) {
     const { data: reportAssignments } = await supabase
       .from("review_assignments")
-      .select("id")
+      .select("id, cycle:performance_cycles!inner(workspace_id)")
       .eq("manager_id", userId)
-      .eq("workspace_id", workspaceId);
+      .eq("cycle.workspace_id", workspaceId);
     const reportAssignmentIds = (reportAssignments || []).map((a: any) => a.id);
     if (reportAssignmentIds.length > 0) {
       const { data: rRatings } = await supabase
@@ -191,8 +191,6 @@ export default async function PerformancePage() {
     .map((a: any) => {
       const gradesVisible = a.cycle?.grades_released === true;
       const isCurrent = a.cycle?.status === "active" || a.cycle?.status === "in_review";
-      const selfDeadline = a.cycle?.self_review_deadline || a.cycle?.review_deadline;
-      const reviewDeadline = a.cycle?.review_deadline;
       return {
         id: a.id,
         cycleId: a.cycle?.id,
@@ -208,8 +206,6 @@ export default async function PerformancePage() {
         selfSubmitted: mySubmissions[a.id]?.has("self") || false,
         assignmentStatus: a.status as string,
         calibratedAt: a.calibrated_at as string | null,
-        selfDeadline,
-        reviewDeadline,
       };
     })
     .sort((a: any, b: any) => {
@@ -219,17 +215,44 @@ export default async function PerformancePage() {
 
   const currentCycleEntry = cycleTimeline.find((c) => c.isCurrent);
 
-  const progressSteps = currentCycleEntry
-    ? [
+  // Fetch actual cycle_phases for the current active cycle to get real deadlines and statuses
+  let progressSteps: { label: string; done: boolean; active?: boolean; deadline: string | null }[] = [];
+  if (currentCycleEntry?.cycleId) {
+    const { data: phases } = await supabase
+      .from("cycle_phases")
+      .select("phase_type, name, status, end_date, sort_order")
+      .eq("cycle_id", currentCycleEntry.cycleId)
+      .order("sort_order");
+
+    if (phases && phases.length > 0) {
+      // Map real phases to progress steps — use actual DB status and deadlines
+      const phaseMap: Record<string, { label: string }> = {
+        goal_setting: { label: "Goal Setting" },
+        self_assessment: { label: "Self-Review" },
+        peer_review: { label: "Peer Review" },
+        manager_review: { label: "Manager Review" },
+        calibration: { label: "Calibration" },
+        communication: { label: "Results" },
+      };
+
+      progressSteps = phases.map((p: any) => ({
+        label: phaseMap[p.phase_type]?.label || p.name || p.phase_type,
+        done: p.status === "completed",
+        active: p.status === "active",
+        deadline: p.end_date,
+      }));
+    } else {
+      // Fallback if no phases configured — use assignment-level data
+      progressSteps = [
         {
           label: "Self-Review",
           done: currentCycleEntry.selfSubmitted,
-          deadline: currentCycleEntry.selfDeadline,
+          deadline: null,
         },
         {
           label: "Manager Review",
           done: currentCycleEntry.assignmentStatus === "completed",
-          deadline: currentCycleEntry.reviewDeadline,
+          deadline: currentCycleEntry.endDate,
         },
         {
           label: "Calibration",
@@ -241,8 +264,9 @@ export default async function PerformancePage() {
           done: currentCycleEntry.gradesReleased,
           deadline: null,
         },
-      ]
-    : [];
+      ];
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -300,7 +324,7 @@ export default async function PerformancePage() {
                 {/* Stepper */}
                 <div className="flex items-center gap-0">
                   {progressSteps.map((step, idx) => {
-                    const isActive = !step.done && (idx === 0 || progressSteps[idx - 1].done);
+                    const isActive = step.active || (!step.done && (idx === 0 || progressSteps[idx - 1].done));
                     const deadlineDate = step.deadline ? new Date(step.deadline) : null;
                     const isOverdue = deadlineDate && isPast(deadlineDate) && !step.done;
 
