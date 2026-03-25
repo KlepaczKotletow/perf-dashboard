@@ -8,6 +8,7 @@ import {
   ArrowLeft, Mail, Pencil, Star,
   MessageSquare, Users,
 } from "lucide-react";
+import { gradeColor, getQuarterLabel } from "@/lib/status";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { notFound } from "next/navigation";
@@ -29,25 +30,7 @@ const feedbackTypeBadge: Record<string, string> = {
 
 // ── Visual helpers ─────────────────────────────────────────────────────────
 
-function gradeColor(grade: string | null | undefined): string {
-  if (!grade) return "text-foreground";
-  const g = grade.toLowerCase();
-  if (g.includes("exceed") || g.includes("outstanding") || g.includes("exceptional"))
-    return "text-emerald-600 dark:text-emerald-400";
-  if (g.includes("performing") || g.includes("meeting") || g.includes("meets"))
-    return "text-primary";
-  if (g.includes("developing") || g.includes("below") || g.includes("needs"))
-    return "text-amber-600 dark:text-amber-400";
-  return "text-foreground";
-}
-
-function getQuarterLabel(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return "—";
-  const q = Math.ceil((date.getMonth() + 1) / 3);
-  return `Q${q} '${String(date.getFullYear()).slice(2)}`;
-}
+// gradeColor and getQuarterLabel imported from @/lib/status
 
 function RatingRing({ rating, max = 5, size = 80, strokeWidth = 8 }: {
   rating: number | null;

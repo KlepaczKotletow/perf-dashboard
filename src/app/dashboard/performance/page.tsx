@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { format, formatDistanceToNow, isPast, isFuture } from "date-fns";
-import { ArrowRight, ChevronRight, Calendar, Clock, Star } from "lucide-react";
+import { ArrowRight, ChevronRight, Calendar, Clock, Star, Check, TrendingUp } from "lucide-react";
 import { CollapsibleSection, SectionEmptyNote } from "./collapsible-section";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
+import { gradeColor, getQuarterLabel } from "@/lib/status";
 
 export default async function PerformancePage() {
   const workspace = await getUserWorkspace();
@@ -34,7 +35,7 @@ export default async function PerformancePage() {
       .from("review_assignments")
       .select(`
         *,
-        cycle:performance_cycles!inner(id, name, status, review_deadline),
+        cycle:performance_cycles!inner(id, name, status, start_date, end_date, review_deadline, grades_released),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", userId)
@@ -185,12 +186,171 @@ export default async function PerformancePage() {
   const pendingManagerReviews = sortedManagerReviews.filter((r: any) => r.status !== "completed");
   const pendingUpwardReviews = sortedUpwardReviews.filter((r: any) => r.status !== "completed");
 
+  // ── Build cycle-over-cycle timeline ──
+  const cycleTimeline = (myAssignments || [])
+    .map((a: any) => {
+      const gradesVisible = a.cycle?.grades_released === true;
+      const isCurrent = a.cycle?.status === "active" || a.cycle?.status === "in_review";
+      return {
+        id: a.id,
+        cycleId: a.cycle?.id,
+        cycleName: a.cycle?.name || "Unknown",
+        startDate: a.cycle?.start_date,
+        quarterLabel: getQuarterLabel(a.cycle?.start_date),
+        cycleStatus: a.cycle?.status,
+        isCurrent,
+        grade: gradesVisible ? a.final_grade : null,
+        rating: gradesVisible ? a.overall_rating : null,
+        gradesReleased: gradesVisible,
+        selfSubmitted: mySubmissions[a.id]?.has("self") || false,
+        assignmentStatus: a.status as string,
+        calibratedAt: a.calibrated_at as string | null,
+      };
+    })
+    .sort((a: any, b: any) => {
+      if (!a.startDate || !b.startDate) return 0;
+      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+    });
+
+  const currentCycleEntry = cycleTimeline.find((c) => c.isCurrent);
+
+  const progressSteps = currentCycleEntry
+    ? [
+        { label: "Self-Review", done: currentCycleEntry.selfSubmitted },
+        { label: "Manager Review", done: currentCycleEntry.assignmentStatus === "completed" },
+        { label: "Calibration", done: currentCycleEntry.calibratedAt != null },
+        { label: "Grade Released", done: currentCycleEntry.gradesReleased },
+      ]
+    : [];
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Performance</h1>
         <p className="text-sm text-muted-foreground mt-1">Your review cycles, actions, and ratings</p>
       </div>
+
+      {/* ── My Performance Timeline ── */}
+      {cycleTimeline.length > 0 && (
+        <Card className="border-border/60">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              My Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Horizontal cycle timeline */}
+            <div className="overflow-x-auto -mx-2 px-2 pb-2">
+              <div className="flex items-start gap-0 min-w-max">
+                {cycleTimeline.map((entry, idx) => (
+                  <div key={entry.id} className="flex items-start">
+                    {/* Node */}
+                    <div className="flex flex-col items-center min-w-[90px]">
+                      {/* Dot */}
+                      <div
+                        className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+                          entry.isCurrent
+                            ? "bg-primary/10 ring-2 ring-primary"
+                            : entry.grade
+                            ? "bg-emerald-100 dark:bg-emerald-400/10"
+                            : "bg-muted"
+                        }`}
+                      >
+                        {entry.grade ? (
+                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        ) : entry.isCurrent ? (
+                          <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
+                        ) : (
+                          <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                        )}
+                      </div>
+
+                      {/* Quarter label */}
+                      <span className="mt-2 text-xs font-mono font-medium text-foreground">
+                        {entry.quarterLabel}
+                      </span>
+
+                      {/* Cycle name */}
+                      <span className="text-[10px] text-muted-foreground/60 truncate max-w-[80px] text-center">
+                        {entry.cycleName}
+                      </span>
+
+                      {/* Grade */}
+                      {entry.grade ? (
+                        <span className={`mt-1 text-xs font-semibold ${gradeColor(entry.grade)}`}>
+                          {entry.grade}
+                        </span>
+                      ) : entry.isCurrent ? (
+                        <Badge className="mt-1 text-[10px] font-medium text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">
+                          {entry.cycleStatus === "in_review" ? "In Review" : "Active"}
+                        </Badge>
+                      ) : (
+                        <span className="mt-1 text-[10px] text-muted-foreground/40">—</span>
+                      )}
+
+                      {/* Rating */}
+                      {entry.rating && (
+                        <span className="text-[10px] text-muted-foreground mt-0.5">
+                          {Number(entry.rating).toFixed(1)}/{ratingMax}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Connector line */}
+                    {idx < cycleTimeline.length - 1 && (
+                      <div className="flex items-center mt-3.5">
+                        <div className={`h-0.5 w-8 ${
+                          entry.grade ? "bg-emerald-300 dark:bg-emerald-700" : "bg-border"
+                        }`} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Current cycle progress tracker */}
+            {currentCycleEntry && progressSteps.length > 0 && (
+              <div className="pt-4 border-t border-border/40">
+                <p className="text-xs font-medium text-muted-foreground mb-3">
+                  Current cycle: {currentCycleEntry.cycleName}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {progressSteps.map((step, idx) => (
+                    <div key={step.label} className="flex items-center gap-2">
+                      <div
+                        className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${
+                          step.done
+                            ? "bg-emerald-100 dark:bg-emerald-400/10"
+                            : "bg-muted"
+                        }`}
+                      >
+                        {step.done ? (
+                          <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <span className="text-[9px] font-medium text-muted-foreground">
+                            {idx + 1}
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={`text-xs ${
+                          step.done
+                            ? "text-foreground font-medium"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Active Cycles Overview ── */}
       {(activeCycles || []).length > 0 && (
