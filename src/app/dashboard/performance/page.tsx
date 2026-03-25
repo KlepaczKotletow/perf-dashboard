@@ -15,7 +15,8 @@ export default async function PerformancePage({
   searchParams: Promise<{ cycle?: string }>;
 }) {
   const params = await searchParams;
-  const selectedCycleId = params.cycle || null;
+  // Default to newest cycle (last in chronologically sorted timeline), allow override via ?cycle=
+  const explicitCycleId = params.cycle || null;
 
   const workspace = await getUserWorkspace();
   if (!workspace?.appUserId) {
@@ -148,16 +149,6 @@ export default async function PerformancePage({
     return true;
   });
 
-  // When a specific cycle is selected, only show ratings from assignments in that cycle
-  const displayRatings = selectedCycleId
-    ? (() => {
-        const cycleAssignmentIds = (myAssignments || [])
-          .filter((a: any) => a.cycle?.id === selectedCycleId || a.cycle_id === selectedCycleId)
-          .map((a: any) => a.id);
-        return dedupedRatings.filter((r: any) => cycleAssignmentIds.includes(r.assignment_id));
-      })()
-    : dedupedRatings;
-
   const ratingMax = workspace?.ratingScale?.max || 5;
 
   const myAssignmentIds = (myAssignments || []).map((a: any) => a.id);
@@ -251,6 +242,20 @@ export default async function PerformancePage({
     return true;
   });
 
+  // Default to newest cycle if none explicitly selected
+  const newestCycleId = cycleTimeline.length > 0 ? cycleTimeline[cycleTimeline.length - 1].cycleId : null;
+  const selectedCycleId = explicitCycleId || newestCycleId;
+
+  // Filter ratings by selected cycle
+  const displayRatings = selectedCycleId
+    ? (() => {
+        const cycleAssignmentIds = (myAssignments || [])
+          .filter((a: any) => a.cycle?.id === selectedCycleId || a.cycle_id === selectedCycleId)
+          .map((a: any) => a.id);
+        return dedupedRatings.filter((r: any) => cycleAssignmentIds.includes(r.assignment_id));
+      })()
+    : dedupedRatings;
+
   const currentCycleEntry = cycleTimeline.find((c) => c.isCurrent);
 
   // Fetch actual cycle_phases for the current active cycle to get real deadlines and statuses
@@ -316,19 +321,9 @@ export default async function PerformancePage({
       {/* ── Cycle Selector + Progress ── */}
       {cycleTimeline.length > 0 && (
         <div className="space-y-4">
-          {/* Cycle filter tabs */}
+          {/* Cycle filter tabs — newest first, default selected */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Link
-              href="/dashboard/performance"
-              className={`shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent ${
-                !selectedCycleId
-                  ? "border-primary bg-primary/5 font-semibold text-foreground"
-                  : "border-border/60 bg-card text-muted-foreground"
-              }`}
-            >
-              All cycles
-            </Link>
-            {cycleTimeline.map((entry) => {
+            {[...cycleTimeline].reverse().map((entry) => {
               const isSelected = selectedCycleId === entry.cycleId;
               return (
                 <Link
@@ -337,12 +332,10 @@ export default async function PerformancePage({
                   className={`shrink-0 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent ${
                     isSelected
                       ? "border-primary bg-primary/5 font-semibold text-foreground"
-                      : entry.isCurrent
-                      ? "border-primary/30 bg-primary/5 text-foreground"
                       : "border-border/60 bg-card text-muted-foreground"
                   }`}
                 >
-                  <span className="font-mono font-semibold">{entry.quarterLabel}</span>
+                  <span className="font-semibold">{entry.cycleName}</span>
                   {entry.grade ? (
                     <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
                   ) : entry.isCurrent ? (
