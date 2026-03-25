@@ -25,6 +25,7 @@ export default async function ReviewDetailPage({
   if (!workspace?.workspaceId || !workspace?.appUserId) notFound();
 
   // Fetch the review assignment with full relations
+  // Note: review_assignments has no workspace_id column — filter via cycle's workspace_id
   const { data: assignment } = await supabase
     .from("review_assignments")
     .select(`
@@ -36,10 +37,10 @@ export default async function ReviewDetailPage({
         level:levels(id, name, grade, job_family:job_families(name))
       ),
       manager:users!review_assignments_manager_id_fkey(id, slack_name),
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date)
+      cycle:performance_cycles!inner(id, name, status, start_date, end_date)
     `)
     .eq("id", id)
-    .eq("workspace_id", workspace.workspaceId)
+    .eq("cycle.workspace_id", workspace.workspaceId)
     .single();
 
   if (!assignment) notFound();
