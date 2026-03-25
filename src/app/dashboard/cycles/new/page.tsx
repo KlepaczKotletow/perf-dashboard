@@ -576,26 +576,32 @@ export default function NewCyclePage() {
       const enrolledIds = new Set(selectedPeopleIds);
       const enrolledUsers = users.filter((u) => selectedPeopleIds.includes(u.id));
 
-      // Standard (self + manager review per employee)
-      const standardAssignments = enrolledUsers.map((u) => ({
-        cycle_id: cycleId, employee_id: u.id, manager_id: u.manager_id || null,
-        assignment_type: "standard", status: "pending",
-      }));
-      if (standardAssignments.length > 0) {
-        const { error: e } = await supabase.from("review_assignments").insert(standardAssignments);
-        if (e) throw e;
-      }
+      // Check if assignments already exist (idempotent — handles retry after partial launch)
+      const { data: existingAssignments } = await supabase
+        .from("review_assignments").select("id").eq("cycle_id", cycleId).limit(1);
 
-      // Upward (direct reports review their manager, only when manager is also enrolled)
-      const upwardAssignments = enrolledUsers
-        .filter((u) => u.manager_id && enrolledIds.has(u.manager_id))
-        .map((u) => ({
-          cycle_id: cycleId, employee_id: u.manager_id, reviewer_id: u.id,
-          manager_id: null, assignment_type: "upward", status: "pending",
+      if (!existingAssignments?.length) {
+        // Standard (self + manager review per employee)
+        const standardAssignments = enrolledUsers.map((u) => ({
+          cycle_id: cycleId, employee_id: u.id, manager_id: u.manager_id || null,
+          assignment_type: "standard", status: "pending",
         }));
-      if (upwardAssignments.length > 0) {
-        const { error: e } = await supabase.from("review_assignments").insert(upwardAssignments);
-        if (e) throw e;
+        if (standardAssignments.length > 0) {
+          const { error: e } = await supabase.from("review_assignments").insert(standardAssignments);
+          if (e) throw e;
+        }
+
+        // Upward (direct reports review their manager, only when manager is also enrolled)
+        const upwardAssignments = enrolledUsers
+          .filter((u) => u.manager_id && enrolledIds.has(u.manager_id))
+          .map((u) => ({
+            cycle_id: cycleId, employee_id: u.manager_id, reviewer_id: u.id,
+            manager_id: null, assignment_type: "upward", status: "pending",
+          }));
+        if (upwardAssignments.length > 0) {
+          const { error: e } = await supabase.from("review_assignments").insert(upwardAssignments);
+          if (e) throw e;
+        }
       }
 
       // Activate first phase
