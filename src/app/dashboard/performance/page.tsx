@@ -191,11 +191,14 @@ export default async function PerformancePage() {
     .map((a: any) => {
       const gradesVisible = a.cycle?.grades_released === true;
       const isCurrent = a.cycle?.status === "active" || a.cycle?.status === "in_review";
+      const selfDeadline = a.cycle?.self_review_deadline || a.cycle?.review_deadline;
+      const reviewDeadline = a.cycle?.review_deadline;
       return {
         id: a.id,
         cycleId: a.cycle?.id,
         cycleName: a.cycle?.name || "Unknown",
         startDate: a.cycle?.start_date,
+        endDate: a.cycle?.end_date,
         quarterLabel: getQuarterLabel(a.cycle?.start_date),
         cycleStatus: a.cycle?.status,
         isCurrent,
@@ -205,6 +208,8 @@ export default async function PerformancePage() {
         selfSubmitted: mySubmissions[a.id]?.has("self") || false,
         assignmentStatus: a.status as string,
         calibratedAt: a.calibrated_at as string | null,
+        selfDeadline,
+        reviewDeadline,
       };
     })
     .sort((a: any, b: any) => {
@@ -216,10 +221,26 @@ export default async function PerformancePage() {
 
   const progressSteps = currentCycleEntry
     ? [
-        { label: "Self-Review", done: currentCycleEntry.selfSubmitted },
-        { label: "Manager Review", done: currentCycleEntry.assignmentStatus === "completed" },
-        { label: "Calibration", done: currentCycleEntry.calibratedAt != null },
-        { label: "Grade Released", done: currentCycleEntry.gradesReleased },
+        {
+          label: "Self-Review",
+          done: currentCycleEntry.selfSubmitted,
+          deadline: currentCycleEntry.selfDeadline,
+        },
+        {
+          label: "Manager Review",
+          done: currentCycleEntry.assignmentStatus === "completed",
+          deadline: currentCycleEntry.reviewDeadline,
+        },
+        {
+          label: "Calibration",
+          done: currentCycleEntry.calibratedAt != null,
+          deadline: null,
+        },
+        {
+          label: "Grade",
+          done: currentCycleEntry.gradesReleased,
+          deadline: null,
+        },
       ]
     : [];
 
@@ -230,193 +251,109 @@ export default async function PerformancePage() {
         <p className="text-sm text-muted-foreground mt-1">Your review cycles, actions, and ratings</p>
       </div>
 
-      {/* ── My Performance Timeline ── */}
+      {/* ── My Performance ── */}
       {cycleTimeline.length > 0 && (
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              My Performance
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {/* Horizontal cycle timeline */}
-            <div className="overflow-x-auto -mx-2 px-2 pb-2">
-              <div className="flex items-start gap-0 min-w-max">
-                {cycleTimeline.map((entry, idx) => (
-                  <div key={entry.id} className="flex items-start">
-                    {/* Node */}
-                    <div className="flex flex-col items-center min-w-[90px]">
-                      {/* Dot */}
-                      <div
-                        className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
-                          entry.isCurrent
-                            ? "bg-primary/10 ring-2 ring-primary"
-                            : entry.grade
-                            ? "bg-emerald-100 dark:bg-emerald-400/10"
-                            : "bg-muted"
-                        }`}
-                      >
-                        {entry.grade ? (
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : entry.isCurrent ? (
-                          <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
-                        ) : (
-                          <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
-                        )}
-                      </div>
+        <div className="space-y-3">
+          {/* Cycle chips — compact horizontal row */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
+            {cycleTimeline.map((entry) => (
+              <Link
+                key={entry.id}
+                href={entry.cycleId ? `/dashboard/cycles/${entry.cycleId}` : "#"}
+                className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
+                  entry.isCurrent
+                    ? "border-primary/30 bg-primary/5"
+                    : "border-border/60 bg-card"
+                }`}
+              >
+                <span className="font-mono font-medium text-foreground">{entry.quarterLabel}</span>
+                {entry.grade ? (
+                  <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
+                ) : entry.isCurrent ? (
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    <span className="text-muted-foreground">{entry.cycleStatus === "in_review" ? "In Review" : "Active"}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/40">—</span>
+                )}
+                {entry.rating && (
+                  <span className="text-muted-foreground tabular-nums">{Number(entry.rating).toFixed(1)}</span>
+                )}
+              </Link>
+            ))}
+          </div>
 
-                      {/* Quarter label */}
-                      <span className="mt-2 text-xs font-mono font-medium text-foreground">
-                        {entry.quarterLabel}
-                      </span>
-
-                      {/* Cycle name */}
-                      <span className="text-[10px] text-muted-foreground/60 truncate max-w-[80px] text-center">
-                        {entry.cycleName}
-                      </span>
-
-                      {/* Grade */}
-                      {entry.grade ? (
-                        <span className={`mt-1 text-xs font-semibold ${gradeColor(entry.grade)}`}>
-                          {entry.grade}
-                        </span>
-                      ) : entry.isCurrent ? (
-                        <Badge className="mt-1 text-[10px] font-medium text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">
-                          {entry.cycleStatus === "in_review" ? "In Review" : "Active"}
-                        </Badge>
-                      ) : (
-                        <span className="mt-1 text-[10px] text-muted-foreground/40">—</span>
-                      )}
-
-                      {/* Rating */}
-                      {entry.rating && (
-                        <span className="text-[10px] text-muted-foreground mt-0.5">
-                          {Number(entry.rating).toFixed(1)}/{ratingMax}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Connector line */}
-                    {idx < cycleTimeline.length - 1 && (
-                      <div className="flex items-center mt-3.5">
-                        <div className={`h-0.5 w-8 ${
-                          entry.grade ? "bg-emerald-300 dark:bg-emerald-700" : "bg-border"
-                        }`} />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Current cycle progress tracker */}
-            {currentCycleEntry && progressSteps.length > 0 && (
-              <div className="pt-4 border-t border-border/40">
-                <p className="text-xs font-medium text-muted-foreground mb-3">
-                  Current cycle: {currentCycleEntry.cycleName}
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {progressSteps.map((step, idx) => (
-                    <div key={step.label} className="flex items-center gap-2">
-                      <div
-                        className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 ${
-                          step.done
-                            ? "bg-emerald-100 dark:bg-emerald-400/10"
-                            : "bg-muted"
-                        }`}
-                      >
-                        {step.done ? (
-                          <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <span className="text-[9px] font-medium text-muted-foreground">
-                            {idx + 1}
-                          </span>
-                        )}
-                      </div>
-                      <span
-                        className={`text-xs ${
-                          step.done
-                            ? "text-foreground font-medium"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                  ))}
+          {/* Current cycle progress — compact inline stepper with deadlines */}
+          {currentCycleEntry && progressSteps.length > 0 && (
+            <Card className="border-border/60">
+              <CardContent className="py-3 px-4">
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-semibold text-foreground">{currentCycleEntry.cycleName}</span>
+                  {currentCycleEntry.endDate && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Ends {format(new Date(currentCycleEntry.endDate), "MMM d")}
+                    </span>
+                  )}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
-      {/* ── Active Cycles Overview ── */}
-      {(activeCycles || []).length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2">
-          {(activeCycles || []).map((cycle: any) => {
-            const deadline = cycle.review_deadline ? new Date(cycle.review_deadline) : null;
-            const isOverdue = deadline && isPast(deadline);
-            const isUpcoming = deadline && isFuture(deadline);
-            const timeLeft = deadline ? formatDistanceToNow(deadline, { addSuffix: true }) : null;
+                {/* Stepper */}
+                <div className="flex items-center gap-0">
+                  {progressSteps.map((step, idx) => {
+                    const isActive = !step.done && (idx === 0 || progressSteps[idx - 1].done);
+                    const deadlineDate = step.deadline ? new Date(step.deadline) : null;
+                    const isOverdue = deadlineDate && isPast(deadlineDate) && !step.done;
 
-            return (
-              <Card key={cycle.id} className="border-border/60">
-                <CardContent className="pt-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calendar className="h-4 w-4 text-primary shrink-0" />
-                        <h3 className="text-sm font-semibold text-foreground truncate">{cycle.name}</h3>
-                        <Badge className={`shrink-0 text-[10px] font-medium ${
-                          cycle.status === "active"
-                            ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10"
-                            : "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10"
-                        }`}>
-                          {cycle.status === "active" ? "Active" : "In Review"}
-                        </Badge>
+                    return (
+                      <div key={step.label} className="flex items-center flex-1 min-w-0">
+                        {/* Step */}
+                        <div className="flex flex-col items-center gap-0.5 min-w-0">
+                          <div
+                            className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 text-[9px] font-bold ${
+                              step.done
+                                ? "bg-emerald-500 text-white dark:bg-emerald-500"
+                                : isActive
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {step.done ? (
+                              <Check className="h-3 w-3" />
+                            ) : (
+                              idx + 1
+                            )}
+                          </div>
+                          <span className={`text-[10px] leading-tight text-center truncate max-w-[72px] ${
+                            isActive ? "font-medium text-foreground" : step.done ? "text-foreground" : "text-muted-foreground"
+                          }`}>
+                            {step.label}
+                          </span>
+                          {deadlineDate && (
+                            <span className={`text-[9px] leading-none ${
+                              isOverdue ? "text-red-500 font-medium" : "text-muted-foreground/60"
+                            }`}>
+                              {isOverdue ? "Overdue" : format(deadlineDate, "MMM d")}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Connector */}
+                        {idx < progressSteps.length - 1 && (
+                          <div className={`flex-1 h-px mx-1 mt-[-14px] ${
+                            step.done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
+                          }`} />
+                        )}
                       </div>
-
-                      {deadline && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Clock className={`h-3 w-3 ${isOverdue ? "text-red-500" : "text-muted-foreground"}`} />
-                          <span className={`text-xs ${isOverdue ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
-                            Review deadline: {format(deadline, "MMM d, yyyy")}
-                            {isOverdue && " (overdue)"}
-                            {isUpcoming && ` — ${timeLeft}`}
-                          </span>
-                        </div>
-                      )}
-
-                      {cycle.self_review_deadline && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span className="text-xs text-muted-foreground">
-                            Self-review deadline: {format(new Date(cycle.self_review_deadline), "MMM d, yyyy")}
-                          </span>
-                        </div>
-                      )}
-
-                      {cycle.start_date && cycle.end_date && (
-                        <p className="text-xs text-muted-foreground/60 mt-1.5">
-                          Period: {format(new Date(cycle.start_date), "MMM d")} — {format(new Date(cycle.end_date), "MMM d, yyyy")}
-                        </p>
-                      )}
-                    </div>
-
-                    <Button size="sm" variant="outline" className="text-xs h-8 shrink-0" asChild>
-                      <Link href={`/dashboard/cycles/${cycle.id}`}>
-                        View <ChevronRight className="h-3 w-3 ml-1" />
-                      </Link>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
+
+      {/* Active Cycles Overview removed — cycle chips above serve this purpose */}
 
       <div className="space-y-2">
 
