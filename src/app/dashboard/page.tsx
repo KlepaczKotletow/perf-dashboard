@@ -604,17 +604,17 @@ export default async function DashboardPage() {
 
     return (
       <div className="space-y-8">
-        {/* Greeting */}
+        {/* Heading */}
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Hey {firstName}
+            Your Team
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {pendingMgrReviews.length > 0
               ? `${pendingMgrReviews.length} team member${pendingMgrReviews.length !== 1 ? "s" : ""} ready for your review.`
               : teamSize === 0
               ? "No direct reports assigned yet."
-              : "Your team is all caught up — great work!"}
+              : `${teamSize} direct report${teamSize !== 1 ? "s" : ""} — all caught up.`}
           </p>
         </div>
 
@@ -829,21 +829,17 @@ export default async function DashboardPage() {
     { label: "Team Members", value: stats.totalUsers, icon: Users, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
   ];
 
-  const quickLinks = [
-    { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, description: "View your performance reviews and pending actions" },
-    { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, description: "See kudos you've given and received" },
-    { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, description: "Manage performance review cycles" },
-    { href: "/dashboard/competencies", label: "Competencies", icon: Target, description: "Define and track competency frameworks" },
-  ];
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Hey {firstName}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          {showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
+        </h1>
         <p className="text-muted-foreground text-sm mt-1">
           {showOnboarding
             ? "Let's get your workspace set up. Follow the steps below to start running reviews."
-            : "Here's what's happening in your workspace."}
+            : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`}
         </p>
       </div>
 
@@ -928,27 +924,40 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <div className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Quick access</h2>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {quickLinks.map((link) => (
+      {/* Active cycles quick view */}
+      {activeCycles.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Active Cycles</h2>
             <Link
-              key={link.href}
-              href={link.href}
-              className="group flex items-center gap-4 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
+              href="/dashboard/cycles"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
             >
-              <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center shrink-0">
-                <link.icon className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{link.label}</p>
-                <p className="text-xs text-muted-foreground truncate">{link.description}</p>
-              </div>
-              <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+              Manage <ChevronRight className="h-3 w-3" />
             </Link>
-          ))}
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {activeCycles.map((cycle: any) => (
+              <Link
+                key={cycle.id}
+                href={`/dashboard/cycles/${cycle.id}`}
+                className="group flex items-center gap-3 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
+              >
+                <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{cycle.name}</p>
+                  {cycle.review_deadline && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Deadline {new Date(cycle.review_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </p>
+                  )}
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
