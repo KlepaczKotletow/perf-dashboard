@@ -123,7 +123,7 @@ function DatePickerField({
 // ── Step indicator bar ────────────────────────────────────────────────────────
 function StepIndicator({ currentStep }: { currentStep: number }) {
   return (
-    <div className="flex items-center justify-between mb-8">
+    <div className="flex items-center justify-between mb-10">
       {STEP_LABELS.map((label, idx) => {
         const stepNum = idx + 1;
         const isCompleted = stepNum < currentStep;
@@ -132,7 +132,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
           <div key={label} className="flex items-center flex-1 last:flex-initial">
             <div className="flex flex-col items-center">
               <div
-                className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
+                className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
                   isCompleted
                     ? "bg-primary border-primary text-primary-foreground"
                     : isCurrent
@@ -142,12 +142,12 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
               >
                 {isCompleted ? <Check className="h-4 w-4" /> : stepNum}
               </div>
-              <span className={`text-[10px] mt-1 whitespace-nowrap ${isCurrent ? "text-primary font-medium" : "text-muted-foreground"}`}>
+              <span className={`text-xs mt-2 whitespace-nowrap ${isCurrent ? "text-primary font-semibold" : "text-muted-foreground"}`}>
                 {label}
               </span>
             </div>
             {idx < STEP_LABELS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-2 mt-[-12px] ${isCompleted ? "bg-primary" : "bg-border"}`} />
+              <div className={`flex-1 h-0.5 mx-3 mt-[-14px] ${isCompleted ? "bg-primary" : "bg-border"}`} />
             )}
           </div>
         );
@@ -165,8 +165,8 @@ function PhaseTimelinePreview({ startDate, endDate }: { startDate?: Date; endDat
   ];
   return (
     <div className="space-y-2">
-      <Label className="text-xs">Phase Timeline Preview</Label>
-      <div className="flex h-6 rounded-md overflow-hidden border border-border/60">
+      <Label className="text-sm font-medium">Phase Timeline Preview</Label>
+      <div className="flex h-10 rounded-lg overflow-hidden border border-border/60">
         {DEFAULT_PHASES.map((phase, idx) => (
           <div
             key={phase.phase_type}
@@ -174,13 +174,13 @@ function PhaseTimelinePreview({ startDate, endDate }: { startDate?: Date; endDat
             style={{ width: `${phase.proportion * 100}%` }}
             title={phase.name}
           >
-            <span className="text-[8px] text-white font-medium truncate px-1">
+            <span className="text-[11px] text-white font-semibold truncate px-1">
               {phase.name.split(" ")[0]}
             </span>
           </div>
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>{format(startDate, "MMM d")}</span>
         <span>{format(endDate, "MMM d, yyyy")}</span>
       </div>
@@ -682,15 +682,15 @@ export default function NewCyclePage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto pb-16">
+    <div className="max-w-4xl mx-auto pb-16">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-8">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/dashboard/cycles"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">New Performance Cycle</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <h1 className="text-2xl font-semibold tracking-tight">New Performance Cycle</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Step {step} of 5
             {autoSaving && <span className="ml-2 text-muted-foreground/60">Saving...</span>}
             {pendingCycleId && !autoSaving && <span className="ml-2 text-muted-foreground/60">Draft saved</span>}
@@ -720,7 +720,7 @@ export default function NewCyclePage() {
           STEP 1 — Basics & Dates
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 1 && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {/* Cycle profile picker */}
           {cycleProfiles.length > 0 && (
             <div className="border border-border/60 rounded-lg p-4 bg-muted/20 space-y-2.5">
@@ -764,7 +764,7 @@ export default function NewCyclePage() {
           )}
 
           {/* Name + Type */}
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <div className="flex-1 space-y-1.5">
               <Label htmlFor="name">Cycle Name *</Label>
               <Input
@@ -774,7 +774,7 @@ export default function NewCyclePage() {
                 placeholder="e.g. Q2 2026 Performance Review"
               />
             </div>
-            <div className="w-44 space-y-1.5">
+            <div className="w-52 space-y-1.5">
               <Label>Type</Label>
               <Select value={cycleType} onValueChange={setCycleType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -786,7 +786,7 @@ export default function NewCyclePage() {
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-4">
             <DatePickerField label="Start Date *" value={startDate} onChange={setStartDate} placeholder="Start" fromDate={new Date()} />
             <DatePickerField label="End Date *" value={endDate} onChange={setEndDate} placeholder="End" fromDate={startDate} />
             <DatePickerField label="Review Deadline" value={reviewDeadline} onChange={setReviewDeadline} placeholder="Optional" optional fromDate={startDate} />
@@ -822,7 +822,7 @@ export default function NewCyclePage() {
           STEP 2 — People
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 2 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-muted-foreground">Select which employees will participate in this review cycle.</p>
 
           {/* Slack warning banner */}
@@ -944,7 +944,7 @@ export default function NewCyclePage() {
           STEP 3 — Questions
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 3 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-muted-foreground">
             Configure the review questions. Select competencies for rating-based assessments and add open-ended text questions for qualitative feedback.
           </p>
@@ -1102,7 +1102,7 @@ export default function NewCyclePage() {
           STEP 4 — Nami Bot
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 4 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-muted-foreground">
             Nami is your AI assistant that sends review prompts to employees via Slack DMs.
             Configure how and when Nami should reach out.
@@ -1206,7 +1206,7 @@ export default function NewCyclePage() {
           STEP 5 — Review & Launch
           ════════════════════════════════════════════════════════════════════════ */}
       {step === 5 && (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-muted-foreground">Review your cycle configuration before launching.</p>
 
           {/* Basics card */}
