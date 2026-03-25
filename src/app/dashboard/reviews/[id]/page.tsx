@@ -30,7 +30,7 @@ export default async function ReviewDetailPage({
     .from("review_assignments")
     .select(`
       id, status, overall_rating, created_at, updated_at,
-      employee_id, manager_id, assignment_type, reviewer_id,
+      employee_id, manager_id, assignment_type, reviewer_id, cycle_id,
       employee:users!review_assignments_employee_id_fkey(
         id, slack_name, job_title, department, avatar_url,
         level_id,
@@ -71,8 +71,8 @@ export default async function ReviewDetailPage({
   const employee = assignment.employee as any;
   const levelId = employee?.level_id;
 
-  // Fetch competencies expected for this employee's level
-  const [levelCompsResult, existingResponsesResult] = await Promise.all([
+  // Fetch competencies from level OR cycle questions, plus existing responses
+  const [levelCompsResult, cycleQuestionsResult, existingResponsesResult] = await Promise.all([
     levelId
       ? supabase
           .from("level_competencies")
@@ -85,6 +85,16 @@ export default async function ReviewDetailPage({
           .order("expected_level", { ascending: false })
       : Promise.resolve({ data: [] }),
 
+    // Also fetch cycle questions as fallback when no level competencies
+    supabase
+      .from("cycle_questions")
+      .select(`
+        id, question_type, competency_id, prompt, sort_order, required,
+        competency:competencies(id, name, description, category)
+      `)
+      .eq("cycle_id", assignment.cycle_id)
+      .order("sort_order"),
+
     supabase
       .from("review_responses")
       .select("id, competency_id, rating, comment, reviewer_id, reviewer_role")
@@ -92,28 +102,56 @@ export default async function ReviewDetailPage({
   ]);
 
   const levelComps = levelCompsResult.data || [];
+  const cycleQuestions = cycleQuestionsResult.data || [];
   const existingResponses = existingResponsesResult.data || [];
 
-  // Build competency ratings array
-  const competencyRatings: CompetencyRating[] = levelComps
-    .filter((lc: any) => lc.competency)
-    .map((lc: any) => {
-      const comp = lc.competency;
+  // Build competency ratings — prefer level competencies, fall back to cycle questions
+  let competencyRatings: CompetencyRating[];
+
+  if (levelComps.length > 0) {
+    // Use level competencies (existing behavior)
+    competencyRatings = levelComps
+      .filter((lc: any) => lc.competency)
+      .map((lc: any) => {
+        const comp = lc.competency;
+        const existing = existingResponses.find(
+          (r: any) => r.competency_id === comp.id
+        );
+        return {
+          competencyId: comp.id,
+          competencyName: comp.name,
+          competencyDescription: comp.description,
+          category: comp.category,
+          expectedLevel: lc.expected_level,
+          behavioralIndicators: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
+          existingResponseId: existing?.id ?? null,
+          currentRating: existing?.rating ?? null,
+          currentComment: existing?.comment ?? null,
+        };
+      });
+  } else {
+    // Fallback: use cycle questions with competencies
+    const compQuestions = cycleQuestions.filter(
+      (q: any) => q.question_type === "competency" && q.competency
+    );
+    competencyRatings = compQuestions.map((q: any) => {
+      const comp = Array.isArray(q.competency) ? q.competency[0] : q.competency;
       const existing = existingResponses.find(
-        (r: any) => r.competency_id === comp.id
+        (r: any) => r.competency_id === comp?.id
       );
       return {
-        competencyId: comp.id,
-        competencyName: comp.name,
-        competencyDescription: comp.description,
-        category: comp.category,
-        expectedLevel: lc.expected_level,
-        behavioralIndicators: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
+        competencyId: comp?.id || q.competency_id,
+        competencyName: comp?.name || "Unknown",
+        competencyDescription: comp?.description || q.prompt || null,
+        category: comp?.category || null,
+        expectedLevel: null,
+        behavioralIndicators: [],
         existingResponseId: existing?.id ?? null,
         currentRating: existing?.rating ?? null,
         currentComment: existing?.comment ?? null,
       };
     });
+  }
 
   const level = employee?.level as any;
   const cycle = assignment.cycle as any;
@@ -190,9 +228,9 @@ export default async function ReviewDetailPage({
               {cycle.end_date && ` → ${format(new Date(cycle.end_date), "MMM d, yyyy")}`}
             </span>
           )}
-          {!levelId && (
-            <span className="text-amber-600 font-medium">
-              ⚠ No job level assigned — competencies cannot be loaded
+          {!levelId && competencyRatings.length === 0 && (
+            <span className="text-muted-foreground">
+              No competencies configured for this cycle
             </span>
           )}
         </div>
