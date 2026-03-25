@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -401,7 +402,12 @@ export default async function DashboardPage() {
     isAdminOrHR ? getChartData(workspace?.workspaceId) : null,
   ]);
 
-  // ── Employee dashboard ─────────────────────────────────────────────────────
+  // ── Employees go straight to Performance (their journey) ──────────────────
+  if (role === "user") {
+    redirect("/dashboard/performance");
+  }
+
+  // ── Employee dashboard (kept for reference, unreachable due to redirect above)
   if (role === "user") {
     const assignments = personal?.assignments || [];
     const recentFeedback = personal?.recentFeedback || [];
