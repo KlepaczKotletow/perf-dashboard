@@ -1,13 +1,155 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { format, formatDistanceToNow, isPast, isFuture } from "date-fns";
-import { ArrowRight, ChevronRight, Calendar, Clock, Star, Check, TrendingUp } from "lucide-react";
-import { CollapsibleSection, SectionEmptyNote } from "./collapsible-section";
+import { isPast } from "date-fns";
+import { Check, Star } from "lucide-react";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
-import { gradeColor, getQuarterLabel } from "@/lib/status";
+import { gradeColor } from "@/lib/status";
+
+import { CycleCard } from "./cycle-card";
+import { PerformanceSummaryHero } from "./summary-hero";
+import { ProgressStepper } from "./progress-stepper";
+import { ActionRequiredSection } from "./action-required-section";
+import { CompletedSection } from "./completed-section";
+import { ResultsSection } from "./results-section";
+
+/* ------------------------------------------------------------------ */
+/*  Types for the per-cycle grouped data                              */
+/* ------------------------------------------------------------------ */
+
+interface ActionTask {
+  id: string;
+  type: "self-review" | "manager-review" | "upward-feedback";
+  label: string;
+  cycleName: string;
+  cycleId: string;
+  dueDate: string | null;
+  assignmentId: string;
+}
+
+interface CompletedItem {
+  id: string;
+  type: "self" | "manager-review" | "upward";
+  label: string;
+  href: string;
+  completedAt: string | null;
+}
+
+interface CompetencyRating {
+  name: string;
+  rating: number;
+}
+
+interface FeedbackPreview {
+  reviewerName: string;
+  reviewerRole: string;
+  comment: string;
+  rating: number | null;
+}
+
+interface ProgressStep {
+  label: string;
+  done: boolean;
+  active?: boolean;
+  deadline: string | null;
+}
+
+interface CycleData {
+  cycleId: string;
+  cycleName: string;
+  cycleStatus: string;
+  startDate: string | null;
+  endDate: string | null;
+  gradesReleased: boolean;
+  isCurrent: boolean;
+  grade: string | null;
+  rating: number | null;
+  pendingTasks: ActionTask[];
+  completedItems: CompletedItem[];
+  competencyRatings: CompetencyRating[];
+  feedbackPreviews: FeedbackPreview[];
+  progressSteps: ProgressStep[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  CycleCardHeader — rendered in the collapsed summary row           */
+/* ------------------------------------------------------------------ */
+
+function CycleCardHeader({
+  cycle,
+  ratingMax,
+}: {
+  cycle: CycleData;
+  ratingMax: number;
+}) {
+  const statusLabel =
+    cycle.cycleStatus === "active"
+      ? "Active"
+      : cycle.cycleStatus === "in_review"
+      ? "In Review"
+      : "Completed";
+
+  const statusBadgeClass =
+    cycle.isCurrent
+      ? "bg-primary/10 text-primary"
+      : "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-400";
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Pulse dot or check icon */}
+      {cycle.isCurrent ? (
+        <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse shrink-0" />
+      ) : (
+        <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+      )}
+
+      {/* Cycle name */}
+      <span className="text-sm font-semibold text-foreground">
+        {cycle.cycleName}
+      </span>
+
+      {/* Status badge */}
+      <Badge className={`text-[10px] font-medium ${statusBadgeClass}`}>
+        {statusLabel}
+      </Badge>
+
+      {/* Pending task count badge */}
+      {cycle.pendingTasks.length > 0 && (
+        <Badge className="text-[10px] h-4 px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400 font-medium">
+          {cycle.pendingTasks.length} pending
+        </Badge>
+      )}
+
+      {/* Right-aligned rating + grade OR "Pending results" */}
+      <span className="ml-auto flex items-center gap-2 shrink-0">
+        {cycle.gradesReleased && (cycle.rating != null || cycle.grade) ? (
+          <>
+            {cycle.rating != null && (
+              <span className="flex items-center gap-1">
+                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                <span className="text-sm font-medium tabular-nums text-foreground">
+                  {Number(cycle.rating).toFixed(1)}/{ratingMax}
+                </span>
+              </span>
+            )}
+            {cycle.grade && (
+              <span className={`text-sm font-semibold ${gradeColor(cycle.grade)}`}>
+                {cycle.grade}
+              </span>
+            )}
+          </>
+        ) : !cycle.isCurrent && !cycle.gradesReleased ? (
+          <span className="text-xs italic text-muted-foreground">
+            Pending results
+          </span>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Page Component                                                */
+/* ------------------------------------------------------------------ */
 
 export default async function PerformancePage({
   searchParams,
@@ -15,7 +157,7 @@ export default async function PerformancePage({
   searchParams: Promise<{ cycle?: string }>;
 }) {
   const params = await searchParams;
-  const explicitCycleId = params.cycle || null;
+  void params; // searchParams no longer used for cycle filtering
 
   const workspace = await getUserWorkspace();
   if (!workspace?.appUserId) {
@@ -32,11 +174,13 @@ export default async function PerformancePage({
 
   const role = workspace.role;
 
+  /* ── All Supabase queries (unchanged) ── */
+
   const [
     { data: myAssignments },
     { data: managerReviews },
     { data: upwardReviews },
-    { data: activeCycles },
+    { data: _activeCycles },
   ] = await Promise.all([
     supabase
       .from("review_assignments")
@@ -90,7 +234,7 @@ export default async function PerformancePage({
     const { data: ratings } = await supabase
       .from("review_responses")
       .select(`
-        id, reviewer_role, rating, comment, created_at,
+        id, reviewer_role, rating, comment, created_at, assignment_id,
         competency:competencies(name, category),
         reviewer:users!review_responses_reviewer_id_fkey(slack_name),
         assignment:review_assignments!review_responses_assignment_id_fkey(
@@ -118,7 +262,7 @@ export default async function PerformancePage({
       const { data: rRatings } = await supabase
         .from("review_responses")
         .select(`
-          id, reviewer_role, rating, comment, created_at,
+          id, reviewer_role, rating, comment, created_at, assignment_id,
           competency:competencies(name, category),
           reviewer:users!review_responses_reviewer_id_fkey(slack_name),
           assignment:review_assignments!review_responses_assignment_id_fkey(
@@ -173,546 +317,414 @@ export default async function PerformancePage({
     return { ...a, selfSubmitted, cycleEnded };
   });
 
-  const sortByCompletion = (a: any, b: any) => {
-    const aComplete = a.status === "completed";
-    const bComplete = b.status === "completed";
-    if (aComplete === bComplete) return 0;
-    return aComplete ? 1 : -1;
-  };
+  /* ================================================================ */
+  /*  Task 7: GROUP BY CYCLE                                          */
+  /* ================================================================ */
 
-  const sortedManagerReviews = [...(managerReviews || [])].sort(sortByCompletion);
-  const sortedUpwardReviews = [...(upwardReviews || [])].sort(sortByCompletion);
+  // 1. Collect all unique cycle IDs from all data sources
+  const cycleMap = new Map<string, {
+    id: string;
+    name: string;
+    status: string;
+    startDate: string | null;
+    endDate: string | null;
+    reviewDeadline: string | null;
+    gradesReleased: boolean;
+  }>();
 
-  const pendingSelfReviews = enrichedAssignments.filter(
-    (a: any) => !a.selfSubmitted && !a.cycleEnded && a.status !== "completed"
-  );
-  const completedSelfReviewAssignments = enrichedAssignments.filter(
-    (a: any) => a.selfSubmitted || a.status === "completed"
-  );
+  for (const a of enrichedAssignments) {
+    const c = a.cycle;
+    if (c?.id && !cycleMap.has(c.id)) {
+      cycleMap.set(c.id, {
+        id: c.id,
+        name: c.name || "Unknown Cycle",
+        status: c.status || "unknown",
+        startDate: c.start_date || null,
+        endDate: c.end_date || null,
+        reviewDeadline: c.review_deadline || null,
+        gradesReleased: c.grades_released === true,
+      });
+    }
+  }
 
-  const pendingManagerReviews = sortedManagerReviews.filter((r: any) => r.status !== "completed");
-  const pendingUpwardReviews = sortedUpwardReviews.filter((r: any) => r.status !== "completed");
+  // Also collect cycles from manager and upward reviews (user might have reviews but no own assignment)
+  for (const r of [...(managerReviews || []), ...(upwardReviews || [])]) {
+    const c = r.cycle;
+    if (c?.id && !cycleMap.has(c.id)) {
+      cycleMap.set(c.id, {
+        id: c.id,
+        name: c.name || "Unknown Cycle",
+        status: c.status || "unknown",
+        startDate: null,
+        endDate: null,
+        reviewDeadline: null,
+        gradesReleased: false,
+      });
+    }
+  }
 
-  // Default to newest cycle by start_date from myAssignments
-  const newestAssignmentCycleId = (myAssignments || [])
-    .slice()
-    .sort((a: any, b: any) => {
-      const da = a.cycle?.start_date ? new Date(a.cycle.start_date).getTime() : 0;
-      const db = b.cycle?.start_date ? new Date(b.cycle.start_date).getTime() : 0;
-      return db - da; // newest first
-    })[0]?.cycle?.id || null;
-  const selectedCycleId = explicitCycleId || newestAssignmentCycleId;
+  // 2. Build assignment lookup by cycle id
+  const assignmentsByCycle = new Map<string, any[]>();
+  for (const a of enrichedAssignments) {
+    const cid = a.cycle?.id;
+    if (!cid) continue;
+    if (!assignmentsByCycle.has(cid)) assignmentsByCycle.set(cid, []);
+    assignmentsByCycle.get(cid)!.push(a);
+  }
 
-  // ── Apply cycle filter to ALL sections ──
-  const filterByCycle = (items: any[], cycleKey = "cycle") =>
-    selectedCycleId
-      ? items.filter((a: any) => a[cycleKey]?.id === selectedCycleId || a.cycle_id === selectedCycleId)
-      : items;
+  // 3. Build manager reviews by cycle id
+  const managerReviewsByCycle = new Map<string, any[]>();
+  for (const r of (managerReviews || [])) {
+    const cid = r.cycle?.id;
+    if (!cid) continue;
+    if (!managerReviewsByCycle.has(cid)) managerReviewsByCycle.set(cid, []);
+    managerReviewsByCycle.get(cid)!.push(r);
+  }
 
-  const filteredSelfReviews = filterByCycle(pendingSelfReviews);
-  const filteredCompletedSelf = filterByCycle(completedSelfReviewAssignments);
-  const filteredManagerReviews = filterByCycle(sortedManagerReviews);
-  const filteredPendingManager = filterByCycle(pendingManagerReviews);
-  const filteredUpwardReviews = filterByCycle(sortedUpwardReviews);
-  const filteredPendingUpward = filterByCycle(pendingUpwardReviews);
+  // 4. Build upward reviews by cycle id
+  const upwardReviewsByCycle = new Map<string, any[]>();
+  for (const r of (upwardReviews || [])) {
+    const cid = r.cycle?.id;
+    if (!cid) continue;
+    if (!upwardReviewsByCycle.has(cid)) upwardReviewsByCycle.set(cid, []);
+    upwardReviewsByCycle.get(cid)!.push(r);
+  }
 
-  // ── Build cycle-over-cycle timeline (deduplicated by cycleId) ──
-  const cycleTimelineRaw = (myAssignments || [])
-    .map((a: any) => {
-      const gradesVisible = a.cycle?.grades_released === true;
-      const isCurrent = a.cycle?.status === "active" || a.cycle?.status === "in_review";
-      return {
-        id: a.id,
-        cycleId: a.cycle?.id as string,
-        cycleName: a.cycle?.name || "Unknown",
-        startDate: a.cycle?.start_date,
-        endDate: a.cycle?.end_date,
-        quarterLabel: getQuarterLabel(a.cycle?.start_date),
-        cycleStatus: a.cycle?.status,
-        isCurrent,
-        grade: gradesVisible ? a.final_grade : null,
-        rating: gradesVisible ? a.overall_rating : null,
-        gradesReleased: gradesVisible,
-        selfSubmitted: mySubmissions[a.id]?.has("self") || false,
-        assignmentStatus: a.status as string,
-        calibratedAt: a.calibrated_at as string | null,
-      };
-    })
-    .sort((a: any, b: any) => {
-      if (!a.startDate || !b.startDate) return 0;
-      return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
-    });
+  // 5. Build ratings by cycle — need to map assignment_id -> cycle_id
+  const assignmentToCycle = new Map<string, string>();
+  for (const a of enrichedAssignments) {
+    if (a.cycle?.id) assignmentToCycle.set(a.id, a.cycle.id);
+  }
 
-  // Deduplicate by cycleId — keep first (best data) per cycle
-  const seenCycleIds = new Set<string>();
-  const cycleTimeline = cycleTimelineRaw.filter((c) => {
-    if (!c.cycleId || seenCycleIds.has(c.cycleId)) return false;
-    seenCycleIds.add(c.cycleId);
-    return true;
-  });
+  const ratingsByCycle = new Map<string, any[]>();
+  for (const r of dedupedRatings) {
+    const cid = assignmentToCycle.get(r.assignment_id);
+    if (!cid) continue;
+    if (!ratingsByCycle.has(cid)) ratingsByCycle.set(cid, []);
+    ratingsByCycle.get(cid)!.push(r);
+  }
 
-  // Filter ratings by selected cycle
-  const displayRatings = selectedCycleId
-    ? (() => {
-        const cycleAssignmentIds = (myAssignments || [])
-          .filter((a: any) => a.cycle?.id === selectedCycleId || a.cycle_id === selectedCycleId)
-          .map((a: any) => a.id);
-        return dedupedRatings.filter((r: any) => cycleAssignmentIds.includes(r.assignment_id));
-      })()
-    : dedupedRatings;
+  // 6. Fetch cycle_phases for all active/in_review cycles
+  const activeCycleIds = Array.from(cycleMap.values())
+    .filter((c) => c.status === "active" || c.status === "in_review")
+    .map((c) => c.id);
 
-  const currentCycleEntry = cycleTimeline.find((c) => c.isCurrent);
-
-  // Fetch actual cycle_phases for the current active cycle to get real deadlines and statuses
-  let progressSteps: { label: string; done: boolean; active?: boolean; deadline: string | null }[] = [];
-  if (currentCycleEntry?.cycleId) {
-    const { data: phases } = await supabase
+  const phasesByCycle = new Map<string, any[]>();
+  if (activeCycleIds.length > 0) {
+    const { data: allPhases } = await supabase
       .from("cycle_phases")
-      .select("phase_type, name, status, end_date, sort_order")
-      .eq("cycle_id", currentCycleEntry.cycleId)
+      .select("cycle_id, phase_type, name, status, end_date, sort_order")
+      .in("cycle_id", activeCycleIds)
       .order("sort_order");
 
-    if (phases && phases.length > 0) {
-      // Map real phases to progress steps — use actual DB status and deadlines
-      const phaseMap: Record<string, { label: string }> = {
-        goal_setting: { label: "Goal Setting" },
-        self_assessment: { label: "Self-Review" },
-        peer_review: { label: "Peer Review" },
-        manager_review: { label: "Manager Review" },
-        calibration: { label: "Calibration" },
-        communication: { label: "Results" },
-      };
-
-      progressSteps = phases.map((p: any) => ({
-        label: phaseMap[p.phase_type]?.label || p.name || p.phase_type,
-        done: p.status === "completed",
-        active: p.status === "active",
-        deadline: p.end_date,
-      }));
-    } else {
-      // Fallback if no phases configured — use assignment-level data
-      progressSteps = [
-        {
-          label: "Self-Review",
-          done: currentCycleEntry.selfSubmitted,
-          deadline: null,
-        },
-        {
-          label: "Manager Review",
-          done: currentCycleEntry.assignmentStatus === "completed",
-          deadline: currentCycleEntry.endDate,
-        },
-        {
-          label: "Calibration",
-          done: currentCycleEntry.calibratedAt != null,
-          deadline: null,
-        },
-        {
-          label: "Grade",
-          done: currentCycleEntry.gradesReleased,
-          deadline: null,
-        },
-      ];
+    for (const p of (allPhases || [])) {
+      if (!phasesByCycle.has(p.cycle_id)) phasesByCycle.set(p.cycle_id, []);
+      phasesByCycle.get(p.cycle_id)!.push(p);
     }
+  }
+
+  // 7. Build the cycles array
+  const phaseMap: Record<string, { label: string }> = {
+    goal_setting: { label: "Goal Setting" },
+    self_assessment: { label: "Self-Review" },
+    peer_review: { label: "Peer Review" },
+    manager_review: { label: "Manager Review" },
+    calibration: { label: "Calibration" },
+    communication: { label: "Results" },
+  };
+
+  const cycles: CycleData[] = Array.from(cycleMap.values())
+    .sort((a, b) => {
+      // Newest first
+      const da = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const db = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return db - da;
+    })
+    .map((meta) => {
+      const cid = meta.id;
+      const isCurrent = meta.status === "active" || meta.status === "in_review";
+
+      // Grade and rating from the first assignment for this cycle that has them
+      const cycleAssignments = assignmentsByCycle.get(cid) || [];
+      const gradedAssignment = cycleAssignments.find(
+        (a: any) => meta.gradesReleased && (a.final_grade || a.overall_rating)
+      );
+      const grade = gradedAssignment?.final_grade || null;
+      const rating = gradedAssignment?.overall_rating
+        ? Number(gradedAssignment.overall_rating)
+        : null;
+
+      // ── Pending tasks ──
+      const pendingTasks: ActionTask[] = [];
+
+      // Self-review pending
+      for (const a of cycleAssignments) {
+        if (!a.selfSubmitted && !a.cycleEnded && a.status !== "completed") {
+          pendingTasks.push({
+            id: `self-${a.id}`,
+            type: "self-review",
+            label: meta.name,
+            cycleName: meta.name,
+            cycleId: cid,
+            dueDate: meta.reviewDeadline,
+            assignmentId: a.id,
+          });
+        }
+      }
+
+      // Manager reviews pending
+      for (const r of (managerReviewsByCycle.get(cid) || [])) {
+        if (r.status !== "completed") {
+          pendingTasks.push({
+            id: `mgr-${r.id}`,
+            type: "manager-review",
+            label: r.employee?.slack_name || "Unknown",
+            cycleName: meta.name,
+            cycleId: cid,
+            dueDate: null,
+            assignmentId: r.id,
+          });
+        }
+      }
+
+      // Upward reviews pending
+      for (const r of (upwardReviewsByCycle.get(cid) || [])) {
+        if (r.status !== "completed") {
+          pendingTasks.push({
+            id: `upward-${r.id}`,
+            type: "upward-feedback",
+            label: r.employee?.slack_name || "Unknown",
+            cycleName: meta.name,
+            cycleId: cid,
+            dueDate: null,
+            assignmentId: r.id,
+          });
+        }
+      }
+
+      // ── Completed items ──
+      const completedItems: CompletedItem[] = [];
+
+      // Self-review completed
+      for (const a of cycleAssignments) {
+        if (a.selfSubmitted || a.status === "completed") {
+          completedItems.push({
+            id: `done-self-${a.id}`,
+            type: "self",
+            label: meta.name,
+            href: `/dashboard/cycles/${cid}/review/${a.id}`,
+            completedAt: a.updated_at || a.created_at || null,
+          });
+        }
+      }
+
+      // Manager reviews completed
+      for (const r of (managerReviewsByCycle.get(cid) || [])) {
+        if (r.status === "completed") {
+          completedItems.push({
+            id: `done-mgr-${r.id}`,
+            type: "manager-review",
+            label: r.employee?.slack_name || "Unknown",
+            href: `/dashboard/reviews/${r.id}`,
+            completedAt: r.updated_at || r.created_at || null,
+          });
+        }
+      }
+
+      // Upward reviews completed
+      for (const r of (upwardReviewsByCycle.get(cid) || [])) {
+        if (r.status === "completed") {
+          completedItems.push({
+            id: `done-up-${r.id}`,
+            type: "upward",
+            label: r.employee?.slack_name || "Unknown",
+            href: `/dashboard/reviews/${r.id}`,
+            completedAt: r.updated_at || r.created_at || null,
+          });
+        }
+      }
+
+      // ── Competency ratings (aggregate by competency name) ──
+      const cycleRatings = ratingsByCycle.get(cid) || [];
+      const compMap = new Map<string, { sum: number; count: number }>();
+      for (const r of cycleRatings) {
+        if (r.competency?.name && r.rating != null) {
+          const existing = compMap.get(r.competency.name);
+          if (existing) {
+            existing.sum += Number(r.rating);
+            existing.count += 1;
+          } else {
+            compMap.set(r.competency.name, { sum: Number(r.rating), count: 1 });
+          }
+        }
+      }
+      const competencyRatings: CompetencyRating[] = Array.from(compMap.entries()).map(
+        ([name, { sum, count }]) => ({
+          name,
+          rating: Math.round((sum / count) * 10) / 10,
+        })
+      );
+
+      // ── Feedback previews ──
+      const feedbackPreviews: FeedbackPreview[] = cycleRatings
+        .filter((r: any) => r.comment)
+        .map((r: any) => ({
+          reviewerName: r.reviewer?.slack_name || "Unknown",
+          reviewerRole: r.reviewer_role || "peer",
+          comment: r.comment,
+          rating: r.rating != null ? Number(r.rating) : null,
+        }));
+
+      // ── Progress steps (only for active cycles) ──
+      let progressSteps: ProgressStep[] = [];
+      if (isCurrent) {
+        const phases = phasesByCycle.get(cid);
+        if (phases && phases.length > 0) {
+          progressSteps = phases.map((p: any) => ({
+            label: phaseMap[p.phase_type]?.label || p.name || p.phase_type,
+            done: p.status === "completed",
+            active: p.status === "active",
+            deadline: p.end_date,
+          }));
+        } else {
+          // Fallback — derive from assignment data
+          const mainAssignment = cycleAssignments[0];
+          if (mainAssignment) {
+            progressSteps = [
+              {
+                label: "Self-Review",
+                done: mainAssignment.selfSubmitted,
+                deadline: null,
+              },
+              {
+                label: "Manager Review",
+                done: mainAssignment.status === "completed",
+                deadline: meta.endDate,
+              },
+              {
+                label: "Calibration",
+                done: mainAssignment.calibrated_at != null,
+                deadline: null,
+              },
+              {
+                label: "Grade",
+                done: meta.gradesReleased,
+                deadline: null,
+              },
+            ];
+          }
+        }
+      }
+
+      return {
+        cycleId: cid,
+        cycleName: meta.name,
+        cycleStatus: meta.status,
+        startDate: meta.startDate,
+        endDate: meta.endDate,
+        gradesReleased: meta.gradesReleased,
+        isCurrent,
+        grade,
+        rating,
+        pendingTasks,
+        completedItems,
+        competencyRatings,
+        feedbackPreviews,
+        progressSteps,
+      };
+    });
+
+  // 8. Summary hero stats
+  const completedWithGrades = cycles.filter((c) => c.gradesReleased && c.rating != null);
+  const completedCount = completedWithGrades.length;
+  const avgRating =
+    completedCount > 0
+      ? completedWithGrades.reduce((sum, c) => sum + (c.rating ?? 0), 0) / completedCount
+      : null;
+  const latestGrade = cycles.find((c) => c.gradesReleased && c.grade)?.grade ?? null;
+
+  // 9. Auto-expand logic
+  const cyclesWithPending = cycles.filter((c) => c.pendingTasks.length > 0);
+  const autoExpandIds = new Set<string>(
+    cyclesWithPending.length > 0
+      ? cyclesWithPending.map((c) => c.cycleId)
+      : cycles.length > 0
+      ? [cycles[0].cycleId]
+      : []
+  );
+
+  /* ================================================================ */
+  /*  Task 8: JSX                                                     */
+  /* ================================================================ */
+
+  // Border color logic
+  function getBorderColor(cycle: CycleData): string {
+    if (cycle.isCurrent) {
+      const hasOverdue = cycle.pendingTasks.some((t) => {
+        if (!t.dueDate) return false;
+        return isPast(new Date(t.dueDate));
+      });
+      return hasOverdue ? "border-l-amber-500" : "border-l-primary";
+    }
+    return "border-l-emerald-500";
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Performance</h1>
-        <p className="text-sm text-muted-foreground mt-1">Your review cycles, actions, and ratings</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          Performance
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Your performance journey across review cycles
+        </p>
       </div>
 
-      {/* ── Cycle Selector + Progress ── */}
-      {cycleTimeline.length > 0 && (
-        <div className="space-y-4">
-          {/* Cycle filter tabs — newest first, default selected */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {[...cycleTimeline].reverse().map((entry) => {
-              const isSelected = selectedCycleId === entry.cycleId;
-              return (
-                <Link
-                  key={entry.cycleId}
-                  href={`/dashboard/performance?cycle=${entry.cycleId}`}
-                  className={`shrink-0 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent ${
-                    isSelected
-                      ? "border-primary bg-primary/5 font-semibold text-foreground"
-                      : "border-border/60 bg-card text-muted-foreground"
-                  }`}
-                >
-                  <span className="font-semibold">{entry.cycleName}</span>
-                  {entry.grade ? (
-                    <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
-                  ) : entry.isCurrent ? (
-                    <span className="flex items-center gap-1.5">
-                      <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                      <span className="text-muted-foreground">{entry.cycleStatus === "in_review" ? "In Review" : "Active"}</span>
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground/40">—</span>
-                  )}
-                  {entry.rating && (
-                    <span className="text-muted-foreground tabular-nums">{Number(entry.rating).toFixed(1)}</span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+      {/* Summary Hero */}
+      <PerformanceSummaryHero
+        completedCycles={completedCount}
+        avgRating={avgRating}
+        latestGrade={latestGrade}
+        ratingMax={ratingMax}
+      />
 
-          {/* Current cycle progress stepper — Leapsome-inspired full-width bar */}
-          {currentCycleEntry && progressSteps.length > 0 && (
-            <Card className="border-border/60">
-              <CardContent className="py-4 px-5">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-semibold text-foreground">{currentCycleEntry.cycleName}</span>
-                  {currentCycleEntry.endDate && (
-                    <span className="text-xs text-muted-foreground">
-                      Ends {format(new Date(currentCycleEntry.endDate), "MMM d, yyyy")}
-                    </span>
-                  )}
+      {/* Cycle Cards */}
+      {cycles.length > 0 ? (
+        <div className="space-y-3">
+          {cycles.map((cycle) => (
+            <CycleCard
+              key={cycle.cycleId}
+              defaultOpen={autoExpandIds.has(cycle.cycleId)}
+              borderColor={getBorderColor(cycle)}
+              header={
+                <CycleCardHeader cycle={cycle} ratingMax={ratingMax} />
+              }
+            >
+              {cycle.isCurrent && cycle.progressSteps.length > 0 && (
+                <div className="mb-4">
+                  <ProgressStepper steps={cycle.progressSteps} />
                 </div>
-
-                {/* Full-width stepper */}
-                <div className="flex items-start w-full">
-                  {progressSteps.map((step, idx) => {
-                    const isActive = step.active || (!step.done && (idx === 0 || progressSteps[idx - 1].done));
-                    const deadlineDate = step.deadline ? new Date(step.deadline) : null;
-                    const isOverdue = deadlineDate && isPast(deadlineDate) && !step.done;
-
-                    return (
-                      <div key={step.label} className="flex items-start flex-1">
-                        {/* Step column */}
-                        <div className="flex flex-col items-center w-full">
-                          {/* Dot + connector row */}
-                          <div className="flex items-center w-full">
-                            {/* Left connector */}
-                            {idx > 0 && (
-                              <div className={`flex-1 h-0.5 ${
-                                progressSteps[idx - 1].done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
-                              }`} />
-                            )}
-                            {idx === 0 && <div className="flex-1" />}
-
-                            {/* Dot */}
-                            <div
-                              className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${
-                                step.done
-                                  ? "bg-emerald-500 text-white"
-                                  : isActive
-                                  ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {step.done ? (
-                                <Check className="h-3.5 w-3.5" />
-                              ) : (
-                                idx + 1
-                              )}
-                            </div>
-
-                            {/* Right connector */}
-                            {idx < progressSteps.length - 1 && (
-                              <div className={`flex-1 h-0.5 ${
-                                step.done ? "bg-emerald-400 dark:bg-emerald-600" : "bg-border"
-                              }`} />
-                            )}
-                            {idx === progressSteps.length - 1 && <div className="flex-1" />}
-                          </div>
-
-                          {/* Label */}
-                          <span className={`mt-2 text-xs text-center whitespace-nowrap ${
-                            isActive ? "font-semibold text-foreground" : step.done ? "font-medium text-foreground" : "text-muted-foreground"
-                          }`}>
-                            {step.label}
-                          </span>
-
-                          {/* Deadline */}
-                          {deadlineDate && (
-                            <span className={`mt-0.5 text-[11px] text-center ${
-                              isOverdue ? "text-red-500 font-semibold" : "text-muted-foreground/70"
-                            }`}>
-                              {isOverdue ? `Overdue · ${format(deadlineDate, "MMM d")}` : format(deadlineDate, "MMM d")}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              )}
+              <ActionRequiredSection tasks={cycle.pendingTasks} />
+              <CompletedSection items={cycle.completedItems} />
+              <ResultsSection
+                overallRating={cycle.rating}
+                grade={cycle.grade}
+                ratingMax={ratingMax}
+                competencyRatings={cycle.competencyRatings}
+                feedbackPreviews={cycle.feedbackPreviews}
+                gradesReleased={cycle.gradesReleased}
+              />
+            </CycleCard>
+          ))}
         </div>
-      )}
-
-      {/* ═══ TO DO — Pending actions ═══ */}
-      {(filteredSelfReviews.length > 0 || filteredPendingManager.length > 0 || filteredPendingUpward.length > 0) && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <span className="h-5 w-5 rounded bg-amber-100 dark:bg-amber-400/10 flex items-center justify-center">
-              <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-            </span>
-            To Do
-            <Badge className="text-[10px] h-4 px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400 font-medium">
-              {filteredSelfReviews.length + filteredPendingManager.length + filteredPendingUpward.length}
-            </Badge>
-          </h2>
-
-          {/* Self-Review */}
-          {filteredSelfReviews.length > 0 && (
-            <Card className="border-border/60">
-              <CardContent>
-                <div className="divide-y divide-border">
-                  {filteredSelfReviews.map((a: any) => (
-                    <div key={`self-${a.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge className="text-[10px] font-medium text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10">Self-Review</Badge>
-                          <span className="text-sm font-medium text-foreground">
-                            {a.cycle?.name || "Unknown Cycle"}
-                          </span>
-                        </div>
-                        {a.cycle?.review_deadline && (
-                          <p className="text-xs text-muted-foreground/70 mt-0.5">
-                            Due {format(new Date(a.cycle.review_deadline), "MMM d, yyyy")}
-                          </p>
-                        )}
-                      </div>
-                      <Button size="sm" className="text-xs h-8 shrink-0" asChild>
-                        <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
-                          Start <ArrowRight className="h-3 w-3 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Manager Reviews to Give */}
-          {filteredPendingManager.length > 0 && (
-            <Card className="border-border/60">
-              <CardContent>
-                <div className="divide-y divide-border">
-                  {filteredPendingManager.map((review: any) => (
-                    <div key={`mgr-${review.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-medium text-primary">
-                            {review.employee?.slack_name?.[0]?.toUpperCase() || "?"}
-                          </span>
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Badge className="text-[10px] font-medium text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10">Manager Review</Badge>
-                            <span className="text-sm font-medium text-foreground truncate">
-                              {review.employee?.slack_name || "Unknown"}
-                            </span>
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {review.cycle?.name || "Unknown cycle"}
-                          </p>
-                        </div>
-                      </div>
-                      <Button size="sm" className="text-xs h-8 shrink-0" asChild>
-                        <Link href={`/dashboard/reviews/${review.id}`}>
-                          Review <ChevronRight className="h-3 w-3 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Upward Feedback to Give */}
-          {filteredPendingUpward.length > 0 && (
-            <Card className="border-border/60">
-              <CardContent>
-                <div className="divide-y divide-border">
-                  {filteredPendingUpward.map((review: any) => (
-                    <div key={`upward-${review.id}`} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Badge className="text-[10px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">Upward</Badge>
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {review.employee?.slack_name || "Unknown"}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {review.cycle?.name || "Unknown cycle"}
-                        </p>
-                      </div>
-                      <Button size="sm" className="text-xs h-8 shrink-0" asChild>
-                        <Link href={`/dashboard/cycles/${review.cycle?.id}/review/${review.id}`}>
-                          Give Feedback <ChevronRight className="h-3 w-3 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ═══ COMPLETED — What you've already done ═══ */}
-      {(filteredCompletedSelf.length > 0 || filteredManagerReviews.filter((r: any) => r.status === "completed").length > 0 || filteredUpwardReviews.filter((r: any) => r.status === "completed").length > 0) && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <span className="h-5 w-5 rounded bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center">
-              <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-            </span>
-            Completed
-          </h2>
-
-          <Card className="border-border/60">
-            <CardContent>
-              <div className="divide-y divide-border">
-                {filteredCompletedSelf.map((a: any) => (
-                  <div key={`done-self-${a.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
-                    <div className="flex items-center gap-2">
-                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Self ✓</Badge>
-                      <span className="text-sm text-foreground">{a.cycle?.name || "Unknown"}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">Submitted</span>
-                  </div>
-                ))}
-                {filteredManagerReviews.filter((r: any) => r.status === "completed").map((review: any) => (
-                  <div key={`done-mgr-${review.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
-                    <div className="flex items-center gap-2">
-                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Review ✓</Badge>
-                      <span className="text-sm text-foreground">{review.employee?.slack_name || "Unknown"}</span>
-                    </div>
-                    <Button size="sm" variant="ghost" className="text-xs h-7 shrink-0" asChild>
-                      <Link href={`/dashboard/reviews/${review.id}`}>
-                        View <ChevronRight className="h-3 w-3 ml-0.5" />
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-                {filteredUpwardReviews.filter((r: any) => r.status === "completed").map((review: any) => (
-                  <div key={`done-up-${review.id}`} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4 opacity-70">
-                    <div className="flex items-center gap-2">
-                      <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">Upward ✓</Badge>
-                      <span className="text-sm text-foreground">{review.employee?.slack_name || "Unknown"}</span>
-                    </div>
-                    <Button size="sm" variant="ghost" className="text-xs h-7 shrink-0" asChild>
-                      <Link href={`/dashboard/reviews/${review.id}`}>
-                        View <ChevronRight className="h-3 w-3 ml-0.5" />
-                      </Link>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* ═══ RECEIVED — Ratings & feedback received from others ═══ */}
-
-      {/* ── Review Ratings ── */}
-      {displayRatings.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <span className="h-5 w-5 rounded bg-sky-100 dark:bg-sky-400/10 flex items-center justify-center">
-              <Star className="h-3 w-3 text-sky-600 dark:text-sky-400" />
-            </span>
-            Received
-            <Badge className="text-[10px] h-4 px-1.5 bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-400 font-medium">
-              {displayRatings.length}
-            </Badge>
-          </h2>
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              Review Ratings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-border">
-              {displayRatings.map((item: any) => {
-                const roleConf: Record<string, { label: string; className: string }> = {
-                  self: { label: "Self", className: "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10" },
-                  manager: { label: "Manager", className: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-                  upward: { label: "Upward", className: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-                  peer: { label: "Peer", className: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-                };
-                const rConf = roleConf[item.reviewer_role] || roleConf.peer;
-                const reviewerName = item.reviewer?.slack_name || "Unknown";
-                const employeeName = item.assignment?.employee?.slack_name || "Unknown";
-                const cycleName = item.assignment?.cycle?.name;
-
-                return (
-                  <div key={item.id} className="py-3.5 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {reviewerName}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {employeeName}
-                          </span>
-                          <Badge className={`shrink-0 text-[10px] font-medium ${rConf.className}`}>
-                            {rConf.label}
-                          </Badge>
-                        </div>
-
-                        <div className="flex items-center gap-3 mt-1">
-                          {item.competency?.name && (
-                            <span className="text-xs text-muted-foreground">
-                              {item.competency.name}
-                            </span>
-                          )}
-                          {item.rating && (
-                            <div className="flex items-center gap-0.5">
-                              {Array.from({ length: ratingMax }, (_, i) => i + 1).map((star) => (
-                                <Star
-                                  key={star}
-                                  className={`h-3.5 w-3.5 ${
-                                    star <= item.rating
-                                      ? "fill-yellow-400 text-yellow-400"
-                                      : "text-muted-foreground/20"
-                                  }`}
-                                />
-                              ))}
-                              <span className="ml-1.5 text-xs font-medium text-muted-foreground">{item.rating}/{ratingMax}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {item.comment && (
-                          <p className="text-sm text-muted-foreground mt-1.5 line-clamp-2">
-                            {item.comment}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <p className="text-xs text-muted-foreground">
-                          {item.created_at
-                            ? format(new Date(item.created_at), "MMM d, yyyy")
-                            : "—"}
-                        </p>
-                        {cycleName && (
-                          <p className="text-[10px] text-muted-foreground/60 mt-0.5">
-                            {cycleName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+      ) : (
+        <div className="text-center py-16">
+          <p className="text-muted-foreground text-sm">
+            No review cycles found. When you are added to a performance cycle,
+            it will appear here.
+          </p>
         </div>
       )}
     </div>
