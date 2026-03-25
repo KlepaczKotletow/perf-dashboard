@@ -9,7 +9,14 @@ import { CollapsibleSection, SectionEmptyNote } from "./collapsible-section";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { gradeColor, getQuarterLabel } from "@/lib/status";
 
-export default async function PerformancePage() {
+export default async function PerformancePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cycle?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedCycleId = params.cycle || null;
+
   const workspace = await getUserWorkspace();
   if (!workspace?.appUserId) {
     return (
@@ -140,6 +147,16 @@ export default async function PerformancePage() {
     seenIds.add(r.id);
     return true;
   });
+
+  // When a specific cycle is selected, only show ratings from assignments in that cycle
+  const displayRatings = selectedCycleId
+    ? (() => {
+        const cycleAssignmentIds = (myAssignments || [])
+          .filter((a: any) => a.cycle?.id === selectedCycleId || a.cycle_id === selectedCycleId)
+          .map((a: any) => a.id);
+        return dedupedRatings.filter((r: any) => cycleAssignmentIds.includes(r.assignment_id));
+      })()
+    : dedupedRatings;
 
   const ratingMax = workspace?.ratingScale?.max || 5;
 
@@ -278,34 +295,50 @@ export default async function PerformancePage() {
       {/* ── My Performance ── */}
       {cycleTimeline.length > 0 && (
         <div className="space-y-3">
-          {/* Cycle chips — compact horizontal row */}
+          {/* Cycle chips — compact horizontal row, click to filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
-            {cycleTimeline.map((entry) => (
-              <Link
-                key={entry.id}
-                href={entry.cycleId ? `/dashboard/cycles/${entry.cycleId}` : "#"}
-                className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
-                  entry.isCurrent
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border/60 bg-card"
-                }`}
-              >
-                <span className="font-mono font-medium text-foreground">{entry.quarterLabel}</span>
-                {entry.grade ? (
-                  <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
-                ) : entry.isCurrent ? (
-                  <span className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    <span className="text-muted-foreground">{entry.cycleStatus === "in_review" ? "In Review" : "Active"}</span>
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground/40">—</span>
-                )}
-                {entry.rating && (
-                  <span className="text-muted-foreground tabular-nums">{Number(entry.rating).toFixed(1)}</span>
-                )}
-              </Link>
-            ))}
+            {/* "All" chip to clear filter */}
+            <Link
+              href="/dashboard/performance"
+              className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
+                !selectedCycleId
+                  ? "border-primary/30 bg-primary/5 font-medium"
+                  : "border-border/60 bg-card"
+              }`}
+            >
+              All
+            </Link>
+            {cycleTimeline.map((entry) => {
+              const isSelected = selectedCycleId === entry.cycleId;
+              return (
+                <Link
+                  key={entry.id}
+                  href={`/dashboard/performance?cycle=${entry.cycleId}`}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors hover:bg-accent ${
+                    isSelected
+                      ? "border-primary/30 bg-primary/5 ring-1 ring-primary/20"
+                      : entry.isCurrent
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-border/60 bg-card"
+                  }`}
+                >
+                  <span className="font-mono font-medium text-foreground">{entry.quarterLabel}</span>
+                  {entry.grade ? (
+                    <span className={`font-semibold ${gradeColor(entry.grade)}`}>{entry.grade}</span>
+                  ) : entry.isCurrent ? (
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                      <span className="text-muted-foreground">{entry.cycleStatus === "in_review" ? "In Review" : "Active"}</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground/40">—</span>
+                  )}
+                  {entry.rating && (
+                    <span className="text-muted-foreground tabular-nums">{Number(entry.rating).toFixed(1)}</span>
+                  )}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Current cycle progress — compact inline stepper with deadlines */}
@@ -347,7 +380,7 @@ export default async function PerformancePage() {
                               idx + 1
                             )}
                           </div>
-                          <span className={`text-[10px] leading-tight text-center truncate max-w-[72px] ${
+                          <span className={`text-[10px] leading-tight text-center whitespace-nowrap ${
                             isActive ? "font-medium text-foreground" : step.done ? "text-foreground" : "text-muted-foreground"
                           }`}>
                             {step.label}
@@ -541,19 +574,24 @@ export default async function PerformancePage() {
       </div>
 
       {/* ── Review Ratings ── */}
-      {dedupedRatings.length > 0 && (
+      {displayRatings.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
               Review Ratings
               <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {dedupedRatings.length}
+                {displayRatings.length}
+                {selectedCycleId && (
+                  <span className="ml-1">
+                    — {cycleTimeline.find(c => c.cycleId === selectedCycleId)?.cycleName || "Selected cycle"}
+                  </span>
+                )}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y divide-border">
-              {dedupedRatings.map((item: any) => {
+              {displayRatings.map((item: any) => {
                 const roleConf: Record<string, { label: string; className: string }> = {
                   self: { label: "Self", className: "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10" },
                   manager: { label: "Manager", className: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
