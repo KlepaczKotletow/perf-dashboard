@@ -13,6 +13,7 @@ import { AnalyticsFilterBar } from "./analytics-filter-bar";
 import { AnalyticsTabNav } from "./analytics-tab-nav";
 import { AnalyticsHeatmapDimSwitcher } from "./analytics-heatmap-dim-switcher";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
+import { getHeatmapColor, getHeatmapLegend } from "@/components/charts/heatmap-colors";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,13 +58,8 @@ function getEmployeeTenureBucket(
   return "Not set";
 }
 
-function heatmapCellClass(avg: number | null): string {
-  if (avg === null) return "";
-  if (avg >= 4.5) return "bg-emerald-50 dark:bg-emerald-950/40";
-  if (avg >= 3.5) return "bg-primary/5 dark:bg-primary/10";
-  if (avg >= 2.5) return "bg-amber-50 dark:bg-amber-950/40";
-  return "bg-red-50 dark:bg-red-950/40";
-}
+// Default rating scale fallback (1–5)
+const DEFAULT_RATING_SCALE = { min: 1, max: 5, labels: { "1": "1", "2": "2", "3": "3", "4": "4", "5": "5" } };
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
@@ -565,6 +561,7 @@ export default async function AnalyticsPage({
   const heatmapData = activeTab === "heatmap"
     ? await getHeatmapData(filters, heatmapDim, wsId)
     : null;
+  const ratingScale = workspace?.ratingScale ?? DEFAULT_RATING_SCALE;
 
   return (
     <div className="space-y-8">
@@ -792,7 +789,7 @@ export default async function AnalyticsPage({
                           <td className="sticky left-0 z-10 bg-background px-4 py-2.5 font-medium text-foreground">
                             {comp}
                           </td>
-                          <td className={`px-3 py-2.5 text-center ${heatmapCellClass(allAvg)}`}>
+                          <td className={`px-3 py-2.5 text-center ${getHeatmapColor(allAvg, ratingScale)}`}>
                             {allAvg !== null ? (
                               <>
                                 <div className="font-semibold tabular-nums">{allAvg.toFixed(1)}</div>
@@ -808,7 +805,7 @@ export default async function AnalyticsPage({
                             return (
                               <td
                                 key={group}
-                                className={`px-3 py-2.5 text-center ${heatmapCellClass(avg)}`}
+                                className={`px-3 py-2.5 text-center ${getHeatmapColor(avg, ratingScale)}`}
                               >
                                 {avg !== null ? (
                                   <>
@@ -830,7 +827,7 @@ export default async function AnalyticsPage({
                       <td className="sticky left-0 z-10 bg-muted/30 px-4 py-2.5 font-semibold text-foreground">
                         Overall
                       </td>
-                      <td className={`px-3 py-2.5 text-center ${heatmapCellClass(heatmapData.grandTotal.count > 0 ? heatmapData.grandTotal.sum / heatmapData.grandTotal.count : null)}`}>
+                      <td className={`px-3 py-2.5 text-center ${getHeatmapColor(heatmapData.grandTotal.count > 0 ? heatmapData.grandTotal.sum / heatmapData.grandTotal.count : null, ratingScale)}`}>
                         {heatmapData.grandTotal.count > 0 ? (
                           <>
                             <div className="font-semibold tabular-nums">
@@ -848,7 +845,7 @@ export default async function AnalyticsPage({
                         return (
                           <td
                             key={group}
-                            className={`px-3 py-2.5 text-center ${heatmapCellClass(avg)}`}
+                            className={`px-3 py-2.5 text-center ${getHeatmapColor(avg, ratingScale)}`}
                           >
                             {avg !== null ? (
                               <>
@@ -864,6 +861,15 @@ export default async function AnalyticsPage({
                     </tr>
                   </tbody>
                 </table>
+                <div className="flex items-center gap-3 mt-4 px-4 text-xs text-muted-foreground">
+                  <span>Scale:</span>
+                  {getHeatmapLegend(ratingScale).map((p) => (
+                    <div key={p.value} className="flex items-center gap-1.5">
+                      <div className={`h-4 w-4 rounded ${p.colorClass}`} />
+                      <span>{p.value} — {p.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
