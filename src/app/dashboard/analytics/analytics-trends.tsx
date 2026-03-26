@@ -23,12 +23,12 @@ export function AnalyticsTrends({ data }: { data: TrendsData }) {
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
-        <ChartCard title="Rating Trend" subtitle="Avg overall rating per cycle">
+        <ChartCard title="Rating Trend" subtitle="How average ratings have changed across recent cycles">
           {hasRatingTrend
             ? <AppLineChart data={data.ratingTrend} height={180} valueFormatter={(v) => v.toFixed(1)} />
             : <div className="flex items-center justify-center h-[180px] text-xs text-muted-foreground">Not enough cycles yet</div>}
         </ChartCard>
-        <ChartCard title="Completion Trend" subtitle="Completion % per cycle">
+        <ChartCard title="Completion Trend" subtitle="How review completion rates have changed across recent cycles">
           {hasCompletionTrend
             ? <AppLineChart data={data.completionTrend} height={180} valueFormatter={(v) => `${v}%`} />
             : <div className="flex items-center justify-center h-[180px] text-xs text-muted-foreground">Not enough cycles yet</div>}

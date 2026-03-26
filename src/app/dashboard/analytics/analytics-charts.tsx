@@ -32,28 +32,28 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {/* Rating Distribution */}
-      <ChartCard title="Rating Distribution" subtitle="Across all responses">
+      <ChartCard title="Rating Distribution" subtitle="How ratings are spread across the scale for the selected cycle">
         {hasRatingData
           ? <AppBarChart data={data.ratingDistribution} height={180} layout="vertical" />
           : EMPTY("No ratings yet")}
       </ChartCard>
 
       {/* By Function */}
-      <ChartCard title="By Function" subtitle="Avg rating per job family">
+      <ChartCard title="By Function" subtitle="Average rating per job function — identify strengths and development areas across disciplines">
         {hasFunctionData
           ? <AppBarChart data={data.functionPerformance} height={180} layout="horizontal" valueFormatter={(v) => v.toFixed(1)} />
           : EMPTY("No function data")}
       </ChartCard>
 
       {/* By Department */}
-      <ChartCard title="By Department" subtitle="Avg rating per department">
+      <ChartCard title="By Department" subtitle="Average rating per department for the selected cycle">
         {hasDeptData
           ? <AppBarChart data={data.departmentPerformance} height={180} layout="horizontal" valueFormatter={(v) => v.toFixed(1)} />
           : EMPTY("No department data")}
       </ChartCard>
 
       {/* Competency Breakdown */}
-      <ChartCard title="Competency Breakdown" subtitle="Average by competency (top 8)">
+      <ChartCard title="Competency Breakdown" subtitle="Average rating for each competency — showing organisational strengths and gaps">
         {hasCompetencyData
           ? <AppBarChart data={data.competencyRatings.slice(0, 8)} height={180} layout="horizontal" valueFormatter={(v) => v.toFixed(1)} />
           : EMPTY("No competency data")}
@@ -61,7 +61,7 @@ export function AnalyticsCharts({ data }: AnalyticsChartsProps) {
 
       {/* Goal Progress */}
       {hasGoalData && (
-        <ChartCard title="Goal Progress" subtitle="By tracking status">
+        <ChartCard title="Goal Progress" subtitle="Distribution of goal tracking statuses across the organisation">
           <DonutChart data={data.goalStatusDistribution} height={180} innerRadius={45} outerRadius={65} />
         </ChartCard>
       )}

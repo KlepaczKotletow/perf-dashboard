@@ -599,7 +599,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
-                <p className="text-xs text-muted-foreground">Avg across all competencies</p>
+                <p className="text-xs text-muted-foreground">Average rating across all competencies for the selected cycle</p>
               </div>
             </Card>
 
@@ -610,7 +610,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.completionRate}%</div>
-                <p className="text-xs text-muted-foreground">{analytics.completedAssignments}/{analytics.totalAssignments} assignments</p>
+                <p className="text-xs text-muted-foreground">Percentage of assigned reviews that have been submitted</p>
               </div>
             </Card>
 
@@ -621,7 +621,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.totalRatings}</div>
-                <p className="text-xs text-muted-foreground">Review response ratings</p>
+                <p className="text-xs text-muted-foreground">Number of individual competency ratings submitted</p>
               </div>
             </Card>
 
@@ -632,7 +632,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.participants}</div>
-                <p className="text-xs text-muted-foreground">Employees in scope</p>
+                <p className="text-xs text-muted-foreground">Number of employees with at least one review assignment</p>
               </div>
             </Card>
 
@@ -643,7 +643,7 @@ export default async function AnalyticsPage({
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.cycleStats.active}</div>
-                <p className="text-xs text-muted-foreground">{analytics.cycleStats.total} total</p>
+                <p className="text-xs text-muted-foreground">Number of cycles currently in active or in-review status</p>
               </div>
             </Card>
           </div>
@@ -745,7 +745,7 @@ export default async function AnalyticsPage({
             <div>
               <h2 className="text-lg font-semibold">Competency Heatmap</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Average ratings per competency, grouped by {heatmapDim}
+                Average ratings across competencies, grouped by the selected dimension. Colors reflect your rating scale.
               </p>
             </div>
             <Suspense fallback={null}>
