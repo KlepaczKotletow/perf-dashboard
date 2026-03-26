@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { isHROrAbove } from "@/lib/roles";
@@ -104,9 +104,18 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
             )}
           </div>
         </div>
-        {canManage && survey.status === "active" && (
-          <SurveyActions surveyId={id} workspaceId={workspace!.workspaceId} />
-        )}
+        <div className="flex items-center gap-2">
+          {responses.length > 0 && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={`/api/surveys/${id}/export`} download>
+                <Download className="h-4 w-4 mr-1.5" />Export CSV
+              </a>
+            </Button>
+          )}
+          {canManage && survey.status === "active" && (
+            <SurveyActions surveyId={id} workspaceId={workspace!.workspaceId} />
+          )}
+        </div>
       </div>
 
       {/* Response rate */}

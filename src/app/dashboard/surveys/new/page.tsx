@@ -362,8 +362,32 @@ export default function NewSurveyPage() {
             <>
               {/* Subjects selection */}
               <div className="space-y-2">
-                <Label>Who is being reviewed?</Label>
-                <p className="text-xs text-muted-foreground">Select the people who will receive 360 feedback</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Who is being reviewed?</Label>
+                    <p className="text-xs text-muted-foreground">Select the people who will receive 360 feedback</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={() => setSelectedSubjects(new Set(team.map(u => u.id)))}
+                    >
+                      Select all
+                    </Button>
+                    {selectedSubjects.size > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() => setSelectedSubjects(new Set())}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
                   {team.map(u => (
                     <label key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer">
