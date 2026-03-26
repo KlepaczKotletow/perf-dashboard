@@ -447,10 +447,19 @@ async function handleSurveyLaunch(surveyId: string) {
 
   if (!participants) return { sent: 0, skipped: 0 };
 
+  // Deduplicate by user_id — one notification per person regardless of rater roles
+  const seenUsers = new Set<string>();
+  const uniqueParticipants = participants.filter((p) => {
+    const userId = (p as any).user?.id;
+    if (!userId || seenUsers.has(userId)) return false;
+    seenUsers.add(userId);
+    return true;
+  });
+
   let sent = 0;
   let skipped = 0;
 
-  for (const p of participants) {
+  for (const p of uniqueParticipants) {
     const user = (p as any).user;
     if (!user?.slack_user_id) {
       skipped++;
@@ -1052,12 +1061,58 @@ async function processSurveyReminder(
 }
 
 // =============================================================================
-//  Deno.serve() — CRON_SECRET bearer auth, routes action to handlers
+//  Auth helpers
+// =============================================================================
+
+/**
+ * Validate a Supabase JWT and return the caller's workspace_id.
+ * Uses auth.getUser() for cryptographic verification, then looks up the
+ * workspace via the user's email (email is provider-set, not user-editable).
+ */
+async function resolveCallerWorkspace(
+  token: string,
+): Promise<{ workspaceId: string } | null> {
+  const authClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const {
+    data: { user },
+    error,
+  } = await authClient.auth.getUser(token);
+  if (error || !user?.email) return null;
+
+  const { data: dbUser } = await supabase
+    .from("users")
+    .select("workspace_id")
+    .eq("slack_email", user.email)
+    .single();
+
+  return dbUser ? { workspaceId: dbUser.workspace_id } : null;
+}
+
+/**
+ * Verify that a resource (cycle or survey) belongs to the caller's workspace.
+ */
+async function verifyResourceOwnership(
+  table: "performance_cycles" | "surveys",
+  resourceId: string,
+  callerWorkspaceId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from(table)
+    .select("workspace_id")
+    .eq("id", resourceId)
+    .single();
+
+  return data?.workspace_id === callerWorkspaceId;
+}
+
+// =============================================================================
+//  Deno.serve() — CRON_SECRET or validated JWT auth, routes action to handlers
 // =============================================================================
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -1071,13 +1126,27 @@ Deno.serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Accept either CRON_SECRET or Supabase service role / anon key auth
+  // -------------------------------------------------------------------------
+  //  Authentication: accept CRON_SECRET or a validated Supabase JWT
+  // -------------------------------------------------------------------------
   const cronSecret = Deno.env.get("CRON_SECRET");
   const authHeader = req.headers.get("authorization") || "";
   const hasCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
-  const hasSupabaseAuth = authHeader.startsWith("Bearer ") && authHeader.length > 50;
 
-  if (!hasCronAuth && !hasSupabaseAuth) {
+  // For JWT auth: extract the token and cryptographically verify it
+  let callerWorkspaceId: string | null = null;
+  let hasJwtAuth = false;
+
+  if (!hasCronAuth && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "");
+    const resolved = await resolveCallerWorkspace(token);
+    if (resolved) {
+      callerWorkspaceId = resolved.workspaceId;
+      hasJwtAuth = true;
+    }
+  }
+
+  if (!hasCronAuth && !hasJwtAuth) {
     return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }
 
@@ -1085,21 +1154,68 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, cycle_id, survey_id, mode } = body;
 
-    let result;
-    if (action === "launch_cycle" && cycle_id) {
-      result = await handleCycleLaunch(cycle_id, mode === "missed" ? "missed" : "all");
-    } else if (action === "launch_survey" && survey_id) {
-      result = await handleSurveyLaunch(survey_id);
-    } else if (action === "run_reminders") {
-      result = await handleReminders();
-    } else {
-      return new Response(JSON.stringify({ error: "Unknown action" }), {
-        status: 400,
+    // -----------------------------------------------------------------------
+    //  run_reminders: CRON_SECRET only (iterates all workspaces)
+    // -----------------------------------------------------------------------
+    if (action === "run_reminders") {
+      if (!hasCronAuth) {
+        return new Response(
+          JSON.stringify({ error: "run_reminders requires CRON_SECRET auth" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const result = await handleReminders();
+      return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, ...result }), {
+    // -----------------------------------------------------------------------
+    //  launch_cycle / launch_survey: verify workspace ownership
+    // -----------------------------------------------------------------------
+    if (action === "launch_cycle" && cycle_id) {
+      // JWT callers must own the cycle; CRON_SECRET bypasses (trusted)
+      if (hasJwtAuth) {
+        const owns = await verifyResourceOwnership(
+          "performance_cycles",
+          cycle_id,
+          callerWorkspaceId!,
+        );
+        if (!owns) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden: cycle belongs to another workspace" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+      const result = await handleCycleLaunch(cycle_id, mode === "missed" ? "missed" : "all");
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "launch_survey" && survey_id) {
+      if (hasJwtAuth) {
+        const owns = await verifyResourceOwnership(
+          "surveys",
+          survey_id,
+          callerWorkspaceId!,
+        );
+        if (!owns) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden: survey belongs to another workspace" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+      const result = await handleSurveyLaunch(survey_id);
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: "Unknown action" }), {
+      status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {

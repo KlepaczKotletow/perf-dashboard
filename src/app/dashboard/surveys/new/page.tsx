@@ -30,11 +30,11 @@ const SURVEY_TYPES = [
   { value: "enps" as SurveyType, label: "eNPS", description: "Would you recommend working here?", icon: TrendingUp, color: "border-green-200 bg-green-50" },
 ];
 
-const RATER_GROUPS: { value: RaterGroup; label: string }[] = [
-  { value: "self", label: "Self" },
-  { value: "manager", label: "Manager" },
-  { value: "peer", label: "Peers" },
-  { value: "direct_report", label: "Direct Reports" },
+const RATER_GROUPS: { value: RaterGroup; label: string; description: string }[] = [
+  { value: "self", label: "Self", description: "The person rates themselves" },
+  { value: "manager", label: "Manager", description: "Their direct manager provides feedback" },
+  { value: "peer", label: "Peers", description: "Colleagues at the same level (max 5)" },
+  { value: "direct_report", label: "Direct Reports", description: "People who report to them" },
 ];
 
 export default function NewSurveyPage() {
@@ -328,6 +328,7 @@ export default function NewSurveyPage() {
               </div>
               <div className="space-y-2">
                 <Label>Rater groups</Label>
+                <p className="text-xs text-muted-foreground">Choose who provides feedback for each subject. Each group sees the same questions but rates from their perspective.</p>
                 <div className="flex flex-wrap gap-4">
                   {RATER_GROUPS.map(g => (
                     <label key={g.value} className="flex items-center gap-2 cursor-pointer">
@@ -341,7 +342,10 @@ export default function NewSurveyPage() {
                           });
                         }}
                       />
-                      <span className="text-sm">{g.label}</span>
+                      <div>
+                        <span className="text-sm">{g.label}</span>
+                        <p className="text-[11px] text-muted-foreground leading-tight">{g.description}</p>
+                      </div>
                     </label>
                   ))}
                 </div>
