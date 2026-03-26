@@ -42,14 +42,19 @@ interface HeatmapData {
 
 // ─── Heatmap helpers ──────────────────────────────────────────────────────────
 
-function getTenureBucket(startDate: string | null | undefined): string {
-  if (!startDate) return "Unknown";
+function getEmployeeTenureBucket(
+  startDate: string | null | undefined,
+  buckets: { min_months: number; max_months: number | null; label: string }[]
+): string {
+  if (!startDate) return "Not set";
   const ms = Date.now() - new Date(startDate).getTime();
-  const years = ms / (1000 * 60 * 60 * 24 * 365.25);
-  if (years < 1) return "< 1yr";
-  if (years < 2) return "1–2yr";
-  if (years < 5) return "2–5yr";
-  return "5yr+";
+  const months = ms / (1000 * 60 * 60 * 24 * 30.44);
+  for (const b of buckets) {
+    if (months >= b.min_months && (b.max_months === null || months < b.max_months)) {
+      return b.label;
+    }
+  }
+  return "Not set";
 }
 
 function heatmapCellClass(avg: number | null): string {
@@ -397,6 +402,17 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
 async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceId: string | undefined): Promise<HeatmapData> {
   const supabase = await createServerSupabaseClient();
 
+  // Fetch configurable tenure buckets if needed
+  let tenureBuckets: { label: string; min_months: number; max_months: number | null; sort_order: number }[] = [];
+  if (dim === "tenure" && workspaceId) {
+    const { data: tb } = await supabase
+      .from("tenure_buckets")
+      .select("label, min_months, max_months, sort_order")
+      .eq("workspace_id", workspaceId)
+      .order("sort_order");
+    tenureBuckets = tb || [];
+  }
+
   // 1. Fetch users with dimension fields
   let heatmapUsersQ = supabase
     .from("users")
@@ -417,7 +433,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
         if (dim === "role") groupValue = u.role || "Unknown";
         else if (dim === "department") groupValue = u.department || "Unknown";
         else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
-        else groupValue = getTenureBucket(u.start_date);
+        else groupValue = getEmployeeTenureBucket(u.start_date, tenureBuckets);
         return [u.id as string, groupValue];
       })
   );
