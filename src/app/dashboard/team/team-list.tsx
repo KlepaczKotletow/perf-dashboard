@@ -17,6 +17,7 @@ interface TeamUser {
   department: string | null;
   role: string | null;
   hire_date?: string | null;
+  employee_status?: string | null;
   is_department_head?: boolean;
   manager: { slack_name: string } | null;
   level: { name: string; grade: string | null; job_family: { name: string } | null } | null;
@@ -208,6 +209,15 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                   {user.is_department_head && (
                     <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10 shrink-0">
                       Head
+                    </Badge>
+                  )}
+                  {user.employee_status && user.employee_status !== "active" && (
+                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-medium shrink-0 ${
+                      user.employee_status === "onboarding" ? "text-sky-600 border-sky-200 bg-sky-50 dark:text-sky-400 dark:border-sky-400/20 dark:bg-sky-400/10" :
+                      user.employee_status === "inactive" ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-400/20 dark:bg-amber-400/10" :
+                      "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-400/20 dark:bg-red-400/10"
+                    }`}>
+                      {user.employee_status === "onboarding" ? "Onboarding" : user.employee_status === "inactive" ? "Inactive" : "Deactivated"}
                     </Badge>
                   )}
                 </div>

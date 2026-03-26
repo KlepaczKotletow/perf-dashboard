@@ -24,7 +24,15 @@ interface UserData {
   hire_date: string | null;
   role: string;
   is_department_head: boolean;
+  employee_status: string;
 }
+
+const EMPLOYEE_STATUSES = [
+  { value: "active", label: "Active", color: "text-emerald-600" },
+  { value: "onboarding", label: "Onboarding", color: "text-sky-600" },
+  { value: "inactive", label: "Inactive", color: "text-amber-600" },
+  { value: "deactivated", label: "Deactivated", color: "text-red-600" },
+];
 
 export default function EditEmployeePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -44,6 +52,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   const [levelId, setLevelId] = useState<string>("");
   const [hireDate, setHireDate] = useState("");
   const [role, setRole] = useState("user");
+  const [employeeStatus, setEmployeeStatus] = useState("active");
   const [isDeptHead, setIsDeptHead] = useState(false);
 
   const supabase = createBrowserClient(
@@ -75,7 +84,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         // Load the user
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role, is_department_head")
+          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role, is_department_head, employee_status")
           .eq("id", id)
           .eq("workspace_id", wsId)
           .single();
@@ -92,6 +101,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setLevelId(userData.level_id || "");
         setHireDate(userData.hire_date || "");
         setRole(userData.role || "user");
+        setEmployeeStatus(userData.employee_status || "active");
         setIsDeptHead(userData.is_department_head || false);
 
         const [{ data: usersData }, { data: levelsData }, { data: familiesData }] = await Promise.all([
@@ -133,7 +143,14 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
 
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      const wsId = authUser?.user_metadata?.workspace_id;
+      if (!authUser?.email) { setError("Not authenticated"); return; }
+      const { data: callerUser } = await supabase
+        .from("users")
+        .select("workspace_id")
+        .eq("slack_email", authUser.email)
+        .single();
+      const wsId = callerUser?.workspace_id;
+      if (!wsId) { setError("Workspace not found"); return; }
 
       const { error: updateError } = await supabase
         .from("users")
@@ -144,6 +161,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           level_id: levelId || null,
           hire_date: hireDate || null,
           role,
+          employee_status: employeeStatus,
           is_department_head: isDeptHead,
         })
         .eq("id", id)
@@ -208,19 +226,35 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           <CardDescription>Update the employee&apos;s role, position, and reporting line</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="role">System Role</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger id="role">
-                <SelectValue placeholder="Select role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="user">User</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="hr">HR</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="role">System Role</Label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Employee</SelectItem>
+                  <SelectItem value="hr">HR</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Employment Status</Label>
+              <Select value={employeeStatus} onValueChange={setEmployeeStatus}>
+                <SelectTrigger id="status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EMPLOYEE_STATUSES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>
+                      <span className={s.color}>{s.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center justify-between rounded-lg border border-border/60 p-3">
