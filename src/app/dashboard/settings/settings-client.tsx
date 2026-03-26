@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase";
 import {
   Building2, Star, Save, Check, Eye, Bell, MessageSquare,
-  Shield, Link2, Upload, X,
+  Shield, Link2, Upload, X, Clock, Plus, Trash2,
 } from "lucide-react";
+import type { TenureBucket } from "@/lib/types";
 
 interface Props {
   workspace: {
@@ -22,13 +23,15 @@ interface Props {
     ratingScale: { min: number; max: number; labels: Record<string, string> };
     installedAt: string | null;
   };
+  tenureBuckets: TenureBucket[];
 }
 
-export function SettingsClient({ workspace }: Props) {
+export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Props) {
   const [teamName, setTeamName] = useState(workspace.teamName);
   const [logoUrl, setLogoUrl] = useState(workspace.logoUrl);
   const [uploading, setUploading] = useState(false);
   const [ratingScale, setRatingScale] = useState(workspace.ratingScale);
+  const [buckets, setBuckets] = useState<TenureBucket[]>(initialBuckets);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +97,24 @@ export function SettingsClient({ workspace }: Props) {
           updated_at: new Date().toISOString(),
         })
         .eq("id", workspace.id);
+
+      // Save tenure buckets: delete all then re-insert
+      await supabase
+        .from("tenure_buckets")
+        .delete()
+        .eq("workspace_id", workspace.id);
+      if (buckets.length > 0) {
+        await supabase.from("tenure_buckets").insert(
+          buckets.map((b, i) => ({
+            workspace_id: workspace.id,
+            label: b.label,
+            min_months: b.min_months,
+            max_months: b.max_months,
+            sort_order: i,
+          }))
+        );
+      }
+
       setRatingScale(clampedScale);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -260,6 +281,107 @@ export function SettingsClient({ workspace }: Props) {
               );
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Tenure Buckets */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Tenure Buckets
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Define how employee tenure is grouped in analytics heatmaps. Based on time since start date.
+          </p>
+
+          <div className="space-y-3">
+            {buckets.map((bucket, idx) => (
+              <div key={idx} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Input
+                    value={bucket.label}
+                    onChange={(e) => {
+                      const updated = [...buckets];
+                      updated[idx] = { ...updated[idx], label: e.target.value };
+                      setBuckets(updated);
+                    }}
+                    placeholder="Label"
+                    className="text-sm"
+                  />
+                </div>
+                <div className="w-24">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={bucket.min_months}
+                    onChange={(e) => {
+                      const updated = [...buckets];
+                      updated[idx] = { ...updated[idx], min_months: parseInt(e.target.value) || 0 };
+                      setBuckets(updated);
+                    }}
+                    placeholder="Min"
+                    className="text-sm"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">to</span>
+                <div className="w-24">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={bucket.max_months ?? ""}
+                    onChange={(e) => {
+                      const updated = [...buckets];
+                      const val = e.target.value === "" ? null : parseInt(e.target.value) || 0;
+                      updated[idx] = { ...updated[idx], max_months: val };
+                      setBuckets(updated);
+                    }}
+                    placeholder="∞"
+                    className="text-sm"
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground w-10">months</span>
+                {buckets.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = buckets.filter((_, i) => i !== idx).map((b, i) => ({ ...b, sort_order: i }));
+                      setBuckets(updated);
+                    }}
+                    className="h-8 w-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              const lastMax = buckets.length > 0 ? (buckets[buckets.length - 1].max_months ?? 0) : 0;
+              setBuckets([
+                ...buckets,
+                {
+                  id: crypto.randomUUID(),
+                  workspace_id: workspace.id,
+                  label: "New bucket",
+                  min_months: lastMax,
+                  max_months: null,
+                  sort_order: buckets.length,
+                },
+              ]);
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add bucket
+          </Button>
         </CardContent>
       </Card>
 

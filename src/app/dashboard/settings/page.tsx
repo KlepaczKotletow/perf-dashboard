@@ -16,6 +16,12 @@ export default async function SettingsPage() {
     .eq("id", workspace.workspaceId)
     .single();
 
+  const { data: tenureBuckets } = await supabase
+    .from("tenure_buckets")
+    .select("*")
+    .eq("workspace_id", workspace.workspaceId)
+    .order("sort_order");
+
   return (
     <SettingsClient
       workspace={{
@@ -26,6 +32,7 @@ export default async function SettingsPage() {
         ratingScale: wsData?.rating_scale || { min: 1, max: 5, labels: { "1": "Needs improvement", "2": "Below expectations", "3": "Meets expectations", "4": "Exceeds expectations", "5": "Exceptional" } },
         installedAt: wsData?.installed_at || null,
       }}
+      tenureBuckets={tenureBuckets || []}
     />
   );
 }
