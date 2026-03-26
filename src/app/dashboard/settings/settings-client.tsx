@@ -78,16 +78,23 @@ export function SettingsClient({ workspace }: Props) {
     setSaving(true);
     setSaved(false);
     try {
+      // Clamp scale: min >= 1, max <= 7 (Slack button limit)
+      const clampedScale = {
+        ...ratingScale,
+        min: Math.max(1, Math.min(ratingScale.min, 6)),
+        max: Math.min(7, Math.max(ratingScale.max, ratingScale.min + 1)),
+      };
       const supabase = createClient();
       await supabase
         .from("workspaces")
         .update({
           team_name: teamName,
           logo_url: logoUrl,
-          rating_scale: ratingScale,
+          rating_scale: clampedScale,
           updated_at: new Date().toISOString(),
         })
         .eq("id", workspace.id);
+      setRatingScale(clampedScale);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -207,7 +214,7 @@ export function SettingsClient({ workspace }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
-            This scale is used across all performance reviews — both on the web dashboard and in Slack via Nami bot.
+            This scale is used across all performance reviews — both on the web dashboard and in Slack via Nami bot. Maximum is 7 (Slack button limit).
           </p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -227,7 +234,7 @@ export function SettingsClient({ workspace }: Props) {
                 id="scaleMax"
                 type="number"
                 min={ratingScale.min + 1}
-                max={10}
+                max={7}
                 value={ratingScale.max}
                 onChange={(e) => setRatingScale({ ...ratingScale, max: parseInt(e.target.value) || 5 })}
               />
