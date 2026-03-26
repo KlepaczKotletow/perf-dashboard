@@ -2,7 +2,7 @@ import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-ser
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Plus, ChevronRight, Lock, ClipboardList } from "lucide-react";
+import { Plus, ChevronRight, Lock, ClipboardList, Download } from "lucide-react";
 import { format } from "date-fns";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 
@@ -82,37 +82,61 @@ export default async function SurveysPage() {
         </div>
       ) : (
         <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-          <div className="grid grid-cols-[1fr_80px_80px_120px_120px_40px] gap-4 px-4 py-2.5 bg-muted/40">
+          <div className="grid grid-cols-[1fr_70px_70px_1fr_100px_70px_32px] gap-3 px-4 py-2.5 bg-muted/40">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</span>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</span>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Responses</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Response rate</span>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Closes</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export</span>
             <span />
           </div>
           {surveys.map((survey) => {
             const total = survey.totalParticipants;
             const completed = survey.completedParticipants;
+            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
             return (
-              <Link
+              <div
                 key={survey.id}
-                href={`/dashboard/surveys/${survey.id}`}
-                aria-label={`${survey.name} — ${TYPE_LABELS[survey.type] || survey.type} survey, ${survey.status}`}
-                className="grid grid-cols-[1fr_80px_80px_120px_120px_40px] gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors items-center"
+                className="grid grid-cols-[1fr_70px_70px_1fr_100px_70px_32px] gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors items-center"
               >
-                <span className="text-sm font-medium text-foreground truncate">{survey.name}</span>
+                <Link href={`/dashboard/surveys/${survey.id}`} className="text-sm font-medium text-foreground truncate hover:underline">
+                  {survey.name}
+                </Link>
                 <Badge variant="outline" className={`text-xs w-fit ${TYPE_COLORS[survey.type] || ""}`}>
                   {TYPE_LABELS[survey.type] || survey.type}
                 </Badge>
                 <Badge variant="outline" className={`text-xs w-fit capitalize ${STATUS_COLORS[survey.status] || ""}`}>
                   {survey.status}
                 </Badge>
-                <span className="text-sm text-muted-foreground">{completed}/{total} responded</span>
-                <span className="text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${rate === 100 ? "bg-emerald-500" : "bg-primary"}`}
+                      style={{ width: `${rate}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{completed}/{total} ({rate}%)</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
                   {survey.closes_at ? format(new Date(survey.closes_at), "MMM d, yyyy") : "—"}
                 </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              </Link>
+                <div>
+                  {completed > 0 && (
+                    <a
+                      href={`/api/surveys/${survey.id}/export`}
+                      download
+                      className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted transition-colors"
+                      title="Export CSV"
+                    >
+                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
+                    </a>
+                  )}
+                </div>
+                <Link href={`/dashboard/surveys/${survey.id}`}>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                </Link>
+              </div>
             );
           })}
         </div>
