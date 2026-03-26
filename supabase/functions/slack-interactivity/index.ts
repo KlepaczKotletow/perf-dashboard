@@ -642,6 +642,12 @@ Deno.serve(async (req) => {
         const reviewer = await getOrCreateUser(workspaceId || ws.id, payload.user.id, botToken);
         if (!reviewer) return json({ response_action: "clear" });
 
+        // Check if already submitted (avoid duplicates)
+        const alreadySubmitted = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${reviewer.id}&reviewer_role=eq.${reviewRole || "manager"}&select=id&limit=1`);
+        if (alreadySubmitted && alreadySubmitted.length > 0 && !alreadySubmitted.error) {
+          return json({ response_action: "errors", errors: { comment_block: "This review has already been submitted." } });
+        }
+
         const ratings: { competencyId: string; rating: number }[] = [];
         for (const cId of (competencyIds || [])) {
           const val = vals[`comp_${cId}`]?.rating?.selected_option?.value;
@@ -948,6 +954,17 @@ Deno.serve(async (req) => {
         let reviewRole = "manager";
         if (user.id === assignment.employee_id) reviewRole = "self";
         if (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id) reviewRole = "upward";
+
+        // Check if already submitted (via web or Slack)
+        const existing = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        if (existing && existing.length > 0 && !existing.error) {
+          await slackApi(botToken, "chat.postEphemeral", {
+            channel: payload.channel?.id || payload.user.id,
+            user: payload.user.id,
+            text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
+          });
+          return json({});
+        }
 
         // WS3: Send manager context before opening the form
         if (reviewRole === "manager" && assignment.cycle_id) {
@@ -1363,6 +1380,16 @@ Deno.serve(async (req) => {
         if (rolePrefix === "self" || user.id === assignment.employee_id) reviewRole = "self";
         if (rolePrefix === "upward" || (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id)) reviewRole = "upward";
 
+        // Check if already submitted (via web or Slack)
+        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        if (existingResp && existingResp.length > 0 && !existingResp.error) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
+          });
+          return json({});
+        }
+
         // WS3: Send manager context before starting review
         if (reviewRole === "manager" && assignment.cycle_id) {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
@@ -1637,6 +1664,17 @@ Deno.serve(async (req) => {
         const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
+
+        // Check if already submitted (e.g. via web while Slack flow was in progress)
+        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${conv.assignment_id}&reviewer_id=eq.${conv.user_id}&reviewer_role=eq.${conv.review_role}&select=id&limit=1`);
+        if (alreadyDone && alreadyDone.length > 0 && !alreadyDone.error) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: "⚠️ This review was already submitted (possibly via the dashboard). Your Slack responses were not saved to avoid duplicates.",
+          });
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, { status: "expired" });
+          return json({});
+        }
 
         // Mark as completed
         await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
