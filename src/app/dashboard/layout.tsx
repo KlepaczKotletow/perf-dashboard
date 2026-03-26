@@ -112,18 +112,18 @@ export default async function DashboardLayout({
       {/* Sidebar — wrapped in SidebarWrapper for mobile drawer behaviour */}
       <SidebarWrapper>
         {/* Logo */}
-        <div className="h-14 flex items-center px-4 border-b border-sidebar-border">
-          <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+        <div className="h-[52px] flex items-center px-4 border-b border-sidebar-border">
+          <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
             {workspace?.logoUrl ? (
-              <img src={workspace.logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover shrink-0" />
+              <img src={workspace.logoUrl} alt="" className="h-7 w-7 rounded-md object-cover shrink-0" />
             ) : (
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                <span className="text-primary-foreground text-sm font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
+              <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center shrink-0">
+                <span className="text-primary-foreground text-xs font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
               </div>
             )}
-            <div className="min-w-0 leading-tight">
-              <span className="font-semibold text-sm text-sidebar-foreground tracking-tight block truncate">{workspace?.workspaceName || "Nami"}</span>
-              <span className="text-[9px] text-muted-foreground/50 italic" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
+            <div className="min-w-0">
+              <span className="font-semibold text-[13px] text-sidebar-foreground tracking-tight block truncate leading-none">{workspace?.workspaceName || "Nami"}</span>
+              <span className="text-[9px] text-muted-foreground/50 italic leading-none mt-0.5 block" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
             </div>
           </Link>
         </div>

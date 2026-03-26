@@ -46,7 +46,7 @@ export function SettingsClient({ workspace }: Props) {
     }));
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
@@ -54,29 +54,24 @@ export function SettingsClient({ workspace }: Props) {
       return;
     }
     setUploading(true);
-    try {
-      const supabase = createClient();
-      const ext = file.name.split(".").pop() || "png";
-      const path = `logos/${workspace.id}.${ext}`;
-      const { error: uploadError } = await supabase.storage
-        .from("workspace-assets")
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadError) {
-        // If bucket doesn't exist, store as data URL fallback
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-          const dataUrl = ev.target?.result as string;
-          setLogoUrl(dataUrl);
-        };
-        reader.readAsDataURL(file);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
-      setLogoUrl(urlData.publicUrl + "?t=" + Date.now());
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    // Resize to 128x128 and convert to small data URL
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, 128, 128);
+        const dataUrl = canvas.toDataURL("image/png", 0.8);
+        setLogoUrl(dataUrl);
+        setUploading(false);
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleSave = async () => {
