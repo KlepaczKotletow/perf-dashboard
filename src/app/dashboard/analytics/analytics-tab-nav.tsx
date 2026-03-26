@@ -4,11 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-type Tab = "overview" | "heatmap";
+type Tab = "overview" | "heatmap" | "cycles";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "heatmap", label: "Heatmap" },
+  { id: "cycles", label: "Cycles" },
 ];
 
 interface AnalyticsTabNavProps {

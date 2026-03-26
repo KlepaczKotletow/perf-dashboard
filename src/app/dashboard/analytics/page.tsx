@@ -13,6 +13,7 @@ import { AnalyticsBreakdowns } from "./analytics-breakdowns";
 import { AnalyticsFilterBar } from "./analytics-filter-bar";
 import { AnalyticsTabNav } from "./analytics-tab-nav";
 import { AnalyticsHeatmapDimSwitcher } from "./analytics-heatmap-dim-switcher";
+import { AnalyticsCycles } from "./analytics-cycles";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
 import { getHeatmapColor, getHeatmapLegend } from "@/components/charts/heatmap-colors";
 
@@ -581,6 +582,228 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   };
 }
 
+// ─── Cycles comparison types ─────────────────────────────────────────────────
+
+export interface CycleRow {
+  id: string;
+  name: string;
+  status: string;
+  startDate: string | null;
+  endDate: string | null;
+  completionRate: number;
+  avgRating: number | null;
+  participants: number;
+}
+
+export interface BreakdownRow {
+  name: string;
+  completionRate: number;
+  avgRating: number | null;
+}
+
+export interface ManagerBreakdownRow {
+  managerName: string;
+  managerId: string;
+  completionRate: number;
+  avgRating: number | null;
+}
+
+export interface ManagerRankRow {
+  name: string;
+  completionRate: number;
+}
+
+export interface CyclesComparisonData {
+  cycles: CycleRow[];
+  byDepartment: Record<string, BreakdownRow[]>;
+  byFunction: Record<string, BreakdownRow[]>;
+  byManager: Record<string, ManagerBreakdownRow[]>;
+  topManagers: ManagerRankRow[];
+  bottomManagers: ManagerRankRow[];
+  hasMore: boolean;
+  allManagers: { id: string; name: string }[];
+}
+
+// ─── Cycles comparison data fetching ─────────────────────────────────────────
+
+async function getCyclesComparisonData(workspaceId: string | undefined, showAll: boolean): Promise<CyclesComparisonData> {
+  const supabase = await createServerSupabaseClient();
+
+  // 1. Fetch cycles
+  let cyclesQ = supabase
+    .from("performance_cycles")
+    .select("id, name, status, start_date, end_date")
+    .in("status", ["active", "in_review", "completed", "closed"])
+    .order("start_date", { ascending: false });
+  if (workspaceId) cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+  if (!showAll) cyclesQ = cyclesQ.limit(4);
+
+  const { data: cyclesRaw, error: cyclesErr } = await cyclesQ;
+  if (cyclesErr) console.error("Failed to fetch cycles comparison:", cyclesErr.message);
+
+  // Check if there are more cycles beyond the 4 shown
+  let hasMore = false;
+  if (!showAll) {
+    let countQ = supabase
+      .from("performance_cycles")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["active", "in_review", "completed", "closed"]);
+    if (workspaceId) countQ = countQ.eq("workspace_id", workspaceId);
+    const { count } = await countQ;
+    hasMore = (count || 0) > 4;
+  }
+
+  const allCycles = cyclesRaw || [];
+  if (allCycles.length === 0) {
+    return { cycles: [], byDepartment: {}, byFunction: {}, byManager: {}, topManagers: [], bottomManagers: [], hasMore: false, allManagers: [] };
+  }
+
+  const cycleIds = allCycles.map((c: any) => c.id);
+
+  // 2. Fetch all assignments for these cycles
+  const { data: assignmentsRaw, error: assignmentsErr } = await supabase
+    .from("review_assignments")
+    .select("id, status, employee_id, cycle_id, overall_rating")
+    .in("cycle_id", cycleIds);
+  if (assignmentsErr) console.error("Failed to fetch cycles assignments:", assignmentsErr.message);
+  const assignments = assignmentsRaw || [];
+
+  // 3. Fetch users with department, job_family (via level), and manager info
+  let usersQ = supabase
+    .from("users")
+    .select("id, department, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family:job_families(name))");
+  if (workspaceId) usersQ = usersQ.eq("workspace_id", workspaceId);
+  const { data: usersRaw, error: usersErr } = await usersQ;
+  if (usersErr) console.error("Failed to fetch cycles users:", usersErr.message);
+  const allUsers = usersRaw || [];
+  const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
+
+  // Build cycle rows
+  const cycleRows: CycleRow[] = allCycles.map((c: any) => {
+    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === c.id);
+    const total = cycleAssignments.length;
+    const completed = cycleAssignments.filter((a: any) => a.status === "completed").length;
+    const rated = cycleAssignments.filter((a: any) => a.overall_rating != null);
+    const avgRating = rated.length > 0
+      ? parseFloat((rated.reduce((sum: number, a: any) => sum + (a.overall_rating as number), 0) / rated.length).toFixed(2))
+      : null;
+    const participants = new Set(cycleAssignments.map((a: any) => a.employee_id)).size;
+
+    return {
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      startDate: c.start_date,
+      endDate: c.end_date,
+      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      avgRating,
+      participants,
+    };
+  });
+
+  // 4. Compute breakdowns by department
+  const byDepartment: Record<string, BreakdownRow[]> = {};
+  for (const cycleId of cycleIds) {
+    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const deptGroups = new Map<string, { completed: number; total: number; ratings: number[] }>();
+    for (const a of cycleAssignments) {
+      const emp = userMap.get(a.employee_id);
+      const dept = (emp as any)?.department || "Unknown";
+      const g = deptGroups.get(dept) || { completed: 0, total: 0, ratings: [] };
+      g.total++;
+      if (a.status === "completed") g.completed++;
+      if (a.overall_rating != null) g.ratings.push(a.overall_rating as number);
+      deptGroups.set(dept, g);
+    }
+    byDepartment[cycleId] = [...deptGroups.entries()]
+      .map(([name, g]) => ({
+        name,
+        completionRate: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0,
+        avgRating: g.ratings.length > 0 ? parseFloat((g.ratings.reduce((a, b) => a + b, 0) / g.ratings.length).toFixed(2)) : null,
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate);
+  }
+
+  // 5. Compute breakdowns by function (job_family)
+  const byFunction: Record<string, BreakdownRow[]> = {};
+  for (const cycleId of cycleIds) {
+    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const funcGroups = new Map<string, { completed: number; total: number; ratings: number[] }>();
+    for (const a of cycleAssignments) {
+      const emp = userMap.get(a.employee_id);
+      const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
+      const g = funcGroups.get(funcName) || { completed: 0, total: 0, ratings: [] };
+      g.total++;
+      if (a.status === "completed") g.completed++;
+      if (a.overall_rating != null) g.ratings.push(a.overall_rating as number);
+      funcGroups.set(funcName, g);
+    }
+    byFunction[cycleId] = [...funcGroups.entries()]
+      .map(([name, g]) => ({
+        name,
+        completionRate: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0,
+        avgRating: g.ratings.length > 0 ? parseFloat((g.ratings.reduce((a, b) => a + b, 0) / g.ratings.length).toFixed(2)) : null,
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate);
+  }
+
+  // 6. Compute breakdowns by manager
+  const byManager: Record<string, ManagerBreakdownRow[]> = {};
+  const managerIdSet = new Set<string>();
+  for (const cycleId of cycleIds) {
+    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const mgrGroups = new Map<string, { managerId: string; managerName: string; completed: number; total: number; ratings: number[] }>();
+    for (const a of cycleAssignments) {
+      const emp = userMap.get(a.employee_id);
+      const managerId = (emp as any)?.manager_id;
+      if (!managerId) continue;
+      const mgr = userMap.get(managerId);
+      const managerName = (mgr as any)?.slack_name || "Unknown";
+      managerIdSet.add(managerId);
+      const g = mgrGroups.get(managerId) || { managerId, managerName, completed: 0, total: 0, ratings: [] as number[] };
+      g.total++;
+      if (a.status === "completed") g.completed++;
+      if (a.overall_rating != null) g.ratings.push(a.overall_rating as number);
+      mgrGroups.set(managerId, g);
+    }
+    byManager[cycleId] = [...mgrGroups.values()]
+      .map((g) => ({
+        managerName: g.managerName,
+        managerId: g.managerId,
+        completionRate: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0,
+        avgRating: g.ratings.length > 0 ? parseFloat((g.ratings.reduce((a, b) => a + b, 0) / g.ratings.length).toFixed(2)) : null,
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate);
+  }
+
+  // All managers for dropdown
+  const allManagers = [...managerIdSet].map((id) => {
+    const mgr = userMap.get(id);
+    return { id, name: (mgr as any)?.slack_name || "Unknown" };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+
+  // 7. Top/bottom 5 managers by current (most recent) cycle completion
+  const currentCycleId = cycleIds[0]; // most recent
+  const currentManagerData = byManager[currentCycleId] || [];
+  const sortedByCompletion = [...currentManagerData].sort((a, b) => b.completionRate - a.completionRate);
+  const topManagers: ManagerRankRow[] = sortedByCompletion.slice(0, 5).map((m) => ({ name: m.managerName, completionRate: m.completionRate }));
+  const bottomManagers: ManagerRankRow[] = [...currentManagerData]
+    .sort((a, b) => a.completionRate - b.completionRate)
+    .slice(0, 5)
+    .map((m) => ({ name: m.managerName, completionRate: m.completionRate }));
+
+  return {
+    cycles: cycleRows,
+    byDepartment,
+    byFunction,
+    byManager,
+    topManagers,
+    bottomManagers,
+    hasMore,
+    allManagers,
+  };
+}
+
 // ─── Performance tier helper ──────────────────────────────────────────────────
 
 function getPerformanceTier(avgRating: number): { label: string; color: string } {
@@ -595,7 +818,7 @@ function getPerformanceTier(avgRating: number): { label: string; color: string }
 export default async function AnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cycleId?: string; functionId?: string; department?: string; tab?: string; heatmap_dim?: string }>;
+  searchParams: Promise<{ cycleId?: string; functionId?: string; department?: string; tab?: string; heatmap_dim?: string; showAll?: string }>;
 }) {
   const workspace = await getUserWorkspace();
 
@@ -613,7 +836,8 @@ export default async function AnalyticsPage({
   }
 
   const params = await searchParams;
-  const activeTab = (params.tab === "heatmap" ? "heatmap" : "overview") as "overview" | "heatmap";
+  const activeTab = (params.tab === "heatmap" ? "heatmap" : params.tab === "cycles" ? "cycles" : "overview") as "overview" | "heatmap" | "cycles";
+  const showAllCycles = params.showAll === "true";
   const filters: FilterParams = {
     cycleId: params.cycleId || null,
     functionId: params.functionId || null,
@@ -631,6 +855,9 @@ export default async function AnalyticsPage({
   ]);
   const heatmapData = activeTab === "heatmap"
     ? await getHeatmapData(filters, heatmapDim, wsId)
+    : null;
+  const cyclesData = activeTab === "cycles"
+    ? await getCyclesComparisonData(wsId, showAllCycles)
     : null;
   const ratingScale = workspace?.ratingScale ?? DEFAULT_RATING_SCALE;
 
@@ -836,6 +1063,10 @@ export default async function AnalyticsPage({
           {/* Trends (cross-cycle) */}
           <AnalyticsTrends data={trends} />
         </>
+      )}
+
+      {activeTab === "cycles" && cyclesData && (
+        <AnalyticsCycles data={cyclesData} />
       )}
 
       {activeTab === "heatmap" && heatmapData && (
