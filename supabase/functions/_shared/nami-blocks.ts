@@ -222,16 +222,27 @@ export function buildCompetencyPrompt(
     actionBlocks.push({ type: "actions" as const, elements: buttons.slice(i, i + 5) });
   }
 
-  return [
+  const blocks: any[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `:bar_chart: *${index + 1}/${total}: ${compName}*\n${compDesc}`,
+        text: `:bar_chart: *${index + 1}/${total}: ${compName}*`,
       },
     },
-    ...actionBlocks,
   ];
+
+  if (compDesc) {
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: `📋 _${compDesc}_` }],
+    });
+  }
+
+  blocks.push({ type: "divider" });
+  blocks.push(...actionBlocks);
+
+  return blocks;
 }
 
 // ---------------------------------------------------------------------------

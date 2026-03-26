@@ -16,6 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 interface CompetencyRating {
   competency_id: string;
   name: string;
+  description: string | null;
   category: string | null;
   expected_level: number | null;
   behaviors: string[];
@@ -163,7 +164,7 @@ export default function ReviewFormPage({
           .from("cycle_questions")
           .select(`
             id, question_type, competency_id, prompt, sort_order, required,
-            competency:competencies(id, name, category)
+            competency:competencies(id, name, category, description)
           `)
           .eq("cycle_id", cycleId)
           .order("sort_order");
@@ -201,6 +202,7 @@ export default function ReviewFormPage({
               compRatings.push({
                 competency_id: comp.id,
                 name: comp.name,
+                description: comp.description || null,
                 category: comp.category,
                 expected_level: expectedMap[comp.id] ?? null,
                 behaviors: behaviorsMap[comp.id] ?? [],
@@ -259,7 +261,7 @@ export default function ReviewFormPage({
               .from("level_competencies")
               .select(`
                 expected_level, behavioral_indicators,
-                competency:competencies!level_competencies_competency_id_fkey(id, name, category)
+                competency:competencies!level_competencies_competency_id_fkey(id, name, category, description)
               `)
               .eq("level_id", levelId)
               .eq("workspace_id", wsId);
@@ -268,6 +270,7 @@ export default function ReviewFormPage({
               competencyData = levelComps.map((lc: any) => ({
                 competency_id: lc.competency.id,
                 name: lc.competency.name,
+                description: lc.competency.description || null,
                 category: lc.competency.category,
                 expected_level: lc.expected_level,
                 behaviors: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
@@ -280,13 +283,14 @@ export default function ReviewFormPage({
           if (competencyData.length === 0 && wsId) {
             const { data: allComps } = await supabase
               .from("competencies")
-              .select("id, name, category")
+              .select("id, name, category, description")
               .eq("workspace_id", wsId)
               .order("category, name");
 
             competencyData = (allComps || []).map((c: any) => ({
               competency_id: c.id,
               name: c.name,
+              description: c.description || null,
               category: c.category,
               expected_level: null,
               behaviors: [],
@@ -603,14 +607,19 @@ export default function ReviewFormPage({
                 const compIdx = competencies.indexOf(comp);
                 return (
                   <div key={comp.competency_id} className={`space-y-3 ${localIdx > 0 ? "pt-7 border-t border-border/40" : ""}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-[15px] font-medium text-foreground leading-snug">
-                        {comp.name}
-                      </Label>
-                      {comp.expected_level && (
-                        <Badge variant="secondary" className="text-[10px] shrink-0">
-                          Target: {comp.expected_level}/{maxRating}
-                        </Badge>
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-[15px] font-medium text-foreground leading-snug">
+                          {comp.name}
+                        </Label>
+                        {comp.expected_level && (
+                          <Badge variant="secondary" className="text-[10px] shrink-0">
+                            Target: {comp.expected_level}/{maxRating}
+                          </Badge>
+                        )}
+                      </div>
+                      {comp.description && (
+                        <p className="text-sm text-muted-foreground mt-1">{comp.description}</p>
                       )}
                     </div>
                     <BehaviorsPanel
