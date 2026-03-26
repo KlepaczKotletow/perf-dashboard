@@ -71,7 +71,7 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   manager_email: ["manager email", "manager_email", "manager", "reports to", "reports_to", "manager mail", "line manager", "direct manager", "direct manager email"],
   level: ["level", "grade", "seniority", "job level", "career level", "band"],
   role: ["system role", "app role", "role", "access", "permission"],
-  start_date: ["start date", "start_date", "hire date", "hire_date", "date of hire", "joined", "joining date", "date joined", "employment date", "onboarding date"],
+  start_date: ["start date", "start_date", "starting date", "started"],
 };
 
 function matchColumn(header: string): string | null {
