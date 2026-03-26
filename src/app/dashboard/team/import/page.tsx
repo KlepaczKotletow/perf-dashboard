@@ -514,7 +514,7 @@ export default function ImportPage() {
                 <span><strong>manager_email</strong> — Direct manager&apos;s email</span>
                 <span><strong>level</strong> — Level name or grade</span>
                 <span><strong>role</strong> — user, manager, hr, or admin</span>
-                <span><strong>start_date</strong> — Hire/start date (YYYY-MM-DD)</span>
+                <span><strong>start_date</strong> — Starting date (YYYY-MM-DD)</span>
               </div>
             </div>
           </CardContent>
@@ -709,6 +709,9 @@ export default function ImportPage() {
                         )}
                         {row.role && (
                           <Badge variant="outline" className="text-[10px]">role: {row.role}</Badge>
+                        )}
+                        {row.start_date && (
+                          <Badge variant="outline" className="text-[10px]">start: {row.start_date}</Badge>
                         )}
                       </div>
                       {(row.errors.length > 0 || row.warnings.length > 0) && (
