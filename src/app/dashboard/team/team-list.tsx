@@ -224,7 +224,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                     {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}{user.level.name}
                   </p>
                 ) : (
-                  <p className="text-[10px] text-amber-500 dark:text-amber-400">Unassigned</p>
+                  <p className="text-[10px] text-muted-foreground/40 italic">No level</p>
                 )}
               </div>
 
