@@ -14,6 +14,7 @@ import { AnalyticsFilterBar } from "./analytics-filter-bar";
 import { AnalyticsTabNav } from "./analytics-tab-nav";
 import { AnalyticsHeatmapDimSwitcher } from "./analytics-heatmap-dim-switcher";
 import { AnalyticsCycles } from "./analytics-cycles";
+import { AnalyticsExportButton } from "./analytics-export-button";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
 import { getHeatmapColor, getHeatmapLegend } from "@/components/charts/heatmap-colors";
 
@@ -864,11 +865,18 @@ export default async function AnalyticsPage({
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Performance insights for {workspace?.workspaceName || "your workspace"}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Analytics</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Performance insights for {workspace?.workspaceName || "your workspace"}
+          </p>
+        </div>
+        <AnalyticsExportButton
+          cycleId={filters.cycleId || undefined}
+          functionId={filters.functionId || undefined}
+          department={filters.department || undefined}
+        />
       </div>
 
       {/* Tab nav */}
