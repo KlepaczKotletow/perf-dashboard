@@ -21,7 +21,7 @@ interface UserData {
   department: string | null;
   manager_id: string | null;
   level_id: string | null;
-  hire_date: string | null;
+  start_date: string | null;
   role: string;
   is_department_head: boolean;
   employee_status: string;
@@ -84,7 +84,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         // Load the user
         const { data: userData, error: userError } = await supabase
           .from("users")
-          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, hire_date, role, is_department_head, employee_status")
+          .select("id, slack_name, slack_email, job_title, department, manager_id, level_id, start_date, role, is_department_head, employee_status")
           .eq("id", id)
           .eq("workspace_id", wsId)
           .single();
@@ -97,9 +97,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setUser(userData);
         setJobTitle(userData.job_title || "");
         setDepartment(userData.department || "");
-        setManagerId(userData.manager_id || "");
-        setLevelId(userData.level_id || "");
-        setHireDate(userData.hire_date || "");
+        setManagerId(userData.manager_id || "__none__");
+        setLevelId(userData.level_id || "__none__");
+        setHireDate(userData.start_date || "");
         setRole(userData.role || "user");
         setEmployeeStatus(userData.employee_status || "active");
         setIsDeptHead(userData.is_department_head || false);
@@ -157,9 +157,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         .update({
           job_title: jobTitle || null,
           department: department || null,
-          manager_id: managerId || null,
-          level_id: levelId || null,
-          hire_date: hireDate || null,
+          manager_id: managerId === "__none__" ? null : managerId || null,
+          level_id: levelId === "__none__" ? null : levelId || null,
+          start_date: hireDate || null,
           role,
           employee_status: employeeStatus,
           is_department_head: isDeptHead,
@@ -288,7 +288,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
                 <SelectValue placeholder="Select manager" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No Manager</SelectItem>
+                <SelectItem value="__none__">No Manager</SelectItem>
                 {allUsers.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.slack_name}
@@ -302,17 +302,17 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           <div className="space-y-2">
             <Label htmlFor="jobFamily">Function</Label>
             <Select
-              value={jobFamilyId}
+              value={jobFamilyId || "__none__"}
               onValueChange={(val) => {
-                setJobFamilyId(val);
-                setLevelId(""); // reset level when family changes
+                setJobFamilyId(val === "__none__" ? "" : val);
+                setLevelId("__none__"); // reset level when family changes
               }}
             >
               <SelectTrigger id="jobFamily">
                 <SelectValue placeholder="Select function" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No function</SelectItem>
+                <SelectItem value="__none__">No function</SelectItem>
                 {jobFamilies.map((f) => (
                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                 ))}
@@ -328,24 +328,61 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          {/* Level — filtered to selected family */}
+          {/* Level — filtered to selected family, or grouped by function if no family picked */}
           <div className="space-y-2">
             <Label htmlFor="level">Job Level</Label>
-            <Select value={levelId} onValueChange={setLevelId} disabled={!jobFamilyId}>
+            <Select
+              value={levelId || "__none__"}
+              onValueChange={(val) => {
+                setLevelId(val);
+                // Auto-set function from the selected level
+                if (val && val !== "__none__") {
+                  const picked = levels.find((l) => l.id === val);
+                  if (picked) setJobFamilyId(picked.job_family_id);
+                }
+              }}
+            >
               <SelectTrigger id="level">
-                <SelectValue placeholder={jobFamilyId ? "Select level" : "Select a function first"} />
+                <SelectValue placeholder="Select level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No level</SelectItem>
-                {levels
-                  .filter((l) => l.job_family_id === jobFamilyId)
-                  .map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}{l.grade ? ` (${l.grade})` : ""}
-                    </SelectItem>
-                  ))}
+                <SelectItem value="__none__">No level</SelectItem>
+                {jobFamilyId
+                  ? levels
+                      .filter((l) => l.job_family_id === jobFamilyId)
+                      .map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}{l.grade ? ` (${l.grade})` : ""}
+                        </SelectItem>
+                      ))
+                  : /* No function selected: show all levels grouped by function name */
+                    [...new Set(levels.map((l) => l.job_family_name))].sort().map((fname) => (
+                      <div key={fname || "ungrouped"}>
+                        {fname && (
+                          <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                            {fname}
+                          </div>
+                        )}
+                        {levels
+                          .filter((l) => l.job_family_name === fname)
+                          .map((l) => (
+                            <SelectItem key={l.id} value={l.id}>
+                              {fname ? `${l.name}` : l.name}{l.grade ? ` (${l.grade})` : ""}
+                            </SelectItem>
+                          ))}
+                      </div>
+                    ))
+                }
               </SelectContent>
             </Select>
+            {levels.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No levels defined yet.{" "}
+                <Link href="/dashboard/admin/functions" target="_blank" className="text-primary underline underline-offset-2">
+                  Create functions & levels →
+                </Link>
+              </p>
+            )}
           </div>
 
           {/* Informal team label */}

@@ -26,7 +26,7 @@ export interface User {
   job_title: string | null
   department: string | null
   level_id: string | null
-  hire_date: string | null
+  start_date: string | null
   avatar_url: string | null
   is_department_head: boolean
   employee_status: string
@@ -305,6 +305,19 @@ export interface Subscription {
   user_limit: number | null
   created_at: string | null
   updated_at: string | null
+}
+
+// ============================================
+// Tenure Buckets (configurable per workspace)
+// ============================================
+
+export interface TenureBucket {
+  id: string;
+  workspace_id: string;
+  label: string;
+  min_months: number;
+  max_months: number | null;
+  sort_order: number;
 }
 
 // ============================================

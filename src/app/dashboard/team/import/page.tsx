@@ -42,15 +42,14 @@ interface MappedUser {
   department?: string;
   job_title?: string;
   manager_email?: string;
-  level?: string;
   role?: string;
   start_date?: string;
+  avatar_url?: string;
 }
 
 interface ValidatedUser extends MappedUser {
   matchedUserId: string | null;
   matchedManagerId: string | null;
-  matchedLevelId: string | null;
   action: "create" | "update";
   errors: string[];
   warnings: string[];
@@ -71,9 +70,9 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   department: ["department", "dept", "team", "division", "group", "org"],
   job_title: ["job title", "title", "position", "role title", "job_title", "jobtitle"],
   manager_email: ["manager email", "manager_email", "manager", "reports to", "reports_to", "manager mail", "line manager", "direct manager", "direct manager email"],
-  level: ["level", "grade", "seniority", "job level", "career level", "band"],
   role: ["system role", "app role", "role", "access", "permission"],
   start_date: ["start date", "start_date", "starting date", "started"],
+  avatar_url: ["avatar", "avatar_url", "profile picture", "profile_picture", "photo", "photo_url", "picture", "image", "image_url"],
 };
 
 function matchColumn(header: string): string | null {
@@ -94,9 +93,9 @@ const TARGET_FIELDS = [
   { value: "department", label: "Department" },
   { value: "job_title", label: "Job Title" },
   { value: "manager_email", label: "Manager Email" },
-  { value: "level", label: "Level / Grade" },
   { value: "role", label: "System Role" },
   { value: "start_date", label: "Start Date" },
+  { value: "avatar_url", label: "Profile Picture URL" },
 ];
 
 const VALID_ROLES = ["user", "hr", "admin"];
@@ -118,7 +117,6 @@ export default function ImportPage() {
 
   // DB refs
   const [dbUsers, setDbUsers] = useState<any[]>([]);
-  const [dbLevels, setDbLevels] = useState<any[]>([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   const supabase = createBrowserClient(
@@ -135,12 +133,11 @@ export default function ImportPage() {
       const wsId = identity.workspaceId;
       setWorkspaceId(wsId);
 
-      const [{ data: users }, { data: levels }] = await Promise.all([
-        supabase.from("users").select("id, slack_email, slack_name").eq("workspace_id", wsId),
-        supabase.from("levels").select("id, name, grade, job_family:job_families(name)").eq("workspace_id", wsId),
-      ]);
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, slack_email, slack_name")
+        .eq("workspace_id", wsId);
       setDbUsers(users || []);
-      setDbLevels(levels || []);
     }
     load();
   }, []);
@@ -151,10 +148,10 @@ export default function ImportPage() {
 
   function downloadTemplate() {
     const csv = [
-      "name,email,department,job_title,manager_email,level,role,start_date",
-      "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,IC3,user,2023-06-15",
-      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,IC4,user,2022-01-10",
-      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,IC5,user,2024-03-01",
+      "name,email,department,job_title,manager_email,role,start_date,avatar_url",
+      "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,user,2023-06-15,https://example.com/jane.jpg",
+      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,user,2022-01-10,",
+      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,user,2024-03-01,",
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -255,9 +252,9 @@ export default function ImportPage() {
       department: reverseMap["department"] ? (row[reverseMap["department"]] || "").trim() : undefined,
       job_title: reverseMap["job_title"] ? (row[reverseMap["job_title"]] || "").trim() : undefined,
       manager_email: reverseMap["manager_email"] ? (row[reverseMap["manager_email"]] || "").trim().toLowerCase() : undefined,
-      level: reverseMap["level"] ? (row[reverseMap["level"]] || "").trim() : undefined,
       role: reverseMap["role"] ? (row[reverseMap["role"]] || "").trim().toLowerCase() : undefined,
       start_date: reverseMap["start_date"] ? (row[reverseMap["start_date"]] || "").trim() : undefined,
+      avatar_url: reverseMap["avatar_url"] ? (row[reverseMap["avatar_url"]] || "").trim() : undefined,
     }));
 
     // Build email -> user map from DB
@@ -269,21 +266,12 @@ export default function ImportPage() {
     // Build set of emails in this CSV (for same-batch manager resolution)
     const csvEmails = new Set(mapped.map((r) => r.email).filter(Boolean));
 
-    // Build level lookup
-    const levelByName = new Map<string, string>();
-    const levelByGrade = new Map<string, string>();
-    dbLevels.forEach((l: any) => {
-      levelByName.set(l.name.toLowerCase(), l.id);
-      if (l.grade) levelByGrade.set(l.grade.toLowerCase(), l.id);
-    });
-
     // Validate
     const validatedRows: ValidatedUser[] = mapped.map((m) => {
       const errors: string[] = [];
       const warnings: string[] = [];
       let matchedUserId: string | null = null;
       let matchedManagerId: string | null = null;
-      let matchedLevelId: string | null = null;
       let action: "create" | "update" = "create";
 
       // Email match — classify as create or update
@@ -314,26 +302,12 @@ export default function ImportPage() {
         }
       }
 
-      // Level match
-      if (m.level) {
-        const lv = m.level.toLowerCase();
-        const byName = levelByName.get(lv);
-        const byGrade = levelByGrade.get(lv);
-        if (byName) {
-          matchedLevelId = byName;
-        } else if (byGrade) {
-          matchedLevelId = byGrade;
-        } else {
-          warnings.push(`warn:level_missing:Level "${m.level}" not found. Check Functions.`);
-        }
-      }
-
       // Role validation
       if (m.role && !VALID_ROLES.includes(m.role)) {
         warnings.push(`info:role_default:Invalid role "${m.role}", will default to "user"`);
       }
 
-      return { ...m, matchedUserId, matchedManagerId, matchedLevelId, action, errors, warnings };
+      return { ...m, matchedUserId, matchedManagerId, action, errors, warnings };
     });
 
     setValidated(validatedRows);
@@ -368,9 +342,9 @@ export default function ImportPage() {
               department: row.department || undefined,
               job_title: row.job_title || undefined,
               manager_email: row.manager_email || undefined,
-              level_id: row.matchedLevelId || undefined,
               role: row.role && VALID_ROLES.includes(row.role) ? row.role : undefined,
-              hire_date: row.start_date || undefined,
+              start_date: row.start_date || undefined,
+              avatar_url: row.avatar_url || undefined,
             })),
           },
         });
@@ -714,9 +688,6 @@ export default function ImportPage() {
                             manager: {row.matchedManagerId ? "matched" : "in CSV"}
                           </Badge>
                         )}
-                        {row.matchedLevelId && (
-                          <Badge variant="outline" className="text-[10px]">level matched</Badge>
-                        )}
                         {row.role && (
                           <Badge variant="outline" className="text-[10px]">role: {row.role}</Badge>
                         )}
@@ -740,7 +711,6 @@ export default function ImportPage() {
                             const resolutionTips: Record<string, string> = {
                               manager_in_csv: "No action needed — manager will be created first, then linked automatically.",
                               manager_missing: "Options: Add the manager to this CSV, create them manually first, or import without — assign manager later in Directory.",
-                              level_missing: "Options: Go to Functions to create this level first, or import without — assign level later in Directory.",
                               role_default: "Will be imported as regular user. You can change their role later in Directory.",
                             };
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
@@ -13,10 +13,11 @@ interface TeamUser {
   id: string;
   slack_name: string | null;
   slack_email: string | null;
+  avatar_url?: string | null;
   job_title: string | null;
   department: string | null;
   role: string | null;
-  hire_date?: string | null;
+  start_date?: string | null;
   employee_status?: string | null;
   is_department_head?: boolean;
   manager: { slack_name: string } | null;
@@ -34,9 +35,9 @@ interface TeamListProps {
 type SortKey = "name" | "department" | "job_title" | "manager" | "start_date" | "role";
 type SortDir = "asc" | "desc";
 
-function formatTenure(hireDate: string | null | undefined): string {
-  if (!hireDate) return "—";
-  const start = new Date(hireDate);
+function formatTenure(startDate: string | null | undefined): string {
+  if (!startDate) return "—";
+  const start = new Date(startDate);
   const now = new Date();
   const diffMs = now.getTime() - start.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -49,9 +50,9 @@ function formatTenure(hireDate: string | null | undefined): string {
   return rem > 0 ? `${years}y ${rem}mo` : `${years}y`;
 }
 
-function formatStartDate(hireDate: string | null | undefined): string {
-  if (!hireDate) return "";
-  return new Date(hireDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function formatStartDate(startDate: string | null | undefined): string {
+  if (!startDate) return "";
+  return new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned }: TeamListProps) {
@@ -83,8 +84,8 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
           bVal = (b.manager?.slack_name || "zzz").toLowerCase();
           break;
         case "start_date":
-          aVal = a.hire_date || "9999";
-          bVal = b.hire_date || "9999";
+          aVal = a.start_date || "9999";
+          bVal = b.start_date || "9999";
           break;
         case "role":
           aVal = a.role || "user";
@@ -193,6 +194,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
 
             <Link href={`/dashboard/team/${user.id}`} className="shrink-0">
               <Avatar className="h-9 w-9">
+                {user.avatar_url && <AvatarImage src={user.avatar_url} alt={user.slack_name || ""} />}
                 <AvatarFallback className="text-xs bg-primary/[0.08] text-primary font-medium">
                   {getInitials(user.slack_name)}
                 </AvatarFallback>
@@ -226,15 +228,15 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                 </p>
               </Link>
 
-              {/* Department + Level */}
+              {/* Department + Competency bracket */}
               <div className="min-w-0 hidden md:block">
                 <p className="text-xs text-muted-foreground truncate">{user.department || "—"}</p>
                 {user.level ? (
-                  <p className="text-[10px] text-muted-foreground/60 truncate">
+                  <p className="text-[10px] text-primary/50 truncate" title={`${user.level.job_family?.name ? user.level.job_family.name + " · " : ""}${user.level.name}`}>
                     {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}{user.level.name}
                   </p>
                 ) : (
-                  <p className="text-[10px] text-muted-foreground/40 italic">No level</p>
+                  <p className="text-[10px] text-amber-500/70 italic truncate">No competency bracket</p>
                 )}
               </div>
 
@@ -247,10 +249,10 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
 
               {/* Start Date + Tenure */}
               <div className="min-w-0 hidden lg:block">
-                {user.hire_date ? (
+                {user.start_date ? (
                   <>
-                    <p className="text-xs text-muted-foreground">{formatStartDate(user.hire_date)}</p>
-                    <p className="text-[10px] text-muted-foreground/60">{formatTenure(user.hire_date)}</p>
+                    <p className="text-xs text-muted-foreground">{formatStartDate(user.start_date)}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{formatTenure(user.start_date)}</p>
                   </>
                 ) : (
                   <p className="text-xs text-muted-foreground/40">—</p>

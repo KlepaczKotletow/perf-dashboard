@@ -42,9 +42,9 @@ interface HeatmapData {
 
 // ─── Heatmap helpers ──────────────────────────────────────────────────────────
 
-function getTenureBucket(hireDate: string | null | undefined): string {
-  if (!hireDate) return "Unknown";
-  const ms = Date.now() - new Date(hireDate).getTime();
+function getTenureBucket(startDate: string | null | undefined): string {
+  if (!startDate) return "Unknown";
+  const ms = Date.now() - new Date(startDate).getTime();
   const years = ms / (1000 * 60 * 60 * 24 * 365.25);
   if (years < 1) return "< 1yr";
   if (years < 2) return "1–2yr";
@@ -400,7 +400,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   // 1. Fetch users with dimension fields
   let heatmapUsersQ = supabase
     .from("users")
-    .select("id, role, department, hire_date, level:levels!users_level_id_fkey(name, job_family_id)");
+    .select("id, role, department, start_date, level:levels!users_level_id_fkey(name, job_family_id)");
   if (workspaceId) heatmapUsersQ = heatmapUsersQ.eq("workspace_id", workspaceId);
   const { data: usersRaw, error: heatmapUsersErr } = await heatmapUsersQ;
   if (heatmapUsersErr) console.error("Failed to fetch heatmap users:", heatmapUsersErr.message);
@@ -417,7 +417,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
         if (dim === "role") groupValue = u.role || "Unknown";
         else if (dim === "department") groupValue = u.department || "Unknown";
         else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
-        else groupValue = getTenureBucket(u.hire_date);
+        else groupValue = getTenureBucket(u.start_date);
         return [u.id as string, groupValue];
       })
   );
