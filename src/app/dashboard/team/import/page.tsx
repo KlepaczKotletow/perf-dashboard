@@ -155,7 +155,7 @@ export default function ImportPage() {
     const csv = [
       "name,email,department,job_title,manager_email,level,role,start_date",
       "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,IC3,user,2023-06-15",
-      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,IC4,manager,2022-01-10",
+      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,IC4,user,2022-01-10",
       "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,IC5,user,2024-03-01",
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
