@@ -161,15 +161,38 @@ export function buildSurveyOpening(
   questionCount: number,
   participantId: string,
   surveyId: string,
+  role?: string,
+  subjectName?: string,
 ) {
   const estMinutes = Math.max(1, Math.ceil(questionCount * 0.5));
+
+  let roleContext = "";
+  if (role === "self") {
+    roleContext = "\n\n:mirror: This is a *self-review* — reflect on your own performance.";
+  } else if (role === "manager" && subjectName) {
+    roleContext = `\n\n:bust_in_silhouette: You're providing *manager feedback* for *${subjectName}*.`;
+  } else if (role === "direct_report" && subjectName) {
+    roleContext = `\n\n:speech_balloon: You're providing *upward feedback* for *${subjectName}*.`;
+  } else if (role === "peer" && subjectName) {
+    roleContext = `\n\n:handshake: You're providing *peer feedback* for *${subjectName}*.`;
+  }
+
   return [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `Hey ${userName}! :wave:\n\nYou've been invited to take the *${surveyName}* survey.\n\n:clipboard: *${questionCount}* questions \u00b7 ~${estMinutes} min`,
+        text: `Hey ${userName}! :wave:\n\nYou've been invited to take the *${surveyName}* survey.${roleContext}\n\n:clipboard: *${questionCount}* questions \u00b7 ~${estMinutes} min`,
       },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: ":lock: Your responses are confidential and will be aggregated with others.",
+        },
+      ],
     },
     { type: "divider" },
     {

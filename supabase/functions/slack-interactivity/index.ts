@@ -947,8 +947,9 @@ Deno.serve(async (req) => {
           participant_id: participantId,
           subject_user_id: participant?.subject_user_id || null,
           answers,
+          workspace_id: ws.id,
         });
-        await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+        await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
           status: "completed",
           completed_at: new Date().toISOString(),
         });
@@ -1419,8 +1420,9 @@ Deno.serve(async (req) => {
             survey_id: surveyId,
             participant_id: participantId,
             answers: { score, follow_up: followup || "" },
+            workspace_id: ws.id,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -2082,8 +2084,9 @@ Deno.serve(async (req) => {
             participant_id: participantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
+            workspace_id: ws.id,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -2154,8 +2157,9 @@ Deno.serve(async (req) => {
             participant_id: participantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
+            workspace_id: ws.id,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -2218,8 +2222,9 @@ Deno.serve(async (req) => {
             participant_id: participantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
+            workspace_id: ws.id,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}`, {
+          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });

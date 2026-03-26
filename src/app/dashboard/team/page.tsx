@@ -163,8 +163,8 @@ export default async function TeamPage({
               <path d="M12 17h.01"/>
             </svg>
             <span>
-              <strong>{unassignedCount} {unassignedCount === 1 ? "person has" : "people have"} no job level assigned</strong>
-              {" "}— their reviews won&apos;t have a competency baseline.
+              <strong>{unassignedCount} {unassignedCount === 1 ? "person has" : "people have"} no competency bracket</strong>
+              {" "}— assign a Function &amp; Level so their reviews include competency ratings.
             </span>
           </div>
           {filterUnassigned ? (

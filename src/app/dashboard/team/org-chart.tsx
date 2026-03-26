@@ -1,11 +1,18 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
+import { ChevronDown, ChevronRight } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+//  Types
+// ---------------------------------------------------------------------------
 
 interface OrgUser {
   id: string;
   slack_name: string | null;
+  avatar_url?: string | null;
   job_title: string | null;
   department: string | null;
   manager_id: string | null;
@@ -15,17 +22,20 @@ interface OrgNode extends OrgUser {
   children: OrgNode[];
 }
 
+// ---------------------------------------------------------------------------
+//  Tree builder (reused from original — includes cycle detection)
+// ---------------------------------------------------------------------------
+
 function buildTree(users: OrgUser[]): OrgNode[] {
   const map = new Map<string, OrgNode>();
   users.forEach((u) => map.set(u.id, { ...u, children: [] }));
 
-  // Detect cycles: a node is a root if its manager chain would cycle back to itself
   function wouldCycle(nodeId: string, managerId: string): boolean {
     let current: string | null = managerId;
     const visited = new Set<string>();
     while (current) {
       if (current === nodeId) return true;
-      if (visited.has(current)) return true; // cycle not involving nodeId but still a cycle
+      if (visited.has(current)) return true;
       visited.add(current);
       current = map.get(current)?.manager_id ?? null;
     }
@@ -34,59 +44,158 @@ function buildTree(users: OrgUser[]): OrgNode[] {
 
   const roots: OrgNode[] = [];
   map.forEach((node) => {
-    if (node.manager_id && map.has(node.manager_id) && !wouldCycle(node.id, node.manager_id)) {
+    if (
+      node.manager_id &&
+      map.has(node.manager_id) &&
+      !wouldCycle(node.id, node.manager_id)
+    ) {
       map.get(node.manager_id)!.children.push(node);
     } else {
       roots.push(node);
     }
   });
 
+  // Sort children alphabetically
+  function sortChildren(node: OrgNode) {
+    node.children.sort((a, b) =>
+      (a.slack_name || "").localeCompare(b.slack_name || ""),
+    );
+    node.children.forEach(sortChildren);
+  }
+  roots.sort((a, b) => (a.slack_name || "").localeCompare(b.slack_name || ""));
+  roots.forEach(sortChildren);
+
   return roots;
 }
 
+// ---------------------------------------------------------------------------
+//  Helpers
+// ---------------------------------------------------------------------------
+
 function getInitials(name: string | null) {
   if (!name) return "?";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
-function OrgNodeItem({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
+// ---------------------------------------------------------------------------
+//  Node card component
+// ---------------------------------------------------------------------------
+
+function NodeCard({ node }: { node: OrgNode }) {
   return (
-    <div className={depth > 0 ? "ml-8 border-l border-border/60 pl-4" : ""}>
-      <div className="py-1.5">
-        <Link
-          href={`/dashboard/team/${node.id}`}
-          className="inline-flex items-center gap-3 px-3 py-2 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all group"
-        >
-          <Avatar className="h-8 w-8 shrink-0">
-            <AvatarFallback className="text-xs bg-primary/[0.08] text-primary font-medium">
-              {getInitials(node.slack_name)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
-              {node.slack_name || "Unknown"}
-            </p>
-            <p className="text-xs text-muted-foreground truncate">
-              {node.job_title || node.department || "—"}
-            </p>
-          </div>
-          {node.children.length > 0 && (
-            <span className="ml-2 text-[10px] text-muted-foreground/60 shrink-0">
-              {node.children.length} {node.children.length === 1 ? "report" : "reports"}
-            </span>
-          )}
-        </Link>
+    <Link
+      href={`/dashboard/team/${node.id}`}
+      className="flex flex-col items-center gap-1.5 group w-[120px] shrink-0"
+    >
+      <Avatar className="h-12 w-12 ring-2 ring-background shadow-md group-hover:shadow-lg group-hover:ring-primary/20 transition-all">
+        {node.avatar_url && (
+          <AvatarImage src={node.avatar_url} alt={node.slack_name || ""} />
+        )}
+        <AvatarFallback className="text-sm bg-primary/[0.08] text-primary font-semibold">
+          {getInitials(node.slack_name)}
+        </AvatarFallback>
+      </Avatar>
+      <div className="text-center min-w-0 w-full">
+        <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors leading-tight">
+          {node.slack_name || "Unknown"}
+        </p>
+        <p className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+          {node.job_title || "—"}
+        </p>
       </div>
-      {node.children.length > 0 && (
-        <div>
-          {node.children.map((child) => (
-            <OrgNodeItem key={child.id} node={child} depth={depth + 1} />
-          ))}
+    </Link>
+  );
+}
+
+// ---------------------------------------------------------------------------
+//  Tree node with connectors (recursive)
+// ---------------------------------------------------------------------------
+
+const AUTO_COLLAPSE_DEPTH = 3;
+
+function TreeNode({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
+  const hasChildren = node.children.length > 0;
+  const [expanded, setExpanded] = useState(depth < AUTO_COLLAPSE_DEPTH);
+
+  return (
+    <div className="flex flex-col items-center">
+      {/* The card itself */}
+      <div className="relative flex flex-col items-center">
+        <NodeCard node={node} />
+
+        {/* Expand/collapse toggle */}
+        {hasChildren && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              setExpanded((prev) => !prev);
+            }}
+            className="mt-1 flex items-center justify-center h-5 w-5 rounded-full border border-border bg-card shadow-sm hover:bg-muted transition-colors z-10"
+            aria-label={expanded ? "Collapse" : "Expand"}
+          >
+            {expanded ? (
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
+            ) : (
+              <span className="text-[9px] font-medium text-muted-foreground leading-none">
+                {node.children.length}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Children */}
+      {hasChildren && expanded && (
+        <div className="flex flex-col items-center">
+          {/* Vertical line from toggle down to the horizontal rail */}
+          <div className="w-px h-5 bg-border/60" />
+
+          {node.children.length === 1 ? (
+            /* Single child — just a vertical line, no horizontal rail */
+            <TreeNode
+              node={node.children[0]}
+              depth={depth + 1}
+            />
+          ) : (
+            /* Multiple children — horizontal rail + vertical drops */
+            <div className="relative flex items-start">
+              {/* Horizontal rail: spans from first child center to last child center */}
+              <div
+                className="absolute top-0 h-px bg-border/60"
+                style={{
+                  left: "calc(60px)",
+                  right: "calc(60px)",
+                }}
+              />
+
+              <div className="flex gap-2">
+                {node.children.map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex flex-col items-center"
+                  >
+                    {/* Vertical drop from horizontal rail to child */}
+                    <div className="w-px h-5 bg-border/60" />
+                    <TreeNode node={child} depth={depth + 1} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+//  Root export
+// ---------------------------------------------------------------------------
 
 interface OrgChartProps {
   users: OrgUser[];
@@ -104,10 +213,28 @@ export function OrgChart({ users }: OrgChartProps) {
   }
 
   return (
-    <div className="space-y-1">
-      {roots.map((root) => (
-        <OrgNodeItem key={root.id} node={root} />
-      ))}
+    <div className="overflow-x-auto pb-8">
+      <div className="inline-flex flex-col items-center min-w-full px-8 pt-4">
+        {roots.length === 1 ? (
+          <TreeNode node={roots[0]} />
+        ) : (
+          /* Multiple roots — render side by side with shared horizontal rail */
+          <div className="relative flex items-start">
+            <div
+              className="absolute top-[34px] h-px bg-border/60"
+              style={{
+                left: "calc(60px)",
+                right: "calc(60px)",
+              }}
+            />
+            <div className="flex gap-6">
+              {roots.map((root) => (
+                <TreeNode key={root.id} node={root} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

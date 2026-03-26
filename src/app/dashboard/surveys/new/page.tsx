@@ -254,42 +254,42 @@ export default function NewSurveyPage() {
         .single();
       if (surveyErr) throw surveyErr;
 
+      const wsId = userData.workspace_id;
       const participants: any[] = [];
       if (surveyType === "360") {
         const { data: wsUsers } = await supabase
           .from("users")
           .select("id, manager_id")
-          .eq("workspace_id", userData.workspace_id);
+          .eq("workspace_id", wsId);
 
         for (const subjectId of selectedSubjects) {
           const subjectData = wsUsers?.find(u => u.id === subjectId);
 
           // Self-review (always included)
-          participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "self" });
+          participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "self", workspace_id: wsId });
 
           // Manager review (auto from org chart)
           if (subjectData?.manager_id && wsUsers?.some(u => u.id === subjectData.manager_id)) {
-            participants.push({ survey_id: survey.id, user_id: subjectData.manager_id, subject_user_id: subjectId, role: "manager" });
+            participants.push({ survey_id: survey.id, user_id: subjectData.manager_id, subject_user_id: subjectId, role: "manager", workspace_id: wsId });
           }
 
           // Direct report reviews (auto from org chart)
           for (const wu of (wsUsers || [])) {
             if (wu.manager_id === subjectId && wu.id !== subjectId) {
-              participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "direct_report" });
+              participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "direct_report", workspace_id: wsId });
             }
           }
 
           // Subject tracking entry
-          participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "subject" });
+          participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "subject", workspace_id: wsId });
 
           // Peers are NOT assigned here for subject_nominates/manager_nominates modes
           // They'll be assigned via a nomination step after launch
-          // For admin_assigns mode, peers would be assigned here (future: add inline peer picker)
         }
       } else {
-        const { data: wsUsers } = await supabase.from("users").select("id").eq("workspace_id", userData.workspace_id);
+        const { data: wsUsers } = await supabase.from("users").select("id").eq("workspace_id", wsId);
         for (const wu of (wsUsers || [])) {
-          participants.push({ survey_id: survey.id, user_id: wu.id, role: "respondent" });
+          participants.push({ survey_id: survey.id, user_id: wu.id, role: "respondent", workspace_id: wsId });
         }
       }
 
@@ -328,7 +328,7 @@ export default function NewSurveyPage() {
       const wsId = identity?.workspaceId;
 
       await supabase.from("surveys").update({
-        nami_send_at: sendAt, nami_confirmed: true
+        nami_send_at: sendAt, nami_confirmed: true, status: "active"
       }).eq("id", pendingSurveyId).eq("workspace_id", wsId);
 
       if (!sendAt) {
@@ -720,8 +720,12 @@ export default function NewSurveyPage() {
                 className="flex-1">
                 {loading ? "Sending..." : "Confirm & Send"}
               </Button>
-              <Button variant="outline" onClick={() => {
+              <Button variant="outline" onClick={async () => {
                   setShowNamiConfirm(false);
+                  const identity = await getClientIdentity(supabase);
+                  if (identity?.workspaceId) {
+                    await supabase.from("surveys").update({ status: "active" }).eq("id", pendingSurveyId).eq("workspace_id", identity.workspaceId);
+                  }
                   router.push(`/dashboard/surveys/${pendingSurveyId}`);
                 }}
                 className="flex-1">

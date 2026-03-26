@@ -210,38 +210,60 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
         </Select>
       )}
 
-      {/* Set Function & Level — two-step */}
+      {/* Set Function & Level — optional function filter, then level */}
       {action === "function_level" && (
         <>
-          <Select value={selectedFunctionId} onValueChange={(v) => { setSelectedFunctionId(v); setValue(""); }}>
+          <Select value={selectedFunctionId || "__all__"} onValueChange={(v) => { setSelectedFunctionId(v === "__all__" ? "" : v); setValue(""); }}>
             <SelectTrigger className="w-40 h-8 text-xs">
-              <SelectValue placeholder="Function..." />
+              <SelectValue placeholder="Filter by function..." />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__all__">All functions</SelectItem>
               {functions.map((f) => (
                 <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          {selectedFunctionId && (
-            <Select value={value} onValueChange={setValue}>
-              <SelectTrigger className="w-40 h-8 text-xs">
-                <SelectValue placeholder="Level..." />
-              </SelectTrigger>
-              <SelectContent>
-                {functionLevels.length === 0 ? (
-                  <SelectItem value="_none" disabled>No levels configured</SelectItem>
-                ) : (
-                  functionLevels.map((l) => (
+          <Select value={value} onValueChange={(val) => {
+            setValue(val);
+            // Auto-set function filter from selected level
+            if (val && val !== "none") {
+              const picked = levels.find((l) => l.id === val);
+              if (picked?.job_family_id) setSelectedFunctionId(picked.job_family_id);
+            }
+          }}>
+            <SelectTrigger className="w-48 h-8 text-xs">
+              <SelectValue placeholder="Select level..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No level</SelectItem>
+              {selectedFunctionId
+                ? functionLevels.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.name}{l.grade ? ` (${l.grade})` : ""}
                     </SelectItem>
                   ))
-                )}
-              </SelectContent>
-            </Select>
-          )}
+                : /* Show all levels grouped by function */
+                  functions.map((f) => {
+                    const fLevels = levels.filter((l) => l.job_family_id === f.id);
+                    if (fLevels.length === 0) return null;
+                    return (
+                      <div key={f.id}>
+                        <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          {f.name}
+                        </div>
+                        {fLevels.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.name}{l.grade ? ` (${l.grade})` : ""}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    );
+                  })
+              }
+            </SelectContent>
+          </Select>
         </>
       )}
 
@@ -262,7 +284,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
       <Button
         size="sm"
         className="h-8 text-xs"
-        disabled={!action || !value || applying || (action === "function_level" && !selectedFunctionId)}
+        disabled={!action || !value || applying}
         onClick={apply}
       >
         {applying ? (

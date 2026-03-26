@@ -539,6 +539,7 @@ Deno.serve(async (req) => {
               participant_id: participantId,
               subject_user_id: participant?.subject_user_id || null,
               answers,
+              workspace_id: ws.id,
             });
 
             await supabase

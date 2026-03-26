@@ -415,7 +415,7 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
 async function handleSurveyLaunch(surveyId: string) {
   const { data: survey } = await supabase
     .from("surveys")
-    .select("id, name, workspace_id, config, workspaces(bot_token)")
+    .select("id, name, type, workspace_id, config, workspaces(bot_token)")
     .eq("id", surveyId)
     .single();
 
@@ -431,15 +431,18 @@ async function handleSurveyLaunch(surveyId: string) {
   const questions = config.questions || [];
   const questionCount = questions.length;
 
-  // Fetch pending participants
+  // Fetch pending participants with role and subject info
   const { data: participants } = await supabase
     .from("survey_participants")
     .select(
       `
       id,
       user_id,
+      role,
+      subject_user_id,
       status,
-      user:users!survey_participants_user_id_fkey(id, slack_user_id, slack_name)
+      user:users!survey_participants_user_id_fkey(id, slack_user_id, slack_name),
+      subject:users!survey_participants_subject_user_id_fkey(id, slack_name)
     `,
     )
     .eq("survey_id", surveyId)
@@ -447,19 +450,24 @@ async function handleSurveyLaunch(surveyId: string) {
 
   if (!participants) return { sent: 0, skipped: 0 };
 
-  // Deduplicate by user_id — one notification per person regardless of rater roles
-  const seenUsers = new Set<string>();
-  const uniqueParticipants = participants.filter((p) => {
-    const userId = (p as any).user?.id;
-    if (!userId || seenUsers.has(userId)) return false;
-    seenUsers.add(userId);
-    return true;
-  });
+  // Filter out "subject" tracking entries — they don't need notifications
+  const filteredParticipants = participants.filter((p: any) => p.role !== "subject");
 
   let sent = 0;
   let skipped = 0;
 
-  for (const p of uniqueParticipants) {
+  // Group participants by user for 360 surveys so we can send a single consolidated DM
+  const userParticipants = new Map<string, typeof filteredParticipants>();
+  for (const p of filteredParticipants) {
+    const userId = (p as any).user?.id;
+    if (!userId) continue;
+    const existing = userParticipants.get(userId) || [];
+    existing.push(p);
+    userParticipants.set(userId, existing);
+  }
+
+  for (const [, userParts] of userParticipants) {
+    const p = userParts[0]; // Use first participant for notification tracking
     const user = (p as any).user;
     if (!user?.slack_user_id) {
       skipped++;
@@ -474,12 +482,15 @@ async function handleSurveyLaunch(surveyId: string) {
       refId,
     );
     if (canSend) {
+      const subjectName = (p as any).subject?.slack_name || undefined;
       const blocks = buildSurveyOpening(
         user.slack_name || "there",
         survey.name,
         questionCount,
         p.id,
         surveyId,
+        (p as any).role,
+        subjectName,
       );
       const ok = await sendSlackBlocks(
         botToken,
