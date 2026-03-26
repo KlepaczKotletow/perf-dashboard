@@ -617,6 +617,88 @@ Deno.serve(async (req) => {
     if (payload.type === "view_submission") {
       const vals = payload.view.state.values;
 
+      // -- NAMI COMMENT MODAL --
+      if (cbId === "nami_comment_submit") {
+        const meta = safeParse(payload.view.private_metadata);
+        const { convId, compName } = meta;
+        const comment = vals?.comment_block?.comment_input?.value || "";
+
+        if (convId && comment) {
+          const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+          const conv = convStates?.[0];
+          if (conv) {
+            const compIds = conv.competency_ids || [];
+            const currentIdx = conv.current_index || 0;
+            const currentCompId = compIds[currentIdx];
+            const ratings = conv.ratings || {};
+
+            if (currentCompId && ratings[currentCompId]) {
+              ratings[currentCompId].comment = comment;
+              await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+                ratings,
+                updated_at: new Date().toISOString(),
+              });
+            }
+
+            // Advance to next competency (same logic as skip)
+            const compNames = conv.competency_names || [];
+            const compDescs = conv.competency_descriptions || compIds.map(() => "");
+            const convRatingScale = conv.rating_scale || undefined;
+            const nextIndex = currentIdx + 1;
+
+            if (nextIndex < compIds.length) {
+              await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+                current_index: nextIndex,
+                ratings,
+                updated_at: new Date().toISOString(),
+              });
+              const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale);
+              await slackApi(botToken, "chat.postMessage", {
+                channel: payload.user.id,
+                text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
+                blocks,
+              });
+            } else {
+              // Check for text questions
+              const textQuestionIds = conv.text_question_ids || [];
+              const textQuestionPrompts = conv.text_question_prompts || [];
+              if (textQuestionIds.length > 0) {
+                await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+                  phase: "text_questions",
+                  current_index: 0,
+                  ratings,
+                  updated_at: new Date().toISOString(),
+                });
+                const { buildTextQuestionPrompt } = await import("../_shared/nami-blocks.ts");
+                const tqBlocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionIds.length, convId, conv.assignment_id);
+                await slackApi(botToken, "chat.postMessage", {
+                  channel: payload.user.id,
+                  text: textQuestionPrompts[0],
+                  blocks: tqBlocks,
+                });
+              } else {
+                // Show summary
+                const { buildReviewSummary } = await import("../_shared/nami-blocks.ts");
+                const namiScaleMax = convRatingScale?.max || 5;
+                const summaryBlocks = buildReviewSummary(conv.employee_name, compIds, compNames, ratings, convId, conv.assignment_id, namiScaleMax);
+                await slackApi(botToken, "chat.postMessage", {
+                  channel: payload.user.id,
+                  text: `Review summary for ${conv.employee_name}`,
+                  blocks: summaryBlocks,
+                });
+              }
+            }
+
+            // Confirm comment saved
+            await slackApi(botToken, "chat.postMessage", {
+              channel: payload.user.id,
+              text: `💬 Comment saved for *${compName}*: _"${comment.slice(0, 80)}${comment.length > 80 ? "..." : ""}"_`,
+            });
+          }
+        }
+        return json({ response_action: "clear" });
+      }
+
       // -- CYCLE REVIEW SELECT --
       if (cbId === "cycle_review_select") {
         const meta = safeParse(payload.view.private_metadata);
@@ -1567,6 +1649,45 @@ Deno.serve(async (req) => {
       // ================================================================
       //  NAMI: Skip comment
       // ================================================================
+      // ================================================================
+      //  NAMI: Open comment modal (replaces free-text comment input)
+      // ================================================================
+      if (action?.action_id === "nami_open_comment_modal") {
+        const meta = safeParse(action.value);
+        const { convId, compName } = meta;
+        if (!convId) return json({});
+
+        await slackApi(botToken, "views.open", {
+          trigger_id: payload.trigger_id,
+          view: {
+            type: "modal",
+            callback_id: "nami_comment_submit",
+            private_metadata: JSON.stringify({ convId, compName }),
+            title: { type: "plain_text", text: "Add Comment" },
+            submit: { type: "plain_text", text: "Save" },
+            close: { type: "plain_text", text: "Cancel" },
+            blocks: [
+              {
+                type: "section",
+                text: { type: "mrkdwn", text: `Comment on *${compName}*:` },
+              },
+              {
+                type: "input",
+                block_id: "comment_block",
+                label: { type: "plain_text", text: "Your thoughts" },
+                element: {
+                  type: "plain_text_input",
+                  action_id: "comment_input",
+                  multiline: true,
+                  placeholder: { type: "plain_text", text: "Share specific examples or observations..." },
+                },
+              },
+            ],
+          },
+        });
+        return json({});
+      }
+
       if (action?.action_id === "nami_skip_comment") {
         const meta = safeParse(action.value);
         const { convId } = meta;

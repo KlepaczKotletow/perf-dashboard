@@ -254,12 +254,18 @@ export function buildCommentPrompt(compName: string, convId: string) {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `Any comments on *${compName}*? Just type your thoughts or skip.`,
+        text: `Any comments on *${compName}*?`,
       },
     },
     {
       type: "actions",
       elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "✏️ Add Comment", emoji: true },
+          action_id: "nami_open_comment_modal",
+          value: JSON.stringify({ convId, compName }),
+        },
         {
           type: "button",
           text: { type: "plain_text", text: "Skip" },

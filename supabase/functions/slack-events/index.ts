@@ -306,8 +306,16 @@ Deno.serve(async (req) => {
         // ── Review flow ──────────────────────────────────────────────
         if (conv.flow_type === "review") {
 
-          // -- Phase: competencies (user is typing a comment for current competency) --
+          // -- Phase: competencies (user typed free text — guide them to use buttons) --
           if (conv.phase === "competencies") {
+            await sendSlackMessage(slackUserId,
+              "💡 Please use the buttons above to rate competencies or add comments. Free-text replies aren't supported here to avoid mix-ups between reviews."
+            );
+            return;
+          }
+
+          // Legacy: keep the advance logic as dead code guard
+          if (false as boolean) {
             const compIds: string[] = conv.competency_ids || [];
             const compNames: string[] = conv.competency_names || [];
             const currentIdx: number = conv.current_index || 0;
@@ -315,7 +323,6 @@ Deno.serve(async (req) => {
             const ratings = conv.ratings || {};
             const evtRatingScale = conv.rating_scale || undefined;
 
-            // Save comment for the current competency
             if (currentCompId && ratings[currentCompId]) {
               ratings[currentCompId].comment = text;
             }
@@ -323,7 +330,6 @@ Deno.serve(async (req) => {
             const nextIndex = currentIdx + 1;
 
             if (nextIndex < compIds.length) {
-              // More competencies — advance and send next prompt
               await supabase
                 .from("conversation_states")
                 .update({
