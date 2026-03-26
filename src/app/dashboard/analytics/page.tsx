@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AnalyticsCharts, type AnalyticsChartsData } from "./analytics-charts";
 import { AnalyticsTrends, type TrendsData } from "./analytics-trends";
+import { AnalyticsBreakdowns } from "./analytics-breakdowns";
 import { AnalyticsFilterBar } from "./analytics-filter-bar";
 import { AnalyticsTabNav } from "./analytics-tab-nav";
 import { AnalyticsHeatmapDimSwitcher } from "./analytics-heatmap-dim-switcher";
@@ -284,6 +285,72 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     goalStatusDistribution,
   };
 
+  // ── Breakdown: Completion Rate by Department ──
+  const completionByDepartment: { name: string; value: number }[] = [];
+  const deptCompletionGroups = new Map<string, { completed: number; total: number }>();
+  for (const a of assignments) {
+    const emp = userMap.get(a.employee_id);
+    const dept = (emp as any)?.department || "Unknown";
+    const g = deptCompletionGroups.get(dept) || { completed: 0, total: 0 };
+    g.total++;
+    if (a.status === "completed") g.completed++;
+    deptCompletionGroups.set(dept, g);
+  }
+  for (const [name, g] of deptCompletionGroups) {
+    completionByDepartment.push({ name, value: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0 });
+  }
+  completionByDepartment.sort((a, b) => b.value - a.value);
+
+  // ── Breakdown: Completion Rate by Function (job_family) ──
+  const completionByFunction: { name: string; value: number }[] = [];
+  const funcCompletionGroups = new Map<string, { completed: number; total: number }>();
+  for (const a of assignments) {
+    const emp = userMap.get(a.employee_id);
+    const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
+    const g = funcCompletionGroups.get(funcName) || { completed: 0, total: 0 };
+    g.total++;
+    if (a.status === "completed") g.completed++;
+    funcCompletionGroups.set(funcName, g);
+  }
+  for (const [name, g] of funcCompletionGroups) {
+    completionByFunction.push({ name, value: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0 });
+  }
+  completionByFunction.sort((a, b) => b.value - a.value);
+
+  // ── Breakdown: Avg Rating by Department ──
+  const avgRatingByDepartment: { name: string; value: number }[] = [];
+  const deptRatingGroups = new Map<string, number[]>();
+  for (const r of responses) {
+    const empId = assignmentEmployeeMap.get(r.assignment_id);
+    if (!empId) continue;
+    const emp = userMap.get(empId);
+    const dept = (emp as any)?.department || "Unknown";
+    const list = deptRatingGroups.get(dept) || [];
+    list.push(r.rating as number);
+    deptRatingGroups.set(dept, list);
+  }
+  for (const [name, vals] of deptRatingGroups) {
+    avgRatingByDepartment.push({ name, value: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) });
+  }
+  avgRatingByDepartment.sort((a, b) => b.value - a.value);
+
+  // ── Breakdown: Avg Rating by Function (job_family) ──
+  const avgRatingByFunction: { name: string; value: number }[] = [];
+  const funcRatingGroups = new Map<string, number[]>();
+  for (const r of responses) {
+    const empId = assignmentEmployeeMap.get(r.assignment_id);
+    if (!empId) continue;
+    const emp = userMap.get(empId);
+    const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
+    const list = funcRatingGroups.get(funcName) || [];
+    list.push(r.rating as number);
+    funcRatingGroups.set(funcName, list);
+  }
+  for (const [name, vals] of funcRatingGroups) {
+    avgRatingByFunction.push({ name, value: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) });
+  }
+  avgRatingByFunction.sort((a, b) => b.value - a.value);
+
   return {
     overallAvg: overallAvg.toFixed(1),
     completionRate,
@@ -297,6 +364,10 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     },
     rankingData,
     chartsData,
+    completionByDepartment,
+    completionByFunction,
+    avgRatingByDepartment,
+    avgRatingByFunction,
   };
 }
 
@@ -668,6 +739,34 @@ export default async function AnalyticsPage({
 
           {/* Charts */}
           <AnalyticsCharts data={analytics.chartsData} />
+
+          {/* Breakdown charts */}
+          <AnalyticsBreakdowns charts={[
+            {
+              title: "Completion Rate by Department",
+              subtitle: "Percentage of reviews submitted by employees in each department",
+              data: analytics.completionByDepartment,
+              unit: "%",
+            },
+            {
+              title: "Completion Rate by Function",
+              subtitle: "Percentage of reviews submitted per job function",
+              data: analytics.completionByFunction,
+              unit: "%",
+            },
+            {
+              title: "Avg Rating by Department",
+              subtitle: "Average competency rating per department for the selected cycle",
+              data: analytics.avgRatingByDepartment,
+              unit: "avg",
+            },
+            {
+              title: "Avg Rating by Function",
+              subtitle: "Average competency rating per job function",
+              data: analytics.avgRatingByFunction,
+              unit: "avg",
+            },
+          ]} />
 
           {/* Performance Ranking */}
           {analytics.rankingData.length > 0 && (
