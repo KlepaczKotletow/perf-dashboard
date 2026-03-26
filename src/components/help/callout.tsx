@@ -9,37 +9,49 @@ interface CalloutProps {
 const config = {
   info: {
     icon: Info,
-    bg: "bg-blue-50 dark:bg-blue-950/40",
-    border: "border-blue-200 dark:border-blue-800",
-    iconColor: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50/80 dark:bg-blue-950/30",
+    border: "border-blue-200/60 dark:border-blue-800/40",
+    iconColor: "text-blue-500 dark:text-blue-400",
+    label: "Info",
   },
   warning: {
     icon: AlertTriangle,
-    bg: "bg-amber-50 dark:bg-amber-950/40",
-    border: "border-amber-200 dark:border-amber-800",
-    iconColor: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50/80 dark:bg-amber-950/30",
+    border: "border-amber-200/60 dark:border-amber-800/40",
+    iconColor: "text-amber-500 dark:text-amber-400",
+    label: "Warning",
   },
   tip: {
     icon: Lightbulb,
-    bg: "bg-green-50 dark:bg-green-950/40",
-    border: "border-green-200 dark:border-green-800",
-    iconColor: "text-green-600 dark:text-green-400",
+    bg: "bg-emerald-50/80 dark:bg-emerald-950/30",
+    border: "border-emerald-200/60 dark:border-emerald-800/40",
+    iconColor: "text-emerald-500 dark:text-emerald-400",
+    label: "Tip",
   },
 };
 
 export function Callout({ type = "info", children }: CalloutProps) {
-  const { icon: Icon, bg, border, iconColor } = config[type];
+  const { icon: Icon, bg, border, iconColor, label } = config[type];
 
   return (
     <div
       className={cn(
-        "my-4 flex gap-3 rounded-lg border p-4",
+        "my-6 flex gap-3 rounded-xl border p-4",
         bg,
         border
       )}
     >
-      <Icon className={cn("h-5 w-5 shrink-0 mt-0.5", iconColor)} />
-      <div className="text-sm leading-relaxed [&>p]:m-0">{children}</div>
+      <div className="flex flex-col items-center gap-1 shrink-0">
+        <Icon className={cn("h-4.5 w-4.5", iconColor)} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-[11px] font-semibold uppercase tracking-wider mb-1", iconColor)}>
+          {label}
+        </p>
+        <div className="text-sm leading-relaxed text-muted-foreground [&>p]:mb-1 [&>p:last-child]:mb-0">
+          {children}
+        </div>
+      </div>
     </div>
   );
 }

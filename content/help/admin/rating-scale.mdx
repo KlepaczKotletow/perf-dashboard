@@ -1,31 +1,50 @@
 ---
 title: "Rating Scale Configuration"
 category: "Admin & Billing"
-roles: ["admin"]
+audience: ["admin"]
 order: 4
+icon: "SlidersHorizontal"
 ---
 
 # Rating Scale Configuration
 
 <RoleTag role="admin" />
 
-Perf uses a 1-5 rating scale by default. Admins can customize the labels per workspace to match your organization's language and culture.
+Perf uses a 1-5 rating scale for performance reviews. Understanding how each level is defined helps ensure consistency across your organization.
 
-## Default Scale
+## Review Rating Scale
 
-| Rating | Default Label | Description |
+The following labels are used during self-assessments, peer reviews, and manager reviews:
+
+| Rating | Label | Description |
 |---|---|---|
-| 1 | Needs Improvement | Performance is significantly below expectations. Immediate action plan required. |
-| 2 | Below Expectations | Performance falls short in key areas. Development support needed. |
-| 3 | Meets Expectations | Solid, reliable performance. Consistently delivers on role requirements. |
-| 4 | Exceeds Expectations | Performance is above what is expected. Demonstrates impact beyond core responsibilities. |
-| 5 | Exceptional | Outstanding performance. A role model who drives exceptional results and elevates others. |
+| 1 | Below expectations | Performance is significantly below role requirements. Immediate support needed. |
+| 2 | Developing | Performance falls short in key areas. Growing toward expectations. |
+| 3 | Meets expectations | Solid, reliable performance. Consistently delivers on role requirements. |
+| 4 | Exceeds expectations | Performance is above what is expected. Demonstrates impact beyond core responsibilities. |
+| 5 | Outstanding | Exceptional performance. A role model who drives results and elevates others. |
 
 <Callout type="info">
-The numeric scale (1-5) is fixed to ensure consistency in analytics and calibration. Only the text labels are customizable.
+The numeric scale (1-5) is fixed to ensure consistency in analytics and calibration. These labels appear in Nami's Slack messages and on the dashboard review pages.
 </Callout>
 
-## What Each Level Means
+## Competency Proficiency Scale
+
+A separate 1-5 scale is used for competency matrix proficiency levels:
+
+| Level | Label | Meaning |
+|---|---|---|
+| 1 | Basic | Aware of the concept; needs guidance |
+| 2 | Developing | Can apply with some support |
+| 3 | Proficient | Independently competent |
+| 4 | Advanced | Coaches others; handles complex scenarios |
+| 5 | Expert | Recognized authority; shapes org-wide standards |
+
+<Callout type="tip">
+The review rating scale and competency proficiency scale serve different purposes. Review ratings evaluate overall performance, while proficiency levels describe skill depth within a specific competency.
+</Callout>
+
+## What Each Review Level Means
 
 Use these as guidelines during manager training:
 
@@ -38,11 +57,6 @@ Use these as guidelines during manager training:
 Aim for a roughly normal distribution. If more than 30% of ratings are 5, consider whether your calibration process is rigorous enough.
 </Callout>
 
-## Configuring Labels
+## Survey Rating Scale
 
-1. Go to **Dashboard > Settings**.
-2. Scroll to **Rating Scale**.
-3. Edit the label for each rating level.
-4. Click **Save**.
-
-Changes apply to all future cycles. Existing completed reviews retain the labels that were active at the time of submission.
+Pulse surveys use a separate 1-7 rating scale, providing more granularity for engagement and sentiment questions. This is different from the 1-5 scale used in performance reviews.

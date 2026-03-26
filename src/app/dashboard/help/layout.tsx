@@ -7,8 +7,8 @@ export default function HelpLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="-mx-4 lg:-mx-8 -my-6 lg:-my-8 flex min-h-screen">
       <HelpSidebar grouped={grouped} />
-      <main className="flex-1 overflow-y-auto">
-        <div className="px-6 py-8 lg:px-10 lg:py-10 pt-16 lg:pt-10">
+      <main className="flex-1 overflow-y-auto min-w-0">
+        <div className="px-6 py-8 lg:px-12 lg:py-10 pt-16 lg:pt-10">
           {children}
         </div>
       </main>

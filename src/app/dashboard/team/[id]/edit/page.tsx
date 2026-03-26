@@ -55,9 +55,18 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
     async function load() {
       setLoading(true);
       try {
-        // Get workspace_id for tenant scoping
+        // Get workspace_id for tenant scoping — look up via email, not user_metadata
         const { data: { user: authUser } } = await supabase.auth.getUser();
-        const wsId = authUser?.user_metadata?.workspace_id;
+        if (!authUser?.email) {
+          setError("Not authenticated");
+          return;
+        }
+        const { data: callerUser } = await supabase
+          .from("users")
+          .select("workspace_id")
+          .eq("slack_email", authUser.email)
+          .single();
+        const wsId = callerUser?.workspace_id;
         if (!wsId) {
           setError("Workspace not found");
           return;
@@ -103,7 +112,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         }));
         setLevels(mappedLevels);
 
-        // Derive current job family from the user's current level
+        // Derive current function from the user's current level
         if (userData.level_id) {
           const currentLevel = mappedLevels.find(l => l.id === userData.level_id);
           setJobFamilyId(currentLevel?.job_family_id || "");
@@ -174,7 +183,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href={`/dashboard/team/${id}`}>
@@ -255,9 +264,9 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
             </Select>
           </div>
 
-          {/* Job Family */}
+          {/* Function */}
           <div className="space-y-2">
-            <Label htmlFor="jobFamily">Job Family</Label>
+            <Label htmlFor="jobFamily">Function</Label>
             <Select
               value={jobFamilyId}
               onValueChange={(val) => {
@@ -266,10 +275,10 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
               }}
             >
               <SelectTrigger id="jobFamily">
-                <SelectValue placeholder="Select job family" />
+                <SelectValue placeholder="Select function" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No job family</SelectItem>
+                <SelectItem value="">No function</SelectItem>
                 {jobFamilies.map((f) => (
                   <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                 ))}
@@ -277,8 +286,8 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
             </Select>
             {jobFamilies.length === 0 && (
               <p className="text-xs text-muted-foreground">
-                No job families yet.{" "}
-                <Link href="/dashboard/admin/job-families" target="_blank" className="text-primary underline underline-offset-2">
+                No functions yet.{" "}
+                <Link href="/dashboard/admin/functions" target="_blank" className="text-primary underline underline-offset-2">
                   Create one →
                 </Link>
               </p>
@@ -290,7 +299,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
             <Label htmlFor="level">Job Level</Label>
             <Select value={levelId} onValueChange={setLevelId} disabled={!jobFamilyId}>
               <SelectTrigger id="level">
-                <SelectValue placeholder={jobFamilyId ? "Select level" : "Select a job family first"} />
+                <SelectValue placeholder={jobFamilyId ? "Select level" : "Select a function first"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">No level</SelectItem>
@@ -316,11 +325,11 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="e.g. Squad Falcon or Platform Team"
             />
-            <p className="text-xs text-muted-foreground">Informal name — not linked to job families</p>
+            <p className="text-xs text-muted-foreground">Informal name — not linked to functions</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="hireDate">Hire Date</Label>
+            <Label htmlFor="hireDate">Start Date</Label>
             <Input
               id="hireDate"
               type="date"

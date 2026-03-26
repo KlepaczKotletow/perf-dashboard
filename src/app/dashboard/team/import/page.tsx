@@ -326,7 +326,7 @@ export default function ImportPage() {
         } else if (byGrade) {
           matchedLevelId = byGrade;
         } else {
-          warnings.push(`warn:level_missing:Level "${m.level}" not found. Check Job Families.`);
+          warnings.push(`warn:level_missing:Level "${m.level}" not found. Check Functions.`);
         }
       }
 
@@ -742,7 +742,7 @@ export default function ImportPage() {
                             const resolutionTips: Record<string, string> = {
                               manager_in_csv: "No action needed — manager will be created first, then linked automatically.",
                               manager_missing: "Options: Add the manager to this CSV, create them manually first, or import without — assign manager later in Directory.",
-                              level_missing: "Options: Go to Job Families to create this level first, or import without — assign level later in Directory.",
+                              level_missing: "Options: Go to Functions to create this level first, or import without — assign level later in Directory.",
                               role_default: "Will be imported as regular user. You can change their role later in Directory.",
                             };
 

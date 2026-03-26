@@ -145,8 +145,8 @@ export default async function TeamPage({
                 </Link>
               </Button>
               <SyncButton workspaceId={workspace?.workspaceId} />
-              <Link href="/dashboard/admin/job-families" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Manage Job Families
+              <Link href="/dashboard/admin/functions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Manage Functions
               </Link>
             </>
           )}

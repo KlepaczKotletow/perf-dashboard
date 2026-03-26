@@ -1,8 +1,9 @@
 ---
 title: "Bulk CSV Import"
 category: "Team Management"
-roles: ["admin"]
+audience: ["admin"]
 order: 4
+icon: "Upload"
 ---
 
 # Bulk CSV Import
@@ -18,21 +19,20 @@ Your file should include the following columns:
 | Column | Required | Description |
 |---|---|---|
 | `email` | Yes | Work email (must match Slack profile) |
-| `first_name` | Yes | First name |
-| `last_name` | Yes | Last name |
-| `role` | No | Perf role: `admin`, `hr`, `manager`, or `member` |
-| `department` | No | Department name (must already exist in Perf) |
-| `function` | No | Job family / function name |
-| `level` | No | Career level (e.g., Senior, Staff) |
-| `manager_email` | No | Email of the direct manager |
+| `name` | No | Full name (aliases: "full name", "employee name", "display name") |
+| `department` | No | Department name (aliases: "dept", "team", "division") |
+| `job_title` | No | Job title (aliases: "title", "position") |
+| `manager_email` | No | Email of the direct manager (aliases: "manager", "reports to") |
+| `level` | No | Career level, e.g. Senior, Staff (aliases: "grade", "seniority") |
+| `role` | No | System role: `admin`, `hr`, `manager`, or `user` |
 
 <Callout type="tip">
-Download the sample CSV template from the import page to ensure your columns are formatted correctly.
+Column names are flexible -- Perf recognizes common aliases automatically. For example, "Full Name" and "Employee Name" both map to the name field.
 </Callout>
 
 ## Column Mapping
 
-After uploading, Perf shows a mapping screen where you confirm which CSV columns correspond to which Perf fields. Unrecognized columns are ignored.
+After uploading, Perf shows a mapping screen where you confirm which CSV columns correspond to which Perf fields. Unrecognized columns can be manually mapped or skipped.
 
 ## Validation
 
@@ -40,8 +40,8 @@ Before applying, Perf checks for:
 
 - Duplicate emails.
 - Invalid email formats.
-- References to departments or functions that do not exist.
-- Circular manager relationships.
+- Invalid role values (must be `user`, `manager`, `hr`, or `admin`).
+- Manager email references that do not match any existing user.
 
 Errors are displayed inline so you can fix and re-upload.
 
@@ -52,3 +52,7 @@ Manager resolution uses the `manager_email` column. Make sure managers are inclu
 ## Preview & Apply
 
 After validation passes, you see a preview of all changes (new members, updates, skipped rows). Review carefully, then click **Apply Import** to finalize.
+
+<Callout type="info">
+The importer matches users by email address. Existing users are updated with the new values; unmatched emails will create new user records.
+</Callout>

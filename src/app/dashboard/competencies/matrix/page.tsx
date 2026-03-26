@@ -96,13 +96,13 @@ export default async function CompetencyMatrixPage() {
           <CardContent className="py-8 text-center text-muted-foreground">
             <p className="mb-4">
               {levels.length === 0
-                ? "No job levels defined yet. Create job families and levels first."
+                ? "No job levels defined yet. Create functions and levels first."
                 : "No competencies defined yet. Create competencies first."}
             </p>
             <div className="flex gap-3 justify-center">
               {levels.length === 0 && (
                 <Button asChild variant="outline">
-                  <Link href="/dashboard/admin/job-families">Manage Job Families</Link>
+                  <Link href="/dashboard/admin/functions">Manage Functions</Link>
                 </Button>
               )}
               {competencies.length === 0 && (

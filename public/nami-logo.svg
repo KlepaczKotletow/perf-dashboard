@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF5ED"/>
+      <stop offset="100%" stop-color="#FFE4D0"/>
+    </linearGradient>
+    <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D4854A"/>
+      <stop offset="100%" stop-color="#B8692E"/>
+    </linearGradient>
+    <linearGradient id="earGrad" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#A0522D"/>
+      <stop offset="100%" stop-color="#7A3B1E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Tail - wagging up cheerfully -->
+  <path d="M380 260 Q415 215 398 170" stroke="#C4783A" stroke-width="16" stroke-linecap="round" fill="none"/>
+  <circle cx="397" cy="167" r="10" fill="#D4854A"/>
+
+  <!-- Body - long dachshund sausage shape -->
+  <ellipse cx="260" cy="320" rx="135" ry="60" fill="url(#bodyGrad)"/>
+
+  <!-- Belly -->
+  <ellipse cx="260" cy="340" rx="95" ry="35" fill="#F0CFA0"/>
+
+  <!-- Back legs (shorter, further back) -->
+  <rect x="348" y="355" width="24" height="42" rx="12" fill="#B8692E"/>
+  <rect x="375" y="355" width="24" height="42" rx="12" fill="#B06228"/>
+
+  <!-- Front legs (short dachshund legs) -->
+  <rect x="148" y="355" width="26" height="44" rx="13" fill="#C4783A"/>
+  <rect x="178" y="355" width="26" height="44" rx="13" fill="#C4783A"/>
+
+  <!-- Paws -->
+  <ellipse cx="161" cy="398" rx="17" ry="9" fill="#D4854A"/>
+  <ellipse cx="191" cy="398" rx="17" ry="9" fill="#D4854A"/>
+  <ellipse cx="360" cy="396" rx="16" ry="9" fill="#C4783A"/>
+  <ellipse cx="387" cy="396" rx="16" ry="9" fill="#B8692E"/>
+
+  <!-- Neck -->
+  <ellipse cx="190" cy="285" rx="55" ry="50" fill="#D4854A"/>
+
+  <!-- Head - slightly oval, not perfectly round -->
+  <ellipse cx="185" cy="220" rx="78" ry="72" fill="#D4854A"/>
+
+  <!-- Long dachshund snout - protruding forward -->
+  <ellipse cx="148" cy="252" rx="55" ry="32" fill="#DEBA8A"/>
+
+  <!-- Left ear - long floppy dachshund ear -->
+  <path d="M112 200 Q75 185 62 230 Q52 280 80 310 Q100 320 110 290 Q118 260 115 230Z" fill="url(#earGrad)"/>
+  <!-- Right ear -->
+  <path d="M255 200 Q290 185 298 225 Q305 270 280 300 Q262 310 255 280 Q248 255 250 225Z" fill="url(#earGrad)"/>
+
+  <!-- Inner ear highlights -->
+  <path d="M110 210 Q82 200 74 235 Q68 270 88 295 Q100 302 105 278 Q110 255 110 235Z" fill="#C4784A" opacity="0.4"/>
+  <path d="M257 210 Q282 200 288 230 Q293 262 276 288 Q266 296 261 275 Q256 252 256 232Z" fill="#C4784A" opacity="0.4"/>
+
+  <!-- Eyes - big, sparkly, anime-style -->
+  <ellipse cx="158" cy="210" rx="20" ry="22" fill="#2D1A0E"/>
+  <ellipse cx="218" cy="210" rx="20" ry="22" fill="#2D1A0E"/>
+
+  <!-- Eye highlights (sparkle) -->
+  <ellipse cx="165" cy="202" rx="8" ry="9" fill="white" opacity="0.9"/>
+  <ellipse cx="225" cy="202" rx="8" ry="9" fill="white" opacity="0.9"/>
+  <circle cx="153" cy="214" r="4.5" fill="white" opacity="0.5"/>
+  <circle cx="213" cy="214" r="4.5" fill="white" opacity="0.5"/>
+
+  <!-- Eyebrows - friendly, slightly raised -->
+  <path d="M136 186 Q158 175 178 186" stroke="#8B4513" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M198 186 Q218 175 240 186" stroke="#8B4513" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Nose - bigger, dachshund-prominent -->
+  <ellipse cx="112" cy="245" rx="16" ry="12" fill="#2D1A0E"/>
+  <ellipse cx="112" cy="242" rx="7" ry="5" fill="#4A3020" opacity="0.5"/>
+
+  <!-- Mouth - wide friendly smile -->
+  <path d="M118 260 Q132 278 148 278 Q164 278 178 260" stroke="#5C3A1E" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+  <!-- Tongue - happy panting -->
+  <ellipse cx="148" cy="280" rx="11" ry="15" fill="#FF8A9B"/>
+  <path d="M141 276 Q148 272 155 276" fill="#DEBA8A"/>
+
+  <!-- Cheek blush -->
+  <ellipse cx="125" cy="240" rx="16" ry="10" fill="#FFB5A0" opacity="0.5"/>
+  <ellipse cx="240" cy="235" rx="14" ry="9" fill="#FFB5A0" opacity="0.45"/>
+
+  <!-- Collar -->
+  <path d="M140 278 Q185 298 240 280" stroke="#FF6B6B" stroke-width="9" stroke-linecap="round" fill="none"/>
+
+  <!-- Collar tag with N -->
+  <circle cx="190" cy="295" r="11" fill="#FFD700"/>
+  <circle cx="190" cy="295" r="7.5" fill="#FFC107"/>
+  <text x="190" y="299" text-anchor="middle" font-size="11" font-weight="bold" fill="#8B6914" font-family="Arial, sans-serif">N</text>
+</svg>

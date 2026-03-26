@@ -17,7 +17,7 @@ The Team page is your central hub for managing everyone in your Perf workspace. 
 
 The fastest way to populate your workspace is to sync directly from Slack.
 
-1. Navigate to **Dashboard > Team**
+1. Navigate to **Dashboard > Directory**
 2. Click the **Sync from Slack** button in the top-right corner
 3. Perf pulls in all active Slack workspace members
 
@@ -31,12 +31,14 @@ New employees who join your Slack workspace are not added to Perf automatically.
 
 Click on any user's name in the team list to open their edit page. You can update the following fields:
 
-- **Display name** -- how they appear across Perf
-- **Department** -- their organizational unit (select from departments you have created)
+- **System Role** -- their Perf permission level: Admin, HR, Manager, or User
+- **Department Head** -- toggle to allow them to calibrate reviews for their department
 - **Job title** -- their current position (e.g., "Senior Software Engineer")
-- **Job level** -- their level within your leveling framework (e.g., IC3, M1)
+- **Job family** -- their career track (e.g., Engineering, Product)
+- **Job level** -- their level within the framework (e.g., IC3, M1)
 - **Manager** -- their direct manager (selected from existing users)
-- **Role** -- their Perf permission level: Admin, HR, Manager, or Employee
+- **Team / Squad** -- their team or squad name
+- **Hire date** -- when they joined the company
 
 <Callout type="tip">
 Setting the manager field correctly is critical. It determines who receives manager review assignments, who can view the employee's goals, and how the org chart is structured.
@@ -56,7 +58,7 @@ For large teams or initial setup, use the CSV import tool at **Dashboard > Team 
 | manager_email | No | alex@company.com |
 | role | No | manager |
 
-The importer matches users by email address. Existing users are updated; unknown emails are skipped (users must exist in Slack first).
+The importer matches users by email address. Existing users are updated; unmatched emails will create new user records.
 
 <Callout type="warning">
 Always preview the import results before confirming. The importer shows a diff of what will change so you can catch errors before they are applied.

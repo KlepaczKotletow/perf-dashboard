@@ -773,7 +773,7 @@ export function CompetenciesClient({
                 </p>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
                   {levels.length === 0
-                    ? "Create job families and levels first to build the competency matrix."
+                    ? "Create functions and levels first to build the competency matrix."
                     : "Add competencies above, then map them to expected proficiency levels."}
                 </p>
               </CardContent>
@@ -788,7 +788,7 @@ export function CompetenciesClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Job Families</SelectItem>
+                    <SelectItem value="all">All Functions</SelectItem>
                     {jobFamilies.map((fam) => (
                       <SelectItem key={fam} value={fam}>{fam}</SelectItem>
                     ))}
@@ -846,7 +846,7 @@ export function CompetenciesClient({
               ) : filteredLevels.length === 0 ? (
                 <div className="py-10 text-center">
                   <Briefcase className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No levels in this job family.</p>
+                  <p className="text-sm text-muted-foreground">No levels in this function.</p>
                 </div>
               ) : (() => {
                 // Group levels by job family for colspan header
