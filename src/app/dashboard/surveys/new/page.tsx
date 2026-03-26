@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
@@ -10,11 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, ArrowRight, Loader2, Plus, X, Users, BarChart2, TrendingUp } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, ArrowRight, Loader2, Plus, X, Users, BarChart2, TrendingUp, Check, UserCircle, UserCog, UsersRound, ArrowDown } from "lucide-react";
 import Link from "next/link";
 
 type SurveyType = "360" | "pulse" | "enps";
-type RaterGroup = "self" | "manager" | "peer" | "direct_report";
 
 interface Question {
   id: string;
@@ -24,17 +24,17 @@ interface Question {
   options?: string[];
 }
 
+interface TeamMember {
+  id: string;
+  slack_name: string;
+  job_title: string | null;
+  manager_id: string | null;
+}
+
 const SURVEY_TYPES = [
   { value: "360" as SurveyType, label: "360° Review", description: "Multi-rater development feedback", icon: Users, color: "border-purple-200 bg-purple-50" },
   { value: "pulse" as SurveyType, label: "Pulse Survey", description: "Quick team temperature check", icon: BarChart2, color: "border-blue-200 bg-blue-50" },
   { value: "enps" as SurveyType, label: "eNPS", description: "Would you recommend working here?", icon: TrendingUp, color: "border-green-200 bg-green-50" },
-];
-
-const RATER_GROUPS: { value: RaterGroup; label: string; description: string }[] = [
-  { value: "self", label: "Self", description: "The person rates themselves" },
-  { value: "manager", label: "Manager", description: "Their direct manager provides feedback" },
-  { value: "peer", label: "Peers", description: "Colleagues at the same level (max 5)" },
-  { value: "direct_report", label: "Direct Reports", description: "People who report to them" },
 ];
 
 export default function NewSurveyPage() {
@@ -56,9 +56,13 @@ export default function NewSurveyPage() {
   const [closesAt, setClosesAt] = useState("");
 
   // Step 2 — 360 specific
-  const [subjects, setSubjects] = useState<any[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
   const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(new Set());
-  const [raterGroups, setRaterGroups] = useState<Set<RaterGroup>>(new Set(["self", "manager", "peer"]));
+  const [includeSelf, setIncludeSelf] = useState(true);
+  const [includeManager, setIncludeManager] = useState(true);
+  const [includeDirectReports, setIncludeDirectReports] = useState(true);
+  const [includePeers, setIncludePeers] = useState(true);
+  const [maxPeers, setMaxPeers] = useState(5);
   const [questions360, setQuestions360] = useState<Question[]>([
     { id: crypto.randomUUID(), type: "rating_7", label: "Communicates clearly and effectively", required: true },
     { id: crypto.randomUUID(), type: "rating_7", label: "Delivers on commitments consistently", required: true },
@@ -85,12 +89,52 @@ export default function NewSurveyPage() {
       const identity = await getClientIdentity(supabase);
       if (!identity) return;
       const wsId = identity.workspaceId;
-      const { data } = await supabase.from("users").select("id, slack_name, job_title").eq("workspace_id", wsId).order("slack_name");
-      setSubjects(data || []);
+      const { data } = await supabase.from("users").select("id, slack_name, job_title, manager_id").eq("workspace_id", wsId).order("slack_name");
+      setTeam(data || []);
     }
     loadTeam();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Compute feedback source counts based on selected subjects
+  const feedbackSummary = useMemo(() => {
+    if (selectedSubjects.size === 0) return null;
+
+    let withManager = 0;
+    let withDirectReports = 0;
+    let totalPeerCandidates = 0;
+
+    for (const subjectId of selectedSubjects) {
+      const subject = team.find(u => u.id === subjectId);
+      if (!subject) continue;
+
+      // Has a manager?
+      if (subject.manager_id && team.some(u => u.id === subject.manager_id)) {
+        withManager++;
+      }
+
+      // Has direct reports?
+      const directReports = team.filter(u => u.manager_id === subjectId);
+      if (directReports.length > 0) {
+        withDirectReports++;
+      }
+
+      // Peer candidates (everyone who isn't the subject, their manager, or their direct report)
+      const peers = team.filter(u =>
+        u.id !== subjectId &&
+        u.id !== subject.manager_id &&
+        u.manager_id !== subjectId
+      );
+      totalPeerCandidates += Math.min(peers.length, maxPeers);
+    }
+
+    return {
+      subjectCount: selectedSubjects.size,
+      withManager,
+      withDirectReports,
+      totalPeerCandidates,
+    };
+  }, [selectedSubjects, team, maxPeers]);
 
   function addQuestion(set: "360" | "pulse") {
     const q: Question = { id: crypto.randomUUID(), type: "rating_7", label: "", required: true };
@@ -130,9 +174,16 @@ export default function NewSurveyPage() {
       const { data: userData } = await supabase.from("users").select("id, workspace_id, manager_id").eq("id", identity.userId).single();
       if (!userData) throw new Error("User not found");
 
+      // Build rater_groups array for config based on toggles
+      const raterGroups: string[] = [];
+      if (includeSelf) raterGroups.push("self");
+      if (includeManager) raterGroups.push("manager");
+      if (includePeers) raterGroups.push("peer");
+      if (includeDirectReports) raterGroups.push("direct_report");
+
       let config: any = {};
       if (surveyType === "360") {
-        config = { questions: questions360, rater_groups: [...raterGroups], min_raters_to_show: 3 };
+        config = { questions: questions360, rater_groups: raterGroups, max_peers: maxPeers, min_raters_to_show: 3 };
       } else if (surveyType === "pulse") {
         config = { questions: pulseQuestions };
       } else {
@@ -163,27 +214,32 @@ export default function NewSurveyPage() {
 
         for (const subjectId of selectedSubjects) {
           const subjectData = wsUsers?.find(u => u.id === subjectId);
-          // Collect peer candidates separately so we can cap them
           const peerCandidates: string[] = [];
+
           for (const wu of (wsUsers || [])) {
             if (wu.id === subjectId) {
-              if (raterGroups.has("self")) {
+              // Self-review
+              if (includeSelf) {
                 participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "self" });
               }
-            } else if (raterGroups.has("manager") && wu.id === subjectData?.manager_id) {
+            } else if (includeManager && wu.id === subjectData?.manager_id) {
+              // Manager review
               participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "manager" });
-            } else if (raterGroups.has("direct_report") && wu.manager_id === subjectId) {
+            } else if (includeDirectReports && wu.manager_id === subjectId) {
+              // Direct report review
               participants.push({ survey_id: survey.id, user_id: wu.id, subject_user_id: subjectId, role: "direct_report" });
-            } else if (raterGroups.has("peer")) {
+            } else if (includePeers) {
+              // Peer candidate
               peerCandidates.push(wu.id);
             }
           }
-          // Limit peers to 5 random per subject to avoid row explosion in large workspaces
-          const MAX_PEERS = 5;
+
+          // Limit peers per subject
           const shuffled = peerCandidates.sort(() => Math.random() - 0.5);
-          for (const peerId of shuffled.slice(0, MAX_PEERS)) {
+          for (const peerId of shuffled.slice(0, maxPeers)) {
             participants.push({ survey_id: survey.id, user_id: peerId, subject_user_id: subjectId, role: "peer" });
           }
+
           // Always add subject tracking entry
           participants.push({ survey_id: survey.id, user_id: subjectId, subject_user_id: subjectId, role: "subject" });
         }
@@ -304,11 +360,12 @@ export default function NewSurveyPage() {
 
           {surveyType === "360" && (
             <>
+              {/* Subjects selection */}
               <div className="space-y-2">
-                <Label>Who are you reviewing?</Label>
-                <p className="text-xs text-muted-foreground">Select one or more team members</p>
+                <Label>Who is being reviewed?</Label>
+                <p className="text-xs text-muted-foreground">Select the people who will receive 360 feedback</p>
                 <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
-                  {subjects.map(u => (
+                  {team.map(u => (
                     <label key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer">
                       <Checkbox
                         checked={selectedSubjects.has(u.id)}
@@ -325,31 +382,109 @@ export default function NewSurveyPage() {
                     </label>
                   ))}
                 </div>
+                {selectedSubjects.size > 0 && (
+                  <p className="text-xs text-muted-foreground">{selectedSubjects.size} selected</p>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label>Rater groups</Label>
-                <p className="text-xs text-muted-foreground">Choose who provides feedback for each subject. Each group sees the same questions but rates from their perspective.</p>
-                <div className="flex flex-wrap gap-4">
-                  {RATER_GROUPS.map(g => (
-                    <label key={g.value} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={raterGroups.has(g.value)}
-                        onCheckedChange={checked => {
-                          setRaterGroups(prev => {
-                            const next = new Set(prev);
-                            checked ? next.add(g.value) : next.delete(g.value);
-                            return next;
-                          });
-                        }}
-                      />
-                      <div>
-                        <span className="text-sm">{g.label}</span>
-                        <p className="text-[11px] text-muted-foreground leading-tight">{g.description}</p>
+
+              {/* Feedback sources — auto-assigned based on org chart */}
+              {selectedSubjects.size > 0 && feedbackSummary && (
+                <div className="space-y-3">
+                  <div>
+                    <Label>Feedback sources</Label>
+                    <p className="text-xs text-muted-foreground">Reviewers are automatically assigned based on your org chart. Toggle which perspectives to include.</p>
+                  </div>
+
+                  <div className="rounded-lg border divide-y">
+                    {/* Self */}
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <UserCircle className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Self-review</p>
+                          <p className="text-xs text-muted-foreground">Each subject rates themselves</p>
+                        </div>
                       </div>
-                    </label>
-                  ))}
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary" className="text-xs">{feedbackSummary.subjectCount} {feedbackSummary.subjectCount === 1 ? "person" : "people"}</Badge>
+                        <Switch checked={includeSelf} onCheckedChange={setIncludeSelf} />
+                      </div>
+                    </div>
+
+                    {/* Manager */}
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <UserCog className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Manager review</p>
+                          <p className="text-xs text-muted-foreground">Their direct manager provides feedback</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {feedbackSummary.withManager < feedbackSummary.subjectCount ? (
+                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-200">{feedbackSummary.withManager} of {feedbackSummary.subjectCount} have a manager</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs"><Check className="h-3 w-3 mr-1" />All have managers</Badge>
+                        )}
+                        <Switch checked={includeManager} onCheckedChange={setIncludeManager} />
+                      </div>
+                    </div>
+
+                    {/* Direct Reports */}
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Direct report review</p>
+                          <p className="text-xs text-muted-foreground">People who report to them provide upward feedback</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {feedbackSummary.withDirectReports === 0 ? (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">No subjects have direct reports</Badge>
+                        ) : feedbackSummary.withDirectReports < feedbackSummary.subjectCount ? (
+                          <Badge variant="outline" className="text-xs">{feedbackSummary.withDirectReports} of {feedbackSummary.subjectCount} have direct reports</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs"><Check className="h-3 w-3 mr-1" />All have direct reports</Badge>
+                        )}
+                        <Switch checked={includeDirectReports} onCheckedChange={setIncludeDirectReports} />
+                      </div>
+                    </div>
+
+                    {/* Peers */}
+                    <div className="px-4 py-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <UsersRound className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">Peer review</p>
+                            <p className="text-xs text-muted-foreground">Colleagues provide lateral feedback (randomly assigned)</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="text-xs">{feedbackSummary.totalPeerCandidates} reviewers</Badge>
+                          <Switch checked={includePeers} onCheckedChange={setIncludePeers} />
+                        </div>
+                      </div>
+                      {includePeers && (
+                        <div className="flex items-center gap-2 pl-7">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">Max peers per subject</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={maxPeers}
+                            onChange={e => setMaxPeers(Math.max(1, Math.min(10, parseInt(e.target.value) || 5)))}
+                            className="w-16 h-7 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Questions */}
               <div className="space-y-2">
                 <Label>Questions <span className="text-xs text-muted-foreground font-normal ml-1">(max 12 recommended)</span></Label>
                 <div className="space-y-2">
@@ -459,16 +594,27 @@ export default function NewSurveyPage() {
                 <span className="font-medium">{name}</span>
               </div>
               {surveyType === "360" && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subjects</span>
-                  <span>{selectedSubjects.size} person{selectedSubjects.size !== 1 ? "s" : ""}</span>
-                </div>
-              )}
-              {surveyType === "360" && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Questions</span>
-                  <span>{questions360.length}</span>
-                </div>
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subjects</span>
+                    <span>{selectedSubjects.size} person{selectedSubjects.size !== 1 ? "s" : ""}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Feedback sources</span>
+                    <span className="text-right text-xs">
+                      {[
+                        includeSelf && "Self",
+                        includeManager && "Manager",
+                        includeDirectReports && "Direct reports",
+                        includePeers && `Peers (max ${maxPeers})`,
+                      ].filter(Boolean).join(", ")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Questions</span>
+                    <span>{questions360.length}</span>
+                  </div>
+                </>
               )}
               {surveyType === "pulse" && (
                 <div className="flex justify-between">
@@ -491,7 +637,7 @@ export default function NewSurveyPage() {
           <div className="flex justify-between">
             <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
             <Button onClick={handleLaunch} disabled={loading}>
-              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Launching...</> : "Launch Survey 🚀"}
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Launching...</> : "Launch Survey"}
             </Button>
           </div>
         </div>
@@ -500,44 +646,39 @@ export default function NewSurveyPage() {
       {showNamiConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-card rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
-            <h3 className="text-lg font-semibold">🤖 Nami will message:</h3>
+            <h3 className="text-lg font-semibold">Nami will message participants</h3>
             <p className="text-sm text-muted-foreground">
               <strong>{namiParticipantCount}</strong> participants will receive a Slack DM to complete the survey.
             </p>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="namiSchedule" checked={namiScheduleMode === "now"}
-                  onChange={() => setNamiScheduleMode("now")} className="accent-emerald-600" />
+                  onChange={() => setNamiScheduleMode("now")} className="accent-primary" />
                 Send now
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="namiSchedule" checked={namiScheduleMode === "schedule"}
-                  onChange={() => setNamiScheduleMode("schedule")} className="accent-emerald-600" />
+                  onChange={() => setNamiScheduleMode("schedule")} className="accent-primary" />
                 Schedule
               </label>
             </div>
             {namiScheduleMode === "schedule" && (
               <input type="datetime-local" value={namiScheduleDate}
                 onChange={(e) => setNamiScheduleDate(e.target.value)}
-                className="w-full border border-zinc-300 rounded-lg px-3 py-2 text-sm" />
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm" />
             )}
             <div className="flex gap-3 pt-2">
-              <button onClick={confirmNamiSend} disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}
-                className="flex-1 bg-emerald-600 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+              <Button onClick={confirmNamiSend} disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}
+                className="flex-1">
                 {loading ? "Sending..." : "Confirm & Send"}
-              </button>
-              <button onClick={async () => {
+              </Button>
+              <Button variant="outline" onClick={() => {
                   setShowNamiConfirm(false);
-                  try {
-                    await supabase.functions.invoke("survey-notifications", {
-                      body: { survey_id: pendingSurveyId, mode: "launch" },
-                    });
-                  } catch (e) { console.error("Notification error:", e); }
                   router.push(`/dashboard/surveys/${pendingSurveyId}`);
                 }}
-                className="flex-1 border border-zinc-300 rounded-lg py-2.5 text-sm font-medium hover:bg-zinc-50 transition-colors">
+                className="flex-1">
                 Skip Nami
-              </button>
+              </Button>
             </div>
           </div>
         </div>
