@@ -131,11 +131,11 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
       .from("review_assignments")
       .select(`
         id, status, overall_rating, final_grade, created_at, updated_at,
-        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released),
+        cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released, workspace_id),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
       .eq("employee_id", id)
-      .eq("workspace_id", workspaceId)
+      .eq("cycle.workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
       .from("users")

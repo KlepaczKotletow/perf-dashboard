@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { getClientIdentity } from "@/lib/client-auth";
 
 interface Question {
   id: string;
@@ -59,17 +60,16 @@ export default function NewTemplatePage() {
     try {
       const supabase = createClient();
 
-      // Get workspace_id for tenant scoping
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) {
+      // Securely resolve workspace_id from DB
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         setSubmitError("Workspace not found. Please re-authenticate.");
         setSaving(false);
         return;
       }
 
       const { error } = await supabase.from("templates").insert({
-        workspace_id: wsId,
+        workspace_id: identity.workspaceId,
         name,
         description,
         is_default: isDefault,

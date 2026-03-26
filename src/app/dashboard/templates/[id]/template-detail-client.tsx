@@ -18,6 +18,7 @@ import {
 import { FileText, Star, MessageSquare, Pencil, Plus, Trash2, Info } from "lucide-react";
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase";
+import { getClientIdentity } from "@/lib/client-auth";
 
 interface Question {
   id: string;
@@ -55,13 +56,13 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         alert("Workspace not found");
         setSaving(false);
         return;
       }
+      const wsId = identity.workspaceId;
 
       const { error } = await supabase
         .from("templates")

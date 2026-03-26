@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Loader2, Check } from "lucide-react";
@@ -36,9 +37,9 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) return;
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const wsId = identity.workspaceId;
       const [
         { data: usersData },
         { data: functionsData },
@@ -68,8 +69,8 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
     setApplying(true);
     setApplyError(null);
 
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    const wsId = authUser?.user_metadata?.workspace_id;
+    const identity = await getClientIdentity(supabase);
+    const wsId = identity?.workspaceId;
 
     // Guard: prevent removing all admins
     if (action === "role" && value !== "admin") {
@@ -251,8 +252,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
             <SelectValue placeholder="Select role..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="user">User</SelectItem>
-            <SelectItem value="manager">Manager</SelectItem>
+            <SelectItem value="user">Employee</SelectItem>
             <SelectItem value="hr">HR</SelectItem>
             <SelectItem value="admin">Admin</SelectItem>
           </SelectContent>

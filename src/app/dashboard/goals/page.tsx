@@ -43,7 +43,8 @@ async function getGoals(
     const { data: reports, error: reportsErr } = await supabase
       .from("users")
       .select("id")
-      .eq("manager_id", currentUserId);
+      .eq("manager_id", currentUserId)
+      .eq("workspace_id", workspaceId);
     if (reportsErr) console.error("Failed to fetch manager reports for goals:", reportsErr.message);
 
     const allIds = [currentUserId, ...((reports || []).map((r: any) => r.id))];

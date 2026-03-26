@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -81,9 +82,9 @@ export default function NewSurveyPage() {
 
   useEffect(() => {
     async function loadTeam() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) return;
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const wsId = identity.workspaceId;
       const { data } = await supabase.from("users").select("id, slack_name, job_title").eq("workspace_id", wsId).order("slack_name");
       setSubjects(data || []);
     }
@@ -124,10 +125,9 @@ export default function NewSurveyPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const appUserId = user.user_metadata?.app_user_id;
-      const { data: userData } = await supabase.from("users").select("id, workspace_id, manager_id").eq("id", appUserId).single();
+      const identity = await getClientIdentity(supabase);
+      if (!identity) throw new Error("Not authenticated");
+      const { data: userData } = await supabase.from("users").select("id, workspace_id, manager_id").eq("id", identity.userId).single();
       if (!userData) throw new Error("User not found");
 
       let config: any = {};
@@ -225,8 +225,8 @@ export default function NewSurveyPage() {
       const sendAt = namiScheduleMode === "schedule" && namiScheduleDate
         ? new Date(namiScheduleDate).toISOString() : null;
 
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const wsId = authUser?.user_metadata?.workspace_id;
+      const identity = await getClientIdentity(supabase);
+      const wsId = identity?.workspaceId;
 
       await supabase.from("surveys").update({
         nami_send_at: sendAt, nami_confirmed: true

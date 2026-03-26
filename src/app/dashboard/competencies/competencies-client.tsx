@@ -32,6 +32,7 @@ import {
   Check,
 } from "lucide-react";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { CompetencyActions } from "./competency-actions";
 import { EditableCell } from "./matrix/editable-cell";
 
@@ -242,10 +243,8 @@ export function CompetenciesClient({
     setAddError(null);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         setAddError("Not authenticated");
         setAddLoading(false);
         return;
@@ -256,7 +255,7 @@ export function CompetenciesClient({
         category: addCategory || null,
         description: addDescription.trim() || null,
         is_core: addIsCore,
-        workspace_id: user.user_metadata?.workspace_id,
+        workspace_id: identity.workspaceId,
       });
 
       if (error) {

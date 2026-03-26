@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { format } from "date-fns";
 
 const CYCLE_TYPES = [
@@ -248,9 +249,9 @@ export default function NewCyclePage() {
   // Load users + competencies on mount, and restore draft if ?draft=<id> is present
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) return;
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const wsId = identity.workspaceId;
 
       const [{ data: usersData }, { data: compsData }, { data: tplData }, { data: profileData }] = await Promise.all([
         supabase.from("users").select("id, slack_name, slack_email, slack_user_id, manager_id").eq("workspace_id", wsId).order("slack_name"),
@@ -336,10 +337,9 @@ export default function NewCyclePage() {
     if (!name.trim()) return; // need at least a name
     setAutoSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const workspaceId: string = user.user_metadata?.workspace_id;
-      if (!workspaceId) return;
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const workspaceId = identity.workspaceId;
 
       const wizardMetadata = {
         step,
@@ -377,7 +377,7 @@ export default function NewCyclePage() {
             ...coreFields,
             status: "draft",
             workspace_id: workspaceId,
-            created_by: user.user_metadata?.app_user_id,
+            created_by: identity.userId,
           })
           .select("id")
           .single();
@@ -457,10 +457,9 @@ export default function NewCyclePage() {
 
   // ── Shared cycle creation ───────────────────────────────────────────────────
   async function createCycleBase(status: "draft" | "active"): Promise<{ cycleId: string; workspaceId: string }> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
-    const workspaceId: string = user.user_metadata?.workspace_id;
-    if (!workspaceId) throw new Error("No workspace found");
+    const identity = await getClientIdentity(supabase);
+    if (!identity) throw new Error("Not authenticated");
+    const workspaceId = identity.workspaceId;
 
     const sendAt = !skipNami && namiScheduleMode === "schedule" && namiScheduleDate
       ? new Date(namiScheduleDate).toISOString() : null;
@@ -493,7 +492,7 @@ export default function NewCyclePage() {
         .insert({
           ...cycleFields,
           workspace_id: workspaceId,
-          created_by: user.user_metadata?.app_user_id,
+          created_by: identity.userId,
         })
         .select("id")
         .single();

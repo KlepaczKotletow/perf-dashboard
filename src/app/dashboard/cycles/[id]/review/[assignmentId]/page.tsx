@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target, CheckCircle2, Cl
 import Link from "next/link";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
 import { formatDistanceToNow } from "date-fns";
+import { getClientIdentity } from "@/lib/client-auth";
 
 interface CompetencyRating {
   competency_id: string;
@@ -64,17 +65,17 @@ export default function ReviewFormPage({
     async function load() {
       setLoading(true);
       try {
-        // Get current user
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        if (!authUser) {
+        // Get current user via secure DB lookup (never trust user_metadata)
+        const identity = await getClientIdentity(supabase);
+        if (!identity) {
           setError("Not authenticated");
           return;
         }
-        const appUserId = authUser.user_metadata?.app_user_id;
-        setCurrentUser({ id: appUserId, ...authUser.user_metadata });
+        const appUserId = identity.userId;
+        setCurrentUser({ id: appUserId, workspace_id: identity.workspaceId, role: identity.role, slack_name: identity.slackName });
 
         // Fetch workspace rating scale
-        const wsId = authUser.user_metadata?.workspace_id;
+        const wsId = identity.workspaceId;
         if (wsId) {
           const { data: wsData } = await supabase
             .from("workspaces")

@@ -4,6 +4,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -299,11 +300,9 @@ export function FunctionsClient({
   // ── Helpers ────────────────────────────────────────────────────────────
 
   async function getAuthUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
-    const wsId = user.user_metadata?.workspace_id;
-    if (!wsId) throw new Error("No workspace");
-    return { user, wsId };
+    const identity = await getClientIdentity(supabase);
+    if (!identity) throw new Error("Not authenticated");
+    return { user: identity, wsId: identity.workspaceId };
   }
 
   // ── Handlers: Functions ────────────────────────────────────────────────

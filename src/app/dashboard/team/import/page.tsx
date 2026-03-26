@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -128,14 +129,11 @@ export default function ImportPage() {
   // Load DB data once
   useEffect(() => {
     async function load() {
-      // Get workspace_id from auth user metadata
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      const wsId = authUser?.user_metadata?.workspace_id;
-      if (wsId) {
-        setWorkspaceId(wsId);
-      }
-
-      if (!wsId) return;
+      // Securely resolve workspace_id from DB
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const wsId = identity.workspaceId;
+      setWorkspaceId(wsId);
 
       const [{ data: users }, { data: levels }] = await Promise.all([
         supabase.from("users").select("id, slack_email, slack_name").eq("workspace_id", wsId),

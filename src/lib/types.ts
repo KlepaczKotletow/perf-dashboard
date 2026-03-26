@@ -8,6 +8,9 @@ export interface Workspace {
   team_name: string | null
   bot_token: string
   bot_user_id: string | null
+  logo_url: string | null
+  rating_scale: any
+  onboarding_completed: boolean
   installed_at: string | null
   updated_at: string | null
 }
@@ -25,6 +28,9 @@ export interface User {
   level_id: string | null
   hire_date: string | null
   avatar_url: string | null
+  is_department_head: boolean
+  employee_status: string
+  timezone: string | null
   created_at: string | null
   updated_at: string | null
   // Relations
@@ -78,7 +84,7 @@ export interface ContinuousFeedback {
 // Performance Cycles (org-wide review periods)
 // ============================================
 
-export type PerformanceCycleStatus = 'draft' | 'active' | 'completed' | 'closed'
+export type PerformanceCycleStatus = 'draft' | 'active' | 'in_review' | 'completed' | 'closed'
 
 export interface PerformanceCycle {
   id: string
@@ -248,7 +254,7 @@ export interface ReviewResponse {
 // Goals & OKRs
 // ============================================
 
-export type GoalStatus = 'draft' | 'active' | 'completed' | 'cancelled'
+export type GoalStatus = 'draft' | 'active' | 'completed' | 'cancelled' | 'archived'
 export type GoalTrackingStatus = 'on_track' | 'at_risk' | 'delayed' | 'achieved'
 export type GoalScope = 'company' | 'team' | 'individual'
 

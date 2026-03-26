@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { MoreVertical, Star, Trash2, Copy } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { getClientIdentity } from "@/lib/client-auth";
 
 interface TemplateActionsProps {
   templateId: string;
@@ -47,13 +48,12 @@ export function TemplateActions({
     try {
       const supabase = createClient();
 
-      // Get workspace_id for tenant scoping
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         alert("Workspace not found");
         return;
       }
+      const wsId = identity.workspaceId;
 
       // Remove default from templates in THIS workspace only
       await supabase.from("templates").update({ is_default: false }).eq("is_default", true).eq("workspace_id", wsId);
@@ -73,14 +73,13 @@ export function TemplateActions({
     try {
       const supabase = createClient();
 
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      const appUserId = user?.user_metadata?.app_user_id;
-      if (!wsId) {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         alert("Workspace not found");
         setDuplicating(false);
         return;
       }
+      const wsId = identity.workspaceId;
 
       const { data, error } = await supabase
         .from("templates")
@@ -91,7 +90,7 @@ export function TemplateActions({
           questions: templateQuestions,
           is_system: false,
           is_default: false,
-          created_by: appUserId || null,
+          created_by: identity.userId,
         })
         .select("id")
         .single();
@@ -113,14 +112,13 @@ export function TemplateActions({
     try {
       const supabase = createClient();
 
-      // Get workspace_id for tenant scoping
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) {
         alert("Workspace not found");
         setDeleting(false);
         return;
       }
+      const wsId = identity.workspaceId;
 
       const { error } = await supabase.from("templates").delete().eq("id", templateId).eq("workspace_id", wsId);
 

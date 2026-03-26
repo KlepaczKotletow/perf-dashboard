@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase";
+import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -494,43 +495,18 @@ export default function FormsPage() {
     async function load() {
       const supabase = createClient();
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const identity = await getClientIdentity(supabase);
 
-      if (!user) {
+      if (!identity) {
         setAccessDenied(true);
         setLoading(false);
         return;
       }
 
-      const wsId: string | undefined = user.user_metadata?.workspace_id;
-      const appUserId: string | undefined = user.user_metadata?.app_user_id;
+      const { workspaceId: wsId, role } = identity;
 
-      if (appUserId) {
-        const { data: dbUser } = await supabase
-          .from("users")
-          .select("role")
-          .eq("id", appUserId)
-          .single();
-
-        const role: string =
-          dbUser?.role || user.user_metadata?.role || "user";
-        if (role !== "admin" && role !== "hr") {
-          setAccessDenied(true);
-          setLoading(false);
-          return;
-        }
-      } else {
-        const role: string = user.user_metadata?.role || "user";
-        if (role !== "admin" && role !== "hr") {
-          setAccessDenied(true);
-          setLoading(false);
-          return;
-        }
-      }
-
-      if (!wsId) {
+      if (role !== "admin" && role !== "hr") {
+        setAccessDenied(true);
         setLoading(false);
         return;
       }

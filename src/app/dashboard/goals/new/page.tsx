@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import { getClientIdentity } from "@/lib/client-auth";
 
 export default function NewGoalPage() {
   const router = useRouter();
@@ -34,9 +35,9 @@ export default function NewGoalPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const wsId = user?.user_metadata?.workspace_id;
-      if (!wsId) return;
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const wsId = identity.workspaceId;
 
       const [{ data: users }, { data: perfCycles }, { data: goals }] = await Promise.all([
         supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).order("slack_name"),
@@ -64,10 +65,9 @@ export default function NewGoalPage() {
     const metricUnit = formData.get("metric_unit") as string;
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setError("Not authenticated"); setLoading(false); return; }
-      const workspaceId = user.user_metadata?.workspace_id;
-      if (!workspaceId) { setError("Workspace not found. Please sign out and sign back in."); setLoading(false); return; }
+      const identity = await getClientIdentity(supabase);
+      if (!identity) { setError("Not authenticated or workspace not found."); setLoading(false); return; }
+      const workspaceId = identity.workspaceId;
 
       const { error: insertError } = await supabase.from("goals").insert({
         title,

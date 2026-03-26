@@ -98,7 +98,8 @@ async function getManagerData(userId: string, workspaceId: string) {
     supabase
       .from("users")
       .select("id, slack_name, job_title, department")
-      .eq("manager_id", userId),
+      .eq("manager_id", userId)
+      .eq("workspace_id", workspaceId),
     supabase
       .from("performance_cycles")
       .select("id, name, status, review_deadline")
