@@ -73,7 +73,6 @@ export function RoleSelector({ userId, currentRole, canEdit, workspaceId }: Role
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="user">{ROLE_LABELS.user}</SelectItem>
-        <SelectItem value="manager">{ROLE_LABELS.manager}</SelectItem>
         <SelectItem value="hr">{ROLE_LABELS.hr}</SelectItem>
         <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
       </SelectContent>

@@ -1,24 +1,26 @@
-// Role hierarchy: admin > hr > manager > user
+// Role hierarchy: admin > hr > user
+// "Manager" is NOT a role — it's determined by having direct reports.
+// The "manager" value is kept in the type for backward compatibility with existing DB rows.
 export type UserRole = "admin" | "hr" | "manager" | "user";
 
 export const ROLE_LEVELS: Record<UserRole, number> = {
   admin: 4,
   hr: 3,
-  manager: 2,
+  manager: 2, // legacy — kept for backward compat, no longer assignable
   user: 1,
 };
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   admin: "Admin",
   hr: "HR",
-  manager: "Manager",
+  manager: "Employee", // display as Employee — manager status comes from direct reports
   user: "Employee",
 };
 
 export const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
   admin: "Full access to all features, can manage users and settings",
   hr: "Can manage competencies, view all reviews, run calibrations",
-  manager: "Can view all reviews and feedback, manage templates",
+  manager: "Regular employee (manager status is based on having direct reports)",
   user: "Can view own reviews and give feedback",
 };
 

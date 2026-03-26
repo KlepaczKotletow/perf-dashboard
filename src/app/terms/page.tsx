@@ -77,7 +77,7 @@ export default function TermsPage() {
                 Access to the Service is managed through your Slack workspace.
                 The person who installs the Slack app and completes payment
                 becomes the workspace administrator. Administrators can assign
-                roles (Admin, HR, Manager, Employee) to other members.
+                roles (Admin, HR, Employee) to other members. Manager status is determined by having direct reports.
               </p>
               <p>
                 You are responsible for maintaining the security of your Slack

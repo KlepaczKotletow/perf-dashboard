@@ -98,7 +98,7 @@ const TARGET_FIELDS = [
   { value: "start_date", label: "Start Date" },
 ];
 
-const VALID_ROLES = ["user", "manager", "hr", "admin"];
+const VALID_ROLES = ["user", "hr", "admin"];
 
 // ----------------------------------------------------------------
 // Component
@@ -517,7 +517,7 @@ export default function ImportPage() {
                 <span><strong>job_title</strong> — e.g. Senior Engineer</span>
                 <span><strong>manager_email</strong> — Direct manager&apos;s email</span>
                 <span><strong>level</strong> — Level name or grade</span>
-                <span><strong>role</strong> — user, manager, hr, or admin</span>
+                <span><strong>role</strong> — user, hr, or admin (manager status is determined by having direct reports)</span>
                 <span><strong>start_date</strong> — Starting date (YYYY-MM-DD)</span>
               </div>
             </div>
