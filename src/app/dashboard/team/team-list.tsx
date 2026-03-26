@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { RoleSelector } from "./role-selector";
 import { BulkActions } from "./bulk-actions";
-import { ArrowRight } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, ArrowRight } from "lucide-react";
 
 interface TeamUser {
   id: string;
@@ -16,6 +16,7 @@ interface TeamUser {
   job_title: string | null;
   department: string | null;
   role: string | null;
+  hire_date?: string | null;
   is_department_head?: boolean;
   manager: { slack_name: string } | null;
   level: { name: string; grade: string | null; job_family: { name: string } | null } | null;
@@ -29,20 +30,79 @@ interface TeamListProps {
   filterUnassigned?: boolean;
 }
 
+type SortKey = "name" | "department" | "job_title" | "manager" | "start_date" | "role";
+type SortDir = "asc" | "desc";
+
+function formatTenure(hireDate: string | null | undefined): string {
+  if (!hireDate) return "—";
+  const start = new Date(hireDate);
+  const now = new Date();
+  const diffMs = now.getTime() - start.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return "Not started";
+  if (diffDays < 30) return `${diffDays}d`;
+  const months = Math.floor(diffDays / 30.44);
+  if (months < 12) return `${months}mo`;
+  const years = Math.floor(months / 12);
+  const rem = months % 12;
+  return rem > 0 ? `${years}y ${rem}mo` : `${years}y`;
+}
+
+function formatStartDate(hireDate: string | null | undefined): string {
+  if (!hireDate) return "";
+  return new Date(hireDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned }: TeamListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const displayUsers = filterUnassigned ? users.filter(u => !u.level) : users;
 
-  const allSelected = displayUsers.length > 0 && selected.size === displayUsers.length;
-  const someSelected = selected.size > 0 && selected.size < displayUsers.length;
+  const sortedUsers = useMemo(() => {
+    const sorted = [...displayUsers].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      switch (sortKey) {
+        case "name":
+          aVal = (a.slack_name || "").toLowerCase();
+          bVal = (b.slack_name || "").toLowerCase();
+          break;
+        case "department":
+          aVal = (a.department || "zzz").toLowerCase();
+          bVal = (b.department || "zzz").toLowerCase();
+          break;
+        case "job_title":
+          aVal = (a.job_title || "zzz").toLowerCase();
+          bVal = (b.job_title || "zzz").toLowerCase();
+          break;
+        case "manager":
+          aVal = (a.manager?.slack_name || "zzz").toLowerCase();
+          bVal = (b.manager?.slack_name || "zzz").toLowerCase();
+          break;
+        case "start_date":
+          aVal = a.hire_date || "9999";
+          bVal = b.hire_date || "9999";
+          break;
+        case "role":
+          aVal = a.role || "user";
+          bVal = b.role || "user";
+          break;
+      }
+      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }, [displayUsers, sortKey, sortDir]);
+
+  const allSelected = sortedUsers.length > 0 && selected.size === sortedUsers.length;
+  const someSelected = selected.size > 0 && selected.size < sortedUsers.length;
 
   function toggleAll() {
-    if (allSelected) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(displayUsers.map((u) => u.id)));
-    }
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(sortedUsers.map((u) => u.id)));
   }
 
   function toggleUser(id: string) {
@@ -54,8 +114,15 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     });
   }
 
-  function clearSelection() {
-    setSelected(new Set());
+  function clearSelection() { setSelected(new Set()); }
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   }
 
   const getInitials = (name: string | null) => {
@@ -63,32 +130,55 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
+  const SortIcon = ({ col }: { col: SortKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+  };
+
+  const colHeaderClass = "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
+
   return (
     <>
-      <div className="space-y-2">
-        {/* Select all header */}
-        {isAdmin && displayUsers.length > 0 && (
-          <div className="flex items-center gap-3 px-3 py-1.5">
+      <div className="space-y-0">
+        {/* Table header */}
+        <div className="flex items-center gap-4 px-3 py-2 border-b border-border/60">
+          {isAdmin && (
             <Checkbox
               checked={allSelected ? true : someSelected ? "indeterminate" : false}
               onCheckedChange={toggleAll}
               aria-label="Select all"
+              className="shrink-0"
             />
-            <span className="text-xs text-muted-foreground">
-              {selected.size > 0
-                ? `${selected.size} selected`
-                : "Select all"}
-            </span>
+          )}
+          <div className="w-9 shrink-0" /> {/* Avatar spacer */}
+          <div className="flex-1 min-w-0 grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+            <button onClick={() => handleSort("name")} className={colHeaderClass}>
+              Name <SortIcon col="name" />
+            </button>
+            <button onClick={() => handleSort("department")} className={`${colHeaderClass} hidden md:flex`}>
+              Department <SortIcon col="department" />
+            </button>
+            <button onClick={() => handleSort("manager")} className={`${colHeaderClass} hidden lg:flex`}>
+              Manager <SortIcon col="manager" />
+            </button>
+            <button onClick={() => handleSort("start_date")} className={`${colHeaderClass} hidden lg:flex`}>
+              Start Date <SortIcon col="start_date" />
+            </button>
+            <button onClick={() => handleSort("role")} className={`${colHeaderClass} hidden sm:flex`}>
+              Role <SortIcon col="role" />
+            </button>
+            <div className="w-8 shrink-0" /> {/* Action spacer */}
           </div>
-        )}
+        </div>
 
-        {displayUsers.map((user) => (
+        {/* Rows */}
+        {sortedUsers.map((user) => (
           <div
             key={user.id}
-            className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${
+            className={`flex items-center gap-4 px-3 py-2.5 border-b border-border/30 transition-all ${
               selected.has(user.id)
-                ? "border-primary/40 bg-primary/[0.03] shadow-sm"
-                : "border-border/60 bg-card hover:border-border hover:shadow-sm"
+                ? "bg-primary/[0.03]"
+                : "hover:bg-muted/30"
             }`}
           >
             {isAdmin && (
@@ -96,6 +186,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                 checked={selected.has(user.id)}
                 onCheckedChange={() => toggleUser(user.id)}
                 aria-label={`Select ${user.slack_name}`}
+                className="shrink-0"
               />
             )}
 
@@ -107,8 +198,8 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               </Avatar>
             </Link>
 
-            <div className="flex-1 min-w-0 grid grid-cols-[1fr_1fr_1fr_auto] gap-4 items-center">
-              {/* Name + email */}
+            <div className="flex-1 min-w-0 grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+              {/* Name + title */}
               <Link href={`/dashboard/team/${user.id}`} className="min-w-0 group">
                 <div className="flex items-center gap-1.5">
                   <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
@@ -116,7 +207,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                   </p>
                   {user.is_department_head && (
                     <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10 shrink-0">
-                      Dept Head
+                      Head
                     </Badge>
                   )}
                 </div>
@@ -127,51 +218,61 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
 
               {/* Department + Level */}
               <div className="min-w-0 hidden md:block">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {user.department && (
-                    <span className="text-xs text-muted-foreground truncate">{user.department}</span>
-                  )}
-                  {user.level ? (
-                    <span className="text-xs text-muted-foreground/60">
-                      {user.department ? " · " : ""}
-                      {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}
-                      {user.level.name}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-amber-500 dark:text-amber-400">
-                      {user.department ? " · " : ""}Unassigned
-                    </span>
-                  )}
-                </div>
+                <p className="text-xs text-muted-foreground truncate">{user.department || "—"}</p>
+                {user.level ? (
+                  <p className="text-[10px] text-muted-foreground/60 truncate">
+                    {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}{user.level.name}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-amber-500 dark:text-amber-400">Unassigned</p>
+                )}
               </div>
 
               {/* Manager */}
               <div className="min-w-0 hidden lg:block">
-                {user.manager?.slack_name ? (
-                  <span className="text-xs text-muted-foreground">Reports to {user.manager.slack_name}</span>
+                <p className="text-xs text-muted-foreground truncate">
+                  {user.manager?.slack_name || <span className="text-muted-foreground/40">—</span>}
+                </p>
+              </div>
+
+              {/* Start Date + Tenure */}
+              <div className="min-w-0 hidden lg:block">
+                {user.hire_date ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">{formatStartDate(user.hire_date)}</p>
+                    <p className="text-[10px] text-muted-foreground/60">{formatTenure(user.hire_date)}</p>
+                  </>
                 ) : (
-                  <span className="text-xs text-muted-foreground/40">No manager</span>
+                  <p className="text-xs text-muted-foreground/40">—</p>
                 )}
               </div>
 
-              {/* Role + Action */}
-              <div className="flex items-center gap-3 shrink-0">
+              {/* Role */}
+              <div className="hidden sm:block shrink-0">
                 <RoleSelector
                   userId={user.id}
                   currentRole={user.role || "user"}
                   canEdit={isAdmin && user.id !== currentUserId}
                   workspaceId={workspaceId}
                 />
-                <Link
-                  href={`/dashboard/team/${user.id}`}
-                  className="text-muted-foreground/40 hover:text-muted-foreground transition-colors"
-                >
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
               </div>
+
+              {/* Action arrow */}
+              <Link
+                href={`/dashboard/team/${user.id}`}
+                className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         ))}
+
+        {sortedUsers.length === 0 && (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            No employees found.
+          </div>
+        )}
       </div>
 
       {/* Bulk action bar */}

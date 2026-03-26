@@ -42,6 +42,7 @@ interface MappedUser {
   manager_email?: string;
   level?: string;
   role?: string;
+  start_date?: string;
 }
 
 interface ValidatedUser extends MappedUser {
@@ -70,6 +71,7 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   manager_email: ["manager email", "manager_email", "manager", "reports to", "reports_to", "manager mail", "line manager", "direct manager", "direct manager email"],
   level: ["level", "grade", "seniority", "job level", "career level", "band"],
   role: ["system role", "app role", "role", "access", "permission"],
+  start_date: ["start date", "start_date", "hire date", "hire_date", "date of hire", "joined", "joining date", "date joined", "employment date", "onboarding date"],
 };
 
 function matchColumn(header: string): string | null {
@@ -92,6 +94,7 @@ const TARGET_FIELDS = [
   { value: "manager_email", label: "Manager Email" },
   { value: "level", label: "Level / Grade" },
   { value: "role", label: "System Role" },
+  { value: "start_date", label: "Start Date" },
 ];
 
 const VALID_ROLES = ["user", "manager", "hr", "admin"];
@@ -149,10 +152,10 @@ export default function ImportPage() {
 
   function downloadTemplate() {
     const csv = [
-      "name,email,department,job_title,manager_email,level,role",
-      "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,IC3,user",
-      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,IC4,manager",
-      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,IC5,user",
+      "name,email,department,job_title,manager_email,level,role,start_date",
+      "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,IC3,user,2023-06-15",
+      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,IC4,manager,2022-01-10",
+      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,IC5,user,2024-03-01",
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -255,6 +258,7 @@ export default function ImportPage() {
       manager_email: reverseMap["manager_email"] ? (row[reverseMap["manager_email"]] || "").trim().toLowerCase() : undefined,
       level: reverseMap["level"] ? (row[reverseMap["level"]] || "").trim() : undefined,
       role: reverseMap["role"] ? (row[reverseMap["role"]] || "").trim().toLowerCase() : undefined,
+      start_date: reverseMap["start_date"] ? (row[reverseMap["start_date"]] || "").trim() : undefined,
     }));
 
     // Build email -> user map from DB
@@ -367,6 +371,7 @@ export default function ImportPage() {
               manager_email: row.manager_email || undefined,
               level_id: row.matchedLevelId || undefined,
               role: row.role && VALID_ROLES.includes(row.role) ? row.role : undefined,
+              hire_date: row.start_date || undefined,
             })),
           },
         });
@@ -509,6 +514,7 @@ export default function ImportPage() {
                 <span><strong>manager_email</strong> — Direct manager&apos;s email</span>
                 <span><strong>level</strong> — Level name or grade</span>
                 <span><strong>role</strong> — user, manager, hr, or admin</span>
+                <span><strong>start_date</strong> — Hire/start date (YYYY-MM-DD)</span>
               </div>
             </div>
           </CardContent>
