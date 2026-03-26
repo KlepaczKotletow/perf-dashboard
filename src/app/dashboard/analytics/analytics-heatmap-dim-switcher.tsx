@@ -4,13 +4,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
 
-type HeatmapDim = "role" | "department" | "level" | "tenure";
+export type HeatmapDim = "role" | "department" | "level" | "tenure" | "manager";
 
 const DIMS: { id: HeatmapDim; label: string }[] = [
   { id: "role", label: "Role" },
   { id: "department", label: "Department" },
   { id: "level", label: "Level" },
   { id: "tenure", label: "Tenure" },
+  { id: "manager", label: "Manager" },
 ];
 
 interface Props {

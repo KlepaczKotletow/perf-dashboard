@@ -24,7 +24,7 @@ interface FilterParams {
 
 // ─── Heatmap types ────────────────────────────────────────────────────────────
 
-type HeatmapDim = "role" | "department" | "level" | "tenure";
+type HeatmapDim = "role" | "department" | "level" | "tenure" | "manager";
 
 interface HeatmapCell {
   sum: number;
@@ -416,13 +416,15 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   // 1. Fetch users with dimension fields
   let heatmapUsersQ = supabase
     .from("users")
-    .select("id, role, department, start_date, level:levels!users_level_id_fkey(name, job_family_id)");
+    .select("id, role, department, start_date, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family_id)");
   if (workspaceId) heatmapUsersQ = heatmapUsersQ.eq("workspace_id", workspaceId);
   const { data: usersRaw, error: heatmapUsersErr } = await heatmapUsersQ;
   if (heatmapUsersErr) console.error("Failed to fetch heatmap users:", heatmapUsersErr.message);
 
+  const allUsers = usersRaw || [];
+
   const userMap = new Map(
-    (usersRaw || [])
+    allUsers
       .filter((u: any) => {
         if (filters.department && u.department !== filters.department) return false;
         if (filters.functionId && (u.level as any)?.job_family_id !== filters.functionId) return false;
@@ -433,6 +435,10 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
         if (dim === "role") groupValue = u.role || "Unknown";
         else if (dim === "department") groupValue = u.department || "Unknown";
         else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
+        else if (dim === "manager") {
+          const mgr = allUsers.find((m: any) => m.id === u.manager_id);
+          groupValue = mgr ? mgr.slack_name : "No manager";
+        }
         else groupValue = getEmployeeTenureBucket(u.start_date, tenureBuckets);
         return [u.id as string, groupValue];
       })
@@ -546,7 +552,7 @@ export default async function AnalyticsPage({
     functionId: params.functionId || null,
     department: params.department || null,
   };
-  const heatmapDim = (["role", "department", "level", "tenure"].includes(params.heatmap_dim || "")
+  const heatmapDim = (["role", "department", "level", "tenure", "manager"].includes(params.heatmap_dim || "")
     ? params.heatmap_dim
     : "role") as HeatmapDim;
 
