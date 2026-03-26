@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
+  Info,
   Loader2,
   ArrowRight,
   X,
@@ -309,9 +310,9 @@ export default function ImportPage() {
           matchedManagerId = mgr.id;
         } else if (csvEmails.has(m.manager_email)) {
           // Manager is in the same CSV — will be resolved in the edge function
-          warnings.push(`Manager "${m.manager_email}" will be created in this import`);
+          warnings.push(`info:manager_in_csv:Manager "${m.manager_email}" will be created in this import`);
         } else {
-          warnings.push(`Manager "${m.manager_email}" not found in system`);
+          warnings.push(`warn:manager_missing:Manager "${m.manager_email}" not found in system`);
         }
       }
 
@@ -325,13 +326,13 @@ export default function ImportPage() {
         } else if (byGrade) {
           matchedLevelId = byGrade;
         } else {
-          warnings.push(`Level "${m.level}" not found. Check Job Families.`);
+          warnings.push(`warn:level_missing:Level "${m.level}" not found. Check Job Families.`);
         }
       }
 
       // Role validation
       if (m.role && !VALID_ROLES.includes(m.role)) {
-        warnings.push(`Invalid role "${m.role}", will default to "user"`);
+        warnings.push(`info:role_default:Invalid role "${m.role}", will default to "user"`);
       }
 
       return { ...m, matchedUserId, matchedManagerId, matchedLevelId, action, errors, warnings };
@@ -404,7 +405,10 @@ export default function ImportPage() {
   const createCount = validated.filter((v) => v.action === "create" && v.errors.length === 0).length;
   const updateCount = validated.filter((v) => v.action === "update" && v.errors.length === 0).length;
   const errorCount = validated.filter((v) => v.errors.length > 0).length;
-  const warningCount = validated.filter((v) => v.warnings.length > 0 && v.errors.length === 0).length;
+  const realWarnings = validated.flatMap((v) => v.warnings.filter((w) => w.startsWith("warn:")));
+  const infoNotes = validated.flatMap((v) => v.warnings.filter((w) => w.startsWith("info:")));
+  const warningCount = realWarnings.length;
+  const infoCount = infoNotes.length;
   const totalValid = createCount + updateCount;
 
   // ----------------------------------------------------------------
@@ -640,6 +644,14 @@ export default function ImportPage() {
                   </span>
                 </div>
               )}
+              {infoCount > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-400/10">
+                  <Info className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                  <span className="text-xs font-medium text-sky-700 dark:text-sky-400">
+                    {infoCount} note{infoCount !== 1 ? "s" : ""}
+                  </span>
+                </div>
+              )}
               {warningCount > 0 && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-400/10">
                   <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
@@ -715,13 +727,46 @@ export default function ImportPage() {
                         )}
                       </div>
                       {(row.errors.length > 0 || row.warnings.length > 0) && (
-                        <div className="mt-1 space-y-0.5">
+                        <div className="mt-1.5 space-y-1">
                           {row.errors.map((e, i) => (
-                            <p key={i} className="text-red-600 dark:text-red-400">{e}</p>
+                            <div key={`e${i}`} className="flex items-start gap-1.5 text-xs text-red-600 dark:text-red-400">
+                              <span className="shrink-0 mt-0.5">✕</span>
+                              <span>{e}</span>
+                            </div>
                           ))}
-                          {row.warnings.map((w, i) => (
-                            <p key={i} className="text-amber-600 dark:text-amber-400">{w}</p>
-                          ))}
+                          {row.warnings.map((w, i) => {
+                            const [severity, type, ...msgParts] = w.split(":");
+                            const msg = msgParts.join(":");
+                            const isInfo = severity === "info";
+
+                            const resolutionTips: Record<string, string> = {
+                              manager_in_csv: "No action needed — manager will be created first, then linked automatically.",
+                              manager_missing: "Options: Add the manager to this CSV, create them manually first, or import without — assign manager later in Directory.",
+                              level_missing: "Options: Go to Job Families to create this level first, or import without — assign level later in Directory.",
+                              role_default: "Will be imported as regular user. You can change their role later in Directory.",
+                            };
+
+                            const tip = resolutionTips[type] || "";
+
+                            return (
+                              <div key={`w${i}`} className="group relative">
+                                <div className={`flex items-start gap-1.5 text-xs cursor-help ${
+                                  isInfo
+                                    ? "text-sky-600 dark:text-sky-400"
+                                    : "text-amber-600 dark:text-amber-400"
+                                }`}>
+                                  <span className="shrink-0 mt-0.5">{isInfo ? "ℹ" : "⚠"}</span>
+                                  <span>{msg}</span>
+                                </div>
+                                {tip && (
+                                  <div className="hidden group-hover:block absolute left-4 top-full z-50 mt-1 w-72 p-2.5 rounded-lg bg-popover border shadow-lg text-xs text-popover-foreground">
+                                    <p className="font-medium mb-1">{isInfo ? "ℹ️ Info" : "💡 How to resolve"}</p>
+                                    <p className="text-muted-foreground leading-relaxed">{tip}</p>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
