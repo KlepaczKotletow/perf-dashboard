@@ -1503,8 +1503,16 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Expire existing active conversation_states for this user+assignment
-        await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&assignment_id=eq.${assignmentId}&status=eq.active`, { status: "expired" });
+        // Expire ALL active conversations for this user (one at a time rule)
+        const activeConvs = await dbQuery("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active&select=id,employee_name,cycle_name`);
+        if (activeConvs && activeConvs.length > 0 && !activeConvs.error) {
+          await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active`, { status: "expired" });
+          const prevName = activeConvs[0].employee_name || "someone";
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: `⏸️ Your previous review for *${prevName}* has been paused. Starting new review below.`,
+          });
+        }
 
         // Get workspace rating scale (default 1-5 if not set)
         const wsRatingScale = ws.rating_scale || { min: 1, max: 5, labels: { "1": "Needs improvement", "2": "Below expectations", "3": "Meets expectations", "4": "Exceeds expectations", "5": "Exceptional" } };
