@@ -58,7 +58,7 @@ export const getUserWorkspace = cache(async () => {
   // Now fetch workspace settings using the DB-verified workspace_id
   const { data: wsData } = await supabase
     .from("workspaces")
-    .select("team_name, onboarding_completed, rating_scale")
+    .select("team_name, onboarding_completed, rating_scale, logo_url")
     .eq("id", dbUser.workspace_id)
     .single()
 
@@ -73,6 +73,7 @@ export const getUserWorkspace = cache(async () => {
     appUserId: dbUser.id,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
     ratingScale: wsData?.rating_scale as { min: number; max: number; labels: Record<string, string> } | null,
+    logoUrl: (wsData as any)?.logo_url as string | null,
   }
 })
 

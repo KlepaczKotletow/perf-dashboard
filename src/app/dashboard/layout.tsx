@@ -112,14 +112,18 @@ export default async function DashboardLayout({
       {/* Sidebar — wrapped in SidebarWrapper for mobile drawer behaviour */}
       <SidebarWrapper>
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b border-sidebar-border">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground text-xs font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
-            </div>
-            <div className="min-w-0">
-              <span className="font-semibold text-[15px] text-sidebar-foreground tracking-tight block truncate">{workspace?.workspaceName || "Nami"}</span>
-              <span className="text-[10px] text-muted-foreground/60 italic tracking-wide" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
+        <div className="h-14 flex items-center px-4 border-b border-sidebar-border">
+          <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+            {workspace?.logoUrl ? (
+              <img src={workspace.logoUrl} alt="" className="h-8 w-8 rounded-lg object-cover shrink-0" />
+            ) : (
+              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                <span className="text-primary-foreground text-sm font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
+              </div>
+            )}
+            <div className="min-w-0 leading-tight">
+              <span className="font-semibold text-sm text-sidebar-foreground tracking-tight block truncate">{workspace?.workspaceName || "Nami"}</span>
+              <span className="text-[9px] text-muted-foreground/50 italic" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
             </div>
           </Link>
         </div>

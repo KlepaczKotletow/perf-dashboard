@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase";
 import {
   Building2, Star, Save, Check, Eye, Bell, MessageSquare,
-  Shield, Link2,
+  Shield, Link2, Upload, X,
 } from "lucide-react";
 
 interface Props {
@@ -18,6 +18,7 @@ interface Props {
     id: string;
     teamName: string;
     teamId: string;
+    logoUrl: string | null;
     ratingScale: { min: number; max: number; labels: Record<string, string> };
     installedAt: string | null;
   };
@@ -25,9 +26,12 @@ interface Props {
 
 export function SettingsClient({ workspace }: Props) {
   const [teamName, setTeamName] = useState(workspace.teamName);
+  const [logoUrl, setLogoUrl] = useState(workspace.logoUrl);
+  const [uploading, setUploading] = useState(false);
   const [ratingScale, setRatingScale] = useState(workspace.ratingScale);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Review visibility & process settings (stored locally for now, DB migration later)
   const [peerAnonymity, setPeerAnonymity] = useState(true);
@@ -42,6 +46,39 @@ export function SettingsClient({ workspace }: Props) {
     }));
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Logo must be under 2MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const supabase = createClient();
+      const ext = file.name.split(".").pop() || "png";
+      const path = `logos/${workspace.id}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("workspace-assets")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) {
+        // If bucket doesn't exist, store as data URL fallback
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const dataUrl = ev.target?.result as string;
+          setLogoUrl(dataUrl);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("workspace-assets").getPublicUrl(path);
+      setLogoUrl(urlData.publicUrl + "?t=" + Date.now());
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
@@ -51,6 +88,7 @@ export function SettingsClient({ workspace }: Props) {
         .from("workspaces")
         .update({
           team_name: teamName,
+          logo_url: logoUrl,
           rating_scale: ratingScale,
           updated_at: new Date().toISOString(),
         })
@@ -87,28 +125,78 @@ export function SettingsClient({ workspace }: Props) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="grid grid-cols-2 gap-5">
+          {/* Logo + Name row */}
+          <div className="flex items-start gap-5">
             <div className="space-y-2">
-              <Label htmlFor="teamName">Organisation name</Label>
-              <Input
-                id="teamName"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-                placeholder="Your company name"
-              />
-              <p className="text-[11px] text-muted-foreground">Shown in Nami bot messages and review headers</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Slack workspace</Label>
-              <div className="flex items-center gap-2">
-                <Input value={workspace.teamId} disabled className="font-mono text-xs" />
-                <Badge variant="secondary" className="shrink-0 text-[10px]">Connected</Badge>
+              <Label>Logo</Label>
+              <div className="relative group">
+                {logoUrl ? (
+                  <div className="relative">
+                    <img
+                      src={logoUrl}
+                      alt="Logo"
+                      className="h-16 w-16 rounded-xl object-cover border border-border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setLogoUrl(null)}
+                      className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="h-16 w-16 rounded-xl border-2 border-dashed border-border hover:border-primary/50 flex flex-col items-center justify-center gap-1 transition-colors"
+                  >
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-[9px] text-muted-foreground">{uploading ? "..." : "Upload"}</span>
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                />
               </div>
-              {workspace.installedAt && (
-                <p className="text-[11px] text-muted-foreground">
-                  Since {new Date(workspace.installedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                </p>
+              {logoUrl && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Change
+                </button>
               )}
+            </div>
+            <div className="flex-1 grid grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="teamName">Organisation name</Label>
+                <Input
+                  id="teamName"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="Your company name"
+                />
+                <p className="text-[11px] text-muted-foreground">Shown in Nami bot messages and review headers</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Slack workspace</Label>
+                <div className="flex items-center gap-2">
+                  <Input value={workspace.teamId} disabled className="font-mono text-xs" />
+                  <Badge variant="secondary" className="shrink-0 text-[10px]">Connected</Badge>
+                </div>
+                {workspace.installedAt && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Since {new Date(workspace.installedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
