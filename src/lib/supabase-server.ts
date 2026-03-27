@@ -47,20 +47,29 @@ export const getUserWorkspace = cache(async () => {
   // SECURITY: Look up the user by slack_user_id (from JWT, not editable by user).
   // Never trust app_user_id or workspace_id from user_metadata — those can be
   // modified by calling supabase.auth.updateUser().
+  // Also filter out deactivated users — removed from Slack workspace = no dashboard access.
   const { data: dbUser } = await supabase
     .from('users')
-    .select('id, workspace_id, role, slack_name, department')
+    .select('id, workspace_id, role, slack_name, department, employee_status')
     .eq('slack_user_id', slackUserId)
+    .neq('employee_status', 'deactivated')
     .single()
 
   if (!dbUser) return null
 
-  // Now fetch workspace settings using the DB-verified workspace_id
-  const { data: wsData } = await supabase
-    .from("workspaces")
-    .select("team_name, onboarding_completed, rating_scale, logo_url")
-    .eq("id", dbUser.workspace_id)
-    .single()
+  // Now fetch workspace settings and check for direct reports in parallel
+  const [{ data: wsData }, { count: directReportCount }] = await Promise.all([
+    supabase
+      .from("workspaces")
+      .select("team_name, onboarding_completed, rating_scale, logo_url")
+      .eq("id", dbUser.workspace_id)
+      .single(),
+    supabase
+      .from("users")
+      .select("id", { count: "exact", head: true })
+      .eq("manager_id", dbUser.id)
+      .eq("workspace_id", dbUser.workspace_id),
+  ])
 
   return {
     userId: user.id,
@@ -71,6 +80,7 @@ export const getUserWorkspace = cache(async () => {
     role: dbUser.role || 'user',
     slackUserId,
     appUserId: dbUser.id,
+    hasDirectReports: (directReportCount ?? 0) > 0,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
     ratingScale: wsData?.rating_scale as { min: number; max: number; labels: Record<string, string> } | null,
     logoUrl: (wsData as any)?.logo_url as string | null,

@@ -566,5 +566,42 @@ Deno.serve(async (req) => {
     void processing;
   }
 
+  // ================================================================
+  //  SECURITY: Handle team_leave — deactivate user when removed from Slack
+  // ================================================================
+  if (innerEvent?.type === "team_leave") {
+    const slackUserId = innerEvent.user?.id;
+    const teamId = event.team_id;
+
+    if (slackUserId && teamId) {
+      const deactivation = (async () => {
+        try {
+          const { data: workspace } = await supabase
+            .from("workspaces")
+            .select("id")
+            .eq("team_id", teamId)
+            .single();
+
+          if (workspace) {
+            const { error } = await supabase
+              .from("users")
+              .update({ employee_status: "deactivated", updated_at: new Date().toISOString() })
+              .eq("slack_user_id", slackUserId)
+              .eq("workspace_id", workspace.id);
+
+            if (error) {
+              console.error("[slack-events] Failed to deactivate user:", error.message);
+            } else {
+              console.log("[slack-events] Deactivated user:", slackUserId, "from workspace:", teamId);
+            }
+          }
+        } catch (err) {
+          console.error("[slack-events] Error handling team_leave:", err);
+        }
+      })();
+      void deactivation;
+    }
+  }
+
   return new Response("OK", { status: 200 });
 });
