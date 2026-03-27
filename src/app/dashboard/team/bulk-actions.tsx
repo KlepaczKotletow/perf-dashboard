@@ -6,15 +6,16 @@ import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, Loader2, Check } from "lucide-react";
+import { X, Loader2, Check, UserX, UserCheck } from "lucide-react";
 
 interface BulkActionsProps {
   selectedIds: string[];
   users: { id: string; slack_name: string | null; department: string | null }[];
+  currentUserId?: string;
   onDone: () => void;
 }
 
-export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
+export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkActionsProps) {
   const router = useRouter();
   const [action, setAction] = useState<string>("");
   const [value, setValue] = useState("");
@@ -131,9 +132,22 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
     if (action === "manager") updateData.manager_id = value === "none" ? null : value;
     if (action === "function_level") updateData.level_id = value === "none" ? null : value;
     if (action === "role") updateData.role = value;
+    if (action === "deactivate") updateData.employee_status = "deactivated";
+    if (action === "reactivate") updateData.employee_status = "active";
+
+    // Guard: prevent self-deactivation
+    const idsToUpdate = (action === "deactivate" && currentUserId)
+      ? selectedIds.filter((id) => id !== currentUserId)
+      : selectedIds;
+
+    if (idsToUpdate.length === 0) {
+      setApplyError("You cannot deactivate yourself.");
+      setApplying(false);
+      return;
+    }
 
     const results = await Promise.all(
-      selectedIds.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
+      idsToUpdate.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
     );
 
     const failed = results.filter((r) => r.error).length;
@@ -284,7 +298,7 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
       <Button
         size="sm"
         className="h-8 text-xs"
-        disabled={!action || !value || applying}
+        disabled={!action || (!value && action !== "deactivate" && action !== "reactivate") || applying}
         onClick={apply}
       >
         {applying ? (
@@ -295,6 +309,30 @@ export function BulkActions({ selectedIds, users, onDone }: BulkActionsProps) {
             Apply
           </>
         )}
+      </Button>
+
+      <div className="h-5 w-px bg-border" />
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+        disabled={applying}
+        onClick={() => { setAction("deactivate"); setValue("confirm"); }}
+      >
+        <UserX className="h-3.5 w-3.5 mr-1" />
+        Deactivate
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+        disabled={applying}
+        onClick={() => { setAction("reactivate"); setValue("confirm"); }}
+      >
+        <UserCheck className="h-3.5 w-3.5 mr-1" />
+        Reactivate
       </Button>
 
       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDone}>

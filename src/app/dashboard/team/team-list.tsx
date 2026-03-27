@@ -292,6 +292,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
         <BulkActions
           selectedIds={Array.from(selected)}
           users={displayUsers}
+          currentUserId={currentUserId}
           onDone={clearSelection}
         />
       )}

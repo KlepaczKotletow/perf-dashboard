@@ -6,7 +6,8 @@ import Link from "next/link";
 import { ArrowLeft, Mail, Pencil, Users } from "lucide-react";
 import { gradeColor, getQuarterLabel } from "@/lib/status";
 import { getUserWorkspace } from "@/lib/supabase-server";
-import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
+import { isHROrAbove, isManagerOrAbove, isAdmin } from "@/lib/roles";
+import { DeactivateButton } from "./deactivate-button";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { getAssignmentStatus, GOAL_TRACKING_STATUS } from "@/lib/status";
@@ -202,12 +203,21 @@ export default async function EmployeeProfilePage({
               </div>
             </div>
             {canEdit && (
-              <Button variant="outline" size="sm" className="text-xs shrink-0" asChild>
-                <Link href={`/dashboard/team/${id}/edit`}>
-                  <Pencil className="h-3 w-3 mr-1.5" />
-                  Edit
-                </Link>
-              </Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="text-xs" asChild>
+                  <Link href={`/dashboard/team/${id}/edit`}>
+                    <Pencil className="h-3 w-3 mr-1.5" />
+                    Edit
+                  </Link>
+                </Button>
+                {isAdmin(workspace?.role) && !isViewingOwnProfile && (
+                  <DeactivateButton
+                    userId={id}
+                    workspaceId={workspace.workspaceId}
+                    isDeactivated={user.employee_status === "deactivated"}
+                  />
+                )}
+              </div>
             )}
           </div>
         </div>
