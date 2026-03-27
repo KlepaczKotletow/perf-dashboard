@@ -65,6 +65,40 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
     ? levels.filter((l) => l.job_family_id === selectedFunctionId)
     : [];
 
+  async function applyStatusChange(newStatus: "deactivated" | "active") {
+    setApplying(true);
+    setApplyError(null);
+
+    const identity = await getClientIdentity(supabase);
+    const wsId = identity?.workspaceId;
+
+    const idsToUpdate = (newStatus === "deactivated" && currentUserId)
+      ? selectedIds.filter((id) => id !== currentUserId)
+      : selectedIds;
+
+    if (idsToUpdate.length === 0) {
+      setApplyError("You cannot deactivate yourself.");
+      setApplying(false);
+      return;
+    }
+
+    const updateData = { employee_status: newStatus, updated_at: new Date().toISOString() };
+    const results = await Promise.all(
+      idsToUpdate.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
+    );
+
+    const failed = results.filter((r) => r.error).length;
+    setApplying(false);
+
+    if (failed > 0) {
+      setApplyError(`${failed} update${failed !== 1 ? "s" : ""} failed. Please try again.`);
+      return;
+    }
+
+    onDone();
+    router.refresh();
+  }
+
   async function apply() {
     if (!action || !value) return;
     setApplying(true);
@@ -132,22 +166,8 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
     if (action === "manager") updateData.manager_id = value === "none" ? null : value;
     if (action === "function_level") updateData.level_id = value === "none" ? null : value;
     if (action === "role") updateData.role = value;
-    if (action === "deactivate") updateData.employee_status = "deactivated";
-    if (action === "reactivate") updateData.employee_status = "active";
-
-    // Guard: prevent self-deactivation
-    const idsToUpdate = (action === "deactivate" && currentUserId)
-      ? selectedIds.filter((id) => id !== currentUserId)
-      : selectedIds;
-
-    if (idsToUpdate.length === 0) {
-      setApplyError("You cannot deactivate yourself.");
-      setApplying(false);
-      return;
-    }
-
     const results = await Promise.all(
-      idsToUpdate.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
+      selectedIds.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
     );
 
     const failed = results.filter((r) => r.error).length;
@@ -298,7 +318,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       <Button
         size="sm"
         className="h-8 text-xs"
-        disabled={!action || (!value && action !== "deactivate" && action !== "reactivate") || applying}
+        disabled={!action || !value || applying}
         onClick={apply}
       >
         {applying ? (
@@ -318,7 +338,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         variant="outline"
         className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
         disabled={applying}
-        onClick={() => { setAction("deactivate"); setValue("confirm"); }}
+        onClick={() => applyStatusChange("deactivated")}
       >
         <UserX className="h-3.5 w-3.5 mr-1" />
         Deactivate
@@ -329,7 +349,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         variant="outline"
         className="h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
         disabled={applying}
-        onClick={() => { setAction("reactivate"); setValue("confirm"); }}
+        onClick={() => applyStatusChange("active")}
       >
         <UserCheck className="h-3.5 w-3.5 mr-1" />
         Reactivate
