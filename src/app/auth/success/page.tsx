@@ -1,14 +1,28 @@
 "use client";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight, Users, Settings, BarChart3, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { createBrowserClient } from "@supabase/ssr";
 
 function AuthSuccessContent() {
   const searchParams = useSearchParams();
   const team = searchParams.get("team");
   const returning = searchParams.get("returning") === "true";
+  const needsSignin = searchParams.get("needs_signin") === "true";
+
+  // SECURITY: If we landed here from OAuth install without a proper magic link,
+  // sign out any stale session to prevent cross-workspace data leakage.
+  useEffect(() => {
+    if (needsSignin) {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      supabase.auth.signOut();
+    }
+  }, [needsSignin]);
 
   if (returning) {
     return (
@@ -101,10 +115,17 @@ function AuthSuccessContent() {
 
         {/* CTA */}
         <Button size="sm" asChild className="gap-1.5">
-          <Link href="/dashboard">
-            Go to Dashboard
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
+          {needsSignin ? (
+            <a href={`${(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim()}/functions/v1/dashboard-auth`}>
+              Sign in with Slack
+              <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+          ) : (
+            <Link href="/dashboard">
+              Go to Dashboard
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </Button>
       </div>
     </div>

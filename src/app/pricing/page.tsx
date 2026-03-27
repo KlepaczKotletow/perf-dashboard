@@ -132,7 +132,7 @@ export default function PricingPage() {
               Home
             </Link>
             <Button size="sm" variant="outline" asChild>
-              <a href={`${process.env.NEXT_PUBLIC_SUPABASE_URL || ""}/functions/v1/dashboard-auth`}>
+              <a href={`${(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim()}/functions/v1/dashboard-auth`}>
                 Sign in
               </a>
             </Button>
