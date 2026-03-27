@@ -1,50 +1,141 @@
 ---
 title: "Security & Privacy"
+description: "How Perf protects your data — tenant isolation, encryption, compliance, and data handling"
 category: "Admin & Billing"
-roles: ["all"]
+audience: ["all"]
 order: 3
+icon: "Shield"
 ---
 
 # Security & Privacy
 
 <RoleTag role="all" />
 
-Perf takes the security and privacy of your performance data seriously. Here is how your information is protected.
+Perf takes the security and privacy of your performance data seriously. This article explains how your data is protected, who can see what, and what commitments we make regarding your information.
 
 ## Who Can See What
+
+Perf enforces strict role-based visibility at the API level — not just the UI. Even if someone manipulates a URL or API call, they cannot access data outside their permissions.
 
 | Data | Employee | Manager | HR / Admin |
 |---|---|---|---|
 | Own review & rating | After Communication phase | Yes | Yes |
-| Direct report reviews | -- | Yes | Yes |
-| Peer feedback (attributed) | -- | Yes | Yes |
+| Direct report reviews | — | Yes | Yes |
+| Peer feedback (attributed) | — | Yes | Yes |
 | Peer feedback (anonymous) | Aggregated only | Aggregated only | Aggregated only |
-| Calibration data | -- | -- | Yes |
-| Analytics (org-wide) | -- | Own team only | Full access |
+| Calibration data | — | — | Yes |
+| Analytics (org-wide) | — | Own team only | Full access |
+| Survey results | — | — | Yes |
 | Kudos received (shared) | Yes | Direct reports | All |
-| Kudos received (not shared) | -- | Direct reports | All |
+| Kudos received (not shared) | — | Direct reports | All |
 | Kudos sent | Own only | Own only | All |
+| Goal progress | Own + company goals | Own team + company | All |
 
 <Callout type="info">
-Visibility rules are enforced at the API level, not just the UI. Even if someone manipulates a URL, they cannot access data outside their permissions.
+Visibility rules are enforced at the database level using Row-Level Security (RLS) policies, not just the application layer. This means even direct database queries are subject to tenant and role restrictions.
 </Callout>
 
-## Workspace Isolation
+## Workspace Isolation (Multi-Tenancy)
 
-Each Slack workspace maps to a single Perf tenant. Data is strictly isolated between tenants -- no cross-workspace access is possible.
+Each Slack workspace maps to a single Perf tenant. Your data is strictly isolated from all other organizations using multiple layers of protection:
 
-## Where Data Is Stored
+- **Row-Level Security (RLS):** Every table in the database has RLS policies that filter data by workspace. Queries automatically return only data belonging to your workspace — this is enforced at the PostgreSQL level, not just in application code.
+- **Cross-tenant validation triggers:** Database triggers on key tables (reviews, feedback, goals, participants) prevent inserting records that reference entities from another workspace. Other tables are protected by RLS policies and foreign key constraints.
+- **Verified identity resolution:** Your workspace identity is determined from your Slack user ID in the authentication token — not from any user-editable field. This prevents workspace spoofing.
 
-All application data is stored in **Supabase** (PostgreSQL) with row-level security policies ensuring tenant isolation. Data is encrypted at rest and in transit.
+<Callout type="tip">
+All 28 database tables have RLS enabled. There are zero tables that allow cross-workspace data access.
+</Callout>
 
-## Slack Token Handling
+## Encryption & Infrastructure
 
-When you sign in via Slack OAuth, Perf receives an access token scoped to the permissions it needs (identity, messaging via Nami). Tokens are stored encrypted and are never exposed in client-side code or logs.
+| Layer | Protection |
+|---|---|
+| **Data at rest** | AES-256 encryption via AWS (Supabase infrastructure) |
+| **Data in transit** | TLS 1.2+ for all connections |
+| **Authentication** | Slack OAuth 2.0 with JWT session tokens |
+| **Backups** | Automated daily backups with encryption, retained for disaster recovery |
+| **Hosting** | Supabase (SOC 2 Type II certified) on AWS; application hosted on Vercel |
+
+## Slack Integration Scope
+
+When you sign in via Slack OAuth, Perf receives an access token scoped to only the permissions it needs:
+
+| Slack Scope | What It Does |
+|---|---|
+| `users:read` / `users:read.email` | Read workspace member names and emails for directory sync |
+| `chat:write` | Send review prompts and reminders via the Nami bot |
+| `im:read` / `im:write` / `im:history` | Handle direct message conversations with the Nami bot |
+| `commands` | Support slash commands (e.g., `/kudos`) |
+| `app_mentions:read` | Detect when the Perf bot is mentioned |
 
 <Callout type="warning">
-Perf never accesses your Slack message history, files, or channels. The Slack integration is limited to authentication and Nami bot messaging.
+Perf never reads your Slack channels, group messages, files, or general message history. The integration is limited to authentication, directory sync, and Nami bot direct messages.
+</Callout>
+
+## What Data We Store
+
+Perf stores **workplace performance data** — review ratings, feedback, goals, competencies, and survey responses. We do **not** store or require:
+
+- Financial data (credit card info is handled entirely by Stripe)
+- Government IDs or social security numbers
+- Health or medical records
+- Biometric data
+- Home addresses or phone numbers
+
+<Callout type="info">
+Because we don't store highly sensitive personal data categories, the impact of a hypothetical data exposure is limited to workplace performance information — not financial, medical, or identity data.
 </Callout>
 
 ## Data Retention
 
-Review and feedback data is retained for the lifetime of your workspace. If you cancel your subscription, you can request a full data export before your workspace is deactivated.
+| Scenario | Retention Period |
+|---|---|
+| **Active subscription** | Data retained indefinitely while your workspace is active |
+| **After cancellation** | Data retained for up to 30 days to allow export, then deleted upon request or at end of retention period |
+| **Backups after deletion** | Automatically purged within 30 additional days |
+| **Legal hold** | Data may be retained longer if required by law or regulation |
+
+You can export your data at any time using the CSV export features in Analytics and Surveys.
+
+## Compliance & Legal
+
+- **Terms of Service:** Our [Terms of Service](/terms) detail your rights, our liability limitations, and data handling obligations.
+- **Privacy Policy:** Our [Privacy Policy](/privacy) explains exactly what data we collect, how we use it, and your rights under GDPR, CCPA, and other privacy laws.
+- **Data Processing Agreement (DPA):** Available on request for GDPR compliance. Contact [legal@getperf.com](mailto:legal@getperf.com).
+- **Subprocessor transparency:** We list all third-party services that process your data in our Privacy Policy and notify workspace admins 30 days before adding new subprocessors.
+
+### Third-Party Services (Subprocessors)
+
+| Provider | Purpose | Data Processed |
+|---|---|---|
+| Slack (Salesforce) | Authentication, bot messaging | User IDs, bot tokens, DM content |
+| Stripe | Payment processing | Email, subscription plan, payment status |
+| Supabase (AWS) | Database, authentication | All Customer Data (encrypted) |
+| Vercel | Application hosting | Anonymized performance metrics only |
+
+## Incident Response
+
+In the event of a confirmed security incident affecting your data:
+
+1. We investigate and contain the incident immediately
+2. We notify affected workspace administrators within 72 hours
+3. We provide details: what happened, what data was affected, and what steps we're taking
+4. We notify regulatory authorities as required by applicable law (GDPR, state breach notification laws)
+5. We cooperate with your organization's own incident response efforts
+
+<Callout type="info">
+Unsuccessful attempts (port scans, failed login attempts, blocked attacks) are not classified as security incidents and do not trigger notification procedures.
+</Callout>
+
+## Your Rights
+
+All users have the right to:
+
+- **Access** — Request a copy of personal data we hold about you
+- **Correction** — Request correction of inaccurate data
+- **Deletion** — Request deletion of your data (workspace admins can initiate this)
+- **Export** — Download your data in CSV format via the dashboard
+- **Withdraw consent** — Uninstall the Slack app to stop all data processing
+
+For privacy inquiries, contact [privacy@getperf.com](mailto:privacy@getperf.com).

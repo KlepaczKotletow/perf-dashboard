@@ -5,7 +5,8 @@ import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 async function getGoals(
   workspaceId: string | undefined,
   role: string | undefined,
-  currentUserId: string | null
+  currentUserId: string | null,
+  hasDirectReports?: boolean,
 ) {
   const supabase = await createServerSupabaseClient();
 
@@ -38,7 +39,7 @@ async function getGoals(
     return data || [];
   }
 
-  if (isManagerOrAbove(role)) {
+  if (isManagerOrAbove(role) || hasDirectReports) {
     // Manager — company goals + team goals + individual goals for self and direct reports
     const { data: reports, error: reportsErr } = await supabase
       .from("users")
@@ -87,7 +88,7 @@ export default async function GoalsPage() {
   const currentUserId = workspace?.appUserId ?? null;
 
   const [goals, cycles] = await Promise.all([
-    getGoals(workspace?.workspaceId, role, currentUserId),
+    getGoals(workspace?.workspaceId, role, currentUserId, workspace?.hasDirectReports),
     getCycles(workspace?.workspaceId),
   ]);
 

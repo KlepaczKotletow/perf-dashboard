@@ -54,6 +54,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   const [role, setRole] = useState("user");
   const [employeeStatus, setEmployeeStatus] = useState("active");
   const [isDeptHead, setIsDeptHead] = useState(false);
+  const [callerRole, setCallerRole] = useState<string>("user");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -72,7 +73,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         }
         const { data: callerUser } = await supabase
           .from("users")
-          .select("workspace_id")
+          .select("workspace_id, role")
           .eq("slack_email", authUser.email)
           .single();
         const wsId = callerUser?.workspace_id;
@@ -80,6 +81,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           setError("Workspace not found");
           return;
         }
+        setCallerRole(callerUser.role || "user");
 
         // Load the user
         const { data: userData, error: userError } = await supabase
@@ -146,24 +148,30 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
       if (!authUser?.email) { setError("Not authenticated"); return; }
       const { data: callerUser } = await supabase
         .from("users")
-        .select("workspace_id")
+        .select("workspace_id, role")
         .eq("slack_email", authUser.email)
         .single();
       const wsId = callerUser?.workspace_id;
       if (!wsId) { setError("Workspace not found"); return; }
 
+      // Only admins can change roles — HR can edit other fields but not role
+      const callerIsAdmin = callerUser?.role === "admin";
+      const updatePayload: Record<string, any> = {
+        job_title: jobTitle || null,
+        department: department || null,
+        manager_id: managerId === "__none__" ? null : managerId || null,
+        level_id: levelId === "__none__" ? null : levelId || null,
+        start_date: hireDate || null,
+        employee_status: employeeStatus,
+        is_department_head: isDeptHead,
+      };
+      if (callerIsAdmin) {
+        updatePayload.role = role;
+      }
+
       const { error: updateError } = await supabase
         .from("users")
-        .update({
-          job_title: jobTitle || null,
-          department: department || null,
-          manager_id: managerId === "__none__" ? null : managerId || null,
-          level_id: levelId === "__none__" ? null : levelId || null,
-          start_date: hireDate || null,
-          role,
-          employee_status: employeeStatus,
-          is_department_head: isDeptHead,
-        })
+        .update(updatePayload)
         .eq("id", id)
         .eq("workspace_id", wsId);
 
@@ -229,16 +237,22 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="role">System Role</Label>
-              <Select value={role} onValueChange={setRole}>
-                <SelectTrigger id="role">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Employee</SelectItem>
-                  <SelectItem value="hr">HR</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
+              {callerRole === "admin" ? (
+                <Select value={role} onValueChange={setRole}>
+                  <SelectTrigger id="role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">Employee</SelectItem>
+                    <SelectItem value="hr">HR</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="flex items-center h-10 px-3 text-sm text-muted-foreground border border-input rounded-md bg-muted/50">
+                  {role === "admin" ? "Admin" : role === "hr" ? "HR" : "Employee"}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Employment Status</Label>

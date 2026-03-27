@@ -73,6 +73,15 @@ Deno.serve(async (req) => {
         body: JSON.stringify(data),
       });
     }
+    async function dbDelete(table: string, query: string) {
+      return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+        method: "DELETE",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+      });
+    }
     async function slackApi(token: string, method: string, data: any) {
       return (await fetch(`https://slack.com/api/${method}`, {
         method: "POST",
@@ -801,9 +810,11 @@ Deno.serve(async (req) => {
           remainingText = remCount > 0 ? `You have *${remCount} more review${remCount > 1 ? "s" : ""}* in this cycle. Check the Nami app Home Tab to continue.` : ":tada: *All caught up!* No more reviews in this cycle.";
         }
 
-        // Compact confirmation message
+        // Compact confirmation message with time-limited Edit button
         const avgStr = avgRating > 0 ? (Math.round(avgRating * 10) / 10).toString() : "N/A";
         const confirmLabel = reviewRole === "upward" ? "Upward feedback" : "Review";
+        const editDeadline = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min window
+        const editValue = JSON.stringify({ assignmentId, reviewRole, employeeId: meta.employeeId, deadline: editDeadline });
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `${confirmLabel} submitted — ${empName}`,
@@ -815,6 +826,21 @@ Deno.serve(async (req) => {
             {
               type: "context",
               elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${ws.rating_scale?.max || 5}* · ${ratings.length} competencies rated` }],
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Edit Review", emoji: true },
+                  action_id: "nami_edit_submitted_review",
+                  value: editValue,
+                },
+              ],
+            },
+            {
+              type: "context",
+              elements: [{ type: "mrkdwn", text: "_You can edit this review for 30 minutes._" }],
             },
             ...(remainingText ? [
               { type: "divider" },
@@ -1441,7 +1467,7 @@ Deno.serve(async (req) => {
       }
 
       // ================================================================
-      //  NAMI: Start review (conversational flow with Block Kit buttons)
+      //  NAMI: Start review — opens a modal form (no inline buttons)
       // ================================================================
       if (action?.action_id === "nami_start_review") {
         const raw = action.value || "";
@@ -1474,88 +1500,56 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        // WS3: Send manager context before starting review
+        // WS3: Send manager context before opening form
         if (reviewRole === "manager" && assignment.cycle_id) {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
         }
 
-        const { competencies, empName, cycleId } = await getCompetenciesForAssignment(assignmentId, assignment.employee_id, ws.id);
-        const cycleName = assignment.performance_cycles?.name || "Review";
+        // Open review as a Slack modal (prevents duplicate clicks, cleaner UX)
+        const view = await buildReviewForm(assignmentId, reviewRole, assignment.employee_id, ws.id);
+        await slackApi(botToken, "views.open", {
+          trigger_id: payload.trigger_id,
+          view,
+        });
+        return json({});
+      }
 
-        if (competencies.length === 0) {
+      // ================================================================
+      //  NAMI: Edit submitted review (within 30-minute window)
+      // ================================================================
+      if (action?.action_id === "nami_edit_submitted_review") {
+        const editMeta = safeParse(action.value);
+        const { assignmentId, reviewRole, employeeId, deadline } = editMeta;
+
+        if (!assignmentId || !deadline) return json({});
+
+        // Enforce 30-minute edit window
+        if (new Date(deadline) < new Date()) {
           await slackApi(botToken, "chat.postMessage", {
-            channel: slackUserId,
-            text: "No competencies found for this review. Please use the full form instead.",
+            channel: payload.user.id,
+            text: "The 30-minute edit window has closed. You can still edit this review on the dashboard.",
           });
           return json({});
         }
 
-        const compIds = competencies.map((c: any) => c.id);
-        const compNames = competencies.map((c: any) => c.name);
-        const compDescs = competencies.map((c: any) => c.description || (c.category ? `Category: ${c.category}` : ""));
+        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
 
-        // Get text questions from cycle_questions
-        let textQuestionIds: string[] = [];
-        let textQuestionPrompts: string[] = [];
-        if (cycleId) {
-          const tqs = await dbQuery("cycle_questions", `cycle_id=eq.${cycleId}&question_type=eq.text&select=id,prompt&order=sort_order`);
-          if (tqs && tqs.length > 0 && !tqs.error) {
-            textQuestionIds = tqs.map((q: any) => q.id);
-            textQuestionPrompts = tqs.map((q: any) => q.prompt || "Additional comments");
-          }
-        }
+        const user = await getOrCreateUser(ws.id, payload.user.id, botToken);
+        if (!user) return json({});
 
-        // Expire ALL active conversations for this user (one at a time rule)
-        const activeConvs = await dbQuery("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active&select=id,employee_name,cycle_name`);
-        if (activeConvs && activeConvs.length > 0 && !activeConvs.error) {
-          await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active`, { status: "expired" });
-          const prevName = activeConvs[0].employee_name || "someone";
-          await slackApi(botToken, "chat.postMessage", {
-            channel: slackUserId,
-            text: `⏸️ Your previous review for *${prevName}* has been paused. Starting new review below.`,
-          });
-        }
+        // Delete existing responses so the modal submission can re-insert cleanly
+        await dbDelete("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole || "manager"}`);
 
-        // Get workspace rating scale (default 1-5 if not set)
-        const wsRatingScale = ws.rating_scale || { min: 1, max: 5, labels: { "1": "Needs improvement", "2": "Below expectations", "3": "Meets expectations", "4": "Exceeds expectations", "5": "Exceptional" } };
-
-        const convState = await dbInsert("conversation_states", {
-          workspace_id: ws.id,
-          user_id: user.id,
-          slack_user_id: slackUserId,
-          assignment_id: assignmentId,
-          review_role: reviewRole,
-          employee_name: empName,
-          cycle_name: cycleName,
-          competency_ids: compIds,
-          competency_names: compNames,
-          competency_descriptions: compDescs,
-          current_index: 0,
-          ratings: {},
-          status: "active",
-          phase: "competencies",
-          flow_type: "review",
-          text_question_ids: textQuestionIds,
-          text_question_prompts: textQuestionPrompts,
-          text_responses: {},
-          rating_scale: wsRatingScale,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        // Reset assignment status back to pending so the submit handler can update it
+        await dbUpdate("review_assignments", `id=eq.${assignmentId}`, {
+          status: "pending", overall_rating: null, updated_at: new Date().toISOString(),
         });
 
-        if (!convState?.[0]) {
-          await slackApi(botToken, "chat.postMessage", {
-            channel: slackUserId,
-            text: "Something went wrong starting the review. Please try again.",
-          });
-          return json({});
-        }
-
-        // Send first competency prompt using Nami blocks
-        const blocks = buildCompetencyPrompt(compNames[0], compDescs[0], 0, compNames.length, convState[0].id, assignmentId, wsRatingScale);
-        await slackApi(botToken, "chat.postMessage", {
-          channel: slackUserId,
-          text: `Rate ${compNames[0]} (1/${compNames.length})`,
-          blocks,
+        // Re-open the review modal
+        const view = await buildReviewForm(assignmentId, reviewRole || "manager", employeeId, ws.id);
+        await slackApi(botToken, "views.open", {
+          trigger_id: payload.trigger_id,
+          view,
         });
         return json({});
       }

@@ -31,7 +31,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
     .eq("parent_id", id)
     .eq("workspace_id", workspace?.workspaceId ?? "");
 
-  const canEdit = isManagerOrAbove(workspace?.role as string | undefined);
+  const canEdit = isManagerOrAbove(workspace?.role as string | undefined) || !!workspace?.hasDirectReports;
 
   // Fetch cycles and employees for edit form
   const [{ data: cycles }, { data: employees }] = await Promise.all([

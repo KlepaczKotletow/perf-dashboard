@@ -49,7 +49,7 @@ export default async function ReviewDetailPage({
   const currentUserId = workspace.appUserId;
   const isAssignmentManager = assignment.manager_id === currentUserId;
   const isAssignmentEmployee = assignment.employee_id === currentUserId;
-  const isWorkspaceManager = isManagerOrAbove(workspace.role as any);
+  const isWorkspaceManager = isManagerOrAbove(workspace.role as any) || !!workspace.hasDirectReports;
   const isUpwardReviewer =
     assignment.assignment_type === "upward" &&
     assignment.reviewer_id === currentUserId;

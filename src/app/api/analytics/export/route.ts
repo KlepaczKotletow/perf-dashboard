@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const workspace = await getUserWorkspace();
 
-    if (!workspace || !isManagerOrAbove(workspace.role)) {
+    if (!workspace || (!isManagerOrAbove(workspace.role) && !workspace.hasDirectReports)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

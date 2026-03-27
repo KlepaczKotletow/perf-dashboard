@@ -139,7 +139,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const workspace = await getUserWorkspace();
 
-  if (!isManagerOrAbove(workspace?.role)) {
+  if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>

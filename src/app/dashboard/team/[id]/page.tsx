@@ -138,7 +138,7 @@ export default async function EmployeeProfilePage({
   const { id } = await params;
   const workspace = await getUserWorkspace();
 
-  const canSeeAllRatings = isManagerOrAbove(workspace?.role);
+  const canSeeAllRatings = isManagerOrAbove(workspace?.role) || !!workspace?.hasDirectReports;
   const canEdit = isHROrAbove(workspace?.role);
   const ratingMax = workspace?.ratingScale?.max || 5;
   const isViewingOwnProfile = workspace?.appUserId === id;

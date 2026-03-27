@@ -8,17 +8,36 @@ import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 
 async function getSurveys(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("surveys")
-    .select("id, type, name, status, closes_at, created_at, survey_participants(status)")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
-  if (error) console.error("Failed to fetch surveys:", error.message);
-  return (data || []).map((s: any) => ({
-    ...s,
-    totalParticipants: s.survey_participants?.length ?? 0,
-    completedParticipants: s.survey_participants?.filter((p: any) => p.status === "completed").length ?? 0,
-  }));
+
+  // Query surveys and participant counts separately to avoid nested-embed RLS issues
+  const [{ data: surveys, error: surveyErr }, { data: counts, error: countErr }] = await Promise.all([
+    supabase
+      .from("surveys")
+      .select("id, type, name, status, closes_at, created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("survey_participants")
+      .select("survey_id, status")
+      .eq("workspace_id", workspaceId),
+  ]);
+
+  if (surveyErr) console.error("Failed to fetch surveys:", surveyErr.message);
+  if (countErr) console.error("Failed to fetch survey participants:", countErr.message);
+
+  // Build a per-survey completion map
+  const statsMap = new Map<string, { total: number; completed: number }>();
+  for (const p of counts || []) {
+    const entry = statsMap.get(p.survey_id) || { total: 0, completed: 0 };
+    entry.total++;
+    if (p.status === "completed") entry.completed++;
+    statsMap.set(p.survey_id, entry);
+  }
+
+  return (surveys || []).map((s: any) => {
+    const stats = statsMap.get(s.id) || { total: 0, completed: 0 };
+    return { ...s, totalParticipants: stats.total, completedParticipants: stats.completed };
+  });
 }
 
 const TYPE_LABELS: Record<string, string> = { "360": "360°", pulse: "Pulse", enps: "eNPS" };
@@ -35,7 +54,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function SurveysPage() {
   const workspace = await getUserWorkspace();
-  if (!isManagerOrAbove(workspace?.role)) {
+  if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">

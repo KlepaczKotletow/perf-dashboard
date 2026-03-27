@@ -8,7 +8,7 @@ export default async function FunctionsPage() {
   const supabase = await createServerSupabaseClient();
   const workspace = await getUserWorkspace();
 
-  if (!workspace || !isManagerOrAbove(workspace.role)) {
+  if (!workspace || (!isManagerOrAbove(workspace.role) && !workspace.hasDirectReports)) {
     redirect("/dashboard");
   }
 

@@ -42,7 +42,7 @@ const proficiencyLabels: Record<number, string> = {
 export default async function CompetencyMatrixPage() {
   const workspace = await getUserWorkspace();
   
-  if (!isManagerOrAbove(workspace?.role)) {
+  if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Lock className="h-16 w-16 text-muted-foreground mb-4" />

@@ -12,16 +12,24 @@ import { SurveyResults } from "./survey-results";
 
 async function getSurvey(id: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
-  const { data } = await supabase
-    .from("surveys")
-    .select(`
-      id, type, name, status, config, closes_at, created_at,
-      survey_participants(id, user_id, subject_user_id, role, status)
-    `)
-    .eq("id", id)
-    .eq("workspace_id", workspaceId)
-    .single();
-  return data;
+
+  // Query survey and participants separately to avoid nested-embed RLS issues
+  const [{ data: survey }, { data: participants }] = await Promise.all([
+    supabase
+      .from("surveys")
+      .select("id, type, name, status, config, closes_at, created_at")
+      .eq("id", id)
+      .eq("workspace_id", workspaceId)
+      .single(),
+    supabase
+      .from("survey_participants")
+      .select("id, user_id, subject_user_id, role, status")
+      .eq("survey_id", id)
+      .eq("workspace_id", workspaceId),
+  ]);
+
+  if (!survey) return null;
+  return { ...survey, survey_participants: participants || [] };
 }
 
 async function getSurveyResponses(surveyId: string, workspaceId: string) {

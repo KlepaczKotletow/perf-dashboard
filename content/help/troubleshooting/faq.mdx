@@ -1,8 +1,10 @@
 ---
 title: "Frequently Asked Questions"
+description: "Quick answers to the most common questions about Perf"
 category: "Troubleshooting"
-roles: ["all"]
+audience: ["all"]
 order: 1
+icon: "HelpCircle"
 ---
 
 # Frequently Asked Questions
@@ -22,26 +24,26 @@ Nami can only message you if you have signed into Perf at least once via Slack O
 3. You have not muted or blocked the Nami bot in Slack.
 
 <Callout type="tip">
-Ask your admin to verify your profile exists in Dashboard > Directory. If it does not, they can add you manually or via CSV import.
+Ask your admin to verify your profile exists in **Dashboard > Team**. If it does not, they can add you manually or via CSV import.
 </Callout>
 
 ---
 
 ## "My review says overdue"
 
-A review is marked overdue when the phase deadline has passed and you have not submitted. You can still submit -- the form is not locked. Complete it as soon as possible; the overdue flag will remain but the review will be accepted.
+A review is marked overdue when the phase deadline has passed and you have not submitted. You can still submit — the form is not locked. Complete it as soon as possible; the overdue flag will remain but the review will be accepted.
 
 ---
 
 ## "I can't see my team"
 
-The My Team page is only visible to users with the **manager** role or above (including HR and Admin). If you should be a manager but do not see the page, ask your admin to update your role in Dashboard > Directory.
+The My Team page is only visible to users with the **manager** role or above (including HR and Admin). If you should be a manager but do not see the page, ask your admin to update your role in **Dashboard > Team**.
 
 ---
 
 ## "How do I change my manager?"
 
-Only admins can update reporting relationships. Ask your admin to go to your profile in Dashboard > Directory and change the manager field.
+Only admins can update reporting relationships. Ask your admin to go to your profile in **Dashboard > Team** and change the manager field.
 
 ---
 
@@ -57,4 +59,52 @@ If the cycle is still in Calibration or an earlier phase, ratings have not been 
 
 ## "Can I edit a submitted review?"
 
-Once submitted, a review cannot be edited by the author. If a correction is genuinely needed, contact your admin or HR -- they can reopen the review for you on a case-by-case basis.
+Once submitted, a review cannot be edited by the author. If a correction is genuinely needed, contact your admin or HR — they can reopen the review for you on a case-by-case basis.
+
+---
+
+## "Is my data safe? Can other companies see it?"
+
+Yes, your data is safe. Each workspace is completely isolated from every other workspace using database-level Row-Level Security (RLS). There is no way for users in one organization to access another organization's data — this is enforced at the database level, not just in the application. See the [Security & Privacy](/dashboard/help/security-privacy) article for full details.
+
+---
+
+## "What data does Perf access from Slack?"
+
+Perf only accesses your Slack user ID, display name, email address, and profile photo for directory sync. It **does not** read your Slack channels, group messages, files, or message history. The only messages Perf reads are direct messages you send to the Nami bot as part of the review workflow.
+
+---
+
+## "What happens to my data if we cancel?"
+
+After cancellation, your workspace retains full access until the end of the billing period. Your data is then kept for up to **30 days** so you can request an export (CSV). After the retention period, data is deleted upon request or as part of our cleanup process. Contact [support@getperf.com](mailto:support@getperf.com) if you need an export before deletion.
+
+---
+
+## "Can my manager see my anonymous feedback?"
+
+No. Anonymous feedback is only shown in **aggregated form** — never attributed to individual respondents. This applies to both managers and HR/Admin users. A minimum of 3 anonymous responses is required before any aggregated data is displayed.
+
+---
+
+## "Where can I find the Terms of Service and Privacy Policy?"
+
+Both are available at the bottom of any page:
+- [Terms of Service](/terms)
+- [Privacy Policy](/privacy)
+
+These documents explain what data we collect, how it's used, your rights (including GDPR and CCPA), and our liability limitations.
+
+---
+
+## "How do I export my data?"
+
+You can export data in CSV format from several places:
+
+- **Analytics:** Go to **Dashboard > Analytics** and click the **Export CSV** button to download review and competency data
+- **Surveys:** Open any survey and click **Export Results** to download responses
+- **Team data:** Use **Dashboard > Team > Import** to download a CSV template that reflects your current team structure
+
+<Callout type="tip">
+We recommend exporting your data regularly as a backup. Perf maintains its own automated backups, but having your own copy ensures you always have access to your historical data.
+</Callout>

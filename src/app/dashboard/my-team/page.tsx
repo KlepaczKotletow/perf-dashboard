@@ -11,7 +11,7 @@ import { getAssignmentStatus } from "@/lib/status";
 export default async function MyTeamPage() {
   const workspace = await getUserWorkspace();
 
-  if (!workspace?.appUserId || !isManagerOrAbove(workspace?.role)) {
+  if (!workspace?.appUserId || (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">

@@ -273,7 +273,7 @@ export default async function PerformancePage({
 
   // For managers, also fetch ratings for their direct reports
   let reportRatings: any[] = [];
-  if (isManagerOrAbove(role)) {
+  if (isManagerOrAbove(role) || workspace.hasDirectReports) {
     const { data: reportAssignments } = await supabase
       .from("review_assignments")
       .select("id, cycle:performance_cycles!inner(workspace_id)")
@@ -302,7 +302,7 @@ export default async function PerformancePage({
 
   const allRatings = isHROrAbove(role)
     ? [...reviewRatings, ...reportRatings]
-    : isManagerOrAbove(role)
+    : (isManagerOrAbove(role) || workspace.hasDirectReports)
     ? [...reviewRatings, ...reportRatings]
     : reviewRatings;
 

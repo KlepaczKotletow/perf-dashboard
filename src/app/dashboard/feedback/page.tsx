@@ -26,7 +26,8 @@ const feedbackTypeConfig: Record<string, { label: string; className: string }> =
 async function getScope(
   role: string | undefined,
   currentUserId: string | null,
-  workspaceId: string | undefined
+  workspaceId: string | undefined,
+  hasDirectReports?: boolean,
 ): Promise<FeedbackScope> {
   // HR / Admin — unrestricted
   if (isHROrAbove(role)) {
@@ -40,7 +41,7 @@ async function getScope(
   }
 
   // Manager — direct reports + self
-  if (isManagerOrAbove(role)) {
+  if (isManagerOrAbove(role) || hasDirectReports) {
     const { data: reports, error: reportsErr } = await supabase
       .from("users")
       .select("id")
@@ -66,6 +67,7 @@ async function getContinuousFeedback(
   workspaceId: string | undefined,
   currentUserId: string | null,
   role: string | undefined,
+  hasDirectReports?: boolean,
 ) {
   // If scope is an empty array we know there's nothing to return
   if (scope.userIds !== null && scope.userIds.length === 0) return [];
@@ -83,7 +85,7 @@ async function getContinuousFeedback(
   }
 
   if (scope.userIds !== null) {
-    if (isManagerOrAbove(role)) {
+    if (isManagerOrAbove(role) || hasDirectReports) {
       // Managers: see all kudos for their reports (regardless of shared flag) + own sent
       query = query.or(`to_user_id.in.(${scope.userIds.join(",")}),from_user_id.in.(${scope.userIds.join(",")})`);
     } else if (currentUserId) {
@@ -125,17 +127,17 @@ export default async function FeedbackPage({
   const role = workspace?.role;
   const currentUserId = workspace?.appUserId ?? null;
 
-  const scope = await getScope(role, currentUserId, workspace?.workspaceId);
+  const scope = await getScope(role, currentUserId, workspace?.workspaceId, workspace?.hasDirectReports);
 
   const pageDescription = isHROrAbove(role)
     ? "All kudos across the organisation"
-    : isManagerOrAbove(role)
+    : (isManagerOrAbove(role) || workspace?.hasDirectReports)
     ? "Kudos for you and your direct reports"
     : "Kudos you've sent and received";
 
   const workspaceId = workspace?.workspaceId;
 
-  const continuousFeedback = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role);
+  const continuousFeedback = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role, workspace?.hasDirectReports);
 
   return (
     <div className="space-y-6">

@@ -23,6 +23,7 @@ import { FooterDropdown } from "./footer-dropdown";
 import { isManagerOrAbove, isAdmin, ROLE_LABELS, UserRole } from "@/lib/roles";
 import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
+import { RoleWatcher } from "./role-watcher";
 
 interface NavSection {
   label: string;
@@ -50,7 +51,7 @@ export default async function DashboardLayout({
     redirect("/onboarding");
   }
 
-  const canAccessManagerFeatures = isManagerOrAbove(workspace?.role);
+  const canAccessManagerFeatures = isManagerOrAbove(workspace?.role) || workspace?.hasDirectReports;
   const canAccessAdminFeatures = isAdmin(workspace?.role);
 
   const sections: NavSection[] = [
@@ -166,6 +167,9 @@ export default async function DashboardLayout({
           />
         </div>
       </SidebarWrapper>
+
+      {/* Realtime watcher — refreshes layout when user's role changes */}
+      <RoleWatcher appUserId={workspace.appUserId} />
 
       {/* Main content
           — desktop (lg+): offset by sidebar width

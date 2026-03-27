@@ -571,7 +571,7 @@ async function getTemplates(workspaceId: string) {
 export default async function TemplatesPage() {
   const workspace = await getUserWorkspace();
 
-  if (!isManagerOrAbove(workspace?.role)) {
+  if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">

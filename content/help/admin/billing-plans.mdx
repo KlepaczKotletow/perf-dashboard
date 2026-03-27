@@ -1,53 +1,84 @@
 ---
 title: "Billing & Plans"
+description: "Pricing tiers, how to upgrade, and managing your Perf subscription"
 category: "Admin & Billing"
-roles: ["admin"]
+audience: ["admin"]
 order: 2
+icon: "CreditCard"
 ---
 
 # Billing & Plans
 
 <RoleTag role="admin" />
 
-Perf offers four pricing tiers so you can start free and scale as your organization grows. All billing is handled through Stripe.
+Perf offers three paid tiers plus a free plan so you can start small and scale as your organization grows. All billing is handled securely through Stripe — we never store your credit card details.
 
 ## Plan Comparison
 
 | Feature | Free | Starter | Professional | Enterprise |
 |---|---|---|---|---|
-| **Price** | $0 | $5/user/mo | $10/user/mo | Custom |
+| **Monthly price** | $0 | $1/user/mo | $3/user/mo | Custom |
+| **Annual price** | $0 | $10/user/yr | $30/user/yr | Custom |
 | **Max users** | 5 | 50 | 500 | Unlimited |
 | **Review cycles** | 1 active | Unlimited | Unlimited | Unlimited |
-| **Survey types** | Pulse only | All | All | All |
-| **Competency frameworks** | 1 | 3 | Unlimited | Unlimited |
-| **Analytics** | Basic | Full | Full + export | Full + API |
-| **Calibration** | -- | -- | Included | Included |
-| **Dedicated support** | -- | -- | -- | Included |
+| **Slack integration** | Yes | Yes | Yes | Yes |
+| **Competency framework** | Yes | Yes | Yes | Yes |
+| **Analytics** | Basic | Basic | Advanced + export | Advanced + API |
+| **9-box calibration** | — | — | Yes | Yes |
+| **Custom templates** | — | — | Yes | Yes |
+| **Surveys (Pulse, eNPS, 360)** | — | Yes | Yes | Yes |
+| **SSO / SAML** | — | — | — | Yes |
+| **Custom integrations** | — | — | — | Yes |
+| **Dedicated CSM** | — | — | — | Yes |
+| **SLA guarantee** | — | — | — | Yes |
+| **Support** | — | Email | Priority | Dedicated |
+
+<Callout type="tip">
+Annual billing saves approximately 17% compared to monthly billing. For example, Professional plan costs $30/user/year vs $36/user/year on monthly billing.
+</Callout>
 
 ## How to Upgrade
 
-1. Go to **Dashboard > Settings > Billing**.
+1. Go to **Dashboard → Settings → Billing**.
 2. Select the plan that fits your needs.
-3. Enter payment details via the Stripe checkout flow.
-4. Your workspace upgrades immediately and all features become available.
+3. Complete the Stripe checkout flow with your payment details.
+4. Your workspace upgrades immediately and all new features become available.
 
 <Callout type="info">
-Plan changes are prorated. If you upgrade mid-month, you only pay the difference for the remaining days.
+Your workspace upgrades immediately upon successful payment. Billing details and invoices are managed through the Stripe customer portal.
 </Callout>
 
 ## Managing Your Subscription
 
-From the Billing page you can:
+From the **Settings → Billing** page you can:
 
-- View your current plan and usage.
-- Update your payment method.
-- Download invoices.
-- Cancel or downgrade (takes effect at end of billing period).
+- View your current plan and active user count
+- Open the **Stripe Customer Portal** to update payment methods
+- Download invoices and payment history
+- Cancel or downgrade your subscription (takes effect at the end of the current billing period)
 
 <Callout type="warning">
-Downgrading may disable features you are currently using. For example, moving from Professional to Starter removes calibration access. Review your usage before downgrading.
+Downgrading may disable features you are currently using. For example, moving from Professional to Starter removes calibration and custom template access. Review your active usage before downgrading.
 </Callout>
+
+## Free Plan
+
+The free plan allows up to **5 users** with no credit card required. It includes one active review cycle, the Slack integration, and the competency framework — perfect for trying Perf before committing.
 
 ## Enterprise Plans
 
-For organizations over 500 users or with advanced requirements (SSO, custom integrations, SLAs), contact sales for a tailored Enterprise agreement.
+For organizations with over 500 users or advanced requirements (SSO/SAML, custom integrations, dedicated support, SLA guarantees), contact [sales@getperf.com](mailto:sales@getperf.com) for a tailored Enterprise agreement.
+
+## Refund Policy
+
+All subscription fees are non-refundable except where required by applicable law. If you believe a refund is warranted, contact [support@getperf.com](mailto:support@getperf.com) — requests are reviewed on a case-by-case basis.
+
+## Cancellation
+
+You can cancel your subscription at any time. After cancellation:
+
+1. You retain full access until the end of your current billing period
+2. Your data is retained for **30 days** to allow you to export
+3. After 30 days, your workspace data is permanently deleted
+
+To cancel, go to **Settings → Billing** and click **Manage Subscription** to open the Stripe portal.

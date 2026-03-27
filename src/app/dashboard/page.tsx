@@ -391,7 +391,7 @@ export default async function DashboardPage() {
   const workspace = await getUserWorkspace();
   const role = workspace?.role || "user";
   const isAdminOrHR = isHROrAbove(role);
-  const hasManagerRole = isManagerOrAbove(role);
+  const hasManagerRole = isManagerOrAbove(role) || workspace?.hasDirectReports;
   const firstName = workspace?.name?.split(" ")[0] || "there";
   const userId = workspace?.appUserId;
 
@@ -403,8 +403,8 @@ export default async function DashboardPage() {
     isAdminOrHR ? getChartData(workspace?.workspaceId) : null,
   ]);
 
-  // ── Employees go straight to Performance (their journey) ──────────────────
-  if (role === "user") {
+  // ── Employees (without direct reports) go straight to Performance ──────────
+  if (role === "user" && !workspace?.hasDirectReports) {
     redirect("/dashboard/performance");
   }
 
