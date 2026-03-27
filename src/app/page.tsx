@@ -12,7 +12,7 @@ export default function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
 
   return (

@@ -100,7 +100,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const scopes =
     "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
 
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scopes}&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(
     slackRedirectUri
   )}&state=${setupToken}`;
 
