@@ -2,6 +2,7 @@ import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-ser
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } from "lucide-react";
@@ -141,134 +142,141 @@ export default async function MyTeamPage() {
       </div>
 
       {/* Team Members */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Team Members</CardTitle>
-          <CardDescription>Direct reports with review and goal status</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <Card className="border-border/60">
+        <CardContent className="p-0">
           {employeeSummaries.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground">
+            <p className="text-center py-12 text-muted-foreground">
               No direct reports found. Assign reporting lines via the Team page.
             </p>
           ) : (
-            <div className="space-y-4">
-              {employeeSummaries.map((emp) => (
-                <div key={emp.id} className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="text-sm">{getInitials(emp.slack_name)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Link href={`/dashboard/team/${emp.id}`} className="font-medium hover:underline">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-5">Name</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Level</TableHead>
+                  <TableHead className="text-center">Rating</TableHead>
+                  <TableHead className="text-center">Reviews</TableHead>
+                  <TableHead className="text-center">Goals</TableHead>
+                  <TableHead className="text-center">Status</TableHead>
+                  <TableHead className="pr-5 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {employeeSummaries.map((emp) => (
+                  <TableRow key={emp.id}>
+                    <TableCell className="pl-5">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs">{getInitials(emp.slack_name)}</AvatarFallback>
+                        </Avatar>
+                        <Link href={`/dashboard/team/${emp.id}`} className="font-medium hover:underline text-sm">
                           {emp.slack_name}
                         </Link>
-                        {emp.needsAction && (
-                          <Badge className="text-[11px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
-                            Action Needed
-                          </Badge>
-                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {emp.job_title || "No title"}
-                        {emp.department && ` · ${emp.department}`}
-                        {emp.level && ` · ${emp.level.name}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-6">
-                    {/* Latest Rating */}
-                    <div className="text-center min-w-[60px]">
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {emp.job_title || "—"}
+                      {emp.department && <span className="text-muted-foreground/60"> · {emp.department}</span>}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {emp.level?.name || "—"}
+                    </TableCell>
+                    <TableCell className="text-center">
                       {emp.latestRating ? (
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="font-bold text-sm">{emp.latestRating}</span>
+                        <div className="flex items-center justify-center gap-1">
+                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                          <span className="font-semibold text-sm">{emp.latestRating}</span>
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No rating</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
-                    </div>
-
-                    {/* Review Status */}
-                    <div className="text-center min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">Reviews</p>
-                      <p className="text-sm">
-                        <span className="font-bold text-green-600">{emp.completedReviews}</span>
-                        {emp.pendingReviews > 0 && (
-                          <span className="text-yellow-600"> / {emp.pendingReviews} pending</span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Goal Progress */}
-                    <div className="text-center min-w-[80px]">
-                      <p className="text-xs text-muted-foreground">Goals</p>
-                      <p className="text-sm">
-                        {emp.activeGoals > 0 ? (
-                          <span>{emp.activeGoals} active ({emp.avgProgress}%)</span>
-                        ) : (
-                          <span className="text-muted-foreground">None</span>
-                        )}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/team/${emp.id}`}>
-                          View <ArrowRight className="h-3 w-3 ml-1" />
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/dashboard/team/${emp.id}/edit`}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      <span className="font-semibold text-emerald-600">{emp.completedReviews}</span>
+                      {emp.pendingReviews > 0 && (
+                        <span className="text-amber-600 text-xs ml-1">({emp.pendingReviews} pending)</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {emp.activeGoals > 0 ? (
+                        <span>{emp.activeGoals} <span className="text-muted-foreground text-xs">({emp.avgProgress}%)</span></span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {emp.needsAction ? (
+                        <Badge className="text-[10px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
+                          Action Needed
+                        </Badge>
+                      ) : (
+                        <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">
+                          On Track
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="pr-5 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                          <Link href={`/dashboard/team/${emp.id}`}>View</Link>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                          <Link href={`/dashboard/team/${emp.id}/edit`}>
+                            <Pencil className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
 
       {/* Pending Review Assignments for your team — active cycles only */}
       {reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active").length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Pending Team Reviews</CardTitle>
-            <CardDescription>Outstanding reviews for your direct reports in active cycles</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {reviewAssignments
-                .filter((a: any) => a.status !== "completed" && a.cycle?.status === "active")
-                .map((assignment: any) => (
-                  <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg border">
-                    <div>
-                      <p className="font-medium">{assignment.employee?.slack_name || "Unknown"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {assignment.cycle?.name || "Unknown Cycle"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge className={`text-[11px] font-medium ${getAssignmentStatus(assignment.status).badge}`}>
-                        {getAssignmentStatus(assignment.status).label}
-                      </Badge>
-                      <Button size="sm" asChild>
-                        <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
-                          Review <ArrowRight className="h-3 w-3 ml-1" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Team Reviews</h2>
+          <Card className="border-border/60">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-5">Employee</TableHead>
+                    <TableHead>Cycle</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="pr-5 text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reviewAssignments
+                    .filter((a: any) => a.status !== "completed" && a.cycle?.status === "active")
+                    .map((assignment: any) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell className="pl-5 font-medium">{assignment.employee?.slack_name || "Unknown"}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{assignment.cycle?.name || "Unknown Cycle"}</TableCell>
+                        <TableCell>
+                          <Badge className={`text-[10px] font-medium ${getAssignmentStatus(assignment.status).badge}`}>
+                            {getAssignmentStatus(assignment.status).label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="pr-5 text-right">
+                          <Button size="sm" className="h-7 text-xs" asChild>
+                            <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
+                              Review <ArrowRight className="h-3 w-3 ml-1" />
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
