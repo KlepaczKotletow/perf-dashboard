@@ -10,6 +10,7 @@ import {
   FileText, ArrowUpDown, CheckCircle2, Clock, AlertCircle,
 } from "lucide-react";
 import { getAssignmentStatus } from "@/lib/status";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup,
   DropdownMenuRadioItem, DropdownMenuTrigger,
@@ -31,45 +32,6 @@ const SORT_OPTIONS = [
 
 const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 };
 const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2, closed: 3 };
-
-function AssignmentRow({ a }: { a: any }) {
-  const config = getAssignmentStatus(a.status);
-  const isUpward = a.assignment_type === "upward";
-  const reviewerName = isUpward
-    ? (a.reviewer?.slack_name ?? "Unassigned")
-    : (a.manager?.slack_name ?? "Unassigned");
-  const initials = (a.employee?.slack_name ?? "?")[0].toUpperCase();
-
-  return (
-    <Link
-      href={`/dashboard/reviews/${a.id}`}
-      className="flex items-center gap-4 px-4 py-3 hover:bg-muted/40 transition-colors group border-b border-border/40 last:border-0"
-    >
-      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-        <span className="text-xs font-semibold text-primary">{initials}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">
-          {a.employee?.slack_name || "Unknown"}
-        </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {a.employee?.department || a.employee?.job_title || "—"}
-        </p>
-      </div>
-      <div className="hidden sm:block w-40 min-w-0">
-        <p className="text-xs text-muted-foreground">Reviewer</p>
-        <p className="text-sm truncate">{reviewerName}</p>
-      </div>
-      <Badge className={`text-[11px] font-medium shrink-0 ${config.badge}`}>
-        {config.label}
-      </Badge>
-      <span className="text-sm font-medium text-muted-foreground w-10 text-right shrink-0">
-        {a.overall_rating ? `${a.overall_rating}/5` : "—"}
-      </span>
-      <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-    </Link>
-  );
-}
 
 function SubSection({
   icon, label, count, items,
@@ -96,7 +58,63 @@ function SubSection({
           ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
       </button>
-      {open && items.map((a) => <AssignmentRow key={a.id} a={a} />)}
+      {open && (
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-5">Employee</TableHead>
+              <TableHead>Reviewer</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Rating</TableHead>
+              <TableHead className="pr-5 w-10"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((a) => {
+              const config = getAssignmentStatus(a.status);
+              const isUpward = a.assignment_type === "upward";
+              const reviewerName = isUpward
+                ? (a.reviewer?.slack_name ?? "Unassigned")
+                : (a.manager?.slack_name ?? "Unassigned");
+              const initials = (a.employee?.slack_name ?? "?")[0].toUpperCase();
+
+              return (
+                <TableRow key={a.id} className="group cursor-pointer" onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}>
+                  <TableCell className="pl-5">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-semibold text-primary">{initials}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {a.employee?.slack_name || "Unknown"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {a.employee?.department || a.employee?.job_title || "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {reviewerName}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge className={`text-[10px] font-medium ${config.badge}`}>
+                      {config.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-center text-sm font-medium text-muted-foreground">
+                    {a.overall_rating ? `${a.overall_rating}/5` : "—"}
+                  </TableCell>
+                  <TableCell className="pr-5">
+                    <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
     </div>
   );
 }
