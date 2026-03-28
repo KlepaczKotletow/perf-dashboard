@@ -824,24 +824,34 @@ export default async function DashboardPage() {
   const completedSteps = steps.filter((s) => s.done).length;
 
   const metrics = [
-    { label: "Active Cycles", value: stats.activeCycles, icon: TrendingUp, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-    { label: "Review Assignments", value: stats.totalReviews, icon: FileText, color: "text-primary bg-primary/[0.08]" },
-    { label: "Kudos Given", value: stats.totalFeedback, icon: MessageSquare, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-    { label: "Team Members", value: stats.totalUsers, icon: Users, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
+    { label: "Active Cycles", value: stats.activeCycles, icon: TrendingUp, iconColor: "text-emerald-600 dark:text-emerald-400", bgColor: "bg-emerald-500/10", accent: "border-b-emerald-500" },
+    { label: "Review Assignments", value: stats.totalReviews, icon: FileText, iconColor: "text-primary", bgColor: "bg-primary/10", accent: "border-b-primary" },
+    { label: "Kudos Given", value: stats.totalFeedback, icon: MessageSquare, iconColor: "text-amber-600 dark:text-amber-400", bgColor: "bg-amber-500/10", accent: "border-b-amber-500" },
+    { label: "Team Members", value: stats.totalUsers, icon: Users, iconColor: "text-sky-600 dark:text-sky-400", bgColor: "bg-sky-500/10", accent: "border-b-sky-500" },
   ];
 
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          {showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          {showOnboarding
-            ? "Let's get your workspace set up. Follow the steps below to start running reviews."
-            : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`}
-        </p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            {showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            {showOnboarding
+              ? "Let's get your workspace set up. Follow the steps below to start running reviews."
+              : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`}
+          </p>
+        </div>
+        {!showOnboarding && activeCycles.length > 0 && (
+          <Link
+            href="/dashboard/cycles"
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            Manage cycles <ChevronRight className="h-3 w-3" />
+          </Link>
+        )}
       </div>
 
       {/* Onboarding checklist */}
@@ -886,15 +896,15 @@ export default async function DashboardPage() {
       {/* Org-wide metrics */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((m) => (
-          <Card key={m.label} className="border-border/60">
+          <Card key={m.label} className={`border-border/60 border-b-2 ${m.accent} hover:shadow-md transition-shadow`}>
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
-                  <p className="text-2xl font-semibold mt-1 text-foreground">{m.value}</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{m.label}</p>
+                  <p className="text-3xl font-bold mt-1.5 text-foreground tracking-tight">{m.value}</p>
                 </div>
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${m.color}`}>
-                  <m.icon className="h-5 w-5" />
+                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${m.bgColor}`}>
+                  <m.icon className={`h-5 w-5 ${m.iconColor}`} />
                 </div>
               </div>
             </CardContent>
@@ -907,55 +917,83 @@ export default async function DashboardPage() {
       {/* Manager team section for HR/Admins who also manage people */}
       {managerData && managerData.teamSize > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">My Direct Reports</h2>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Card><CardContent className="pt-4 pb-3">
-              <p className="text-xs text-muted-foreground">Team Size</p>
-              <p className="text-2xl font-bold text-foreground">{managerData.teamSize}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3">
-              <p className="text-xs text-muted-foreground">Pending Your Review</p>
-              <p className="text-2xl font-bold text-amber-600">{managerData.pendingMgrReviews.length}</p>
-            </CardContent></Card>
-            <Card><CardContent className="pt-4 pb-3">
-              <p className="text-xs text-muted-foreground">Waiting on Self-Review</p>
-              <p className="text-2xl font-bold text-foreground">{managerData.waitingOnSelf.length}</p>
-            </CardContent></Card>
+          <div className="flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">My Direct Reports</h2>
+            <Link
+              href="/dashboard/my-team"
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              View team <ChevronRight className="h-3 w-3" />
+            </Link>
           </div>
+          <Card className="border-border/60">
+            <CardContent className="py-4">
+              <div className="flex items-center divide-x divide-border">
+                <div className="flex-1 text-center px-4">
+                  <p className="text-2xl font-bold text-foreground">{managerData.teamSize}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">Reports</p>
+                </div>
+                <div className="flex-1 text-center px-4">
+                  <p className={`text-2xl font-bold ${managerData.pendingMgrReviews.length > 0 ? "text-amber-600" : "text-foreground"}`}>
+                    {managerData.pendingMgrReviews.length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">Pending Review</p>
+                </div>
+                <div className="flex-1 text-center px-4">
+                  <p className="text-2xl font-bold text-foreground">{managerData.waitingOnSelf.length}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">Awaiting Self</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {/* Active cycles quick view */}
       {activeCycles.length > 0 && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Active Cycles</h2>
-            <Link
-              href="/dashboard/cycles"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            >
-              Manage <ChevronRight className="h-3 w-3" />
-            </Link>
-          </div>
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Active Cycles</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {activeCycles.map((cycle: any) => (
-              <Link
-                key={cycle.id}
-                href={`/dashboard/cycles/${cycle.id}`}
-                className="group flex items-center gap-3 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
-              >
-                <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{cycle.name}</p>
-                  {cycle.review_deadline && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Deadline {new Date(cycle.review_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                    </p>
-                  )}
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
-              </Link>
-            ))}
+            {activeCycles.map((cycle: any) => {
+              const daysLeft = cycle.review_deadline
+                ? Math.ceil((new Date(cycle.review_deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                : null;
+              const dotColor = daysLeft !== null && daysLeft < 0
+                ? "bg-red-500"
+                : daysLeft !== null && daysLeft <= 7
+                  ? "bg-amber-500"
+                  : "bg-emerald-500";
+              const deadlineColor = daysLeft !== null && daysLeft < 0
+                ? "text-red-600 dark:text-red-400"
+                : daysLeft !== null && daysLeft <= 7
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-muted-foreground";
+
+              return (
+                <Link
+                  key={cycle.id}
+                  href={`/dashboard/cycles/${cycle.id}`}
+                  className="group flex items-center gap-3 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-md transition-all"
+                >
+                  <div className={`h-2 w-2 rounded-full ${dotColor} shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{cycle.name}</p>
+                    {cycle.review_deadline && (
+                      <p className={`text-xs mt-0.5 ${deadlineColor}`}>
+                        {daysLeft !== null && daysLeft < 0
+                          ? `Overdue by ${Math.abs(daysLeft)} day${Math.abs(daysLeft) !== 1 ? "s" : ""}`
+                          : daysLeft !== null && daysLeft <= 1
+                            ? "Due tomorrow"
+                            : daysLeft !== null && daysLeft <= 7
+                              ? `${daysLeft} days left`
+                              : `Deadline ${new Date(cycle.review_deadline).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                      </p>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

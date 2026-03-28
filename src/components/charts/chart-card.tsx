@@ -30,7 +30,7 @@ export function ChartCard({ title, subtitle, delta, children, className = "" }: 
     : "";
 
   return (
-    <Card className={`border-border/60 ${className}`}>
+    <Card className={`border-border/60 hover:shadow-md transition-shadow ${className}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div>
