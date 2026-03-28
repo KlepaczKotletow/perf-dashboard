@@ -146,7 +146,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
       {sorted.map(({ cycle, standard, upward }) => {
         const cid = cycle?.id ?? "__none__";
         const isCollapsed = collapsed.has(cid);
-        const pendingCount = [...standard, ...upward].filter(a => a.status !== "completed").length;
+        const incompleteCount = [...standard, ...upward].filter(a => a.status !== "completed").length;
         const totalCount = standard.length + upward.length;
 
         return (
@@ -170,9 +170,9 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                 )}
               </div>
               <div className="flex items-center gap-3 shrink-0 ml-4">
-                {pendingCount > 0 && (
+                {incompleteCount > 0 && (
                   <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                    {pendingCount} pending
+                    {incompleteCount} incomplete
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground">{totalCount} review{totalCount !== 1 ? "s" : ""}</span>
@@ -185,10 +185,10 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
             </button>
 
             {/* Collapsed summary */}
-            {isCollapsed && pendingCount > 0 && (
+            {isCollapsed && incompleteCount > 0 && (
               <div className="px-5 py-2 flex items-center gap-2 text-xs text-muted-foreground bg-muted/5">
                 <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                {pendingCount} assignment{pendingCount !== 1 ? "s" : ""} pending action
+                {incompleteCount} assignment{incompleteCount !== 1 ? "s" : ""} incomplete
               </div>
             )}
 
