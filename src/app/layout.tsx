@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Perf — Performance Management",
+  title: "Nami — Performance Management",
   description: "Modern performance management powered by Slack. Run 360 reviews, track competencies, set goals, and give continuous feedback.",
 };
 

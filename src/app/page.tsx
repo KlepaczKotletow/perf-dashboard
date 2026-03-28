@@ -62,7 +62,7 @@ export default function Home() {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-[56px] font-bold tracking-tight text-foreground leading-[1.08]">
-                Namiormance reviews your team will{" "}
+                Performance reviews your team will{" "}
                 <span className="text-primary">actually complete</span>
               </h1>
 
@@ -278,7 +278,7 @@ export default function Home() {
                         </div>
                         <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
                           <p className="text-sm text-foreground leading-relaxed">
-                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Namiormance Review</span> cycle.
+                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
                           </p>
                           <p className="text-sm text-foreground leading-relaxed mt-2">
                             Let&apos;s start with <span className="font-semibold">Collaboration</span>. How would you rate Alex?
@@ -525,7 +525,7 @@ export default function Home() {
                     },
                     {
                       icon: Star,
-                      title: "Namiormance Ranking with tier badges",
+                      title: "Performance Ranking with tier badges",
                       body: "Every employee ranked by average rating with a clear tier: Exceptional, Strong, Solid, or Needs Development. Filterable by function and department. Useful for calibration, promotion decisions, and headcount planning.",
                     },
                     {
@@ -629,11 +629,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Namiormance ranking snippet */}
+                {/* Performance ranking snippet */}
                 <div className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/5 bg-white">
                   <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    <p className="text-[13px] font-semibold text-foreground">Namiormance Ranking</p>
+                    <p className="text-[13px] font-semibold text-foreground">Performance Ranking</p>
                   </div>
                   <div className="divide-y divide-border/40">
                     {[
@@ -813,7 +813,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-[12px] text-foreground leading-relaxed">
-                        Q1 Namiormance Review is complete! <span className="font-semibold">47 participants</span> &middot; Avg rating: <span className="font-semibold text-primary">4.2/5</span>
+                        Q1 Performance Review is complete! <span className="font-semibold">47 participants</span> &middot; Avg rating: <span className="font-semibold text-primary">4.2/5</span>
                       </p>
                       <div className="flex gap-1.5 mt-2.5">
                         <div className="px-3 py-1.5 rounded-md bg-primary text-white text-[10px] font-medium">View Dashboard</div>
@@ -954,7 +954,7 @@ export default function Home() {
                 <div>
                   <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Analytics</p>
                   <ul className="space-y-1.5">
-                    {["Competency heatmap", "Namiormance ranking", "Trend analysis"].map((f) => (
+                    {["Competency heatmap", "Performance ranking", "Trend analysis"].map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
                         <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
                         {f}

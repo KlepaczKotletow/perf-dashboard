@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Perf",
-  description: "Privacy Policy for Perf. Learn how we collect, use, protect, and handle your data.",
+  title: "Privacy Policy — Nami",
+  description: "Privacy Policy for Nami. Learn how we collect, use, protect, and handle your data.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -30,10 +30,10 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Introduction</h2>
             <p className="mb-3">
-              Perf (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is
+              Nami (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is
               committed to protecting the privacy and security of your information. This Privacy
               Policy explains how we collect, use, disclose, and safeguard your information when you
-              use the Perf platform, including our web application, Slack integration, and all related
+              use the Nami platform, including our web application, Slack integration, and all related
               services (collectively, the &quot;Service&quot;).
             </p>
             <p className="mb-3">
@@ -53,14 +53,14 @@ export default function PrivacyPolicyPage() {
 
             <h3 className="font-medium text-foreground mt-4 mb-2">2.1 Information from Slack</h3>
             <p className="mb-2">
-              When you install the Perf Slack application, we receive the following information from
+              When you install the Nami Slack application, we receive the following information from
               your Slack workspace through the OAuth 2.0 authorization flow:
             </p>
             <ul className="list-disc pl-6 space-y-1 mb-3">
               <li>Slack workspace ID and workspace name</li>
               <li>Slack user IDs, display names, and email addresses</li>
               <li>Profile information such as job titles and avatar URLs</li>
-              <li>Bot access tokens necessary to send messages on behalf of the Perf bot</li>
+              <li>Bot access tokens necessary to send messages on behalf of the Nami bot</li>
             </ul>
             <p className="mb-3">
               We request the following Slack OAuth scopes:{" "}
@@ -75,7 +75,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               We do not read the content of your Slack channels, group messages, or direct messages
-              beyond those sent directly to the Perf bot as part of the review and feedback workflow.
+              beyond those sent directly to the Nami bot as part of the review and feedback workflow.
             </p>
 
             <h3 className="font-medium text-foreground mt-4 mb-2">2.2 Information You Provide</h3>
@@ -154,7 +154,7 @@ export default function PrivacyPolicyPage() {
               <li>We never sell, rent, lease, or trade your personal information or Customer Data to
                 any third party, for any reason, under any circumstances</li>
               <li>We never use your data for targeted advertising or marketing</li>
-              <li>We never share your identifiable data with other Perf customers</li>
+              <li>We never share your identifiable data with other Nami customers</li>
               <li>We never use your Customer Data to train artificial intelligence or machine learning
                 models without your explicit prior written consent</li>
               <li>We never profile individual users for purposes unrelated to the Service</li>
