@@ -3,6 +3,7 @@ import { Clock, ArrowRight, ChevronRight } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ActionTask {
   id: string;
@@ -75,51 +76,62 @@ export function ActionRequiredSection({ tasks }: ActionRequiredSectionProps) {
         </Badge>
       </h3>
 
-      <div className="divide-y divide-border rounded-lg border border-border/60 bg-card">
-        {tasks.map((task) => {
-          const badge = typeBadgeConfig[task.type];
-          const cta = getTaskCta(task.type);
-          const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-          const isOverdue = dueDate && isPast(dueDate);
+      <div className="rounded-lg border border-border/60 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="pl-5">Type</TableHead>
+              <TableHead>Task</TableHead>
+              <TableHead>Due Date</TableHead>
+              <TableHead className="pr-5 text-right">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tasks.map((task) => {
+              const badge = typeBadgeConfig[task.type];
+              const cta = getTaskCta(task.type);
+              const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+              const isOverdue = dueDate && isPast(dueDate);
 
-          return (
-            <div
-              key={task.id}
-              className="py-3.5 px-5 flex items-center justify-between gap-4"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    className={`text-[10px] font-medium ${badge.className}`}
-                  >
-                    {badge.label}
-                  </Badge>
-                  <span className="text-sm font-medium text-foreground truncate">
+              return (
+                <TableRow key={task.id}>
+                  <TableCell className="pl-5">
+                    <Badge className={`text-[10px] font-medium ${badge.className}`}>
+                      {badge.label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="font-medium text-sm">
                     {task.label}
-                  </span>
-                </div>
-                {dueDate && (
-                  <p
-                    className={`text-xs mt-0.5 ${
-                      isOverdue
-                        ? "text-red-500 font-semibold"
-                        : "text-muted-foreground/70"
-                    }`}
-                  >
-                    {isOverdue
-                      ? `Overdue \u00b7 ${format(dueDate, "MMM d, yyyy")}`
-                      : `Due ${format(dueDate, "MMM d, yyyy")}`}
-                  </p>
-                )}
-              </div>
-              <Button size="sm" className="text-xs h-8 shrink-0" asChild>
-                <Link href={getTaskHref(task)}>
-                  {cta.text} <cta.icon className="h-3 w-3 ml-1" />
-                </Link>
-              </Button>
-            </div>
-          );
-        })}
+                  </TableCell>
+                  <TableCell>
+                    {dueDate ? (
+                      <span
+                        className={`text-xs ${
+                          isOverdue
+                            ? "text-red-500 font-semibold"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {isOverdue
+                          ? `Overdue \u00b7 ${format(dueDate, "MMM d, yyyy")}`
+                          : format(dueDate, "MMM d, yyyy")}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="pr-5 text-right">
+                    <Button size="sm" className="text-xs h-7" asChild>
+                      <Link href={getTaskHref(task)}>
+                        {cta.text} <cta.icon className="h-3 w-3 ml-1" />
+                      </Link>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
