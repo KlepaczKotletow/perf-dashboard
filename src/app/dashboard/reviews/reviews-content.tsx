@@ -198,7 +198,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-5 w-[30%]">Employee</TableHead>
-                    <TableHead className="w-[25%]">Manager / Reviewer</TableHead>
+                    <TableHead className="w-[25%]">Reviewer</TableHead>
                     <TableHead className="w-[12%]">Type</TableHead>
                     <TableHead className="w-[13%] text-center">Status</TableHead>
                     <TableHead className="w-[10%] text-center">Rating</TableHead>
