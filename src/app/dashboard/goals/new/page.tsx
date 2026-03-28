@@ -73,8 +73,8 @@ export default function NewGoalPage() {
         title,
         description: description || null,
         employee_id: employeeId,
-        cycle_id: cycleId || null,
-        parent_id: parentId || null,
+        cycle_id: cycleId && cycleId !== "__none__" ? cycleId : null,
+        parent_id: parentId && parentId !== "__none__" ? parentId : null,
         due_date: dueDate || null,
         status: goalStatus,
         progress: 0,
@@ -162,7 +162,7 @@ export default function NewGoalPage() {
                 <Select value={cycleId} onValueChange={setCycleId}>
                   <SelectTrigger><SelectValue placeholder="Link to cycle" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (no cycle)</SelectItem>
+                    <SelectItem value="__none__">None (no cycle)</SelectItem>
                     {cycles.map((cycle) => (
                       <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>
                     ))}
@@ -175,7 +175,7 @@ export default function NewGoalPage() {
                 <Select value={parentId} onValueChange={setParentId}>
                   <SelectTrigger><SelectValue placeholder="None (top-level)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (top-level)</SelectItem>
+                    <SelectItem value="__none__">None (top-level)</SelectItem>
                     {existingGoals.map((g) => (
                       <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
                     ))}
