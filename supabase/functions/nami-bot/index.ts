@@ -16,6 +16,13 @@ import {
   buildOverdueNotice,
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
+import { callSlackApi } from "../_shared/slack-api.ts";
+
+// Throttle between bulk message sends to avoid hitting Slack rate limits
+const BULK_SEND_DELAY_MS = 1000;
+function throttle(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, BULK_SEND_DELAY_MS));
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -35,15 +42,9 @@ async function sendSlackBlocks(
   blocks: any[],
 ): Promise<boolean> {
   try {
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${botToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ channel: slackUserId, text, blocks }),
+    const data = await callSlackApi(botToken, "chat.postMessage", {
+      channel: slackUserId, text, blocks,
     });
-    const data = await res.json();
     if (!data.ok) {
       console.error("Slack API error:", data.error, { channel: slackUserId });
     }
@@ -103,19 +104,38 @@ async function rollbackNotification(
 //  Manager context
 // =============================================================================
 
+interface CompetencyExpectation {
+  name: string;
+  expectedLevel: number;
+  prevRating?: number;
+}
+
 interface ManagerContext {
   selfAvg?: number;
   prevRating?: number;
   goalsCount?: number;
+  goalsByStatus?: Record<string, number>;
+  levelName?: string;
+  competencyExpectations?: CompetencyExpectation[];
 }
 
 async function getManagerContext(
   employeeId: string,
   cycleId: string,
+  workspaceId: string,
 ): Promise<ManagerContext> {
   const ctx: ManagerContext = {};
 
   try {
+    // 0. Verify cycle belongs to this workspace
+    const { data: cycle } = await supabase
+      .from("performance_cycles")
+      .select("id")
+      .eq("id", cycleId)
+      .eq("workspace_id", workspaceId)
+      .single();
+    if (!cycle) return ctx;
+
     // 1. Self-assessment average for this cycle
     const { data: assignments } = await supabase
       .from("review_assignments")
@@ -140,10 +160,10 @@ async function getManagerContext(
       }
     }
 
-    // 2. Previous cycle rating
+    // 2. Previous cycle overall rating
     const { data: prevAssignments } = await supabase
       .from("review_assignments")
-      .select("overall_rating")
+      .select("id, overall_rating")
       .eq("employee_id", employeeId)
       .eq("status", "completed")
       .neq("cycle_id", cycleId)
@@ -154,15 +174,69 @@ async function getManagerContext(
       ctx.prevRating = prevAssignments[0].overall_rating;
     }
 
-    // 3. Active goals count
+    // 3. Previous cycle per-competency manager ratings
+    let prevCompRatings: Record<string, number> = {};
+    if (prevAssignments?.[0]?.id) {
+      const { data: prevResponses } = await supabase
+        .from("review_responses")
+        .select("competency_id, rating")
+        .eq("assignment_id", prevAssignments[0].id)
+        .eq("reviewer_role", "manager");
+
+      if (prevResponses) {
+        for (const r of prevResponses) {
+          if (r.competency_id && r.rating != null) {
+            prevCompRatings[r.competency_id] = r.rating;
+          }
+        }
+      }
+    }
+
+    // 4. Employee level name + competency expectations
+    const { data: empData } = await supabase
+      .from("users")
+      .select("level_id, job_title, levels(name, job_families(name))")
+      .eq("id", employeeId)
+      .eq("workspace_id", workspaceId)
+      .single();
+
+    if (empData?.level_id) {
+      const level = (empData as any).levels;
+      if (level) {
+        const jfName = level.job_families?.name;
+        ctx.levelName = jfName ? `${jfName} — ${level.name}` : level.name;
+      }
+
+      // Fetch competency expectations for this level
+      const { data: levelComps } = await supabase
+        .from("level_competencies")
+        .select("competency_id, expected_level, competencies(name)")
+        .eq("level_id", empData.level_id)
+        .eq("workspace_id", workspaceId);
+
+      if (levelComps && levelComps.length > 0) {
+        ctx.competencyExpectations = levelComps.map((lc: any) => ({
+          name: lc.competencies?.name || "Unknown",
+          expectedLevel: lc.expected_level,
+          prevRating: prevCompRatings[lc.competency_id],
+        }));
+      }
+    }
+
+    // 5. Goal status breakdown
     const { data: goals } = await supabase
       .from("goals")
-      .select("id")
+      .select("id, tracking_status")
       .eq("employee_id", employeeId)
       .eq("status", "active");
 
-    if (goals) {
+    if (goals && goals.length > 0) {
       ctx.goalsCount = goals.length;
+      ctx.goalsByStatus = {};
+      for (const g of goals) {
+        const ts = g.tracking_status || "no_status";
+        ctx.goalsByStatus[ts] = (ctx.goalsByStatus[ts] || 0) + 1;
+      }
     }
   } catch (err) {
     console.error("getManagerContext error:", err);
@@ -262,9 +336,13 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
   let failed = 0;
   const failedUsers: string[] = [];
 
-  for (const a of filteredAssignments) {
+  for (let _i = 0; _i < filteredAssignments.length; _i++) {
+    const a = filteredAssignments[_i];
     const emp = (a as any).employee;
     const mgr = (a as any).manager;
+
+    // Throttle between iterations to respect Slack rate limits
+    if (_i > 0) await throttle();
 
     // --- Employee self-review ---
     if (emp?.slack_user_id && a.assignment_type === "standard") {
@@ -317,7 +395,7 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
           refId,
         );
         if (canSend) {
-          const context = await getManagerContext(a.employee_id, cycleId);
+          const context = await getManagerContext(a.employee_id, cycleId, workspaceId);
           const blocks = buildManagerReviewOpening(
             mgr.slack_name || "there",
             emp?.slack_name || "a team member",
