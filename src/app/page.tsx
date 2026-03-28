@@ -12,11 +12,13 @@ export default function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}`;
+  // CSRF: include a nonce state parameter (Slack requires this for App Directory)
+  const oauthState = `nonce_${crypto.randomUUID()}`;
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}&state=${oauthState}`;
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
 
       {/* ── Header ── */}
       <header className="border-b border-border/60 backdrop-blur-md bg-white/80 sticky top-0 z-50">
@@ -25,7 +27,7 @@ export default function Home() {
             <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-white text-xs font-bold">P</span>
             </div>
-            <span className="font-semibold tracking-tight text-foreground">Perf</span>
+            <span className="font-semibold tracking-tight text-foreground">Nami</span>
           </Link>
           <div className="hidden lg:flex items-center gap-3">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
@@ -60,7 +62,7 @@ export default function Home() {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-[56px] font-bold tracking-tight text-foreground leading-[1.08]">
-                Performance reviews your team will{" "}
+                Namiormance reviews your team will{" "}
                 <span className="text-primary">actually complete</span>
               </h1>
 
@@ -116,7 +118,7 @@ export default function Home() {
                           <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
                             <span className="text-white text-[9px] font-bold">P</span>
                           </div>
-                          <span className="text-xs font-semibold text-foreground">Perf</span>
+                          <span className="text-xs font-semibold text-foreground">Nami</span>
                         </div>
                       </div>
                       {[
@@ -206,7 +208,7 @@ export default function Home() {
                   Reviews that actually get completed — because they live in Slack
                 </h2>
                 <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  Most teams struggle with 40–60% review completion. Perf fixes this by meeting people where they already work.
+                  Most teams struggle with 40–60% review completion. Nami fixes this by meeting people where they already work.
                 </p>
 
                 <ul className="mt-8 space-y-5">
@@ -214,12 +216,12 @@ export default function Home() {
                     {
                       icon: MessageSquare,
                       title: "Slack DMs, not another form",
-                      body: "Perf sends review requests as Slack DMs. Your team responds in the thread — no new tab, no new login, no context switch. Completion rates climb from ~40% to 95%+.",
+                      body: "Nami sends review requests as Slack DMs. Your team responds in the thread — no new tab, no new login, no context switch. Completion rates climb from ~40% to 95%+.",
                     },
                     {
                       icon: Users,
                       title: "Every angle covered: self, manager, peer, upward",
-                      body: "One cycle covers all reviewer types. Perf auto-assigns based on reporting lines, sends reminders, and tracks who's outstanding — without you chasing anyone.",
+                      body: "One cycle covers all reviewer types. Nami auto-assigns based on reporting lines, sends reminders, and tracks who's outstanding — without you chasing anyone.",
                     },
                     {
                       icon: Star,
@@ -276,7 +278,7 @@ export default function Home() {
                         </div>
                         <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
                           <p className="text-sm text-foreground leading-relaxed">
-                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
+                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Namiormance Review</span> cycle.
                           </p>
                           <p className="text-sm text-foreground leading-relaxed mt-2">
                             Let&apos;s start with <span className="font-semibold">Collaboration</span>. How would you rate Alex?
@@ -452,7 +454,7 @@ export default function Home() {
                   Goals your whole team can see — tracked in real time
                 </h2>
                 <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  When goals live separately from reviews, ratings feel arbitrary. Perf ties them together so every performance conversation is grounded in actual work.
+                  When goals live separately from reviews, ratings feel arbitrary. Nami ties them together so every performance conversation is grounded in actual work.
                 </p>
 
                 <ul className="mt-8 space-y-5">
@@ -465,7 +467,7 @@ export default function Home() {
                     {
                       icon: Users,
                       title: "Managers have context in every 1:1",
-                      body: "When your manager opens your profile, your goal progress is right there. No more 'what were you working on this quarter?' at review time — the history is already in Perf.",
+                      body: "When your manager opens your profile, your goal progress is right there. No more 'what were you working on this quarter?' at review time — the history is already in Nami.",
                     },
                     {
                       icon: TrendingUp,
@@ -511,7 +513,7 @@ export default function Home() {
                   Analytics that tell you something — not just pretty charts
                 </h2>
                 <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  Most HR tools give you a pie chart and call it analytics. Perf gives you actionable data sliced by role, department, level, and tenure — so you know exactly where to invest.
+                  Most HR tools give you a pie chart and call it analytics. Nami gives you actionable data sliced by role, department, level, and tenure — so you know exactly where to invest.
                 </p>
 
                 <ul className="mt-8 space-y-5">
@@ -523,7 +525,7 @@ export default function Home() {
                     },
                     {
                       icon: Star,
-                      title: "Performance Ranking with tier badges",
+                      title: "Namiormance Ranking with tier badges",
                       body: "Every employee ranked by average rating with a clear tier: Exceptional, Strong, Solid, or Needs Development. Filterable by function and department. Useful for calibration, promotion decisions, and headcount planning.",
                     },
                     {
@@ -627,11 +629,11 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Performance ranking snippet */}
+                {/* Namiormance ranking snippet */}
                 <div className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/5 bg-white">
                   <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
                     <Star className="h-4 w-4 text-yellow-500" />
-                    <p className="text-[13px] font-semibold text-foreground">Performance Ranking</p>
+                    <p className="text-[13px] font-semibold text-foreground">Namiormance Ranking</p>
                   </div>
                   <div className="divide-y divide-border/40">
                     {[
@@ -811,7 +813,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-[12px] text-foreground leading-relaxed">
-                        Q1 Performance Review is complete! <span className="font-semibold">47 participants</span> &middot; Avg rating: <span className="font-semibold text-primary">4.2/5</span>
+                        Q1 Namiormance Review is complete! <span className="font-semibold">47 participants</span> &middot; Avg rating: <span className="font-semibold text-primary">4.2/5</span>
                       </p>
                       <div className="flex gap-1.5 mt-2.5">
                         <div className="px-3 py-1.5 rounded-md bg-primary text-white text-[10px] font-medium">View Dashboard</div>
@@ -842,7 +844,7 @@ export default function Home() {
             </span>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
             <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
-              No lengthy onboarding. No training. No new tool for your team to learn. Just add Perf to Slack and you&apos;re set.
+              No lengthy onboarding. No training. No new tool for your team to learn. Just add Nami to Slack and you&apos;re set.
             </p>
           </ScrollReveal>
 
@@ -853,20 +855,20 @@ export default function Home() {
                 {
                   step: 1,
                   icon: Slack,
-                  title: "Add Perf to Slack",
+                  title: "Add Nami to Slack",
                   description: "Click 'Add to Slack' and authorize in your workspace. Takes under 60 seconds. No engineering setup required.",
                 },
                 {
                   step: 2,
                   icon: Target,
                   title: "Set up your team and competencies",
-                  description: "Perf syncs your Slack members automatically. Assign managers, define reporting lines, and set the competencies your org values.",
+                  description: "Nami syncs your Slack members automatically. Assign managers, define reporting lines, and set the competencies your org values.",
                 },
                 {
                   step: 3,
                   icon: BarChart3,
                   title: "Launch cycles and read the data",
-                  description: "Pick a template, set a deadline, and Perf handles assignments, DM reminders, and collection. Analytics update in real time.",
+                  description: "Pick a template, set a deadline, and Nami handles assignments, DM reminders, and collection. Analytics update in real time.",
                 },
               ].map((item, i) => (
                 <ScrollReveal key={item.step} delay={i * 120}>
@@ -914,7 +916,7 @@ export default function Home() {
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
               Pricing
             </span>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Other tools charge $8–15/user. Perf is $1.</h2>
+            <h2 className="text-3xl font-bold tracking-tight text-foreground">Other tools charge $8–15/user. Nami is $1.</h2>
             <p className="mt-3 text-muted-foreground text-[15px]">Less than a coffee. More than most enterprise tools.</p>
           </ScrollReveal>
 
@@ -952,7 +954,7 @@ export default function Home() {
                 <div>
                   <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Analytics</p>
                   <ul className="space-y-1.5">
-                    {["Competency heatmap", "Performance ranking", "Trend analysis"].map((f) => (
+                    {["Competency heatmap", "Namiormance ranking", "Trend analysis"].map((f) => (
                       <li key={f} className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
                         <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
                         {f}
@@ -1007,7 +1009,7 @@ export default function Home() {
               <div className="h-6 w-6 rounded-md bg-primary flex items-center justify-center">
                 <span className="text-white text-[10px] font-bold">P</span>
               </div>
-              <span className="font-semibold text-foreground">Perf</span>
+              <span className="font-semibold text-foreground">Nami</span>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex gap-6 text-sm">
