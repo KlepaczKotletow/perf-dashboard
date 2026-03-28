@@ -38,11 +38,11 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
         >
           <Menu className="h-5 w-5" />
         </button>
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-xs font-bold">P</span>
+        <Link href="/dashboard" className="flex items-center gap-3.5">
+          <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center">
+            <span className="text-primary-foreground text-base font-bold">P</span>
           </div>
-          <span className="font-semibold text-[15px] text-sidebar-foreground tracking-tight">Perf</span>
+          <span className="font-semibold text-[17px] text-sidebar-foreground tracking-tight">Perf</span>
         </Link>
       </div>
 
