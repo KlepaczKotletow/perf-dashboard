@@ -2,8 +2,10 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   FileText,
   Plus,
@@ -11,6 +13,9 @@ import {
   Layers,
   Calendar,
   ArrowRight,
+  Search,
+  X,
+  Target,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -297,18 +302,48 @@ export default function TemplatesClient({
 }: {
   templates: Template[];
 }) {
+  const [search, setSearch] = useState("");
+
+  const searchLower = search.toLowerCase();
+  const matchesSearch = (t: any) =>
+    !search ||
+    t.name?.toLowerCase().includes(searchLower) ||
+    t.description?.toLowerCase().includes(searchLower);
+
   const reviewTemplates = templates.filter(
-    (t) => !t.template_type || t.template_type === "review"
+    (t) => (!t.template_type || t.template_type === "review") && matchesSearch(t)
   );
   const frameworkTemplates = templates.filter(
-    (t) => t.template_type === "competency_framework"
+    (t) => t.template_type === "competency_framework" && matchesSearch(t)
   );
   const cycleProfileTemplates = templates.filter(
-    (t) => t.template_type === "cycle_profile"
+    (t) => t.template_type === "cycle_profile" && matchesSearch(t)
+  );
+  const goalTemplates = templates.filter(
+    (t) => t.template_type === "goal_template" && matchesSearch(t)
   );
 
   return (
     <Tabs defaultValue="reviews" className="space-y-4">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search templates..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
       <TabsList>
         <TabsTrigger value="reviews" className="gap-1.5">
           <FileText className="h-3.5 w-3.5" />
@@ -329,6 +364,13 @@ export default function TemplatesClient({
           Cycle Profiles
           <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
             {cycleProfileTemplates.length}
+          </Badge>
+        </TabsTrigger>
+        <TabsTrigger value="goal_templates" className="gap-1.5">
+          <Target className="h-3.5 w-3.5" />
+          Goal Templates
+          <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+            {goalTemplates.length}
           </Badge>
         </TabsTrigger>
       </TabsList>
@@ -423,6 +465,70 @@ export default function TemplatesClient({
             {cycleProfileTemplates.map((template) => (
               <CycleProfileCard key={template.id} template={template} />
             ))}
+          </div>
+        )}
+      </TabsContent>
+
+      {/* ── Goal Templates Tab ── */}
+      <TabsContent value="goal_templates">
+        {goalTemplates.length === 0 ? (
+          <div className="rounded-lg border border-border/60 bg-card py-16 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Target className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">
+              No goal templates yet
+            </p>
+            <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+              Goal templates provide pre-configured starting points for creating goals.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {goalTemplates.map((tpl) => {
+              const content = tpl.content as any;
+              return (
+                <Card key={tpl.id} className="border-border/60 hover:shadow-md transition-shadow">
+                  <CardContent className="pt-5 pb-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{tpl.name}</h3>
+                        {tpl.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{tpl.description}</p>
+                        )}
+                      </div>
+                      {tpl.is_system && (
+                        <Badge variant="outline" className="text-[10px] shrink-0">System</Badge>
+                      )}
+                    </div>
+                    {content && (
+                      <div className="space-y-1">
+                        {content.title && (
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">Title:</span> {content.title}
+                          </p>
+                        )}
+                        {content.scope && (
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">Scope:</span> {content.scope}
+                          </p>
+                        )}
+                        {content.metric_unit && (
+                          <p className="text-xs text-muted-foreground">
+                            <span className="font-medium">Metric:</span> {content.metric_start ?? 0} → {content.metric_target} {content.metric_unit}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="text-xs h-7" asChild>
+                        <Link href={`/dashboard/templates/${tpl.id}`}>View</Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </TabsContent>

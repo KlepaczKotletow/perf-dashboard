@@ -31,6 +31,7 @@ export default function NewGoalPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [cycles, setCycles] = useState<any[]>([]);
   const [existingGoals, setExistingGoals] = useState<any[]>([]);
+  const [workspaceGoalTemplates, setWorkspaceGoalTemplates] = useState<any[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [cycleId, setCycleId] = useState("");
   const [parentId, setParentId] = useState("");
@@ -57,14 +58,22 @@ export default function NewGoalPage() {
       if (!identity) return;
       const wsId = identity.workspaceId;
 
-      const [{ data: users }, { data: perfCycles }, { data: goals }] = await Promise.all([
+      const [{ data: users }, { data: perfCycles }, { data: goals }, { data: goalTpls }] = await Promise.all([
         supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).order("slack_name"),
         supabase.from("performance_cycles").select("id, name").eq("workspace_id", wsId).order("created_at", { ascending: false }),
         supabase.from("goals").select("id, title").eq("workspace_id", wsId).order("title"),
+        supabase
+          .from("templates")
+          .select("id, name, description, content, is_system")
+          .eq("workspace_id", wsId)
+          .eq("template_type", "goal_template")
+          .order("is_system", { ascending: false })
+          .order("name"),
       ]);
       setEmployees(users || []);
       setCycles(perfCycles || []);
       setExistingGoals(goals || []);
+      setWorkspaceGoalTemplates(goalTpls || []);
 
       const paramCycle = searchParams.get("cycle_id");
       const paramEmployee = searchParams.get("employee_id");
@@ -82,6 +91,16 @@ export default function NewGoalPage() {
     if (tpl.metric_start) { setMetricStart(tpl.metric_start); setShowAdvanced(true); }
     if (tpl.metric_target) { setMetricTarget(tpl.metric_target); setShowAdvanced(true); }
     if (tpl.metric_unit) { setMetricUnit(tpl.metric_unit); setShowAdvanced(true); }
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  }
+
+  function applyWorkspaceTemplate(tpl: any) {
+    const content = tpl.content || {};
+    if (content.title) setTitle(content.title);
+    if (content.scope) setScope(content.scope);
+    if (content.metric_start != null) { setMetricStart(String(content.metric_start)); setShowAdvanced(true); }
+    if (content.metric_target != null) { setMetricTarget(String(content.metric_target)); setShowAdvanced(true); }
+    if (content.metric_unit) { setMetricUnit(content.metric_unit); setShowAdvanced(true); }
     setTimeout(() => titleInputRef.current?.focus(), 0);
   }
 
@@ -135,8 +154,27 @@ export default function NewGoalPage() {
         </div>
       </div>
 
+      {workspaceGoalTemplates.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Your Templates</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {workspaceGoalTemplates.map((tpl) => (
+              <button key={tpl.id} type="button" onClick={() => applyWorkspaceTemplate(tpl)}
+                className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-colors text-left">
+                <span className="text-xl">📋</span>
+                <div className="min-w-0">
+                  <span className="text-sm font-medium text-foreground block truncate">{tpl.name}</span>
+                  {tpl.description && <span className="text-xs text-muted-foreground block truncate">{tpl.description}</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
-        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Start from a template</h2>
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+          {workspaceGoalTemplates.length > 0 ? "Quick Start" : "Start from a template"}
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {GOAL_TEMPLATES.map((tpl) => (
             <button

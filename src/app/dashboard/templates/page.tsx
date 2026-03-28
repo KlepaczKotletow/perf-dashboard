@@ -503,6 +503,39 @@ const SYSTEM_CYCLE_PROFILES = [
   },
 ];
 
+// ── System Goal Templates ───────────────────────────────────────────────────
+
+const SYSTEM_GOAL_TEMPLATES = [
+  {
+    name: "Improve a Metric",
+    description: "Set a measurable improvement target with baseline and goal values",
+    template_type: "goal_template",
+    is_system: true,
+    content: { title: "Improve [metric] by [X]%", scope: "individual", metric_start: 0, metric_target: 100, metric_unit: "%" },
+  },
+  {
+    name: "Complete a Project",
+    description: "Track a project from start to completion with a deadline",
+    template_type: "goal_template",
+    is_system: true,
+    content: { title: "Complete [project name] by [date]", scope: "individual" },
+  },
+  {
+    name: "Team Development",
+    description: "Track team learning and development activities",
+    template_type: "goal_template",
+    is_system: true,
+    content: { title: "Complete [X] team development sessions", scope: "team", metric_start: 0, metric_target: 4, metric_unit: "sessions" },
+  },
+  {
+    name: "Customer Satisfaction",
+    description: "Improve customer satisfaction scores",
+    template_type: "goal_template",
+    is_system: true,
+    content: { title: "Increase CSAT score to [target]", scope: "team", metric_start: 0, metric_target: 5, metric_unit: "score" },
+  },
+];
+
 // ── Seeding Function ────────────────────────────────────────────────────────
 
 async function seedSystemTemplates(workspaceId: string) {
@@ -550,7 +583,14 @@ async function seedSystemTemplates(workspaceId: string) {
     is_default: false,
   }));
 
-  await supabase.from("templates").insert([...reviewRows, ...frameworkRows, ...cycleRows]);
+  // Seed goal templates
+  const goalRows = SYSTEM_GOAL_TEMPLATES.map((t) => ({
+    ...t,
+    workspace_id: workspaceId,
+    is_default: false,
+  }));
+
+  await supabase.from("templates").insert([...reviewRows, ...frameworkRows, ...cycleRows, ...goalRows]);
 }
 
 // ── Data Fetching ───────────────────────────────────────────────────────────
@@ -605,7 +645,7 @@ export default async function TemplatesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Template Library</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Review templates, competency frameworks, and cycle profiles
+            Review templates, competency frameworks, cycle profiles, and goal templates
           </p>
         </div>
         <Button size="sm" asChild>
