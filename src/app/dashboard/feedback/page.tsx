@@ -1,10 +1,11 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { FeedbackFilter } from "./feedback-filter";
 import { Suspense } from "react";
-import { MessageSquare, ArrowRight } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 
 interface FeedbackFilters {
@@ -202,49 +203,56 @@ export default async function FeedbackPage({
 
       {continuousFeedback.length > 0 && (
         <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">
-              Kudos
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                {continuousFeedback.length}{continuousFeedback.length === 50 ? " (showing first 50)" : ""}
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-border">
-              {continuousFeedback.map((item: any) => {
-                const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-5">From</TableHead>
+                  <TableHead>To</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="min-w-[300px]">Message</TableHead>
+                  <TableHead className="pr-5 text-right">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {continuousFeedback.map((item: any) => {
+                  const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
 
-                return (
-                  <div key={item.id} className="py-3.5 first:pt-0 last:pb-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {item.is_anonymous ? "Anonymous" : item.from_user?.slack_name || "Unknown"}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-                          <span className="text-sm font-medium text-foreground truncate">
-                            {item.to_user?.slack_name || "Unknown"}
-                          </span>
-                          <Badge className={`shrink-0 text-[10px] font-medium ${typeConf.className}`}>
-                            {typeConf.label}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                          {item.message}
-                        </p>
-                      </div>
-                      <p className="text-xs text-muted-foreground shrink-0">
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="pl-5 font-medium">
+                        {item.is_anonymous ? (
+                          <span className="text-muted-foreground italic">Anonymous</span>
+                        ) : (
+                          item.from_user?.slack_name || "Unknown"
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {item.to_user?.slack_name || "Unknown"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`text-[10px] font-medium ${typeConf.className}`}>
+                          {typeConf.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-md">
+                        <p className="line-clamp-2 text-sm">{item.message}</p>
+                      </TableCell>
+                      <TableCell className="pr-5 text-right text-muted-foreground text-xs whitespace-nowrap">
                         {item.created_at
                           ? format(new Date(item.created_at), "MMM d, yyyy")
                           : "—"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {continuousFeedback.length === 50 && (
+              <p className="text-xs text-muted-foreground text-center py-3 border-t border-border/60">
+                Showing first 50 results. Use filters to narrow down.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
