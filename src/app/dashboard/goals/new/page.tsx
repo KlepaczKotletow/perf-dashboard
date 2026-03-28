@@ -1,20 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown, ChevronRight, Zap } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
 
+const GOAL_TEMPLATES = [
+  { label: "Improve a Metric", icon: "📈", title: "Improve [metric] by [X]%", metric_start: "0", metric_target: "100", metric_unit: "%", scope: "individual" },
+  { label: "Complete a Project", icon: "🏁", title: "Complete [project name] by [date]", scope: "individual" },
+  { label: "Earn Certification", icon: "🎓", title: "Obtain [certification name]", scope: "individual" },
+  { label: "Reduce Costs", icon: "💰", title: "Reduce [cost area] by [X]%", metric_start: "0", metric_target: "100", metric_unit: "%", scope: "team" },
+  { label: "Customer Satisfaction", icon: "⭐", title: "Increase CSAT score to [target]", metric_start: "0", metric_target: "5", metric_unit: "score", scope: "team" },
+  { label: "Team Development", icon: "👥", title: "Complete [X] team development sessions", metric_start: "0", metric_target: "4", metric_unit: "sessions", scope: "team" },
+];
+
 export default function NewGoalPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -27,6 +38,13 @@ export default function NewGoalPage() {
   const [trackingStatus, setTrackingStatus] = useState("on_track");
   const [goalStatus, setGoalStatus] = useState("active");
   const [title, setTitle] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [weight, setWeight] = useState("1.00");
+  const [metricStart, setMetricStart] = useState("");
+  const [metricTarget, setMetricTarget] = useState("");
+  const [metricUnit, setMetricUnit] = useState("");
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -47,22 +65,30 @@ export default function NewGoalPage() {
       setEmployees(users || []);
       setCycles(perfCycles || []);
       setExistingGoals(goals || []);
+
+      const paramCycle = searchParams.get("cycle_id");
+      const paramEmployee = searchParams.get("employee_id");
+      const paramParent = searchParams.get("parent_id");
+      if (paramCycle) setCycleId(paramCycle);
+      if (paramEmployee) setEmployeeId(paramEmployee);
+      if (paramParent) setParentId(paramParent);
     }
     load();
   }, []);
+
+  function applyTemplate(tpl: typeof GOAL_TEMPLATES[0]) {
+    setTitle(tpl.title);
+    if (tpl.scope) setScope(tpl.scope);
+    if (tpl.metric_start) { setMetricStart(tpl.metric_start); setShowAdvanced(true); }
+    if (tpl.metric_target) { setMetricTarget(tpl.metric_target); setShowAdvanced(true); }
+    if (tpl.metric_unit) { setMetricUnit(tpl.metric_unit); setShowAdvanced(true); }
+    setTimeout(() => titleInputRef.current?.focus(), 0);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
-    const formData = new FormData(e.currentTarget);
-    const description = formData.get("description") as string;
-    const dueDate = formData.get("due_date") as string;
-    const weight = parseFloat(formData.get("weight") as string) || 1.0;
-    const metricStart = formData.get("metric_start") as string;
-    const metricTarget = formData.get("metric_target") as string;
-    const metricUnit = formData.get("metric_unit") as string;
 
     try {
       const identity = await getClientIdentity(supabase);
@@ -78,7 +104,7 @@ export default function NewGoalPage() {
         due_date: dueDate || null,
         status: goalStatus,
         progress: 0,
-        weight,
+        weight: parseFloat(weight) || 1.0,
         metric_start: metricStart ? parseFloat(metricStart) : null,
         metric_current: metricStart ? parseFloat(metricStart) : null,
         metric_target: metricTarget ? parseFloat(metricTarget) : null,
@@ -109,6 +135,23 @@ export default function NewGoalPage() {
         </div>
       </div>
 
+      <div className="space-y-2">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Start from a template</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {GOAL_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.label}
+              type="button"
+              onClick={() => applyTemplate(tpl)}
+              className="flex items-center gap-3 p-3 rounded-lg border border-border/60 hover:border-primary/40 hover:bg-primary/5 transition-colors text-left"
+            >
+              <span className="text-xl">{tpl.icon}</span>
+              <span className="text-sm font-medium text-foreground">{tpl.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Card className="border-border/60">
         <CardHeader>
           <CardTitle className="text-base">Goal Details</CardTitle>
@@ -134,109 +177,122 @@ export default function NewGoalPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Scope</Label>
-                <Select value={scope} onValueChange={setScope}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="individual">Individual</SelectItem>
-                    <SelectItem value="team">Team</SelectItem>
-                    <SelectItem value="company">Company</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="due_date">Due Date</Label>
+                <Input id="due_date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="title">Goal Title *</Label>
-              <Input id="title" name="title" placeholder="e.g., Improve API response times by 50%" required value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input id="title" ref={titleInputRef} placeholder="e.g., Improve API response times by 50%" required value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" name="description" placeholder="Describe the goal, success criteria, and expected outcomes..." rows={3} />
+              <Textarea id="description" placeholder="Describe the goal, success criteria, and expected outcomes..." rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="cycle">Performance Cycle</Label>
-                <Select value={cycleId} onValueChange={setCycleId}>
-                  <SelectTrigger><SelectValue placeholder="Link to cycle" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None (no cycle)</SelectItem>
-                    {cycles.map((cycle) => (
-                      <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Parent Goal</Label>
-                <Select value={parentId} onValueChange={setParentId}>
-                  <SelectTrigger><SelectValue placeholder="None (top-level)" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None (top-level)</SelectItem>
-                    {existingGoals.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="cycle">Performance Cycle</Label>
+              <Select value={cycleId} onValueChange={setCycleId}>
+                <SelectTrigger><SelectValue placeholder="Link to cycle" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None (no cycle)</SelectItem>
+                  {cycles.map((cycle) => (
+                    <SelectItem key={cycle.id} value={cycle.id}>{cycle.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Metrics */}
-            <div>
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">
-                Metric Tracking (optional)
-              </Label>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="metric_start" className="text-xs">Start Value</Label>
-                  <Input id="metric_start" name="metric_start" type="number" step="any" placeholder="0" />
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5 py-2"
+            >
+              {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {showAdvanced ? "Hide" : "Show"} advanced options
+            </button>
+
+            {showAdvanced && (
+              <div className="space-y-5">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Scope</Label>
+                    <Select value={scope} onValueChange={setScope}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="individual">Individual</SelectItem>
+                        <SelectItem value="team">Team</SelectItem>
+                        <SelectItem value="company">Company</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Parent Goal</Label>
+                    <Select value={parentId} onValueChange={setParentId}>
+                      <SelectTrigger><SelectValue placeholder="None (top-level)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None (top-level)</SelectItem>
+                        {existingGoals.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="metric_target" className="text-xs">Target Value</Label>
-                  <Input id="metric_target" name="metric_target" type="number" step="any" placeholder="100" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="metric_unit" className="text-xs">Unit</Label>
-                  <Input id="metric_unit" name="metric_unit" placeholder="%, deals, hours..." />
-                </div>
-              </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="weight">Weight</Label>
-                <Input id="weight" name="weight" type="number" step="0.01" min="0.01" defaultValue="1.00" />
+                <div>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">
+                    Metric Tracking (optional)
+                  </Label>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="metric_start" className="text-xs">Start Value</Label>
+                      <Input id="metric_start" type="number" step="any" placeholder="0" value={metricStart} onChange={(e) => setMetricStart(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="metric_target" className="text-xs">Target Value</Label>
+                      <Input id="metric_target" type="number" step="any" placeholder="100" value={metricTarget} onChange={(e) => setMetricTarget(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="metric_unit" className="text-xs">Unit</Label>
+                      <Input id="metric_unit" placeholder="%, deals, hours..." value={metricUnit} onChange={(e) => setMetricUnit(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="weight">Weight</Label>
+                    <Input id="weight" type="number" step="0.01" min="0.01" value={weight} onChange={(e) => setWeight(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={goalStatus} onValueChange={setGoalStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tracking Status</Label>
+                    <Select value={trackingStatus} onValueChange={setTrackingStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="on_track">On Track</SelectItem>
+                        <SelectItem value="at_risk">At Risk</SelectItem>
+                        <SelectItem value="delayed">Delayed</SelectItem>
+                        <SelectItem value="achieved">Achieved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={goalStatus} onValueChange={setGoalStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Tracking Status</Label>
-                <Select value={trackingStatus} onValueChange={setTrackingStatus}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="on_track">On Track</SelectItem>
-                    <SelectItem value="at_risk">At Risk</SelectItem>
-                    <SelectItem value="delayed">Delayed</SelectItem>
-                    <SelectItem value="achieved">Achieved</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="due_date">Due Date</Label>
-                <Input id="due_date" name="due_date" type="date" />
-              </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" asChild>

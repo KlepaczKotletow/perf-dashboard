@@ -29,6 +29,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   ChevronRight,
   ChevronDown,
   Search,
@@ -40,7 +49,12 @@ import {
   CheckCircle2,
   X,
   AlertCircle,
+  Copy,
+  MoreHorizontal,
+  Zap,
+  Loader2,
 } from "lucide-react";
+import { getClientIdentity } from "@/lib/client-auth";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -88,6 +102,7 @@ interface Cycle {
 interface GoalsClientProps {
   goals: GoalRow[];
   cycles: Cycle[];
+  employees?: { id: string; slack_name: string }[];
   role?: string;
   workspaceId: string;
 }
@@ -159,7 +174,7 @@ function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
 
 // ─── Component ──────────────────────────────────────────
 
-export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId }: GoalsClientProps) {
+export default function GoalsClient({ goals: rawGoals, cycles, employees = [], role, workspaceId }: GoalsClientProps) {
   const router = useRouter();
   const supabase = useMemo(
     () => createBrowserClient(
@@ -169,6 +184,41 @@ export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId
     []
   );
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+
+  // Quick-add dialog
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [quickEmployeeId, setQuickEmployeeId] = useState("");
+  const [quickAdding, setQuickAdding] = useState(false);
+
+  async function handleQuickAdd() {
+    if (!quickTitle.trim() || !quickEmployeeId) return;
+    setQuickAdding(true);
+    try {
+      const identity = await getClientIdentity(supabase);
+      if (!identity) return;
+      const { error } = await supabase.from("goals").insert({
+        title: quickTitle.trim(),
+        employee_id: quickEmployeeId,
+        workspace_id: identity.workspaceId,
+        status: "active",
+        progress: 0,
+        weight: 1.0,
+        tracking_status: "on_track",
+        scope: "individual",
+      });
+      if (!error) {
+        setQuickTitle("");
+        setQuickEmployeeId("");
+        setQuickAddOpen(false);
+        router.refresh();
+      }
+    } catch (err) {
+      console.error("Quick add goal error:", err);
+    } finally {
+      setQuickAdding(false);
+    }
+  }
 
   // Normalize Supabase FK join arrays into single objects
   const goals: NormalizedGoalRow[] = useMemo(
@@ -329,6 +379,37 @@ export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId
     router.refresh();
   }
 
+  async function handleDuplicate(goal: NormalizedGoalRow) {
+    const identity = await getClientIdentity(supabase);
+    if (!identity) return;
+
+    const { error } = await supabase.from("goals").insert({
+      title: `${goal.title} (Copy)`,
+      description: goal.description,
+      employee_id: goal.employee?.id ?? null,
+      cycle_id: goal.cycle?.id ?? null,
+      parent_id: goal.parent_id,
+      scope: goal.scope,
+      weight: goal.weight,
+      metric_start: goal.metric_start,
+      metric_target: goal.metric_target,
+      metric_unit: goal.metric_unit,
+      metric_current: goal.metric_start,
+      due_date: goal.due_date,
+      status: "draft",
+      progress: 0,
+      tracking_status: "on_track",
+      workspace_id: workspaceId,
+    });
+
+    if (error) {
+      console.error("Failed to duplicate goal:", error);
+      return;
+    }
+
+    router.refresh();
+  }
+
   // ─── Render ─────────────────────────────────────────
 
   return (
@@ -345,12 +426,57 @@ export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId
               : "Company-wide goals and your personal objectives"}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/goals/new">
-            <Plus className="h-4 w-4 mr-2" />
-            New Goal
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
+            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            Quick Add
+          </Button>
+          <Button asChild>
+            <Link href="/dashboard/goals/new">
+              <Plus className="h-4 w-4 mr-2" />
+              New Goal
+            </Link>
+          </Button>
+        </div>
+
+        <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Quick Add Goal</DialogTitle>
+              <DialogDescription>Create a goal with just a title and owner. You can add details later.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Goal Title *</Label>
+                <Input
+                  placeholder="e.g., Improve API response times by 50%"
+                  value={quickTitle}
+                  onChange={(e) => setQuickTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleQuickAdd()}
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Employee *</Label>
+                <Select value={quickEmployeeId} onValueChange={setQuickEmployeeId}>
+                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>{emp.slack_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
+              <Button onClick={handleQuickAdd} disabled={quickAdding || !quickTitle.trim() || !quickEmployeeId}>
+                {quickAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Create Goal
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Summary Stats */}
@@ -504,6 +630,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId
                   </button>
                 </TableHead>
                 <TableHead className="w-[110px]">Status</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -618,6 +745,22 @@ export default function GoalsClient({ goals: rawGoals, cycles, role, workspaceId
                               {cfg.label}
                             </DropdownMenuItem>
                           ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="w-10 pr-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDuplicate(goal)}>
+                            <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

@@ -14,6 +14,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getClientIdentity } from "@/lib/client-auth";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -211,6 +213,42 @@ export default function GoalDetailClient({
     router.refresh();
   }
 
+  async function handleDuplicate() {
+    setSaveError(null);
+    const identity = await getClientIdentity(supabase);
+    if (!identity) {
+      setSaveError("Failed to duplicate goal");
+      return;
+    }
+
+    const { error } = await supabase.from("goals").insert({
+      title: `${goal.title} (Copy)`,
+      description: goal.description,
+      employee_id: goal.employee?.id ?? null,
+      cycle_id: goal.cycle?.id ?? null,
+      parent_id: goal.parent?.id ?? null,
+      scope: goal.scope,
+      weight: goal.weight,
+      metric_start: goal.metric_start,
+      metric_target: goal.metric_target,
+      metric_unit: goal.metric_unit,
+      metric_current: goal.metric_start,
+      due_date: goal.due_date,
+      status: "draft",
+      progress: 0,
+      tracking_status: "on_track",
+      workspace_id: workspaceId,
+    });
+
+    if (error) {
+      setSaveError("Failed to duplicate goal");
+      return;
+    }
+
+    router.push("/dashboard/goals");
+    router.refresh();
+  }
+
   // ─── Derived ────────────────────────────────────────────────────────────
 
   const tc = goal.tracking_status ? trackingConfig[goal.tracking_status] : null;
@@ -295,15 +333,20 @@ export default function GoalDetailClient({
                 </Button>
               </>
             ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setEditing(true)}
-                className="gap-1.5"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-                Edit
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={handleDuplicate} className="gap-1.5">
+                  <Copy className="h-3.5 w-3.5" /> Duplicate
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditing(true)}
+                  className="gap-1.5"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Edit
+                </Button>
+              </>
             )}
           </div>
         )}

@@ -82,15 +82,32 @@ async function getCycles(workspaceId: string | undefined) {
   return data || [];
 }
 
+async function getEmployees(workspaceId: string | undefined) {
+  const supabase = await createServerSupabaseClient();
+  let query = supabase
+    .from("users")
+    .select("id, slack_name")
+    .order("slack_name");
+
+  if (workspaceId) {
+    query = query.eq("workspace_id", workspaceId);
+  }
+
+  const { data, error } = await query;
+  if (error) console.error("Failed to fetch employees for goals:", error.message);
+  return data || [];
+}
+
 export default async function GoalsPage() {
   const workspace = await getUserWorkspace();
   const role = workspace?.role;
   const currentUserId = workspace?.appUserId ?? null;
 
-  const [goals, cycles] = await Promise.all([
+  const [goals, cycles, employees] = await Promise.all([
     getGoals(workspace?.workspaceId, role, currentUserId, workspace?.hasDirectReports),
     getCycles(workspace?.workspaceId),
+    getEmployees(workspace?.workspaceId),
   ]);
 
-  return <GoalsClient goals={goals} cycles={cycles} role={role} workspaceId={workspace?.workspaceId ?? ""} />;
+  return <GoalsClient goals={goals} cycles={cycles} employees={employees} role={role} workspaceId={workspace?.workspaceId ?? ""} />;
 }
