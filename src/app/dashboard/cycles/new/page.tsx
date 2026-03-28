@@ -159,7 +159,9 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
 
 // ── Phase timeline preview ───────────────────────────────────────────────────
 function PhaseTimelinePreview({ startDate, endDate }: { startDate?: Date; endDate?: Date }) {
-  if (!startDate || !endDate || endDate <= startDate) return null;
+  if (!startDate || !endDate) return null;
+
+  const isInvalid = endDate <= startDate;
   const colors = [
     "bg-blue-400", "bg-indigo-400", "bg-purple-400",
     "bg-pink-400", "bg-amber-400", "bg-emerald-400",
@@ -167,20 +169,26 @@ function PhaseTimelinePreview({ startDate, endDate }: { startDate?: Date; endDat
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">Phase Timeline Preview</Label>
-      <div className="flex h-10 rounded-lg overflow-hidden border border-border/60">
-        {DEFAULT_PHASES.map((phase, idx) => (
-          <div
-            key={phase.phase_type}
-            className={`${colors[idx]} flex items-center justify-center`}
-            style={{ width: `${phase.proportion * 100}%` }}
-            title={phase.name}
-          >
-            <span className="text-[11px] text-white font-semibold truncate px-1">
-              {phase.name.split(" ")[0]}
-            </span>
-          </div>
-        ))}
-      </div>
+      {isInvalid ? (
+        <div className="flex h-10 rounded-lg items-center justify-center border border-dashed border-amber-300 bg-amber-50/50 dark:border-amber-400/30 dark:bg-amber-400/5">
+          <span className="text-xs text-amber-600 dark:text-amber-400">End date must be after the start date</span>
+        </div>
+      ) : (
+        <div className="flex h-10 rounded-lg overflow-hidden border border-border/60">
+          {DEFAULT_PHASES.map((phase, idx) => (
+            <div
+              key={phase.phase_type}
+              className={`${colors[idx]} flex items-center justify-center`}
+              style={{ width: `${phase.proportion * 100}%` }}
+              title={phase.name}
+            >
+              <span className="text-[11px] text-white font-semibold truncate px-1">
+                {phase.name.split(" ")[0]}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="flex justify-between text-xs text-muted-foreground">
         <span>{format(startDate, "MMM d")}</span>
         <span>{format(endDate, "MMM d, yyyy")}</span>
