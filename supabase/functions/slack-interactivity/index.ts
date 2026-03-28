@@ -1,4 +1,5 @@
 import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, buildReviewSummary, buildSurveyQuestionPrompt } from "../_shared/nami-blocks.ts";
+import { callSlackApi } from "../_shared/slack-api.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -32,7 +33,10 @@ Deno.serve(async (req) => {
       );
       const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(baseString));
       const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-      if (`v0=${hex}` !== slackSig) {
+      // Timing-safe comparison to prevent timing attacks
+      const computed = encoder.encode(`v0=${hex}`);
+      const received = encoder.encode(slackSig);
+      if (computed.byteLength !== received.byteLength || !crypto.subtle.timingSafeEqual(computed, received)) {
         return new Response("Invalid signature", { status: 403 });
       }
     }
@@ -83,11 +87,7 @@ Deno.serve(async (req) => {
       });
     }
     async function slackApi(token: string, method: string, data: any) {
-      return (await fetch(`https://slack.com/api/${method}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      })).json();
+      return callSlackApi(token, method, data);
     }
 
     // Token refresh
@@ -942,6 +942,17 @@ Deno.serve(async (req) => {
               ],
             });
           }
+
+          // Send confirmation to the sender
+          const recipientName = to.slack_name || "your colleague";
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Kudos sent to ${recipientName}`,
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Thank you!* Your kudos to *${recipientName}* has been sent.` } },
+              { type: "context", elements: [{ type: "mrkdwn", text: isShared ? ":bell: They'll receive a notification." : ":lock: Visible only to admins." }] },
+            ],
+          });
         }
         return json({ response_action: "clear" });
       }
@@ -951,6 +962,16 @@ Deno.serve(async (req) => {
         const meta = safeParse(payload.view?.private_metadata || "{}");
         const { participantId, surveyId } = meta || {};
         if (!participantId || !surveyId) return json({ response_action: "clear" });
+
+        // Check if already completed (prevent duplicate submissions)
+        const existingParticipant = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        if (existingParticipant?.[0]?.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: You've already submitted this survey. Thank you!",
+          });
+          return json({ response_action: "clear" });
+        }
 
         const vals = payload.view.state.values;
         const answers: Record<string, any> = {};
@@ -980,6 +1001,18 @@ Deno.serve(async (req) => {
           completed_at: new Date().toISOString(),
         });
 
+        // Send thank-you confirmation to the user
+        const surveyForConfirm = await dbQuery("surveys", `id=eq.${surveyId}&select=name`);
+        const surveyName = surveyForConfirm?.[0]?.name || "the survey";
+        await slackApi(botToken, "chat.postMessage", {
+          channel: payload.user.id,
+          text: `Survey submitted — ${surveyName}`,
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Thank you!* Your response to *${surveyName}* has been recorded.` } },
+            { type: "context", elements: [{ type: "mrkdwn", text: ":lock: Your answers are confidential and will be aggregated with other responses." }] },
+          ],
+        });
+
         return json({ response_action: "clear" });
       }
 
@@ -990,6 +1023,17 @@ Deno.serve(async (req) => {
         if (!selected?.participantId) return json({ response_action: "clear" });
 
         const { participantId, surveyId } = selected;
+
+        // Check if already completed
+        const existingSP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        if (existingSP?.[0]?.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: You've already completed this survey. Thank you!",
+          });
+          return json({ response_action: "clear" });
+        }
+
         const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,type,name,config,workspace_id`);
         const survey = surveys?.[0];
         if (!survey || survey.workspace_id !== ws.id) return json({ response_action: "clear" });
@@ -1063,6 +1107,17 @@ Deno.serve(async (req) => {
         let reviewRole = "manager";
         if (user.id === assignment.employee_id) reviewRole = "self";
         if (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id) reviewRole = "upward";
+        if (assignment.assignment_type === "peer" && user.id === assignment.reviewer_id) reviewRole = "peer";
+
+        // Authorization check — reject if role doesn't match
+        if (reviewRole === "manager" && user.id !== assignment.manager_id) {
+          await slackApi(botToken, "chat.postEphemeral", {
+            channel: payload.channel?.id || payload.user.id,
+            user: payload.user.id,
+            text: ":no_entry: You are not authorized to review this employee.",
+          });
+          return json({});
+        }
 
         // Check if already submitted (via web or Slack)
         const existing = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
@@ -1151,6 +1206,26 @@ Deno.serve(async (req) => {
         let reviewRole = "manager";
         if (user.id === assignment.employee_id) reviewRole = "self";
         if (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id) reviewRole = "upward";
+        if (assignment.assignment_type === "peer" && user.id === assignment.reviewer_id) reviewRole = "peer";
+
+        // Authorization check
+        if (reviewRole === "manager" && user.id !== assignment.manager_id) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":no_entry: You are not authorized to review this employee.",
+          });
+          return json({});
+        }
+
+        // Check if already submitted (via web or modal)
+        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        if (existingResp && existingResp.length > 0 && !existingResp.error) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: ":white_check_mark: This review has already been submitted. You can view or edit it on the dashboard.",
+          });
+          return json({});
+        }
 
         // WS3: Send manager context before starting DM review
         if (reviewRole === "manager" && assignment.cycle_id) {
@@ -1222,6 +1297,17 @@ Deno.serve(async (req) => {
         const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
+
+        // Check if already submitted (via web or another Slack flow)
+        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${conv.assignment_id}&reviewer_id=eq.${conv.user_id}&reviewer_role=eq.${conv.review_role || "manager"}&select=id&limit=1`);
+        if (alreadyDone && alreadyDone.length > 0 && !alreadyDone.error) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: This review has already been submitted. You can view or edit it on the dashboard.",
+          });
+          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, { status: "expired" });
+          return json({});
+        }
 
         // Mark as completed
         await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
@@ -1368,6 +1454,17 @@ Deno.serve(async (req) => {
         const { participantId, surveyId } = safeParse(action.value) || {};
         if (!participantId || !surveyId) return json({});
 
+        // Check if already completed
+        const existingP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        if (existingP?.[0]?.status === "completed") {
+          await slackApi(botToken, "chat.postEphemeral", {
+            channel: payload.channel?.id || payload.user.id,
+            user: payload.user.id,
+            text: ":white_check_mark: You've already completed this survey. Thank you!",
+          });
+          return json({});
+        }
+
         const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,type,name,config,workspace_id`);
         const survey = surveys?.[0];
         if (!survey || survey.workspace_id !== ws.id) return json({});
@@ -1434,6 +1531,20 @@ Deno.serve(async (req) => {
         const { participantId, surveyId } = safeParse(action.value) || {};
         if (!participantId) return json({});
 
+        // Check if already completed
+        const existingEnps = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        if (existingEnps?.[0]?.status === "completed") {
+          await slackApi(botToken, "chat.update", {
+            channel: payload.channel?.id || payload.user.id,
+            ts: payload.message?.ts,
+            text: "✅ You've already submitted your response. Thank you!",
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: ":white_check_mark: *You've already submitted your response.* Thank you!" } },
+            ],
+          });
+          return json({});
+        }
+
         // Extract score and follow-up from message state
         const state = payload.state?.values || {};
         const scoreBlock = Object.keys(state).find(k => k.startsWith("enps_score_"));
@@ -1489,6 +1600,16 @@ Deno.serve(async (req) => {
         let reviewRole = "manager";
         if (rolePrefix === "self" || user.id === assignment.employee_id) reviewRole = "self";
         if (rolePrefix === "upward" || (assignment.assignment_type === "upward" && user.id === assignment.reviewer_id)) reviewRole = "upward";
+        if (assignment.assignment_type === "peer" && user.id === assignment.reviewer_id) reviewRole = "peer";
+
+        // Authorization check
+        if (reviewRole === "manager" && user.id !== assignment.manager_id) {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: ":no_entry: You are not authorized to review this employee.",
+          });
+          return json({});
+        }
 
         // Check if already submitted (via web or Slack)
         const existingResp = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
@@ -1960,6 +2081,17 @@ Deno.serve(async (req) => {
         if (!participantId || !surveyId) return json({});
 
         const slackUserId = payload.user.id;
+
+        // Check if already completed
+        const existingP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        if (existingP?.[0]?.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: ":white_check_mark: You've already completed this survey. Thank you!",
+          });
+          return json({});
+        }
+
         const user = await getOrCreateUser(ws.id, slackUserId, botToken);
         if (!user) return json({});
 
@@ -2030,7 +2162,13 @@ Deno.serve(async (req) => {
 
         const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
-        if (!conv) return json({});
+        if (!conv || conv.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: This survey has already been submitted. Thank you!",
+          });
+          return json({});
+        }
 
         const questions: any[] = conv.survey_questions_config || [];
         const questionIds = conv.survey_question_ids || [];
@@ -2103,7 +2241,13 @@ Deno.serve(async (req) => {
 
         const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
-        if (!conv) return json({});
+        if (!conv || conv.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: This survey has already been submitted. Thank you!",
+          });
+          return json({});
+        }
 
         const questions: any[] = conv.survey_questions_config || [];
         const questionIds = conv.survey_question_ids || [];
@@ -2176,7 +2320,13 @@ Deno.serve(async (req) => {
 
         const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
         const conv = convStates?.[0];
-        if (!conv) return json({});
+        if (!conv || conv.status === "completed") {
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: ":white_check_mark: This survey has already been submitted. Thank you!",
+          });
+          return json({});
+        }
 
         const questions: any[] = conv.survey_questions_config || [];
         const currentIdx = questionIndex ?? conv.current_index ?? 0;
