@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
-import { ArrowLeft, Plus, Trash2, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 
@@ -149,12 +149,37 @@ export default function NewTemplatePage() {
             <CardDescription>Define the questions for this review template</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {questions.map((question, index) => (
+            {questions.map((question, idx) => (
               <div
                 key={question.id}
                 className="flex gap-3 items-start p-4 bg-slate-50 dark:bg-slate-900 rounded-lg"
               >
-                <GripVertical className="h-5 w-5 text-slate-400 mt-2 cursor-move" />
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    disabled={idx === 0}
+                    onClick={() => {
+                      const newQ = [...questions];
+                      [newQ[idx - 1], newQ[idx]] = [newQ[idx], newQ[idx - 1]];
+                      setQuestions(newQ);
+                    }}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={idx === questions.length - 1}
+                    onClick={() => {
+                      const newQ = [...questions];
+                      [newQ[idx], newQ[idx + 1]] = [newQ[idx + 1], newQ[idx]];
+                      setQuestions(newQ);
+                    }}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </button>
+                </div>
                 <div className="flex-1 space-y-3">
                   <div className="flex gap-3">
                     <div className="flex-1">

@@ -232,14 +232,59 @@ export function FrameworkImportDialog({
         is_core: c.is_core ?? false,
       }));
 
-      const { error: insertError } = await supabase
+      const { data: importedCompetencies, error: insertError } = await supabase
         .from("competencies")
-        .insert(rows);
+        .insert(rows)
+        .select("id, name");
 
       if (insertError) throw insertError;
 
+      // ── Import level definitions ─────────────────────────────────────
+      let levelWarning = "";
+
+      if (importedCompetencies && importedCompetencies.length > 0) {
+        const wsId = workspaceId;
+        const allComps = competencies; // original template competencies
+
+        const { data: wsLevels } = await supabase
+          .from("levels")
+          .select("id, sort_order")
+          .eq("workspace_id", wsId)
+          .order("sort_order");
+
+        if (wsLevels && wsLevels.length > 0) {
+          const levelCompInserts: any[] = [];
+
+          for (const comp of importedCompetencies) {
+            // Find the original template competency data to get levels
+            const templateComp = allComps.find((c: any) => c.name === comp.name);
+            if (!templateComp?.levels) continue;
+
+            for (const [levelNum, levelData] of Object.entries(templateComp.levels)) {
+              const levelIdx = parseInt(levelNum) - 1; // 0-based index
+              if (levelIdx < wsLevels.length) {
+                const wsLevel = wsLevels[levelIdx];
+                levelCompInserts.push({
+                  level_id: wsLevel.id,
+                  competency_id: comp.id,
+                  expected_level: parseInt(levelNum),
+                  workspace_id: wsId,
+                  behavioral_indicators: (levelData as any).indicators || [],
+                });
+              }
+            }
+          }
+
+          if (levelCompInserts.length > 0) {
+            await supabase.from("level_competencies").insert(levelCompInserts);
+          }
+        } else {
+          levelWarning = "\n\nNote: Competencies imported but level expectations were skipped — set up your career levels first in Functions.";
+        }
+      }
+
       alert(
-        `Successfully imported ${toImport.length} competenc${toImport.length === 1 ? "y" : "ies"} into your workspace.`
+        `Successfully imported ${toImport.length} competenc${toImport.length === 1 ? "y" : "ies"} into your workspace.${levelWarning}`
       );
 
       onOpenChange(false);
