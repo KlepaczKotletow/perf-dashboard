@@ -885,14 +885,14 @@ export default function Home() {
                 {
                   step: 2,
                   icon: Target,
-                  title: "Set up your team and competencies",
-                  description: "Nami syncs your Slack members automatically. Assign managers, define reporting lines, and set the competencies your org values.",
+                  title: "Import your team in seconds",
+                  description: "Nami auto-syncs your Slack members — names, photos, emails. Assign managers with a click, then use pre-built competency frameworks to get started instantly.",
                 },
                 {
                   step: 3,
                   icon: BarChart3,
-                  title: "Launch cycles and read the data",
-                  description: "Pick a template, set a deadline, and Nami handles assignments, DM reminders, and collection. Analytics update in real time.",
+                  title: "Launch from templates",
+                  description: "Pick from ready-made review, goal, or cycle templates — or create your own. Set a deadline and Nami handles assignments, reminders, and collection.",
                 },
               ].map((item, i) => (
                 <ScrollReveal key={item.step} delay={i * 120}>
@@ -911,6 +911,29 @@ export default function Home() {
                 </ScrollReveal>
               ))}
             </ol>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Built-in features strip ── */}
+      <section className="bg-[#f8f6f0] border-y border-border/40 py-14">
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-8">
+            Everything you need, built in
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { icon: "🔄", title: "Slack Auto-Sync", desc: "Team members, photos, and emails imported automatically from your workspace" },
+              { icon: "📋", title: "Pre-built Templates", desc: "Review, competency, goal, and cycle templates — ready to use or customise" },
+              { icon: "🎯", title: "Competency Frameworks", desc: "Engineering, Product, Management, and General frameworks with level expectations" },
+              { icon: "📊", title: "Real-time Analytics", desc: "Heatmaps, rankings, trend analysis, and department breakdowns — no exports needed" },
+            ].map((f) => (
+              <div key={f.title} className="rounded-xl border border-border/60 bg-white p-4 space-y-2">
+                <span className="text-2xl">{f.icon}</span>
+                <p className="text-sm font-semibold text-foreground">{f.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
