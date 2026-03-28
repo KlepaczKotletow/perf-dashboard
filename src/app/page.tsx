@@ -193,6 +193,30 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Research-backed stats bar ── */}
+      <section className="bg-white border-y border-border/40 py-14 lg:py-16">
+        <div className="max-w-5xl mx-auto px-6">
+          <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-10">
+            Why performance management matters — backed by research
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
+            {[
+              { stat: "23%", label: "higher profitability", detail: "at companies with engaged employees", source: "Gallup, 2024" },
+              { stat: "4.2×", label: "more likely to outperform", detail: "competitors with robust performance management", source: "McKinsey" },
+              { stat: "$438B", label: "lost to disengagement", detail: "in global productivity annually", source: "Gallup, 2024" },
+              { stat: "51%", label: "lower turnover", detail: "at organisations with high employee engagement", source: "Gallup, 2024" },
+            ].map((item) => (
+              <div key={item.stat} className="text-center space-y-1.5">
+                <p className="text-3xl lg:text-4xl font-bold tracking-tight text-primary">{item.stat}</p>
+                <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
+                <p className="text-[10px] text-muted-foreground/60 italic">{item.source}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Feature Spotlight 1: Reviews ── */}
       <section id="features" className="bg-white py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
