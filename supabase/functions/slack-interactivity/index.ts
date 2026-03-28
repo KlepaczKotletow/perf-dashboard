@@ -341,19 +341,77 @@ Deno.serve(async (req) => {
           }
         }
 
-        // 3. Goals
+        // 3. Goals with tracking status
         const goals = await dbQuery("goals",
-          `employee_id=eq.${employeeId}&status=eq.active&select=id,progress`);
+          `employee_id=eq.${employeeId}&status=eq.active&select=id,progress,tracking_status`);
         if (goals?.length > 0 && !goals.error) {
           const avgProgress = Math.round(goals.reduce((s: number, g: any) => s + (g.progress || 0), 0) / goals.length);
-          contextLines.push(`Goals: ${goals.length} active (${avgProgress}% avg progress)`);
+          const statusParts: string[] = [];
+          const byStatus: Record<string, number> = {};
+          for (const g of goals) {
+            const ts = g.tracking_status || "no_status";
+            byStatus[ts] = (byStatus[ts] || 0) + 1;
+          }
+          if (byStatus.on_track) statusParts.push(`${byStatus.on_track} on track`);
+          if (byStatus.achieved) statusParts.push(`${byStatus.achieved} achieved`);
+          if (byStatus.at_risk) statusParts.push(`${byStatus.at_risk} at risk`);
+          if (byStatus.delayed) statusParts.push(`${byStatus.delayed} delayed`);
+          const statusSuffix = statusParts.length > 0 ? ` · ${statusParts.join(" · ")}` : "";
+          contextLines.push(`Goals: ${goals.length} active (${avgProgress}% avg progress${statusSuffix})`);
         }
 
         // 4. Previous cycle rating
         const prevAssignments = await dbQuery("review_assignments",
-          `employee_id=eq.${employeeId}&status=eq.completed&cycle_id=neq.${cycleId}&select=overall_rating,updated_at&order=updated_at.desc&limit=1`);
+          `employee_id=eq.${employeeId}&status=eq.completed&cycle_id=neq.${cycleId}&select=id,overall_rating,updated_at&order=updated_at.desc&limit=1`);
         if (prevAssignments?.[0]?.overall_rating) {
           contextLines.push(`Previous Rating: ⭐ *${(Math.round(prevAssignments[0].overall_rating * 10) / 10).toString()}/${ws.rating_scale?.max || 5}*`);
+        }
+
+        // 5. Competency expectations from level matrix
+        const empLevelData = await dbQuery("users", `id=eq.${employeeId}&workspace_id=eq.${ws.id}&select=level_id,levels(name,job_families(name))`);
+        const empLevel = empLevelData?.[0];
+        if (empLevel?.level_id) {
+          const level = (empLevel as any).levels;
+          const levelName = level?.job_families?.name
+            ? `${level.job_families.name} — ${level.name}`
+            : level?.name;
+
+          const levelComps = await dbQuery("level_competencies",
+            `level_id=eq.${empLevel.level_id}&workspace_id=eq.${ws.id}&select=competency_id,expected_level,competencies(name)`);
+
+          if (levelComps?.length > 0 && !levelComps.error && levelName) {
+            // Get previous per-competency ratings
+            let prevCompMap: Record<string, number> = {};
+            if (prevAssignments?.[0]?.id) {
+              const prevResp = await dbQuery("review_responses",
+                `assignment_id=eq.${prevAssignments[0].id}&reviewer_role=eq.manager&select=competency_id,rating`);
+              if (prevResp && !prevResp.error) {
+                for (const r of prevResp) {
+                  if (r.competency_id && r.rating != null) prevCompMap[r.competency_id] = r.rating;
+                }
+              }
+            }
+
+            contextLines.push(""); // blank line separator
+            contextLines.push(`:clipboard: *${levelName} expectations:*`);
+            const MAX_SHOWN = 5;
+            const shown = levelComps.slice(0, MAX_SHOWN);
+            for (const lc of shown) {
+              const compName = lc.competencies?.name || "Unknown";
+              const prev = prevCompMap[lc.competency_id];
+              let line = `• ${compName} — target: *${lc.expected_level}/${ws.rating_scale?.max || 5}*`;
+              if (prev != null) {
+                const met = prev >= lc.expected_level ? " :white_check_mark:" : "";
+                line += ` (prev: ${prev}/${ws.rating_scale?.max || 5})${met}`;
+              } else {
+                line += " _(no prior data)_";
+              }
+              contextLines.push(line);
+            }
+            if (levelComps.length > MAX_SHOWN) {
+              contextLines.push(`_…and ${levelComps.length - MAX_SHOWN} more in the review form_`);
+            }
+          }
         }
 
         if (contextLines.length === 0) return; // No context available
