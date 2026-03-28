@@ -698,15 +698,8 @@ export default async function PerformancePage({
       : null;
   const latestGrade = cycles.find((c) => c.gradesReleased && c.grade)?.grade ?? null;
 
-  // 9. Auto-expand logic
-  const cyclesWithPending = cycles.filter((c) => c.pendingTasks.length > 0);
-  const autoExpandIds = new Set<string>(
-    cyclesWithPending.length > 0
-      ? cyclesWithPending.map((c) => c.cycleId)
-      : cycles.length > 0
-      ? [cycles[0].cycleId]
-      : []
-  );
+  // 9. Auto-expand logic — all collapsed by default
+  const autoExpandIds = new Set<string>();
 
   /* ================================================================ */
   /*  Task 8: JSX                                                     */
