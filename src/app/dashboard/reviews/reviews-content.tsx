@@ -34,7 +34,10 @@ const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, compl
 const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2, closed: 3 };
 
 function UserCell({ name, subtitle, avatarUrl }: { name: string; subtitle?: string; avatarUrl?: string }) {
-  const initials = (name ?? "?")[0].toUpperCase();
+  if (!name || name === "Unassigned") {
+    return <span className="text-xs text-muted-foreground italic">Not assigned</span>;
+  }
+  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   return (
     <div className="flex items-center gap-3">
       <Avatar className="h-7 w-7">
@@ -195,7 +198,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="pl-5 w-[30%]">Employee</TableHead>
-                    <TableHead className="w-[25%]">Reviewer</TableHead>
+                    <TableHead className="w-[25%]">Manager / Reviewer</TableHead>
                     <TableHead className="w-[12%]">Type</TableHead>
                     <TableHead className="w-[13%] text-center">Status</TableHead>
                     <TableHead className="w-[10%] text-center">Rating</TableHead>
@@ -203,14 +206,14 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Manager / Standard reviews */}
+                  {/* Standard reviews (self + manager) */}
                   {standard.length > 0 && (
                     <TableRow className="hover:bg-transparent bg-muted/10">
                       <TableCell colSpan={6} className="pl-5 py-1.5">
                         <div className="flex items-center gap-2">
                           <Users className="h-3.5 w-3.5 text-muted-foreground" />
                           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Manager Reviews · {standard.length}
+                            Standard Reviews · {standard.length}
                           </span>
                         </div>
                       </TableCell>
@@ -218,7 +221,6 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                   )}
                   {standard.map((a) => {
                     const config = getAssignmentStatus(a.status);
-                    const reviewerName = a.manager?.slack_name ?? "Unassigned";
                     return (
                       <TableRow
                         key={a.id}
@@ -234,12 +236,12 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                         </TableCell>
                         <TableCell>
                           <UserCell
-                            name={reviewerName}
+                            name={a.manager?.slack_name}
                             avatarUrl={a.manager?.avatar_url}
                           />
                         </TableCell>
                         <TableCell>
-                          <span className="text-xs text-muted-foreground">Manager</span>
+                          <Badge variant="outline" className="text-[10px] font-medium">Standard</Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={`text-[10px] font-medium ${config.badge}`}>
@@ -271,7 +273,6 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                   )}
                   {upward.map((a) => {
                     const config = getAssignmentStatus(a.status);
-                    const reviewerName = a.reviewer?.slack_name ?? "Unassigned";
                     return (
                       <TableRow
                         key={a.id}
@@ -287,12 +288,12 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
                         </TableCell>
                         <TableCell>
                           <UserCell
-                            name={reviewerName}
+                            name={a.reviewer?.slack_name}
                             avatarUrl={a.reviewer?.avatar_url}
                           />
                         </TableCell>
                         <TableCell>
-                          <span className="text-xs text-muted-foreground">Upward</span>
+                          <Badge variant="outline" className="text-[10px] font-medium">Upward</Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge className={`text-[10px] font-medium ${config.badge}`}>
