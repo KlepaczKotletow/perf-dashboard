@@ -59,9 +59,21 @@ export function buildManagerReviewOpening(
   cycleName: string,
   deadline: string,
   assignmentId: string,
-  context: { selfAvg?: number; prevRating?: number; goalsCount?: number },
+  context: {
+    selfAvg?: number;
+    prevRating?: number;
+    goalsCount?: number;
+    goalsByStatus?: Record<string, number>;
+    levelName?: string;
+    competencyExpectations?: Array<{
+      name: string;
+      expectedLevel: number;
+      prevRating?: number;
+    }>;
+  },
   ratingMax: number = 5,
 ) {
+  // --- Quick context section ---
   const contextLines: string[] = [];
   if (context.selfAvg != null) {
     contextLines.push(
@@ -70,11 +82,21 @@ export function buildManagerReviewOpening(
   }
   if (context.prevRating != null) {
     contextLines.push(
-      `Previous cycle rating: :star: *${(Math.round(context.prevRating * 10) / 10).toString()}/${ratingMax}*`,
+      `Previous cycle: :star: *${(Math.round(context.prevRating * 10) / 10).toString()}/${ratingMax}*`,
     );
   }
+
+  // Goal status breakdown
   if (context.goalsCount != null && context.goalsCount > 0) {
-    contextLines.push(`Active goals: *${context.goalsCount}*`);
+    const statusParts: string[] = [];
+    const byStatus = context.goalsByStatus || {};
+    if (byStatus.on_track) statusParts.push(`${byStatus.on_track} on track`);
+    if (byStatus.achieved) statusParts.push(`${byStatus.achieved} achieved`);
+    if (byStatus.at_risk) statusParts.push(`${byStatus.at_risk} at risk`);
+    if (byStatus.delayed) statusParts.push(`${byStatus.delayed} delayed`);
+
+    const statusSuffix = statusParts.length > 0 ? ` (${statusParts.join(" · ")})` : "";
+    contextLines.push(`Active goals: *${context.goalsCount}*${statusSuffix}`);
   }
 
   const contextBlock =
@@ -82,12 +104,37 @@ export function buildManagerReviewOpening(
       ? `\n\n:bar_chart: *Quick context:*\n${contextLines.join("\n")}`
       : "";
 
+  // --- Competency expectations section ---
+  let competencyBlock = "";
+  if (
+    context.competencyExpectations &&
+    context.competencyExpectations.length > 0 &&
+    context.levelName
+  ) {
+    const MAX_SHOWN = 5;
+    const comps = context.competencyExpectations;
+    const lines = comps.slice(0, MAX_SHOWN).map((c) => {
+      let line = `• ${c.name} — target: *${c.expectedLevel}/${ratingMax}*`;
+      if (c.prevRating != null) {
+        const met = c.prevRating >= c.expectedLevel ? " :white_check_mark:" : "";
+        line += ` (prev: ${c.prevRating}/${ratingMax})${met}`;
+      } else {
+        line += " _(no prior data)_";
+      }
+      return line;
+    });
+    if (comps.length > MAX_SHOWN) {
+      lines.push(`_…and ${comps.length - MAX_SHOWN} more in the review form_`);
+    }
+    competencyBlock = `\n\n:clipboard: *${context.levelName} expectations:*\n${lines.join("\n")}`;
+  }
+
   return [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `Hey ${managerName}! :wave:\n\nIt's time to review *${employeeName}* for *${cycleName}*.\n:calendar: Deadline: *${deadline}*${contextBlock}`,
+        text: `Hey ${managerName}! :wave:\n\nIt's time to review *${employeeName}* for *${cycleName}*.\n:calendar: Deadline: *${deadline}*${contextBlock}${competencyBlock}`,
       },
     },
     { type: "divider" },
