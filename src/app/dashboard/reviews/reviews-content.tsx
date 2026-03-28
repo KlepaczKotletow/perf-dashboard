@@ -3,11 +3,11 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import {
   ArrowRight, Users, ArrowUpCircle, ChevronDown, ChevronRight,
-  FileText, ArrowUpDown, CheckCircle2, Clock, AlertCircle,
+  FileText, ArrowUpDown, AlertCircle,
 } from "lucide-react";
 import { getAssignmentStatus } from "@/lib/status";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,88 +33,18 @@ const SORT_OPTIONS = [
 const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 };
 const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2, closed: 3 };
 
-function SubSection({
-  icon, label, count, items,
-  hasBorderTop,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  count: number;
-  items: any[];
-  hasBorderTop?: boolean;
-}) {
-  const [open, setOpen] = useState(true);
+function UserCell({ name, subtitle, avatarUrl }: { name: string; subtitle?: string; avatarUrl?: string }) {
+  const initials = (name ?? "?")[0].toUpperCase();
   return (
-    <div className={hasBorderTop ? "border-t border-border/40" : ""}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-5 py-2 bg-muted/10 hover:bg-muted/20 transition-colors text-left"
-      >
-        {icon}
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex-1">
-          {label} · {count}
-        </span>
-        {open
-          ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-      </button>
-      {open && (
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-5">Employee</TableHead>
-              <TableHead>Reviewer</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Rating</TableHead>
-              <TableHead className="pr-5 w-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((a) => {
-              const config = getAssignmentStatus(a.status);
-              const isUpward = a.assignment_type === "upward";
-              const reviewerName = isUpward
-                ? (a.reviewer?.slack_name ?? "Unassigned")
-                : (a.manager?.slack_name ?? "Unassigned");
-              const initials = (a.employee?.slack_name ?? "?")[0].toUpperCase();
-
-              return (
-                <TableRow key={a.id} className="group cursor-pointer" onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}>
-                  <TableCell className="pl-5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-xs font-semibold text-primary">{initials}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {a.employee?.slack_name || "Unknown"}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {a.employee?.department || a.employee?.job_title || "—"}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {reviewerName}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge className={`text-[10px] font-medium ${config.badge}`}>
-                      {config.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center text-sm font-medium text-muted-foreground">
-                    {a.overall_rating ? `${a.overall_rating}/5` : "—"}
-                  </TableCell>
-                  <TableCell className="pr-5">
-                    <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      )}
+    <div className="flex items-center gap-3">
+      <Avatar className="h-7 w-7">
+        {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
+        <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground truncate">{name}</p>
+        {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+      </div>
     </div>
   );
 }
@@ -218,7 +148,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
 
         return (
           <div key={cid} className="rounded-xl border border-border/60 bg-card overflow-hidden">
-            {/* Cycle header — clickable to collapse */}
+            {/* Cycle header */}
             <button
               onClick={() => toggleCollapse(cid)}
               className="w-full flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
@@ -251,7 +181,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
               </div>
             </button>
 
-            {/* Collapsed view: just a summary bar */}
+            {/* Collapsed summary */}
             {isCollapsed && pendingCount > 0 && (
               <div className="px-5 py-2 flex items-center gap-2 text-xs text-muted-foreground bg-muted/5">
                 <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
@@ -259,27 +189,127 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
               </div>
             )}
 
-            {/* Expanded content */}
+            {/* Expanded: single table for all assignments */}
             {!isCollapsed && (
-              <>
-                {standard.length > 0 && (
-                  <SubSection
-                    icon={<Users className="h-3.5 w-3.5 text-muted-foreground" />}
-                    label="Manager Reviews"
-                    count={standard.length}
-                    items={standard}
-                  />
-                )}
-                {upward.length > 0 && (
-                  <SubSection
-                    icon={<ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />}
-                    label="Upward Reviews"
-                    count={upward.length}
-                    items={upward}
-                    hasBorderTop={standard.length > 0}
-                  />
-                )}
-              </>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-5 w-[30%]">Employee</TableHead>
+                    <TableHead className="w-[25%]">Reviewer</TableHead>
+                    <TableHead className="w-[12%]">Type</TableHead>
+                    <TableHead className="w-[13%] text-center">Status</TableHead>
+                    <TableHead className="w-[10%] text-center">Rating</TableHead>
+                    <TableHead className="pr-5 w-[5%]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* Manager / Standard reviews */}
+                  {standard.length > 0 && (
+                    <TableRow className="hover:bg-transparent bg-muted/10">
+                      <TableCell colSpan={6} className="pl-5 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Manager Reviews · {standard.length}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {standard.map((a) => {
+                    const config = getAssignmentStatus(a.status);
+                    const reviewerName = a.manager?.slack_name ?? "Unassigned";
+                    return (
+                      <TableRow
+                        key={a.id}
+                        className="group cursor-pointer"
+                        onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}
+                      >
+                        <TableCell className="pl-5">
+                          <UserCell
+                            name={a.employee?.slack_name || "Unknown"}
+                            subtitle={a.employee?.department || a.employee?.job_title || undefined}
+                            avatarUrl={a.employee?.avatar_url}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <UserCell
+                            name={reviewerName}
+                            avatarUrl={a.manager?.avatar_url}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">Manager</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={`text-[10px] font-medium ${config.badge}`}>
+                            {config.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center text-sm font-medium text-muted-foreground">
+                          {a.overall_rating ? `${a.overall_rating}/5` : "—"}
+                        </TableCell>
+                        <TableCell className="pr-5">
+                          <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  {/* Upward reviews */}
+                  {upward.length > 0 && (
+                    <TableRow className="hover:bg-transparent bg-muted/10">
+                      <TableCell colSpan={6} className="pl-5 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Upward Reviews · {upward.length}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {upward.map((a) => {
+                    const config = getAssignmentStatus(a.status);
+                    const reviewerName = a.reviewer?.slack_name ?? "Unassigned";
+                    return (
+                      <TableRow
+                        key={a.id}
+                        className="group cursor-pointer"
+                        onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}
+                      >
+                        <TableCell className="pl-5">
+                          <UserCell
+                            name={a.employee?.slack_name || "Unknown"}
+                            subtitle={a.employee?.department || a.employee?.job_title || undefined}
+                            avatarUrl={a.employee?.avatar_url}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <UserCell
+                            name={reviewerName}
+                            avatarUrl={a.reviewer?.avatar_url}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">Upward</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={`text-[10px] font-medium ${config.badge}`}>
+                            {config.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center text-sm font-medium text-muted-foreground">
+                          {a.overall_rating ? `${a.overall_rating}/5` : "—"}
+                        </TableCell>
+                        <TableCell className="pr-5">
+                          <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             )}
           </div>
         );
