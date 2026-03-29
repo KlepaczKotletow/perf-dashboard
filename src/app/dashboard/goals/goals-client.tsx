@@ -593,14 +593,35 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
 
       {/* Data Table */}
       {flat.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
-            <CheckCircle2 className="h-6 w-6 text-muted-foreground/50" />
+        <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
+          <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+            <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
           </div>
-          <p className="text-sm font-medium">No goals found</p>
-          <p className="text-xs mt-1">
-            {goals.length > 0 ? "Try adjusting your filters." : "Create your first goal to get started."}
-          </p>
+          {goals.length > 0 ? (
+            <>
+              <p className="text-sm font-medium text-foreground mb-1">No goals found</p>
+              <p className="text-xs text-muted-foreground">Try adjusting your filters.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-foreground mb-1">No goals yet</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                Create your first goal to start tracking objectives for your team.
+              </p>
+              <div className="flex items-center justify-center gap-2 mt-5">
+                <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
+                  <Zap className="h-3.5 w-3.5 mr-1.5" />
+                  Quick Add
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href="/dashboard/goals/new">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    New Goal
+                  </Link>
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto">

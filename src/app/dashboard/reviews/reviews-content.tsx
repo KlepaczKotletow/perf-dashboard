@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import {
   ArrowRight, Users, ArrowUpCircle, ChevronDown, ChevronRight,
-  FileText, ArrowUpDown, AlertCircle,
+  FileText, ArrowUpDown, AlertCircle, Plus,
 } from "lucide-react";
 import { getAssignmentStatus } from "@/lib/status";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -96,14 +96,20 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
 
   if (initialCycles.length === 0) {
     return (
-      <div className="rounded-xl border border-border/60 bg-card py-16 text-center">
+      <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
         <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
           <FileText className="h-5 w-5 text-muted-foreground" />
         </div>
         <p className="text-sm font-medium text-foreground mb-1">No review assignments yet</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-xs text-muted-foreground max-w-xs mx-auto">
           Assignments are created when a performance cycle is launched.
         </p>
+        <Button size="sm" className="mt-5 gap-1.5" asChild>
+          <a href="/dashboard/cycles/new">
+            <Plus className="h-3.5 w-3.5" />
+            Launch a Cycle
+          </a>
+        </Button>
       </div>
     );
   }

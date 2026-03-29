@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { RoleSelector } from "./role-selector";
 import { BulkActions } from "./bulk-actions";
-import { ArrowUpDown, ArrowUp, ArrowDown, ArrowRight } from "lucide-react";
+import { ArrowUpDown, ArrowUp, ArrowDown, ArrowRight, Users, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface TeamUser {
   id: string;
@@ -281,8 +282,20 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
         ))}
 
         {sortedUsers.length === 0 && (
-          <div className="py-12 text-center text-sm text-muted-foreground">
-            No employees found.
+          <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
+            <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">No team members yet</p>
+            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+              Import your team from Slack to get started.
+            </p>
+            <Link href="/dashboard/team/import">
+              <Button size="sm" className="mt-5 gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Import from Slack
+              </Button>
+            </Link>
           </div>
         )}
       </div>

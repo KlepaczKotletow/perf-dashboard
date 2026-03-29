@@ -654,20 +654,33 @@ export function CompetenciesClient({
                   <Target className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1.5">
-                  No competencies yet
+                  No competencies defined
                 </p>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                  Define the skills and behaviours you want to measure in performance reviews.
+                  Define the skills and behaviors your organisation values.
                 </p>
                 {canEdit && (
-                  <Button
-                    size="sm"
-                    className="mt-5 gap-1.5"
-                    onClick={() => setShowAdd(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add your first competency
-                  </Button>
+                  <div className="flex items-center justify-center gap-2 mt-5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      asChild
+                    >
+                      <a href="/dashboard/templates">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        Import Framework
+                      </a>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setShowAdd(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Competency
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>

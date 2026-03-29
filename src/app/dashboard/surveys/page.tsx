@@ -87,15 +87,20 @@ export default async function SurveysPage() {
       </div>
 
       {surveys.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center rounded-lg border border-dashed">
-          <ClipboardList className="h-10 w-10 text-muted-foreground/40 mb-4" />
-          <h3 className="text-base font-medium text-foreground mb-1">No surveys yet</h3>
-          <p className="text-sm text-muted-foreground mb-5 max-w-sm">
-            Launch a 360, pulse survey, or eNPS — participants respond directly in Slack.
+        <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
+          <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+            <ClipboardList className="h-5 w-5 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-foreground mb-1">No surveys yet</p>
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+            Create your first survey to gather feedback from your team.
           </p>
           {isAdminOrHR && (
-            <Button size="sm" asChild>
-              <Link href="/dashboard/surveys/new"><Plus className="h-3.5 w-3.5 mr-1.5" />Launch your first survey</Link>
+            <Button size="sm" className="mt-5 gap-1.5" asChild>
+              <Link href="/dashboard/surveys/new">
+                <Plus className="h-3.5 w-3.5" />
+                Create Survey
+              </Link>
             </Button>
           )}
         </div>
