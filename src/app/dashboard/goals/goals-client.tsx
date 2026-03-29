@@ -53,7 +53,9 @@ import {
   MoreHorizontal,
   Zap,
   Loader2,
+  Download,
 } from "lucide-react";
+import { isHROrAbove } from "@/lib/roles";
 import { getClientIdentity } from "@/lib/client-auth";
 
 // ─── Types ──────────────────────────────────────────────
@@ -427,6 +429,17 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {isHROrAbove(role) && (
+            <Button variant="outline" size="sm" onClick={() => {
+              const a = document.createElement("a");
+              a.href = "/api/goals/export";
+              a.download = `goals-export-${new Date().toISOString().split("T")[0]}.csv`;
+              a.click();
+            }}>
+              <Download className="h-3.5 w-3.5 mr-1.5" />
+              Export
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Quick Add
