@@ -452,6 +452,350 @@ const SYSTEM_COMPETENCY_FRAMEWORKS = [
       ],
     },
   },
+  // ── Sales & Business Development ──
+  {
+    name: "Sales & Business Development",
+    description: "Career framework for sales professionals covering pipeline management, negotiation, and account growth.",
+    content: {
+      competencies: [
+        {
+          name: "Pipeline Management", description: "Building and managing a healthy sales pipeline", category: "Sales", is_core: false,
+          levels: {
+            "1": { title: "SDR", indicators: ["Maintains accurate CRM data", "Follows up on inbound leads within SLA"] },
+            "2": { title: "AE", indicators: ["Builds qualified pipeline independently", "Accurately forecasts deal close dates"] },
+            "3": { title: "Senior AE", indicators: ["Manages complex multi-stakeholder pipelines", "Coaches junior reps on pipeline hygiene"] },
+            "4": { title: "Sales Manager", indicators: ["Designs pipeline review cadences for the team", "Identifies systemic pipeline gaps across reps"] },
+            "5": { title: "VP Sales", indicators: ["Architects pipeline strategy across segments", "Drives predictable revenue through pipeline analytics"] },
+          },
+        },
+        {
+          name: "Negotiation & Closing", description: "Ability to negotiate terms and close deals", category: "Sales", is_core: false,
+          levels: {
+            "1": { title: "SDR", indicators: ["Handles basic objections using scripts", "Qualifies decision-makers correctly"] },
+            "2": { title: "AE", indicators: ["Leads contract negotiation independently", "Manages competitive deals effectively"] },
+            "3": { title: "Senior AE", indicators: ["Structures multi-year enterprise deals", "Navigates procurement and legal reviews"] },
+            "4": { title: "Sales Manager", indicators: ["Coaches team on advanced negotiation tactics", "Approves deal structures and discount levels"] },
+            "5": { title: "VP Sales", indicators: ["Negotiates strategic partnerships at C-level", "Designs pricing and packaging strategies"] },
+          },
+        },
+        {
+          name: "Account Management", description: "Growing and retaining existing customer relationships", category: "Sales", is_core: false,
+          levels: {
+            "1": { title: "SDR", indicators: ["Responds to customer queries promptly", "Documents customer interactions accurately"] },
+            "2": { title: "AE", indicators: ["Identifies upsell opportunities in existing accounts", "Builds multi-threaded relationships within accounts"] },
+            "3": { title: "Senior AE", indicators: ["Develops strategic account plans", "Drives net revenue retention above target"] },
+            "4": { title: "Sales Manager", indicators: ["Designs account segmentation strategy", "Coaches team on strategic account development"] },
+            "5": { title: "VP Sales", indicators: ["Defines company-wide account strategy and tiering", "Owns executive relationships for top accounts"] },
+          },
+        },
+        {
+          name: "Product Knowledge", description: "Understanding the product deeply enough to sell effectively", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "SDR", indicators: ["Delivers standard product pitch confidently", "Answers common prospect questions accurately"] },
+            "2": { title: "AE", indicators: ["Tailors demos to prospect use cases", "Articulates competitive differentiators"] },
+            "3": { title: "Senior AE", indicators: ["Provides technical depth in enterprise demos", "Influences product roadmap with market feedback"] },
+            "4": { title: "Sales Manager", indicators: ["Ensures team stays current on product updates", "Partners with product on go-to-market planning"] },
+            "5": { title: "VP Sales", indicators: ["Shapes product strategy based on market intelligence", "Represents product vision to analysts and press"] },
+          },
+        },
+        {
+          name: "Prospecting & Outreach", description: "Finding and engaging potential customers", category: "Sales", is_core: false,
+          levels: {
+            "1": { title: "SDR", indicators: ["Executes outbound cadences consistently", "Personalises outreach beyond templates"] },
+            "2": { title: "AE", indicators: ["Sources own pipeline through networking and referrals", "Targets ideal customer profile accounts"] },
+            "3": { title: "Senior AE", indicators: ["Builds inbound through thought leadership", "Develops account-based marketing strategies"] },
+            "4": { title: "Sales Manager", indicators: ["Designs prospecting playbooks for the team", "Measures and optimises outreach effectiveness"] },
+            "5": { title: "VP Sales", indicators: ["Defines go-to-market strategy and segmentation", "Builds strategic partnerships for lead generation"] },
+          },
+        },
+      ],
+    },
+  },
+  // ── Marketing ──
+  {
+    name: "Marketing",
+    description: "Career framework for marketing professionals covering brand, content, demand generation, and analytics.",
+    content: {
+      competencies: [
+        {
+          name: "Brand & Messaging", description: "Developing and maintaining brand voice and positioning", category: "Strategic", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Follows brand guidelines consistently", "Writes clear copy for standard channels"] },
+            "2": { title: "Specialist", indicators: ["Develops messaging for campaigns independently", "Maintains brand consistency across channels"] },
+            "3": { title: "Senior", indicators: ["Shapes brand positioning for new markets", "Creates messaging frameworks for product launches"] },
+            "4": { title: "Director", indicators: ["Defines brand strategy and voice guidelines", "Manages brand through crisis communications"] },
+            "5": { title: "VP", indicators: ["Sets company-wide brand vision", "Positions brand for IPO or major market expansion"] },
+          },
+        },
+        {
+          name: "Demand Generation", description: "Driving pipeline and revenue through marketing programs", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Executes campaign tasks on schedule", "Reports on basic campaign metrics"] },
+            "2": { title: "Specialist", indicators: ["Runs multi-channel campaigns independently", "Optimises campaigns based on performance data"] },
+            "3": { title: "Senior", indicators: ["Designs full-funnel demand gen strategy", "Manages marketing budget and ROI targets"] },
+            "4": { title: "Director", indicators: ["Builds scalable demand generation engine", "Aligns marketing pipeline targets with sales"] },
+            "5": { title: "VP", indicators: ["Defines revenue marketing strategy across segments", "Builds predictable marketing-sourced pipeline model"] },
+          },
+        },
+        {
+          name: "Content Strategy", description: "Planning and producing content that drives awareness and conversion", category: "Strategic", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Produces content from briefs on time", "Follows SEO best practices in writing"] },
+            "2": { title: "Specialist", indicators: ["Creates content calendars and editorial plans", "Writes thought leadership pieces independently"] },
+            "3": { title: "Senior", indicators: ["Develops content strategy aligned to buyer journey", "Manages freelance writers and content operations"] },
+            "4": { title: "Director", indicators: ["Builds content engine that drives measurable pipeline", "Defines content standards and governance"] },
+            "5": { title: "VP", indicators: ["Creates company narrative and content vision", "Positions executives as industry thought leaders"] },
+          },
+        },
+        {
+          name: "Marketing Analytics", description: "Measuring, analysing, and optimising marketing performance", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Pulls standard reports accurately", "Tracks campaign KPIs in dashboards"] },
+            "2": { title: "Specialist", indicators: ["Analyses campaign performance and recommends changes", "Sets up attribution models and tracking"] },
+            "3": { title: "Senior", indicators: ["Builds marketing data infrastructure", "Delivers insights that change strategy"] },
+            "4": { title: "Director", indicators: ["Defines marketing measurement framework", "Presents ROI analysis to executive team"] },
+            "5": { title: "VP", indicators: ["Drives data-driven culture across marketing", "Uses predictive analytics for resource allocation"] },
+          },
+        },
+        {
+          name: "Digital & Growth", description: "Leveraging digital channels for acquisition and growth", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Manages social media posts and schedules", "Runs basic paid campaigns with guidance"] },
+            "2": { title: "Specialist", indicators: ["Optimises paid acquisition across channels", "Runs A/B tests on landing pages and ads"] },
+            "3": { title: "Senior", indicators: ["Designs growth experiments and scaling strategies", "Manages significant ad spend profitably"] },
+            "4": { title: "Director", indicators: ["Builds growth team and experimentation culture", "Owns customer acquisition cost and LTV targets"] },
+            "5": { title: "VP", indicators: ["Defines company growth strategy across all channels", "Drives product-led growth initiatives"] },
+          },
+        },
+      ],
+    },
+  },
+  // ── Customer Success ──
+  {
+    name: "Customer Success",
+    description: "Career framework for customer success professionals covering onboarding, retention, and expansion.",
+    content: {
+      competencies: [
+        {
+          name: "Customer Onboarding", description: "Guiding new customers to value quickly", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "CSA", indicators: ["Follows onboarding playbook accurately", "Tracks customer milestones in CRM"] },
+            "2": { title: "CSM", indicators: ["Customises onboarding to customer needs", "Achieves time-to-value targets consistently"] },
+            "3": { title: "Senior CSM", indicators: ["Designs onboarding for enterprise accounts", "Identifies and mitigates adoption risks early"] },
+            "4": { title: "CS Manager", indicators: ["Builds scalable onboarding programs", "Measures and improves onboarding metrics across team"] },
+            "5": { title: "VP CS", indicators: ["Defines onboarding strategy for all segments", "Builds self-serve onboarding for SMB tier"] },
+          },
+        },
+        {
+          name: "Retention & Health Scoring", description: "Monitoring and improving customer health to prevent churn", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "CSA", indicators: ["Monitors health scores and flags at-risk accounts", "Follows escalation procedures correctly"] },
+            "2": { title: "CSM", indicators: ["Proactively intervenes on declining health scores", "Conducts QBRs with key accounts"] },
+            "3": { title: "Senior CSM", indicators: ["Builds customer health models and playbooks", "Reduces churn rate within portfolio"] },
+            "4": { title: "CS Manager", indicators: ["Designs health scoring methodology", "Owns net retention metrics for the team"] },
+            "5": { title: "VP CS", indicators: ["Defines company-wide retention strategy", "Builds predictive churn models with data team"] },
+          },
+        },
+        {
+          name: "Expansion & Upselling", description: "Growing revenue within existing accounts", category: "Sales", is_core: false,
+          levels: {
+            "1": { title: "CSA", indicators: ["Identifies basic upsell signals", "Passes qualified expansion leads to AE"] },
+            "2": { title: "CSM", indicators: ["Drives expansion conversations independently", "Achieves net revenue retention targets"] },
+            "3": { title: "Senior CSM", indicators: ["Develops strategic account growth plans", "Closes expansion deals without AE involvement"] },
+            "4": { title: "CS Manager", indicators: ["Builds expansion playbooks and enablement", "Sets and tracks NRR targets across portfolio"] },
+            "5": { title: "VP CS", indicators: ["Designs CS-led revenue strategy", "Aligns expansion with product and sales strategy"] },
+          },
+        },
+        {
+          name: "Customer Advocacy", description: "Building champions and leveraging customer stories", category: "Strategic", is_core: false,
+          levels: {
+            "1": { title: "CSA", indicators: ["Collects customer feedback and NPS responses", "Identifies happy customers for testimonials"] },
+            "2": { title: "CSM", indicators: ["Builds champion relationships within accounts", "Secures case studies and references"] },
+            "3": { title: "Senior CSM", indicators: ["Develops customer advisory board programs", "Drives advocacy that generates pipeline"] },
+            "4": { title: "CS Manager", indicators: ["Builds systematic advocacy program", "Measures advocacy impact on pipeline and retention"] },
+            "5": { title: "VP CS", indicators: ["Creates customer community strategy", "Positions top customers as co-marketing partners"] },
+          },
+        },
+        {
+          name: "Technical Product Knowledge", description: "Deep understanding of the product to guide customer outcomes", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "CSA", indicators: ["Knows product features and common workflows", "Resolves basic customer questions independently"] },
+            "2": { title: "CSM", indicators: ["Advises customers on best practices and configurations", "Troubleshoots intermediate product issues"] },
+            "3": { title: "Senior CSM", indicators: ["Designs custom solutions for complex use cases", "Provides product feedback that shapes roadmap"] },
+            "4": { title: "CS Manager", indicators: ["Ensures team maintains deep product expertise", "Partners with product on customer-driven features"] },
+            "5": { title: "VP CS", indicators: ["Influences product strategy with customer insights", "Builds CS engineering or solutions team"] },
+          },
+        },
+      ],
+    },
+  },
+  // ── Finance & Operations ──
+  {
+    name: "Finance & Operations",
+    description: "Career framework for finance and operations professionals covering analysis, planning, compliance, and process excellence.",
+    content: {
+      competencies: [
+        {
+          name: "Financial Analysis", description: "Analysing financial data to inform decisions", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Analyst", indicators: ["Produces accurate financial reports on time", "Performs variance analysis with guidance"] },
+            "2": { title: "Senior Analyst", indicators: ["Builds financial models independently", "Identifies trends and provides actionable insights"] },
+            "3": { title: "Manager", indicators: ["Leads budgeting and forecasting cycles", "Presents financial analysis to leadership"] },
+            "4": { title: "Director", indicators: ["Designs financial planning framework", "Drives strategic resource allocation decisions"] },
+            "5": { title: "VP/CFO", indicators: ["Sets company financial strategy", "Manages investor relations and board reporting"] },
+          },
+        },
+        {
+          name: "Process Optimisation", description: "Improving operational efficiency and scalability", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "Analyst", indicators: ["Documents existing processes accurately", "Identifies bottlenecks in workflows"] },
+            "2": { title: "Senior Analyst", indicators: ["Redesigns processes for efficiency gains", "Implements automation for repetitive tasks"] },
+            "3": { title: "Manager", indicators: ["Leads cross-functional process improvement projects", "Measures and reports on operational KPIs"] },
+            "4": { title: "Director", indicators: ["Builds operational excellence framework", "Drives company-wide efficiency initiatives"] },
+            "5": { title: "VP/COO", indicators: ["Defines operational strategy for scale", "Builds systems that support 10x growth"] },
+          },
+        },
+        {
+          name: "Compliance & Risk", description: "Ensuring regulatory compliance and managing risk", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Analyst", indicators: ["Follows compliance checklists and procedures", "Reports compliance issues promptly"] },
+            "2": { title: "Senior Analyst", indicators: ["Conducts compliance audits independently", "Maintains regulatory documentation"] },
+            "3": { title: "Manager", indicators: ["Designs compliance programs for new regulations", "Manages internal audit processes"] },
+            "4": { title: "Director", indicators: ["Builds enterprise risk management framework", "Leads regulatory relationships and filings"] },
+            "5": { title: "VP/CFO", indicators: ["Sets compliance strategy across jurisdictions", "Manages board-level risk reporting"] },
+          },
+        },
+        {
+          name: "Vendor & Procurement", description: "Managing vendor relationships and procurement processes", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "Analyst", indicators: ["Processes purchase orders accurately", "Maintains vendor records and contracts"] },
+            "2": { title: "Senior Analyst", indicators: ["Negotiates vendor terms and pricing", "Evaluates vendor performance against SLAs"] },
+            "3": { title: "Manager", indicators: ["Manages vendor portfolio and consolidation", "Leads RFP processes for major purchases"] },
+            "4": { title: "Director", indicators: ["Designs procurement strategy and policies", "Manages strategic vendor partnerships"] },
+            "5": { title: "VP/COO", indicators: ["Defines company-wide procurement strategy", "Negotiates enterprise-level partnerships"] },
+          },
+        },
+      ],
+    },
+  },
+  // ── Design & UX ──
+  {
+    name: "Design & UX",
+    description: "Career framework for designers covering user research, visual design, interaction design, and design leadership.",
+    content: {
+      competencies: [
+        {
+          name: "User Research", description: "Understanding user needs through research methods", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "Junior", indicators: ["Conducts basic usability tests with guidance", "Documents research findings clearly"] },
+            "2": { title: "Mid", indicators: ["Plans and executes research studies independently", "Synthesises findings into actionable insights"] },
+            "3": { title: "Senior", indicators: ["Designs research programs that shape product strategy", "Mentors others on research methodologies"] },
+            "4": { title: "Lead", indicators: ["Builds research operations and tooling", "Drives research culture across the organisation"] },
+            "5": { title: "Head of Design", indicators: ["Defines user-centred design strategy", "Represents user voice at executive level"] },
+          },
+        },
+        {
+          name: "Visual Design", description: "Creating aesthetically excellent and brand-consistent designs", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Junior", indicators: ["Follows design system guidelines", "Produces assets for standard use cases"] },
+            "2": { title: "Mid", indicators: ["Creates polished designs for complex features", "Contributes components to design system"] },
+            "3": { title: "Senior", indicators: ["Defines visual direction for major initiatives", "Evolves design system and brand expression"] },
+            "4": { title: "Lead", indicators: ["Sets visual design standards across products", "Manages external design agency relationships"] },
+            "5": { title: "Head of Design", indicators: ["Defines company visual identity and design language", "Drives design excellence as competitive advantage"] },
+          },
+        },
+        {
+          name: "Interaction Design", description: "Designing intuitive, usable product experiences", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Junior", indicators: ["Creates wireframes and prototypes with guidance", "Follows established interaction patterns"] },
+            "2": { title: "Mid", indicators: ["Designs end-to-end user flows independently", "Iterates designs based on user feedback"] },
+            "3": { title: "Senior", indicators: ["Solves complex interaction challenges", "Establishes interaction patterns for new product areas"] },
+            "4": { title: "Lead", indicators: ["Defines interaction design principles", "Ensures consistency across product surfaces"] },
+            "5": { title: "Head of Design", indicators: ["Shapes product UX vision and strategy", "Drives design thinking across the organisation"] },
+          },
+        },
+        {
+          name: "Design Systems", description: "Building and maintaining scalable design systems", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Junior", indicators: ["Uses design system components correctly", "Reports inconsistencies and bugs"] },
+            "2": { title: "Mid", indicators: ["Creates new components following system patterns", "Documents component usage guidelines"] },
+            "3": { title: "Senior", indicators: ["Architects design system structure and governance", "Drives adoption across teams"] },
+            "4": { title: "Lead", indicators: ["Manages design system as a product", "Aligns design system with engineering architecture"] },
+            "5": { title: "Head of Design", indicators: ["Defines design system strategy across platforms", "Builds design-engineering collaboration model"] },
+          },
+        },
+        {
+          name: "Design Leadership", description: "Leading design teams and driving design culture", category: "Leadership", is_core: false,
+          levels: {
+            "1": { title: "Junior", indicators: ["Presents own work clearly in critiques", "Accepts and applies feedback constructively"] },
+            "2": { title: "Mid", indicators: ["Gives constructive feedback in design reviews", "Mentors junior designers informally"] },
+            "3": { title: "Senior", indicators: ["Leads design projects and coordinates with stakeholders", "Facilitates design sprints and workshops"] },
+            "4": { title: "Lead", indicators: ["Manages and develops a team of designers", "Defines design process and quality standards"] },
+            "5": { title: "Head of Design", indicators: ["Builds and scales design organisation", "Represents design at executive level and drives culture"] },
+          },
+        },
+      ],
+    },
+  },
+  // ── Human Resources ──
+  {
+    name: "Human Resources",
+    description: "Career framework for HR professionals based on SHRM principles covering talent acquisition, employee relations, and organisational development.",
+    content: {
+      competencies: [
+        {
+          name: "Talent Acquisition", description: "Attracting and hiring top talent", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Schedules interviews and manages candidate logistics", "Maintains accurate ATS records"] },
+            "2": { title: "Recruiter", indicators: ["Sources and screens candidates independently", "Manages candidate experience through full lifecycle"] },
+            "3": { title: "Senior Recruiter", indicators: ["Fills complex senior and niche roles", "Builds employer brand through strategic channels"] },
+            "4": { title: "TA Manager", indicators: ["Designs recruiting strategy and processes", "Manages recruiting team and agency relationships"] },
+            "5": { title: "VP People", indicators: ["Defines company-wide talent strategy", "Builds employer brand at industry level"] },
+          },
+        },
+        {
+          name: "Employee Relations", description: "Managing employee relations and workplace culture", category: "Core", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Handles basic employee queries and documentation", "Follows HR policies and procedures correctly"] },
+            "2": { title: "Generalist", indicators: ["Resolves employee issues independently", "Conducts investigations with guidance"] },
+            "3": { title: "Senior Generalist", indicators: ["Manages complex employee relations cases", "Advises managers on performance improvement plans"] },
+            "4": { title: "HR Manager", indicators: ["Designs employee relations policies and programs", "Manages sensitive terminations and restructures"] },
+            "5": { title: "VP People", indicators: ["Sets employee experience strategy", "Manages crisis communications and workplace culture"] },
+          },
+        },
+        {
+          name: "Learning & Development", description: "Building employee capabilities through training and development", category: "Strategic", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Coordinates training logistics and materials", "Tracks training completion and feedback"] },
+            "2": { title: "L&D Specialist", indicators: ["Designs and delivers training programs", "Evaluates training effectiveness with data"] },
+            "3": { title: "Senior L&D", indicators: ["Builds leadership development programs", "Creates career frameworks and progression paths"] },
+            "4": { title: "L&D Manager", indicators: ["Designs company-wide learning strategy", "Manages L&D budget and vendor relationships"] },
+            "5": { title: "VP People", indicators: ["Defines talent development as competitive advantage", "Builds learning culture across the organisation"] },
+          },
+        },
+        {
+          name: "Compensation & Benefits", description: "Designing and managing total rewards programs", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Processes payroll and benefits administration accurately", "Answers basic compensation questions"] },
+            "2": { title: "Analyst", indicators: ["Conducts market compensation benchmarking", "Administers equity and bonus programs"] },
+            "3": { title: "Senior Analyst", indicators: ["Designs compensation bands and structures", "Manages benefits program selection and renewal"] },
+            "4": { title: "Comp Manager", indicators: ["Builds total rewards philosophy and strategy", "Manages executive compensation programs"] },
+            "5": { title: "VP People", indicators: ["Defines compensation strategy for talent retention", "Manages board-level compensation committee"] },
+          },
+        },
+        {
+          name: "HR Analytics & Compliance", description: "Using data for HR decisions and ensuring legal compliance", category: "Technical", is_core: false,
+          levels: {
+            "1": { title: "Coordinator", indicators: ["Maintains accurate employee records", "Runs standard HR reports"] },
+            "2": { title: "Analyst", indicators: ["Analyses turnover, engagement, and diversity metrics", "Ensures compliance with labour laws"] },
+            "3": { title: "Senior Analyst", indicators: ["Builds HR dashboards and predictive models", "Leads compliance audits and certifications"] },
+            "4": { title: "HR Manager", indicators: ["Defines HR metrics framework and reporting", "Manages multi-jurisdiction compliance"] },
+            "5": { title: "VP People", indicators: ["Uses people analytics for strategic decisions", "Defines company-wide DEI and compliance strategy"] },
+          },
+        },
+      ],
+    },
+  },
 ];
 
 // ── System Cycle Profiles ───────────────────────────────────────────────────
@@ -541,56 +885,67 @@ const SYSTEM_GOAL_TEMPLATES = [
 async function seedSystemTemplates(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
-  // Check if any system templates already exist for this workspace
-  const { count } = await supabase
+  // Fetch existing system template names to avoid duplicates
+  const { data: existing } = await supabase
     .from("templates")
-    .select("*", { count: "exact", head: true })
+    .select("name")
     .eq("workspace_id", workspaceId)
     .eq("is_system", true);
 
-  if (count && count > 0) return;
+  const existingNames = new Set((existing || []).map((t: any) => t.name));
 
-  // Seed review templates
-  const reviewRows = SYSTEM_REVIEW_TEMPLATES.map((t) => ({
-    workspace_id: workspaceId,
-    name: t.name,
-    description: t.description,
-    questions: t.questions,
-    template_type: "review",
-    is_system: true,
-    is_default: false,
-  }));
+  // Seed review templates (skip already-existing by name)
+  const reviewRows = SYSTEM_REVIEW_TEMPLATES
+    .filter((t) => !existingNames.has(t.name))
+    .map((t) => ({
+      workspace_id: workspaceId,
+      name: t.name,
+      description: t.description,
+      questions: t.questions,
+      template_type: "review",
+      is_system: true,
+      is_default: false,
+    }));
 
   // Seed competency framework templates
-  const frameworkRows = SYSTEM_COMPETENCY_FRAMEWORKS.map((t) => ({
-    workspace_id: workspaceId,
-    name: t.name,
-    description: t.description,
-    content: t.content,
-    template_type: "competency_framework",
-    is_system: true,
-    is_default: false,
-  }));
+  const frameworkRows = SYSTEM_COMPETENCY_FRAMEWORKS
+    .filter((t) => !existingNames.has(t.name))
+    .map((t) => ({
+      workspace_id: workspaceId,
+      name: t.name,
+      description: t.description,
+      content: t.content,
+      template_type: "competency_framework",
+      is_system: true,
+      is_default: false,
+    }));
 
   // Seed cycle profile templates
-  const cycleRows = SYSTEM_CYCLE_PROFILES.map((t) => ({
-    workspace_id: workspaceId,
-    name: t.name,
-    description: t.description,
-    content: t.content,
-    template_type: "cycle_profile",
-    is_system: true,
-    is_default: false,
-  }));
+  const cycleRows = SYSTEM_CYCLE_PROFILES
+    .filter((t) => !existingNames.has(t.name))
+    .map((t) => ({
+      workspace_id: workspaceId,
+      name: t.name,
+      description: t.description,
+      content: t.content,
+      template_type: "cycle_profile",
+      is_system: true,
+      is_default: false,
+    }));
 
   // Seed goal templates
-  const goalRows = SYSTEM_GOAL_TEMPLATES.map((t) => ({
-    ...t,
-    workspace_id: workspaceId,
-    is_default: false,
-  }));
+  const goalRows = SYSTEM_GOAL_TEMPLATES
+    .filter((t) => !existingNames.has(t.name))
+    .map((t) => ({
+      ...t,
+      workspace_id: workspaceId,
+      is_default: false,
+    }));
 
-  await supabase.from("templates").insert([...reviewRows, ...frameworkRows, ...cycleRows, ...goalRows]);
+  const allRows = [...reviewRows, ...frameworkRows, ...cycleRows, ...goalRows];
+  if (allRows.length > 0) {
+    await supabase.from("templates").insert(allRows);
+  }
 }
 
 // ── Data Fetching ───────────────────────────────────────────────────────────
