@@ -798,6 +798,435 @@ const SYSTEM_COMPETENCY_FRAMEWORKS = [
   },
 ];
 
+// ── System Function Templates ─────────────────────────────────────────────
+
+const SYSTEM_FUNCTION_TEMPLATES = [
+  {
+    name: "Software Engineering",
+    description: "Career framework for software engineers covering coding, architecture, and leadership skills across five seniority levels.",
+    content: {
+      function_name: "Software Engineering",
+      function_description: "Career framework for software engineers covering coding, architecture, and leadership skills across five seniority levels.",
+      levels: [
+        { name: "Junior", sort_order: 0 },
+        { name: "Mid", sort_order: 1 },
+        { name: "Senior", sort_order: 2 },
+        { name: "Staff", sort_order: 3 },
+        { name: "Principal", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Coding & Quality",
+          description: "Writing clean, maintainable, well-tested code with appropriate documentation",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "System Design",
+          description: "Designing scalable, reliable, and maintainable systems and APIs",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Debugging & Problem Solving",
+          description: "Diagnosing and resolving complex technical issues efficiently",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Delivery & Execution",
+          description: "Shipping quality work on time and managing project scope effectively",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Communication",
+          description: "Expressing ideas clearly and collaborating effectively across teams",
+          category: "Leadership",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Mentorship & Leadership",
+          description: "Growing others and building team capabilities through guidance and teaching",
+          category: "Leadership",
+          expected_scores: [1, 1, 2, 3, 4],
+        },
+      ],
+    },
+  },
+  {
+    name: "Product Management",
+    description: "Career framework for product managers covering strategy, research, execution, and stakeholder management.",
+    content: {
+      function_name: "Product Management",
+      function_description: "Career framework for product managers covering strategy, research, execution, and stakeholder management.",
+      levels: [
+        { name: "Associate PM", sort_order: 0 },
+        { name: "PM", sort_order: 1 },
+        { name: "Senior PM", sort_order: 2 },
+        { name: "Lead PM", sort_order: 3 },
+        { name: "Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Product Strategy",
+          description: "Defining product vision, roadmap, and competitive positioning",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "User Research & Empathy",
+          description: "Deeply understanding user needs, pain points, and behaviors through research",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Data-Driven Decisions",
+          description: "Using quantitative and qualitative data to inform product choices",
+          category: "Analytical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Execution & Delivery",
+          description: "Shipping products on time with quality through effective project management",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Stakeholder Management",
+          description: "Building alignment and managing expectations across the organization",
+          category: "Leadership",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Technical Fluency",
+          description: "Understanding technology well enough to make informed product decisions",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 3, 4],
+        },
+      ],
+    },
+  },
+  {
+    name: "Design",
+    description: "Career framework for designers covering visual design, UX research, interaction design, and design systems.",
+    content: {
+      function_name: "Design",
+      function_description: "Career framework for designers covering visual design, UX research, interaction design, and design systems.",
+      levels: [
+        { name: "Junior Designer", sort_order: 0 },
+        { name: "Mid Designer", sort_order: 1 },
+        { name: "Senior Designer", sort_order: 2 },
+        { name: "Lead Designer", sort_order: 3 },
+        { name: "Design Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Visual & UI Design",
+          description: "Creating polished, accessible interfaces with strong typography, color, and layout",
+          category: "Craft",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "UX Research & Testing",
+          description: "Planning and conducting user research to validate design decisions",
+          category: "Research",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Interaction Design",
+          description: "Designing intuitive user flows, micro-interactions, and navigation patterns",
+          category: "Craft",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Design Systems",
+          description: "Building and maintaining scalable component libraries and design tokens",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Prototyping & Tools",
+          description: "Rapidly creating interactive prototypes to communicate and test ideas",
+          category: "Craft",
+          expected_scores: [1, 2, 3, 3, 3],
+        },
+        {
+          name: "Design Communication",
+          description: "Presenting design rationale and facilitating productive design critiques",
+          category: "Leadership",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+      ],
+    },
+  },
+  {
+    name: "Marketing",
+    description: "Career framework for marketers covering campaign strategy, content, analytics, and brand management.",
+    content: {
+      function_name: "Marketing",
+      function_description: "Career framework for marketers covering campaign strategy, content, analytics, and brand management.",
+      levels: [
+        { name: "Coordinator", sort_order: 0 },
+        { name: "Specialist", sort_order: 1 },
+        { name: "Manager", sort_order: 2 },
+        { name: "Senior Manager", sort_order: 3 },
+        { name: "Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Campaign Strategy",
+          description: "Planning and executing multi-channel marketing campaigns aligned to business goals",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Content & Storytelling",
+          description: "Creating compelling content that resonates with target audiences across channels",
+          category: "Creative",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Analytics & Attribution",
+          description: "Measuring marketing impact, attribution modeling, and data-driven optimization",
+          category: "Analytical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Channel Management",
+          description: "Managing and optimizing performance across paid, owned, and earned media channels",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Brand & Positioning",
+          description: "Developing and maintaining brand identity, messaging, and competitive positioning",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Cross-Functional Collaboration",
+          description: "Working effectively with sales, product, and other teams to drive business outcomes",
+          category: "Leadership",
+          expected_scores: [1, 1, 2, 3, 4],
+        },
+      ],
+    },
+  },
+  {
+    name: "Sales",
+    description: "Career framework for sales professionals covering prospecting, negotiation, account management, and leadership.",
+    content: {
+      function_name: "Sales",
+      function_description: "Career framework for sales professionals covering prospecting, negotiation, account management, and leadership.",
+      levels: [
+        { name: "SDR", sort_order: 0 },
+        { name: "Account Executive", sort_order: 1 },
+        { name: "Senior AE", sort_order: 2 },
+        { name: "Lead AE", sort_order: 3 },
+        { name: "Sales Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Prospecting & Pipeline",
+          description: "Building and managing a healthy sales pipeline through outbound and inbound activities",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Discovery & Qualification",
+          description: "Uncovering customer needs and qualifying opportunities using structured frameworks",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Negotiation & Closing",
+          description: "Structuring proposals, navigating procurement, and closing deals effectively",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Product & Market Knowledge",
+          description: "Deep understanding of the product, competitive landscape, and industry trends",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Account Management",
+          description: "Growing existing accounts through renewals, upsells, and strategic relationship building",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Communication & Influence",
+          description: "Presenting solutions persuasively and building trusted advisor relationships",
+          category: "Leadership",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+      ],
+    },
+  },
+  {
+    name: "Customer Success",
+    description: "Career framework for customer success professionals covering onboarding, retention, escalation management, and advocacy.",
+    content: {
+      function_name: "Customer Success",
+      function_description: "Career framework for customer success professionals covering onboarding, retention, escalation management, and advocacy.",
+      levels: [
+        { name: "CS Associate", sort_order: 0 },
+        { name: "CSM", sort_order: 1 },
+        { name: "Senior CSM", sort_order: 2 },
+        { name: "Lead CSM", sort_order: 3 },
+        { name: "CS Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Onboarding & Adoption",
+          description: "Guiding new customers to value through structured onboarding and adoption programs",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Retention & Renewals",
+          description: "Driving customer retention through proactive engagement and renewal management",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Escalation Management",
+          description: "Handling customer escalations with urgency, empathy, and effective resolution",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Product Expertise",
+          description: "Deep knowledge of the product to guide customers toward best practices and solutions",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Customer Advocacy",
+          description: "Representing the voice of the customer internally to influence product and business decisions",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Relationship Building",
+          description: "Building and maintaining trusted, long-term relationships with key stakeholders",
+          category: "Leadership",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+      ],
+    },
+  },
+  {
+    name: "Data & Analytics",
+    description: "Career framework for data and analytics professionals covering SQL, statistics, visualization, and business acumen.",
+    content: {
+      function_name: "Data & Analytics",
+      function_description: "Career framework for data and analytics professionals covering SQL, statistics, visualization, and business acumen.",
+      levels: [
+        { name: "Junior Analyst", sort_order: 0 },
+        { name: "Analyst", sort_order: 1 },
+        { name: "Senior Analyst", sort_order: 2 },
+        { name: "Lead Analyst", sort_order: 3 },
+        { name: "Analytics Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Data Modeling & SQL",
+          description: "Designing data models and writing efficient queries to extract and transform data",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Statistical Analysis",
+          description: "Applying statistical methods, hypothesis testing, and experimentation to generate insights",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Data Visualization",
+          description: "Creating clear, compelling visualizations and dashboards that drive action",
+          category: "Craft",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Business Acumen",
+          description: "Translating business questions into analytical frameworks and actionable recommendations",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Data Engineering",
+          description: "Building and maintaining data pipelines, ETL processes, and data quality systems",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Stakeholder Communication",
+          description: "Presenting data insights to non-technical audiences and influencing decisions",
+          category: "Leadership",
+          expected_scores: [1, 1, 2, 3, 4],
+        },
+      ],
+    },
+  },
+  {
+    name: "People & HR",
+    description: "Career framework for HR professionals covering talent acquisition, employee relations, L&D, and people analytics.",
+    content: {
+      function_name: "People & HR",
+      function_description: "Career framework for HR professionals covering talent acquisition, employee relations, L&D, and people analytics.",
+      levels: [
+        { name: "HR Coordinator", sort_order: 0 },
+        { name: "HR Specialist", sort_order: 1 },
+        { name: "HR Manager", sort_order: 2 },
+        { name: "Senior HR Manager", sort_order: 3 },
+        { name: "HR Director", sort_order: 4 },
+      ],
+      competencies: [
+        {
+          name: "Talent Acquisition",
+          description: "Sourcing, interviewing, and hiring top talent through effective recruitment processes",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "Employee Relations",
+          description: "Managing employee concerns, conflict resolution, and fostering a positive workplace culture",
+          category: "Execution",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Learning & Development",
+          description: "Designing and delivering training programs that build organizational capability",
+          category: "Strategic",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "Compensation & Benefits",
+          description: "Managing total rewards programs, benchmarking, and pay equity analysis",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 4],
+        },
+        {
+          name: "HR Operations & Compliance",
+          description: "Ensuring smooth HR operations, policy development, and regulatory compliance",
+          category: "Technical",
+          expected_scores: [1, 2, 3, 4, 5],
+        },
+        {
+          name: "People Analytics",
+          description: "Using workforce data to inform decisions on retention, engagement, and organizational design",
+          category: "Analytical",
+          expected_scores: [1, 1, 2, 3, 4],
+        },
+      ],
+    },
+  },
+];
+
 // ── System Cycle Profiles ───────────────────────────────────────────────────
 
 const SYSTEM_CYCLE_PROFILES = [
@@ -920,6 +1349,19 @@ async function seedSystemTemplates(workspaceId: string) {
       is_default: false,
     }));
 
+  // Seed function templates
+  const functionRows = SYSTEM_FUNCTION_TEMPLATES
+    .filter((t) => !existingNames.has(t.name))
+    .map((t) => ({
+      workspace_id: workspaceId,
+      name: t.name,
+      description: t.description,
+      content: t.content,
+      template_type: "function_template",
+      is_system: true,
+      is_default: false,
+    }));
+
   // Seed cycle profile templates
   const cycleRows = SYSTEM_CYCLE_PROFILES
     .filter((t) => !existingNames.has(t.name))
@@ -942,7 +1384,7 @@ async function seedSystemTemplates(workspaceId: string) {
       is_default: false,
     }));
 
-  const allRows = [...reviewRows, ...frameworkRows, ...cycleRows, ...goalRows];
+  const allRows = [...reviewRows, ...frameworkRows, ...functionRows, ...cycleRows, ...goalRows];
   if (allRows.length > 0) {
     await supabase.from("templates").insert(allRows);
   }
@@ -1000,7 +1442,7 @@ export default async function TemplatesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Template Library</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Review templates, competency frameworks, cycle profiles, and goal templates
+            Review templates, function templates, competency frameworks, cycle profiles, and goal templates
           </p>
         </div>
         <Button size="sm" asChild>
@@ -1012,7 +1454,7 @@ export default async function TemplatesPage() {
       </div>
 
       {/* Tabbed content */}
-      <TemplatesClient templates={templates} />
+      <TemplatesClient templates={templates} workspaceId={workspaceId} />
     </div>
   );
 }
