@@ -40,7 +40,7 @@ interface FunctionImportDialogProps {
   template: {
     id: string;
     name: string;
-    description: string;
+    description: string | null;
     content: any;
   };
   workspaceId: string;
