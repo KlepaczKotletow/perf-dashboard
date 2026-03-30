@@ -16,9 +16,11 @@ import {
   Search,
   X,
   Target,
+  Briefcase,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
+import { FunctionImportDialog } from "./function-import-dialog";
 
 interface Template {
   id: string;
@@ -142,6 +144,120 @@ function FrameworkCard({ template }: { template: Template }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+// ── Function Template Card ────────────────────────────────────────────────
+
+function FunctionTemplateCard({
+  template,
+  workspaceId,
+}: {
+  template: Template;
+  workspaceId: string;
+}) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const content = template.content as {
+    function_name: string;
+    function_description: string;
+    levels: Array<{ name: string; sort_order: number }>;
+    competencies: Array<{
+      name: string;
+      description: string;
+      category: string;
+      expected_scores: number[];
+    }>;
+  } | null;
+
+  const levels = content?.levels || [];
+  const competencies = content?.competencies || [];
+  const categories = [...new Set(competencies.map((c) => c.category))];
+
+  return (
+    <>
+      <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-foreground">
+                  {content?.function_name || template.name}
+                </span>
+                {template.is_system && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400"
+                  >
+                    System
+                  </Badge>
+                )}
+              </div>
+              {template.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {template.description}
+                </p>
+              )}
+            </div>
+            <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950/30 flex items-center justify-center shrink-0">
+              <Briefcase className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex items-center gap-3 mt-3">
+            <span className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground tabular-nums">
+                {levels.length}
+              </span>{" "}
+              levels
+            </span>
+            <span className="text-border">|</span>
+            <span className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground tabular-nums">
+                {competencies.length}
+              </span>{" "}
+              skills
+            </span>
+          </div>
+
+          {/* Level names */}
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {levels.map((l) => (
+              <Badge key={l.sort_order} variant="secondary" className="text-[10px]">
+                {l.name}
+              </Badge>
+            ))}
+          </div>
+
+          {/* Category badges */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {categories.map((cat) => (
+              <Badge key={cat} variant="outline" className="text-[10px]">
+                {cat}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border/50 px-5 py-2.5 flex items-center justify-end">
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setDialogOpen(true)}
+          >
+            Use Template
+          </Button>
+        </div>
+      </div>
+
+      <FunctionImportDialog
+        template={template}
+        workspaceId={workspaceId}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+    </>
   );
 }
 
@@ -299,8 +415,10 @@ function ReviewTemplateRow({ template }: { template: Template }) {
 
 export default function TemplatesClient({
   templates,
+  workspaceId,
 }: {
   templates: Template[];
+  workspaceId: string;
 }) {
   const [search, setSearch] = useState("");
 
@@ -321,6 +439,9 @@ export default function TemplatesClient({
   );
   const goalTemplates = templates.filter(
     (t) => t.template_type === "goal_template" && matchesSearch(t)
+  );
+  const functionTemplates = templates.filter(
+    (t) => t.template_type === "function_template" && matchesSearch(t)
   );
 
   return (
@@ -350,6 +471,13 @@ export default function TemplatesClient({
           Review Templates
           <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
             {reviewTemplates.length}
+          </Badge>
+        </TabsTrigger>
+        <TabsTrigger value="functions" className="gap-1.5">
+          <Briefcase className="h-3.5 w-3.5" />
+          Function Templates
+          <Badge variant="secondary" className="ml-1 text-[10px] h-4 px-1.5">
+            {functionTemplates.length}
           </Badge>
         </TabsTrigger>
         <TabsTrigger value="frameworks" className="gap-1.5">
@@ -416,6 +544,33 @@ export default function TemplatesClient({
             </div>
             {reviewTemplates.map((template) => (
               <ReviewTemplateRow key={template.id} template={template} />
+            ))}
+          </div>
+        )}
+      </TabsContent>
+
+      {/* ── Function Templates Tab ── */}
+      <TabsContent value="functions">
+        {functionTemplates.length === 0 ? (
+          <div className="rounded-lg border border-border/60 bg-card py-16 text-center">
+            <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Briefcase className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-foreground mb-1">
+              No function templates yet
+            </p>
+            <p className="text-sm text-muted-foreground mb-5 max-w-xs mx-auto">
+              Function templates let you create a complete competency matrix with one click.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {functionTemplates.map((template) => (
+              <FunctionTemplateCard
+                key={template.id}
+                template={template}
+                workspaceId={workspaceId}
+              />
             ))}
           </div>
         )}
