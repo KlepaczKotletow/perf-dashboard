@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, ChevronDown, ChevronRight, Zap } from "lucide-react";
+import { ArrowLeft, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
