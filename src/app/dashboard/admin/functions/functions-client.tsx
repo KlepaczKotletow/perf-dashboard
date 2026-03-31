@@ -7,6 +7,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Plus,
@@ -48,6 +49,7 @@ interface JobFamily { id: string; name: string; description: string | null; }
 interface Level { id: string; name: string; grade: string | null; sort_order: number; job_family_id: string | null; }
 interface Competency { id: string; name: string; description: string | null; category: string | null; is_core: boolean; job_family_id: string | null; workspace_id: string; }
 interface LevelCompetency { id: string; level_id: string; competency_id: string; expected_level: number; workspace_id: string; }
+interface ScoreDescriptor { id: string; competency_id: string; score: number; description: string; workspace_id: string; }
 interface User { id: string; level_id: string | null; }
 
 interface FunctionsClientProps {
@@ -56,6 +58,7 @@ interface FunctionsClientProps {
   competencies: Competency[];
   levelCompetencies: LevelCompetency[];
   users: User[];
+  scoreDescriptors: ScoreDescriptor[];
   canEdit: boolean;
   workspaceId: string;
 }
@@ -212,6 +215,7 @@ export function FunctionsClient({
   competencies: initialCompetencies,
   levelCompetencies: initialLevelCompetencies,
   users,
+  scoreDescriptors: initialScoreDescriptors,
   canEdit,
   workspaceId,
 }: FunctionsClientProps) {
@@ -263,6 +267,10 @@ export function FunctionsClient({
   // Skill description expand/collapse
   const [expandedSkillId, setExpandedSkillId] = useState<string | null>(null);
 
+  // Score descriptors
+  const [scoreDescriptors, setScoreDescriptors] = useState<ScoreDescriptor[]>(initialScoreDescriptors);
+  const [expandedDescriptorId, setExpandedDescriptorId] = useState<string | null>(null);
+
   // ── Derived ────────────────────────────────────────────────────────────
 
   const matrixLookup = useMemo(() => {
@@ -272,6 +280,62 @@ export function FunctionsClient({
     });
     return lookup;
   }, [initialLevelCompetencies]);
+
+  // Score descriptor lookup: "competencyId-score" -> descriptor
+  const descriptorLookup = useMemo(() => {
+    const lookup: Record<string, ScoreDescriptor> = {};
+    for (const sd of scoreDescriptors) {
+      lookup[`${sd.competency_id}-${sd.score}`] = sd;
+    }
+    return lookup;
+  }, [scoreDescriptors]);
+
+  // Save a score descriptor (upsert on blur)
+  async function handleSaveDescriptor(competencyId: string, score: number, description: string) {
+    const trimmed = description.trim();
+    const key = `${competencyId}-${score}`;
+    const existing = descriptorLookup[key];
+
+    if (!trimmed && !existing) return;
+
+    if (!trimmed && existing) {
+      const { error } = await supabase
+        .from("competency_score_descriptors")
+        .delete()
+        .eq("id", existing.id);
+      if (!error) {
+        setScoreDescriptors((prev) => prev.filter((sd) => sd.id !== existing.id));
+      }
+      return;
+    }
+
+    if (existing) {
+      if (existing.description === trimmed) return;
+      const { error } = await supabase
+        .from("competency_score_descriptors")
+        .update({ description: trimmed, updated_at: new Date().toISOString() })
+        .eq("id", existing.id);
+      if (!error) {
+        setScoreDescriptors((prev) =>
+          prev.map((sd) => sd.id === existing.id ? { ...sd, description: trimmed } : sd)
+        );
+      }
+    } else {
+      const { data, error } = await supabase
+        .from("competency_score_descriptors")
+        .insert({
+          competency_id: competencyId,
+          score,
+          description: trimmed,
+          workspace_id: workspaceId,
+        })
+        .select("id, competency_id, score, description, workspace_id")
+        .single();
+      if (!error && data) {
+        setScoreDescriptors((prev) => [...prev, data]);
+      }
+    }
+  }
 
   // Keep local levels state in sync after router.refresh()
   useEffect(() => {
@@ -1045,6 +1109,77 @@ export function FunctionsClient({
                 </div>
               )}
             </div>
+
+            {/* Score Descriptors */}
+            {(functionSkills.length > 0 || coreSkills.length > 0) && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+                  Score Descriptors
+                </p>
+                <div className="rounded-xl border border-border/60 divide-y divide-border/30 overflow-hidden">
+                  {[...functionSkills, ...coreSkills].map((skill) => {
+                    const isExpanded = expandedDescriptorId === skill.id;
+                    const descriptorCount = scoreDescriptors.filter((sd) => sd.competency_id === skill.id).length;
+                    return (
+                      <div key={`desc-${skill.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDescriptorId(isExpanded ? null : skill.id)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+                        >
+                          <ChevronRight className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                          <span className="text-xs font-medium text-foreground">{skill.name}</span>
+                          {skill.is_core && (
+                            <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/30 text-primary">Core</Badge>
+                          )}
+                          {descriptorCount === 0 && (
+                            <span className="text-[10px] text-muted-foreground/50 ml-auto">not defined</span>
+                          )}
+                          {descriptorCount > 0 && (
+                            <span className="text-[10px] text-muted-foreground/50 ml-auto">
+                              {descriptorCount}/5 defined
+                            </span>
+                          )}
+                        </button>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-1 space-y-2 bg-muted/10">
+                            {descriptorCount === 0 && canEdit && (
+                              <p className="text-[11px] text-muted-foreground mb-2">
+                                Define what each score means for {skill.name}
+                              </p>
+                            )}
+                            {[1, 2, 3, 4, 5].map((score) => {
+                              const dKey = `${skill.id}-${score}`;
+                              const descriptor = descriptorLookup[dKey];
+                              return (
+                                <div key={score} className="flex items-start gap-3">
+                                  <div className={`w-7 h-7 rounded-md text-[11px] font-bold flex items-center justify-center shrink-0 mt-1 border ${proficiencyColors[score]}`}>
+                                    {score}
+                                  </div>
+                                  {canEdit ? (
+                                    <Textarea
+                                      defaultValue={descriptor?.description ?? ""}
+                                      placeholder={`What does a ${score} in ${skill.name} look like?`}
+                                      className="text-xs min-h-[56px] resize-none flex-1"
+                                      rows={2}
+                                      onBlur={(e) => handleSaveDescriptor(skill.id, score, e.target.value)}
+                                    />
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground py-2 flex-1">
+                                      {descriptor?.description || <span className="text-muted-foreground/40 italic">Not defined</span>}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
