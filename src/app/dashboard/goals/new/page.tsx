@@ -81,6 +81,21 @@ export default function NewGoalPage() {
       if (paramCycle) setCycleId(paramCycle);
       if (paramEmployee) setEmployeeId(paramEmployee);
       if (paramParent) setParentId(paramParent);
+
+      // ── Auto-apply goal template if ?templateId=<id> ──
+      const templateId = searchParams.get("templateId");
+      if (templateId && goalTpls && goalTpls.length > 0) {
+        const tpl = (goalTpls as any[]).find((t) => t.id === templateId);
+        if (tpl) {
+          const content = tpl.content || {};
+          if (content.title) setTitle(content.title);
+          if (content.scope) setScope(content.scope);
+          if (content.metric_start != null) { setMetricStart(String(content.metric_start)); setShowAdvanced(true); }
+          if (content.metric_target != null) { setMetricTarget(String(content.metric_target)); setShowAdvanced(true); }
+          if (content.metric_unit) { setMetricUnit(content.metric_unit); setShowAdvanced(true); }
+          setTimeout(() => titleInputRef.current?.focus(), 0);
+        }
+      }
     }
     load();
   }, []);
