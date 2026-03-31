@@ -335,6 +335,22 @@ export default function NewCyclePage() {
           applyCycleProfileFromContent(profile);
         }
       }
+
+      // ── Auto-apply review template if ?reviewTemplate=<id> ──
+      const reviewTemplateId = searchParams.get("reviewTemplate");
+      if (reviewTemplateId) {
+        const loadedTemplates = (tplData || []) as Template[];
+        const tpl = loadedTemplates.find((t) => t.id === reviewTemplateId);
+        if (tpl) {
+          const mapped: TextQuestion[] = (tpl.questions || []).map((q: any) => ({
+            prompt: q.prompt || q.text,
+            required: q.required !== false,
+          }));
+          setTextQuestions(mapped);
+          setTemplateApplied(tpl.name);
+          setTimeout(() => setTemplateApplied(null), 2500);
+        }
+      }
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
