@@ -362,6 +362,7 @@ async function getChartData(workspaceId: string | undefined): Promise<DashboardC
   const reviewTrend: { name: string; value: number }[] = [];
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
+    d.setDate(1); // Avoid day-overflow (e.g. March 31 → Nov 31 wraps to Dec)
     d.setMonth(d.getMonth() - i);
     const key = d.toLocaleString("default", { month: "short" });
     reviewTrend.push({ name: key, value: monthlyMap[key] || 0 });
