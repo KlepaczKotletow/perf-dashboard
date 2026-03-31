@@ -372,8 +372,9 @@ async function getChartData(workspaceId: string | undefined): Promise<DashboardC
   const deptRatings: Record<string, number[]> = {};
   responses.forEach((r: any) => {
     const empId = r.assignment?.employee_id;
-    if (empId && r.rating) {
-      const dept = userDeptMap.get(empId) || "Unassigned";
+    const dept = empId ? userDeptMap.get(empId) : null;
+    // Skip employees with no department assigned — don't pollute the chart
+    if (empId && r.rating && dept) {
       if (!deptRatings[dept]) deptRatings[dept] = [];
       deptRatings[dept].push(r.rating);
     }

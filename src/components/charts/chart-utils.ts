@@ -13,7 +13,7 @@ export const STATUS_COLORS = {
   on_track: { fill: "#22c55e", label: "On Track" },
   at_risk: { fill: "#f59e0b", label: "At Risk" },
   delayed: { fill: "#ef4444", label: "Delayed" },
-  achieved: { fill: "#10b981", label: "Achieved" },
+  achieved: { fill: "#6366f1", label: "Achieved" },
   // lifecycle statuses
   draft: { fill: "#a1a1aa", label: "Draft" },
   active: { fill: "#6366f1", label: "Active" },

@@ -61,7 +61,7 @@ export function AppBarChart({
         <BarChart
           data={data}
           layout={isHorizontal ? "vertical" : "horizontal"}
-          margin={{ top: 4, right: 8, left: isHorizontal ? 80 : 0, bottom: 0 }}
+          margin={{ top: 4, right: 8, left: isHorizontal ? 4 : 0, bottom: 0 }}
         >
           {showGrid && (
             <CartesianGrid
@@ -78,7 +78,7 @@ export function AppBarChart({
               <YAxis
                 type="category"
                 dataKey="name"
-                width={76}
+                width={Math.min(120, Math.max(60, Math.max(...data.map(d => d.name.length)) * 7))}
                 tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
               />
             </>
