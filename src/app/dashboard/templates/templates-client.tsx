@@ -21,6 +21,7 @@ import {
 import { format } from "date-fns";
 import { useState } from "react";
 import { FunctionImportDialog } from "./function-import-dialog";
+import { CycleImportDialog } from "./cycle-import-dialog";
 
 interface Template {
   id: string;
@@ -271,6 +272,7 @@ const CYCLE_TYPE_COLORS: Record<string, string> = {
 };
 
 function CycleProfileCard({ template }: { template: Template }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
   const content = template.content as {
     cycle_type: string;
     suggested_description: string;
@@ -283,75 +285,86 @@ function CycleProfileCard({ template }: { template: Template }) {
   const categories = content?.suggested_competency_categories || [];
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
-      <div className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm font-medium text-foreground">
-                {template.name}
-              </span>
-              {template.is_system && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400"
-                >
-                  System
-                </Badge>
+    <>
+      <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm font-medium text-foreground">
+                  {template.name}
+                </span>
+                {template.is_system && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400"
+                  >
+                    System
+                  </Badge>
+                )}
+              </div>
+              {template.description && (
+                <p className="text-xs text-muted-foreground line-clamp-2">
+                  {template.description}
+                </p>
               )}
             </div>
-            {template.description && (
-              <p className="text-xs text-muted-foreground line-clamp-2">
-                {template.description}
-              </p>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Badge
+                variant="outline"
+                className={`text-[10px] capitalize ${CYCLE_TYPE_COLORS[cycleType] || CYCLE_TYPE_COLORS.custom}`}
+              >
+                {cycleType}
+              </Badge>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Badge
-              variant="outline"
-              className={`text-[10px] capitalize ${CYCLE_TYPE_COLORS[cycleType] || CYCLE_TYPE_COLORS.custom}`}
-            >
-              {cycleType}
-            </Badge>
-          </div>
-        </div>
 
-        {/* Details */}
-        <div className="mt-3 space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <FileText className="h-3 w-3" />
-            <span>
-              Review template:{" "}
-              <span className="font-medium text-foreground">
-                {content?.review_template_name || "None"}
-              </span>
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Layers className="h-3 w-3" />
-            <span>
-              Categories:{" "}
-              {categories.map((cat, i) => (
-                <span key={cat}>
-                  {i > 0 && ", "}
-                  <span className="font-medium text-foreground">{cat}</span>
+          {/* Details */}
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <FileText className="h-3 w-3" />
+              <span>
+                Review template:{" "}
+                <span className="font-medium text-foreground">
+                  {content?.review_template_name || "None"}
                 </span>
-              ))}
-            </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Layers className="h-3 w-3" />
+              <span>
+                Categories:{" "}
+                {categories.map((cat, i) => (
+                  <span key={cat}>
+                    {i > 0 && ", "}
+                    <span className="font-medium text-foreground">{cat}</span>
+                  </span>
+                ))}
+              </span>
+            </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border/50 px-5 py-2.5 flex items-center justify-end">
+          <Button
+            variant="default"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => setDialogOpen(true)}
+          >
+            Use Template
+            <ArrowRight className="h-3 w-3 ml-1" />
+          </Button>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border/50 px-5 py-2.5 flex items-center justify-end">
-        <Button variant="default" size="sm" className="h-7 text-xs" asChild>
-          <Link href={`/dashboard/cycles/new?profile=${template.id}`}>
-            Use in Wizard
-            <ArrowRight className="h-3 w-3 ml-1" />
-          </Link>
-        </Button>
-      </div>
-    </div>
+      <CycleImportDialog
+        template={template}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
+    </>
   );
 }
 
