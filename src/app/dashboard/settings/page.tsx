@@ -1,12 +1,12 @@
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
-import { isAdminOrAbove } from "@/lib/roles";
+import { isHROrAbove } from "@/lib/roles";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { SettingsClient } from "./settings-client";
 
 export default async function SettingsPage() {
   const workspace = await getUserWorkspace();
-  if (!workspace || !isAdminOrAbove(workspace.role)) redirect("/dashboard");
+  if (!workspace || !isHROrAbove(workspace.role)) redirect("/dashboard");
 
   const supabase = await createServerSupabaseClient();
 
