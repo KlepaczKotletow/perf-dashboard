@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { FooterDropdown } from "./footer-dropdown";
-import { isManagerOrAbove, isAdmin, ROLE_LABELS, UserRole } from "@/lib/roles";
+import { isManagerOrAbove, isAdmin, isHROrAbove, ROLE_LABELS, UserRole } from "@/lib/roles";
 import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
 import { RoleWatcher } from "./role-watcher";
@@ -32,6 +32,7 @@ interface NavSection {
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     requiresManager: boolean;
+    requiresHR: boolean;
     requiresAdmin: boolean;
   }[];
 }
@@ -53,41 +54,42 @@ export default async function DashboardLayout({
 
   const canAccessManagerFeatures = isManagerOrAbove(workspace?.role) || workspace?.hasDirectReports;
   const canAccessAdminFeatures = isAdmin(workspace?.role);
+  const canAccessHRFeatures = isHROrAbove(workspace?.role);
 
   const sections: NavSection[] = [
     {
       label: "Personal",
       items: [
-        { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresAdmin: false },
-        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresAdmin: false },
+        { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
       label: "People",
       items: [
-        { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresAdmin: false },
+        { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
       label: "Organization",
       items: [
-        { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresAdmin: false },
-        { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresAdmin: false },
+        { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
       label: "Settings",
       items: [
-        { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresAdmin: true },
-        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresAdmin: true },
-        { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresAdmin: true },
-        { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresAdmin: true },
+        { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresHR: false, requiresAdmin: true },
       ],
     },
   ];
@@ -98,6 +100,7 @@ export default async function DashboardLayout({
       ...section,
       items: section.items.filter((item) => {
         if (item.requiresAdmin && !canAccessAdminFeatures) return false;
+        if (item.requiresHR && !canAccessHRFeatures) return false;
         if (item.requiresManager && !canAccessManagerFeatures) return false;
         return true;
       }),
