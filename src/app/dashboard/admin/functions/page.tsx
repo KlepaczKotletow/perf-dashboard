@@ -1,7 +1,7 @@
 // src/app/dashboard/admin/functions/page.tsx
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { isAdminOrAbove, isManagerOrAbove } from "@/lib/roles";
+import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { FunctionsClient } from "./functions-client";
 
 export default async function FunctionsPage() {
@@ -12,7 +12,7 @@ export default async function FunctionsPage() {
     redirect("/dashboard");
   }
 
-  const canEdit = isAdminOrAbove(workspace.role);
+  const canEdit = isHROrAbove(workspace.role);
 
   const [
     { data: functions },
