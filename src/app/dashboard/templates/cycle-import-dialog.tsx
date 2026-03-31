@@ -123,6 +123,9 @@ export function CycleImportDialog({
   // ── Reset on close ──────────────────────────────────────────────────────
 
   function handleOpenChange(nextOpen: boolean) {
+    if (nextOpen && !cycleName) {
+      setCycleName(template.name);
+    }
     if (!nextOpen) {
       setCycleName("");
       setStartDate("");
@@ -132,17 +135,10 @@ export function CycleImportDialog({
     onOpenChange(nextOpen);
   }
 
-  function handleOpenChangeWrapper(nextOpen: boolean) {
-    if (nextOpen && !cycleName) {
-      setCycleName(template.name);
-    }
-    handleOpenChange(nextOpen);
-  }
-
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChangeWrapper}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -232,7 +228,7 @@ export function CycleImportDialog({
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={creating}>
+          <Button onClick={handleCreate} disabled={creating || !cycleName.trim() || !startDate || !endDate}>
             {creating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {creating ? "Creating..." : "Create Draft"}
           </Button>
