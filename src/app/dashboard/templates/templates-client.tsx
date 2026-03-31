@@ -697,6 +697,11 @@ export default function TemplatesClient({
                       <Button size="sm" variant="outline" className="text-xs h-7" asChild>
                         <Link href={`/dashboard/templates/${tpl.id}`}>View</Link>
                       </Button>
+                      <Button size="sm" variant="default" className="text-xs h-7" asChild>
+                        <Link href={`/dashboard/goals/new?templateId=${tpl.id}`}>
+                          Use Template
+                        </Link>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
