@@ -372,12 +372,9 @@ function CycleProfileCard({ template }: { template: Template }) {
 
 function ReviewTemplateRow({ template }: { template: Template }) {
   return (
-    <Link
-      href={`/dashboard/templates/${template.id}`}
-      className="grid grid-cols-[1fr_80px_140px_120px_40px] items-center gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors group"
-    >
+    <div className="grid grid-cols-[1fr_80px_140px_120px_160px] items-center gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors group">
       {/* Name + description + badges */}
-      <div className="min-w-0">
+      <Link href={`/dashboard/templates/${template.id}`} className="min-w-0 block">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
             {template.name}
@@ -401,7 +398,7 @@ function ReviewTemplateRow({ template }: { template: Template }) {
             {template.description}
           </p>
         )}
-      </div>
+      </Link>
 
       {/* Question count */}
       <span className="text-sm text-foreground text-center tabular-nums">
@@ -418,9 +415,15 @@ function ReviewTemplateRow({ template }: { template: Template }) {
         {format(new Date(template.created_at), "MMM d, yyyy")}
       </span>
 
-      {/* Arrow */}
-      <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors justify-self-end" />
-    </Link>
+      {/* Use Template button */}
+      <div className="flex items-center justify-end">
+        <Button variant="default" size="sm" className="h-7 text-xs" asChild>
+          <Link href={`/dashboard/cycles/new?reviewTemplate=${template.id}`}>
+            Use Template
+          </Link>
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -540,7 +543,7 @@ export default function TemplatesClient({
         ) : (
           <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/50 overflow-hidden">
             {/* Column headers */}
-            <div className="grid grid-cols-[1fr_80px_140px_120px_40px] items-center gap-4 px-5 py-2.5 bg-muted/40">
+            <div className="grid grid-cols-[1fr_80px_140px_120px_160px] items-center gap-4 px-5 py-2.5 bg-muted/40">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Name
               </span>
@@ -553,7 +556,9 @@ export default function TemplatesClient({
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Created
               </span>
-              <span />
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground text-right">
+                Actions
+              </span>
             </div>
             {reviewTemplates.map((template) => (
               <ReviewTemplateRow key={template.id} template={template} />
