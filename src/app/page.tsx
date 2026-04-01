@@ -475,33 +475,43 @@ export default function Home() {
                   Goals & OKRs
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
-                  Goals your whole team can see — tracked in real time
+                  Set a goal in 30 seconds. Track it forever.
                 </h2>
                 <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  When goals live separately from reviews, ratings feel arbitrary. Nami ties them together so every performance conversation is grounded in actual work.
+                  Most goal tools are glorified spreadsheets. Nami makes goals effortless — create one in seconds from a template, and it stays connected to reviews, analytics, and your team&apos;s Slack.
                 </p>
 
                 <ul className="mt-8 space-y-5">
                   {[
                     {
+                      icon: Zap,
+                      title: "One-click goal templates",
+                      body: "Pick from pre-built templates — Improve a Metric, Complete a Project, Team Development — and the goal form is pre-filled. Edit the brackets, hit save. Done in 30 seconds.",
+                    },
+                    {
                       icon: Flag,
-                      title: "OKR-style goals, individually owned",
-                      body: "Create goals for individuals or teams. Each has an owner, a due date, and a live tracking status: On Track, At Risk, Delayed, or Achieved. Everyone can see where things stand.",
+                      title: "Individual and team goals with live tracking",
+                      body: "Every goal has an owner, due date, and status: On Track, At Risk, Delayed, or Achieved. Metrics update in real time — no manual check-ins needed.",
+                    },
+                    {
+                      icon: Send,
+                      title: "Status changes notify managers on Slack",
+                      body: "When a goal moves to At Risk or Delayed, the employee\u2019s manager gets a Slack DM instantly. No surprises at review time — issues surface the moment they happen.",
                     },
                     {
                       icon: Users,
-                      title: "Managers have context in every 1:1",
-                      body: "When your manager opens your profile, your goal progress is right there. No more 'what were you working on this quarter?' at review time — the history is already in Nami.",
+                      title: "Full context in every 1:1",
+                      body: "Open any team member\u2019s profile and their goal progress is right there. Managers walk into every 1:1 knowing exactly where things stand — no \u2018what were you working on?\u2019",
                     },
                     {
                       icon: TrendingUp,
-                      title: "Goals roll up into Analytics",
-                      body: "The Analytics dashboard shows what percentage of the org is on track at any moment. Spot patterns before they become problems — which teams are slipping, which are flying.",
+                      title: "Goals roll up into org-wide Analytics",
+                      body: "See what percentage of the org is on track at any moment. Spot which teams are slipping and which are flying — before it shows up in quarterly results.",
                     },
                     {
                       icon: BarChart3,
-                      title: "Goal progress informs performance ratings",
-                      body: "When a review cycle opens, historical goal data is right there. Ratings reflect real work and real outcomes — not just how much the reviewer likes the person.",
+                      title: "Goal data feeds directly into reviews",
+                      body: "When a review cycle opens, historical goal progress is already in the competency framework. Ratings reflect real outcomes — not recency bias or guesswork.",
                     },
                   ].map((item) => (
                     <li key={item.title} className="flex gap-4">
@@ -923,13 +933,15 @@ export default function Home() {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { icon: "🔄", title: "Slack Auto-Sync", desc: "Team members, photos, and emails imported automatically from your workspace" },
-              { icon: "📋", title: "Pre-built Templates", desc: "Review, competency, goal, and cycle templates — ready to use or customise" },
-              { icon: "🎯", title: "Competency Frameworks", desc: "Engineering, Product, Management, and General frameworks with level expectations" },
-              { icon: "📊", title: "Real-time Analytics", desc: "Heatmaps, rankings, trend analysis, and department breakdowns — no exports needed" },
+              { icon: Slack, title: "Slack Auto-Sync", desc: "Team members, photos, and emails imported automatically from your workspace" },
+              { icon: Grid3X3, title: "Pre-built Templates", desc: "Review, competency, goal, and cycle templates — ready to use or customise" },
+              { icon: Target, title: "Competency Frameworks", desc: "Engineering, Product, Management, and General frameworks with level expectations" },
+              { icon: BarChart3, title: "Real-time Analytics", desc: "Heatmaps, rankings, trend analysis, and department breakdowns — no exports needed" },
             ].map((f) => (
               <div key={f.title} className="rounded-xl border border-border/60 bg-white p-4 space-y-2">
-                <span className="text-2xl">{f.icon}</span>
+                <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center">
+                  <f.icon className="h-4.5 w-4.5 text-primary" />
+                </div>
                 <p className="text-sm font-semibold text-foreground">{f.title}</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
               </div>
