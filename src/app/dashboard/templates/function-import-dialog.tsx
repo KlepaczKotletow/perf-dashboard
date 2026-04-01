@@ -230,9 +230,14 @@ export function FunctionImportDialog({
         workspace_id: string;
       }> = [];
 
-      for (let ci = 0; ci < competencies.length; ci++) {
-        const comp = competencies[ci];
-        const compId = insertedComps?.[ci]?.id;
+      // Build name→id map from inserted competencies (order not guaranteed)
+      const compNameToId = new Map<string, string>();
+      for (const ic of insertedComps ?? []) {
+        compNameToId.set(ic.name, ic.id);
+      }
+
+      for (const comp of competencies) {
+        const compId = compNameToId.get(comp.name);
         if (!compId || !comp.score_descriptors) continue;
 
         for (const [scoreStr, desc] of Object.entries(comp.score_descriptors)) {
