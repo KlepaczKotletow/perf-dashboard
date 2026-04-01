@@ -487,7 +487,25 @@ Deno.serve(async (req) => {
         // If still empty, workspace has no competencies — review will proceed with text questions only
       }
 
-      return { competencies, empName, cycleId };
+      // Fetch score descriptors for all competencies in this review
+      let scoreDescriptorsByComp: Record<string, Record<string, string>> = {};
+      if (competencies.length > 0) {
+        const compIds = competencies.map((c: any) => c.id);
+        const sds = await dbQuery(
+          "competency_score_descriptors",
+          `workspace_id=eq.${wsId}&competency_id=in.(${compIds.join(",")})&select=competency_id,score,description`
+        );
+        if (sds && sds.length > 0 && !sds.error) {
+          for (const sd of sds) {
+            if (!scoreDescriptorsByComp[sd.competency_id]) {
+              scoreDescriptorsByComp[sd.competency_id] = {};
+            }
+            scoreDescriptorsByComp[sd.competency_id][String(sd.score)] = sd.description;
+          }
+        }
+      }
+
+      return { competencies, empName, cycleId, scoreDescriptorsByComp };
     }
 
     // ================================================================
@@ -719,7 +737,9 @@ Deno.serve(async (req) => {
                 ratings,
                 updated_at: new Date().toISOString(),
               });
-              const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale);
+              const sdByComp = conv.score_descriptors_by_comp || {};
+              const compSd = sdByComp[compIds[nextIndex]] || undefined;
+              const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale, compSd);
               await slackApi(botToken, "chat.postMessage", {
                 channel: payload.user.id,
                 text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
@@ -1290,7 +1310,7 @@ Deno.serve(async (req) => {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
         }
 
-        const { competencies, empName } = await getCompetenciesForAssignment(assignmentId, assignment.employee_id, ws.id);
+        const { competencies, empName, scoreDescriptorsByComp } = await getCompetenciesForAssignment(assignmentId, assignment.employee_id, ws.id);
         const cycleName = assignment.performance_cycles?.name || "Review";
 
         if (competencies.length === 0) {
@@ -1303,6 +1323,7 @@ Deno.serve(async (req) => {
 
         const compIds = competencies.map((c: any) => c.id);
         const compNames = competencies.map((c: any) => c.name);
+        const compDescs = competencies.map((c: any) => c.description || "");
 
         await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&assignment_id=eq.${assignmentId}&status=eq.active`, { status: "expired" });
 
@@ -1316,6 +1337,8 @@ Deno.serve(async (req) => {
           cycle_name: cycleName,
           competency_ids: compIds,
           competency_names: compNames,
+          competency_descriptions: compDescs,
+          score_descriptors_by_comp: scoreDescriptorsByComp,
           current_index: 0,
           ratings: {},
           status: "active",
@@ -1893,7 +1916,9 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
           });
 
-          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale);
+          const sdByComp2 = conv.score_descriptors_by_comp || {};
+          const compSd2 = sdByComp2[compIds[nextIndex]] || undefined;
+          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale, compSd2);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
@@ -2095,9 +2120,11 @@ Deno.serve(async (req) => {
 
         const compNames = conv.competency_names || [];
         const compIds = conv.competency_ids || [];
+        const compDescsEdit = conv.competency_descriptions || [];
         const editRatingScale = conv.rating_scale || undefined;
+        const editSdByComp = conv.score_descriptors_by_comp || {};
         if (compNames.length > 0) {
-          const blocks = buildCompetencyPrompt(compNames[0], "", 0, compNames.length, convId, conv.assignment_id, editRatingScale);
+          const blocks = buildCompetencyPrompt(compNames[0], compDescsEdit[0] || "", 0, compNames.length, convId, conv.assignment_id, editRatingScale, editSdByComp[compIds[0]] || undefined);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Editing review \u2014 rate ${compNames[0]} again`,

@@ -6,6 +6,7 @@ import {
   buildReviewSummary,
   buildSurveyQuestionPrompt,
 } from "../_shared/nami-blocks.ts";
+import { callSlackApi, sendSlackMessage as sendSlackMessageWithRetry } from "../_shared/slack-api.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -32,22 +33,18 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   );
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(baseString));
   const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  return `v0=${hex}` === slackSig;
+  // Timing-safe comparison to prevent timing attacks
+  const computed = encoder.encode(`v0=${hex}`);
+  const received = encoder.encode(slackSig);
+  if (computed.byteLength !== received.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(computed, received);
 }
 
 async function publishHomeTab(botToken: string, slackUserId: string, blocks: unknown[]) {
-  const res = await fetch("https://slack.com/api/views.publish", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      user_id: slackUserId,
-      view: { type: "home", blocks },
-    }),
+  const data = await callSlackApi(botToken, "views.publish", {
+    user_id: slackUserId,
+    view: { type: "home", blocks },
   });
-  const data = await res.json();
   if (!data.ok) {
     console.error("views.publish failed:", data.error);
   }
@@ -237,7 +234,7 @@ Deno.serve(async (req) => {
     if (!appUser) {
       // User not yet in the system — show a simple welcome message
       await publishHomeTab(workspace.bot_token, slackUserId, [
-        header("👋 Welcome to Perf"),
+        header("👋 Welcome to Nami"),
         section("You haven't been added to the workspace yet. Ask your admin to import the team from Slack."),
       ]);
       return new Response("OK", { status: 200 });
@@ -291,16 +288,7 @@ Deno.serve(async (req) => {
         const botToken = ws.bot_token;
 
         async function sendSlackMessage(channel: string, msgText: string, msgBlocks?: unknown[]) {
-          const payload: any = { channel, text: msgText };
-          if (msgBlocks) payload.blocks = msgBlocks;
-          await fetch("https://slack.com/api/chat.postMessage", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${botToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          });
+          await sendSlackMessageWithRetry(botToken, channel, msgText, msgBlocks);
         }
 
         // ── Review flow ──────────────────────────────────────────────
@@ -340,9 +328,12 @@ Deno.serve(async (req) => {
                 .eq("id", conv.id);
 
               const compDescs: string[] = conv.competency_descriptions || [];
+              const evtSdByComp = conv.score_descriptors_by_comp || {};
+              const compIds: string[] = conv.competency_ids || [];
+              const evtCompSd = evtSdByComp[compIds[nextIndex]] || undefined;
               const blocks = buildCompetencyPrompt(
                 compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length,
-                conv.id, conv.assignment_id, evtRatingScale,
+                conv.id, conv.assignment_id, evtRatingScale, evtCompSd,
               );
               await sendSlackMessage(
                 slackUserId,
@@ -564,6 +555,87 @@ Deno.serve(async (req) => {
 
     // Don't await — return 200 immediately, Deno keeps the promise alive
     void processing;
+  }
+
+  // ================================================================
+  //  REQUIRED: Handle app_uninstalled — clean up tokens and workspace data
+  // ================================================================
+  if (innerEvent?.type === "app_uninstalled") {
+    const teamId = event.team_id;
+    const cleanup = (async () => {
+      try {
+        const { data: workspace } = await supabase
+          .from("workspaces")
+          .select("id")
+          .eq("team_id", teamId)
+          .single();
+
+        if (workspace) {
+          // Invalidate tokens — set to null so stale tokens can't be used
+          await supabase
+            .from("workspaces")
+            .update({
+              bot_token: null,
+              refresh_token: null,
+              token_expires_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", workspace.id);
+
+          // Cancel any active conversation states for this workspace
+          await supabase
+            .from("conversation_states")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("status", "active")
+            .in(
+              "slack_user_id",
+              supabase
+                .from("users")
+                .select("slack_user_id")
+                .eq("workspace_id", workspace.id)
+            );
+
+          console.log("[slack-events] app_uninstalled: cleaned up workspace", teamId);
+        }
+      } catch (err) {
+        console.error("[slack-events] Error handling app_uninstalled:", err);
+      }
+    })();
+    void cleanup;
+  }
+
+  // ================================================================
+  //  REQUIRED: Handle tokens_revoked — invalidate specific tokens
+  // ================================================================
+  if (innerEvent?.type === "tokens_revoked") {
+    const teamId = event.team_id;
+    const revokedTokens = innerEvent.tokens;
+    const cleanup = (async () => {
+      try {
+        // If bot tokens were revoked, clear them from the workspace
+        if (revokedTokens?.bot && revokedTokens.bot.length > 0) {
+          await supabase
+            .from("workspaces")
+            .update({
+              bot_token: null,
+              refresh_token: null,
+              token_expires_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("team_id", teamId);
+
+          console.log("[slack-events] tokens_revoked: cleared bot tokens for", teamId);
+        }
+
+        // If user tokens were revoked, log it (we don't store user tokens long-term)
+        if (revokedTokens?.oauth && revokedTokens.oauth.length > 0) {
+          console.log("[slack-events] tokens_revoked: user tokens revoked for", teamId, revokedTokens.oauth);
+        }
+      } catch (err) {
+        console.error("[slack-events] Error handling tokens_revoked:", err);
+      }
+    })();
+    void cleanup;
   }
 
   // ================================================================

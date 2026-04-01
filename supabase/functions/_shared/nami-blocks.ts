@@ -274,6 +274,7 @@ export function buildCompetencyPrompt(
   convId: string,
   assignmentId: string,
   ratingScale?: { min: number; max: number; labels: Record<number | string, string> },
+  scoreDescriptors?: Record<string, string>, // "2" → "behavioral description for score 2"
 ) {
   const scale = ratingScale || { min: 1, max: 5, labels: RATING_LABELS };
   const buttons = [];
@@ -306,6 +307,18 @@ export function buildCompetencyPrompt(
     blocks.push({
       type: "context",
       elements: [{ type: "mrkdwn", text: `📋 _${compDesc}_` }],
+    });
+  }
+
+  // Show per-competency score descriptors if available
+  if (scoreDescriptors && Object.keys(scoreDescriptors).length > 0) {
+    const descLines = Object.entries(scoreDescriptors)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([score, desc]) => `*${score}* — ${desc}`)
+      .join("\n");
+    blocks.push({
+      type: "context",
+      elements: [{ type: "mrkdwn", text: descLines }],
     });
   }
 
