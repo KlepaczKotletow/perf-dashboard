@@ -731,7 +731,7 @@ export default function Home() {
           </ScrollReveal>
 
           <div className="grid sm:grid-cols-2 gap-5">
-            {/* Card 1: Conversational Reviews */}
+            {/* Card 1: Competency-Aware Reviews */}
             <ScrollReveal>
               <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
                 <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
@@ -740,18 +740,27 @@ export default function Home() {
                   </div>
                   <span className="text-white text-xs font-semibold">Nami</span>
                 </div>
-                <div className="p-4 space-y-3">
+                <div className="p-4 space-y-2.5">
                   <div className="flex gap-2.5">
                     <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
                       <span className="text-white text-[9px] font-bold">N</span>
                     </div>
-                    <div>
-                      <p className="text-[12px] text-foreground leading-relaxed">
-                        How would you rate <span className="font-semibold">Alex</span> on <span className="font-semibold">Execution</span>?
-                      </p>
-                      <div className="flex gap-1 mt-2">
-                        {[1,2,3,4,5].map((n) => (
-                          <div key={n} className={`px-2.5 py-1 rounded text-[10px] font-medium ${n === 5 ? 'bg-primary text-white' : 'bg-muted border border-border/60 text-muted-foreground'}`}>{n}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-semibold text-foreground">2/6: Product Strategy</p>
+                      <p className="text-[10px] text-muted-foreground italic mt-0.5">Defining product vision, roadmap, and positioning</p>
+                      <div className="space-y-1 mt-2 text-[10px] text-muted-foreground border-l-2 border-border/60 pl-2">
+                        <p><span className="font-bold text-orange-600">2</span> — Contributes to roadmap discussions</p>
+                        <p><span className="font-bold text-yellow-600">3</span> — Owns a product area&apos;s roadmap</p>
+                        <p><span className="font-bold text-green-600">4</span> — Defines multi-quarter strategy</p>
+                        <p><span className="font-bold text-emerald-600">5</span> — Sets company-wide product vision</p>
+                      </div>
+                      <div className="flex gap-1 mt-2.5">
+                        {[
+                          { n: 3, label: "3" },
+                          { n: 4, label: "4" },
+                          { n: 5, label: "5" },
+                        ].map((btn) => (
+                          <div key={btn.n} className={`px-2.5 py-1 rounded text-[10px] font-medium ${btn.n === 4 ? 'bg-primary text-white' : 'bg-muted border border-border/60 text-muted-foreground'}`}>{btn.label}</div>
                         ))}
                       </div>
                     </div>
@@ -759,15 +768,15 @@ export default function Home() {
                 </div>
                 <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
                   <div className="flex items-center gap-2">
-                    <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Conversational Reviews</p>
+                    <Target className="h-3.5 w-3.5 text-primary" />
+                    <p className="text-[11px] font-medium text-foreground">Competency-Aware Reviews</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Reviews happen in natural conversation — not forms</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Score descriptors built into every rating — no guesswork</p>
                 </div>
               </div>
             </ScrollReveal>
 
-            {/* Card 2: Manager Context */}
+            {/* Card 2: Manager Context + Competency Expectations */}
             <ScrollReveal delay={80}>
               <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
                 <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
@@ -785,18 +794,29 @@ export default function Home() {
                       <p className="text-[12px] text-foreground leading-relaxed mb-2">
                         Before you rate Alex, here&apos;s some context:
                       </p>
-                      <div className="space-y-1.5 p-3 rounded-lg bg-muted/40 border border-border/50">
-                        <div className="flex justify-between text-[11px]">
+                      <div className="space-y-1.5 p-2.5 rounded-lg bg-muted/40 border border-border/50 text-[10px]">
+                        <div className="flex justify-between">
                           <span className="text-muted-foreground">Self-assessment avg</span>
                           <span className="font-semibold text-foreground">4.2/5</span>
                         </div>
-                        <div className="flex justify-between text-[11px]">
+                        <div className="flex justify-between">
                           <span className="text-muted-foreground">Active goals</span>
                           <span className="font-semibold text-emerald-600">3 (2 on track)</span>
                         </div>
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-muted-foreground">Previous cycle</span>
-                          <span className="font-semibold text-foreground">3.8/5</span>
+                      </div>
+                      <div className="mt-2 space-y-1 p-2.5 rounded-lg bg-muted/40 border border-border/50 text-[10px]">
+                        <p className="font-semibold text-foreground mb-1">Senior PM expectations:</p>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Product Strategy</span>
+                          <span className="font-semibold">target: <span className="text-primary">4/5</span></span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Stakeholder Mgmt</span>
+                          <span className="font-semibold">target: <span className="text-primary">4/5</span> <span className="text-emerald-600">&#10003;</span></span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Execution</span>
+                          <span className="font-semibold">target: <span className="text-primary">5/5</span></span>
                         </div>
                       </div>
                     </div>
@@ -805,9 +825,9 @@ export default function Home() {
                 <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Manager Context</p>
+                    <p className="text-[11px] font-medium text-foreground">Framework-Powered Context</p>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Managers get full context before rating</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Expected scores from the competency matrix — right in Slack</p>
                 </div>
               </div>
             </ScrollReveal>
