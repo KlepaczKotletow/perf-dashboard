@@ -290,7 +290,7 @@ export default function Home() {
 
                   {/* Conversation */}
                   <div className="p-5 space-y-5 bg-white">
-                    {/* Nami → review request */}
+                    {/* Nami → competency review with score descriptors */}
                     <div className="flex gap-3">
                       <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
                         <span className="text-white text-xs font-bold">N</span>
@@ -300,39 +300,55 @@ export default function Home() {
                           <span className="text-sm font-bold text-foreground">Nami</span>
                           <span className="text-[11px] text-muted-foreground">10:32 AM</span>
                         </div>
-                        <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60">
-                          <p className="text-sm text-foreground leading-relaxed">
-                            Hey Sarah! You have a peer review for <span className="font-semibold">Alex Johnson</span> as part of the <span className="font-semibold">Q1 Performance Review</span> cycle.
+                        <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60 space-y-3">
+                          <p className="text-[13px] font-semibold text-foreground">
+                            2/6: Product Strategy
                           </p>
-                          <p className="text-sm text-foreground leading-relaxed mt-2">
-                            Let&apos;s start with <span className="font-semibold">Collaboration</span>. How would you rate Alex?
+                          <p className="text-[11px] text-muted-foreground italic">
+                            Defining product vision, roadmap, and competitive positioning
                           </p>
-                          <div className="flex flex-wrap gap-1.5 mt-3">
-                            {[1,2,3,4,5].map((n) => (
-                              <div key={n} className={`px-3.5 py-1.5 rounded-md text-xs font-medium ${n === 4 ? 'bg-primary text-white ring-2 ring-primary/30' : 'bg-muted border border-border text-foreground'}`}>{n}</div>
-                            ))}
+                          {/* Score descriptors */}
+                          <div className="space-y-1.5 text-[11px] text-muted-foreground border-l-2 border-border/60 pl-3">
+                            <p><span className="font-bold text-orange-600">2</span> — Contributes to roadmap discussions with feature-level ideas</p>
+                            <p><span className="font-bold text-yellow-600">3</span> — Owns a product area&apos;s roadmap, prioritizing by impact</p>
+                            <p><span className="font-bold text-green-600">4</span> — Defines multi-quarter strategy backed by market analysis</p>
+                            <p><span className="font-bold text-emerald-600">5</span> — Sets company-wide product vision that aligns all teams</p>
+                          </div>
+                          <div className="border-t border-border/40 pt-2.5">
+                            <div className="flex flex-wrap gap-1.5">
+                              {[
+                                { n: 2, label: "Below expectations" },
+                                { n: 3, label: "Meets expectations" },
+                                { n: 4, label: "Exceeds expectations" },
+                                { n: 5, label: "Exceptional" },
+                              ].map((btn) => (
+                                <div key={btn.n} className={`px-3 py-1.5 rounded-md text-[10px] font-medium ${btn.n === 4 ? 'bg-primary text-white ring-2 ring-primary/30' : 'bg-muted border border-border text-foreground'}`}>
+                                  {btn.n} - {btn.label}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* User clicks 4 */}
+                    {/* Manager rates 4 with context */}
                     <div className="flex gap-3">
                       <div className="h-9 w-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
-                        <span className="text-chart-2 text-xs font-bold">S</span>
+                        <span className="text-chart-2 text-xs font-bold">M</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground">Sarah Chen</span>
+                          <span className="text-sm font-bold text-foreground">Mike Torres</span>
                           <span className="text-[11px] text-muted-foreground">10:33 AM</span>
                         </div>
-                        <p className="text-sm text-foreground leading-relaxed">
-                          Great at cross-team coordination this quarter, especially on the platform migration.
+                        <p className="text-[13px] text-foreground leading-relaxed">
+                          4 — Alex drove the Q4 roadmap independently and identified the upsell opportunity that became our top initiative.
                         </p>
                       </div>
                     </div>
 
-                    {/* Nami confirmation + progress */}
+                    {/* Nami confirmation + next */}
                     <div className="flex gap-3">
                       <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
                         <span className="text-white text-xs font-bold">N</span>
@@ -342,21 +358,21 @@ export default function Home() {
                           <span className="text-sm font-bold text-foreground">Nami</span>
                           <span className="text-[11px] text-muted-foreground">10:33 AM</span>
                         </div>
-                        <p className="text-sm text-foreground leading-relaxed">
-                          Collaboration: <span className="font-semibold text-primary">4/5</span>. Next up: <span className="font-semibold">Communication</span> (2/4 done)
+                        <p className="text-[13px] text-foreground leading-relaxed">
+                          Product Strategy: <span className="font-semibold text-primary">4/5</span> (target: 4). Next: <span className="font-semibold">Stakeholder Management</span>
                         </p>
                         <div className="mt-2 flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: '50%' }} />
+                            <div className="h-full bg-primary rounded-full" style={{ width: '33%' }} />
                           </div>
-                          <span className="text-[10px] text-muted-foreground font-medium">2/4</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">2/6</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
                 <p className="text-center mt-5 text-sm text-muted-foreground/70">
-                  Meet Nami — reviews in Slack, done in under 2 minutes.
+                  Nami shows what each score means for that exact competency — no guesswork, no tab-switching.
                 </p>
               </div>
             </ScrollReveal>
