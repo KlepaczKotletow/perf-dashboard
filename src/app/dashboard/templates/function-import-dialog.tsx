@@ -33,6 +33,7 @@ interface FunctionTemplateContent {
     description: string;
     category: string;
     expected_scores: number[]; // index maps to levels by sort_order
+    score_descriptors?: Record<string, string>; // "2" → "description for score 2"
   }>;
 }
 
@@ -219,6 +220,40 @@ export function FunctionImportDialog({
           .insert(lcRows);
 
         if (lcError) throw lcError;
+      }
+
+      // 5. Insert score descriptors (if template provides them)
+      const sdRows: Array<{
+        competency_id: string;
+        score: number;
+        description: string;
+        workspace_id: string;
+      }> = [];
+
+      for (let ci = 0; ci < competencies.length; ci++) {
+        const comp = competencies[ci];
+        const compId = insertedComps?.[ci]?.id;
+        if (!compId || !comp.score_descriptors) continue;
+
+        for (const [scoreStr, desc] of Object.entries(comp.score_descriptors)) {
+          const score = parseInt(scoreStr, 10);
+          if (score >= 1 && score <= 5 && desc) {
+            sdRows.push({
+              competency_id: compId,
+              score,
+              description: desc,
+              workspace_id: workspaceId,
+            });
+          }
+        }
+      }
+
+      if (sdRows.length > 0) {
+        const { error: sdError } = await supabase
+          .from("competency_score_descriptors")
+          .insert(sdRows);
+
+        if (sdError) throw sdError;
       }
 
       // Success
