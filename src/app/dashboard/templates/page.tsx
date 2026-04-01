@@ -872,7 +872,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Product Strategy",
           description: "Defining product vision, roadmap, and competitive positioning",
           category: "Strategic",
-          expected_scores: [2, 2, 3, 4, 5],
+          expected_scores: [2, 3, 4, 4, 5],
         },
         {
           name: "User Research & Empathy",
@@ -1031,7 +1031,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Prospecting & Pipeline",
           description: "Building and managing a healthy sales pipeline through outbound and inbound activities",
           category: "Execution",
-          expected_scores: [3, 4, 5, 4, 3],
+          expected_scores: [3, 4, 5, 4, 4],
         },
         {
           name: "Deal Management & Closing",
@@ -1061,7 +1061,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Team Leadership & Coaching",
           description: "Mentoring reps, running deal reviews, and building high-performing sales teams",
           category: "Leadership",
-          expected_scores: [2, 2, 2, 4, 5],
+          expected_scores: [2, 2, 3, 4, 5],
         },
       ],
     },
@@ -1084,7 +1084,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Onboarding & Adoption",
           description: "Guiding new customers to value through structured onboarding and adoption programs",
           category: "Execution",
-          expected_scores: [3, 4, 5, 4, 3],
+          expected_scores: [3, 4, 5, 4, 4],
         },
         {
           name: "Retention & Renewals",
@@ -1149,7 +1149,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Data Visualization",
           description: "Creating clear, compelling visualizations and dashboards that drive action",
           category: "Craft",
-          expected_scores: [2, 3, 4, 4, 3],
+          expected_scores: [2, 3, 4, 4, 4],
         },
         {
           name: "Business Acumen",
@@ -1161,7 +1161,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Data Engineering",
           description: "Building and maintaining data pipelines, ETL processes, and data quality systems",
           category: "Technical",
-          expected_scores: [2, 3, 4, 4, 3],
+          expected_scores: [2, 3, 4, 4, 4],
         },
         {
           name: "Stakeholder Communication",
