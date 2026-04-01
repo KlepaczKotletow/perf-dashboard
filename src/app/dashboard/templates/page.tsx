@@ -837,7 +837,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Delivery & Execution",
           description: "Shipping quality work on time and managing project scope effectively",
           category: "Execution",
-          expected_scores: [2, 3, 4, 4, 5],
+          expected_scores: [2, 3, 4, 5, 4],
         },
         {
           name: "Communication",
@@ -931,7 +931,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "UX Research & Testing",
           description: "Planning and conducting user research to validate design decisions",
           category: "Research",
-          expected_scores: [2, 2, 4, 4, 5],
+          expected_scores: [2, 3, 4, 4, 5],
         },
         {
           name: "Interaction Design",
@@ -943,7 +943,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Design Systems",
           description: "Building and maintaining scalable component libraries and design tokens",
           category: "Technical",
-          expected_scores: [2, 2, 3, 5, 5],
+          expected_scores: [2, 2, 3, 4, 5],
         },
         {
           name: "Cross-functional Collaboration",
@@ -978,19 +978,19 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Campaign Strategy",
           description: "Planning and executing multi-channel marketing campaigns aligned to business goals",
           category: "Execution",
-          expected_scores: [3, 4, 5, 4, 3],
+          expected_scores: [2, 3, 4, 5, 4],
         },
         {
           name: "Content & Storytelling",
           description: "Creating compelling content that resonates with target audiences across channels",
           category: "Creative",
-          expected_scores: [2, 3, 4, 4, 5],
+          expected_scores: [2, 3, 4, 5, 4],
         },
         {
           name: "Analytics & Attribution",
           description: "Measuring marketing impact, attribution modeling, and data-driven optimization",
           category: "Analytical",
-          expected_scores: [2, 3, 4, 4, 5],
+          expected_scores: [2, 3, 4, 4, 4],
         },
         {
           name: "Brand & Positioning",
@@ -1102,7 +1102,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Product Expertise",
           description: "Deep knowledge of the product to guide customers toward best practices and solutions",
           category: "Technical",
-          expected_scores: [2, 3, 4, 4, 3],
+          expected_scores: [2, 3, 4, 4, 4],
         },
         {
           name: "Customer Advocacy",
@@ -1143,7 +1143,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Statistical Analysis",
           description: "Applying statistical methods, hypothesis testing, and experimentation to generate insights",
           category: "Technical",
-          expected_scores: [2, 3, 4, 5, 5],
+          expected_scores: [2, 3, 4, 5, 4],
         },
         {
           name: "Data Visualization",
@@ -1190,7 +1190,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "Talent Acquisition",
           description: "Sourcing, interviewing, and hiring top talent through effective recruitment processes",
           category: "Execution",
-          expected_scores: [2, 3, 4, 5, 5],
+          expected_scores: [2, 3, 4, 5, 4],
         },
         {
           name: "Employee Relations",
@@ -1202,7 +1202,7 @@ const SYSTEM_FUNCTION_TEMPLATES = [
           name: "HR Operations & Compliance",
           description: "Ensuring smooth HR operations, policy development, and regulatory compliance",
           category: "Technical",
-          expected_scores: [3, 4, 4, 4, 3],
+          expected_scores: [3, 4, 4, 4, 4],
         },
         {
           name: "Organizational Design & Culture",
