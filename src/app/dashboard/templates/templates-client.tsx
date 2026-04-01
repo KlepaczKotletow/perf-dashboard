@@ -181,37 +181,64 @@ function TemplateRow({
       const c = template.content as any;
       const levels = c?.levels || [];
       const competencies = c?.competencies || [];
+      const hasDescriptors = competencies.some((comp: any) => comp.score_descriptors && Object.keys(comp.score_descriptors).length > 0);
       return (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border/30">
-                <th className="text-left py-2 pr-4 font-medium text-muted-foreground min-w-[180px]">Competency</th>
-                {levels.map((l: any) => (
-                  <th key={l.name} className="text-center py-2 px-2 font-medium text-foreground min-w-[64px]">{l.name}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {competencies.map((comp: any) => (
-                <tr key={comp.name} className="border-b border-border/20 last:border-0">
-                  <td className="py-2 pr-4">
-                    <span className="font-medium text-foreground">{comp.name}</span>
-                    {comp.description && (
-                      <p className="text-muted-foreground mt-0.5 leading-relaxed">{comp.description}</p>
-                    )}
-                  </td>
-                  {(comp.expected_scores || []).map((score: number, i: number) => (
-                    <td key={i} className="text-center py-2 px-2">
-                      <span className={`inline-flex w-6 h-6 items-center justify-center rounded text-[10px] font-bold border ${proficiencyColors[score] || ""}`}>
-                        {score}
-                      </span>
-                    </td>
+        <div className="space-y-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border/30">
+                  <th className="text-left py-2 pr-4 font-medium text-muted-foreground min-w-[180px]">Competency</th>
+                  {levels.map((l: any) => (
+                    <th key={l.name} className="text-center py-2 px-2 font-medium text-foreground min-w-[64px]">{l.name}</th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {competencies.map((comp: any) => (
+                  <tr key={comp.name} className="border-b border-border/20 last:border-0">
+                    <td className="py-2 pr-4">
+                      <span className="font-medium text-foreground">{comp.name}</span>
+                      {comp.description && (
+                        <p className="text-muted-foreground mt-0.5 leading-relaxed">{comp.description}</p>
+                      )}
+                    </td>
+                    {(comp.expected_scores || []).map((score: number, i: number) => (
+                      <td key={i} className="text-center py-2 px-2">
+                        <span className={`inline-flex w-6 h-6 items-center justify-center rounded text-[10px] font-bold border ${proficiencyColors[score] || ""}`}>
+                          {score}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {hasDescriptors && (
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Score Descriptors</p>
+              <div className="space-y-3">
+                {competencies.filter((comp: any) => comp.score_descriptors).map((comp: any) => (
+                  <div key={`sd-${comp.name}`}>
+                    <p className="text-xs font-medium text-foreground mb-1.5">{comp.name}</p>
+                    <div className="grid gap-1">
+                      {Object.entries(comp.score_descriptors as Record<string, string>)
+                        .sort(([a], [b]) => Number(a) - Number(b))
+                        .map(([score, desc]) => (
+                          <div key={score} className="flex items-start gap-2">
+                            <span className={`inline-flex w-5 h-5 items-center justify-center rounded text-[9px] font-bold border shrink-0 mt-0.5 ${proficiencyColors[Number(score)] || ""}`}>
+                              {score}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground leading-relaxed">{desc as string}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       );
     }
