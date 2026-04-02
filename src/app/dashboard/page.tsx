@@ -156,6 +156,7 @@ async function getManagerData(userId: string, workspaceId: string) {
 }
 
 async function getOrgData(workspaceId: string | undefined) {
+  if (!workspaceId) return null;
   const supabase = await createServerSupabaseClient();
 
   // Build workspace-scoped activeCycles query up-front so we can include it in one batch
@@ -166,7 +167,7 @@ async function getOrgData(workspaceId: string | undefined) {
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(3);
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
@@ -188,25 +189,25 @@ async function getOrgData(workspaceId: string | undefined) {
   const reviewsQuery = (() => {
     // review_assignments has no direct workspace_id — count via workspace cycles
     let q = supabase.from("performance_cycles").select("id").eq("status", "active");
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
   const feedbackQuery = (() => {
     let q = supabase.from("continuous_feedback").select("*", { count: "exact", head: true });
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
   const usersQuery = (() => {
     let q = supabase.from("users").select("*", { count: "exact", head: true });
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
   const activeQuery = (() => {
     let q = supabase.from("performance_cycles").select("*", { count: "exact", head: true }).eq("status", "active");
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
@@ -258,24 +259,25 @@ async function getOrgData(workspaceId: string | undefined) {
 }
 
 async function getChartData(workspaceId: string | undefined): Promise<DashboardChartData> {
+  if (!workspaceId) return { completionRate: 0, completionDelta: null, previousCycleName: null, goalDistribution: [], reviewTrend: [], departmentPerformance: [] };
   const supabase = await createServerSupabaseClient();
 
   // Scope all queries to the workspace
   const goalsQuery = (() => {
     let q = supabase.from("goals").select("id, tracking_status, status");
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
   const usersQuery2 = (() => {
     let q = supabase.from("users").select("id, department");
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 
   const cyclesQuery = (() => {
     let q = supabase.from("performance_cycles").select("id, name, status, created_at").order("created_at", { ascending: false });
-    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    q = q.eq("workspace_id", workspaceId);
     return q;
   })();
 

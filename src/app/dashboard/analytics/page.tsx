@@ -67,17 +67,16 @@ const DEFAULT_RATING_SCALE = { min: 1, max: 5, labels: { "1": "1", "2": "2", "3"
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
 async function getFilterOptions(workspaceId: string | undefined) {
+  if (!workspaceId) return { cycles: [], functions: [], departments: [] };
   const supabase = await createServerSupabaseClient();
 
   let cyclesQ = supabase.from("performance_cycles").select("id, name, status").order("created_at", { ascending: false });
   let functionsQ = supabase.from("job_families").select("id, name").order("name");
   let usersQ = supabase.from("users").select("department");
 
-  if (workspaceId) {
-    cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
-    functionsQ = functionsQ.eq("workspace_id", workspaceId);
-    usersQ = usersQ.eq("workspace_id", workspaceId);
-  }
+  cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+  functionsQ = functionsQ.eq("workspace_id", workspaceId);
+  usersQ = usersQ.eq("workspace_id", workspaceId);
 
   const [{ data: cycles, error: cyclesErr }, { data: functions, error: functionsErr }, { data: users, error: usersErr }] = await Promise.all([
     cyclesQ,
@@ -98,13 +97,14 @@ async function getFilterOptions(workspaceId: string | undefined) {
 }
 
 async function getAnalyticsData(filters: FilterParams, workspaceId: string | undefined) {
+  if (!workspaceId) throw new Error("workspaceId required");
   const supabase = await createServerSupabaseClient();
 
   // 1. Users — with level → job_family join for function breakdown
   let usersQ = supabase
     .from("users")
     .select("id, department, slack_name, level_id, level:levels!users_level_id_fkey(name, job_family_id, job_family:job_families(name))");
-  if (workspaceId) usersQ = usersQ.eq("workspace_id", workspaceId);
+  usersQ = usersQ.eq("workspace_id", workspaceId);
   const { data: usersData, error: usersDataErr } = await usersQ;
   if (usersDataErr) console.error("Failed to fetch analytics users:", usersDataErr.message);
 
@@ -126,7 +126,7 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
   // 2. Assignments — scoped to workspace cycles, optionally filtered by specific cycle
   // First get workspace cycle IDs to scope assignments
   let wsCyclesQ = supabase.from("performance_cycles").select("id");
-  if (workspaceId) wsCyclesQ = wsCyclesQ.eq("workspace_id", workspaceId);
+  wsCyclesQ = wsCyclesQ.eq("workspace_id", workspaceId);
   const { data: wsCyclesData, error: wsCyclesErr } = await wsCyclesQ;
   if (wsCyclesErr) console.error("Failed to fetch workspace cycles:", wsCyclesErr.message);
   const wsCycleIds = (wsCyclesData || []).map((c: any) => c.id);
@@ -166,13 +166,13 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
 
   // 4. Goals (not filtered by cycle — workspace-wide)
   let goalsQ = supabase.from("goals").select("id, tracking_status, status");
-  if (workspaceId) goalsQ = goalsQ.eq("workspace_id", workspaceId);
+  goalsQ = goalsQ.eq("workspace_id", workspaceId);
   const { data: goalsData, error: goalsErr } = await goalsQ;
   if (goalsErr) console.error("Failed to fetch analytics goals:", goalsErr.message);
 
   // 5. All cycles (for cycle stats tile)
   let allCyclesQ = supabase.from("performance_cycles").select("id, status");
-  if (workspaceId) allCyclesQ = allCyclesQ.eq("workspace_id", workspaceId);
+  allCyclesQ = allCyclesQ.eq("workspace_id", workspaceId);
   const { data: allCycles, error: allCyclesErr } = await allCyclesQ;
   if (allCyclesErr) console.error("Failed to fetch all cycles:", allCyclesErr.message);
 
@@ -374,6 +374,7 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
 }
 
 async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId: string | undefined): Promise<TrendsData> {
+  if (!workspaceId) return { ratingTrend: [], completionTrend: [] };
   const supabase = await createServerSupabaseClient();
 
   let cyclesQ = supabase
@@ -382,7 +383,7 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
     .in("status", ["completed", "active"])
     .order("created_at", { ascending: false })
     .limit(6);
-  if (workspaceId) cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+  cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
   const { data: cycles, error: trendCyclesErr } = await cyclesQ;
   if (trendCyclesErr) console.error("Failed to fetch trend cycles:", trendCyclesErr.message);
 
@@ -393,7 +394,7 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
   let trendsUsersQ = supabase
     .from("users")
     .select("id, department, level:levels!users_level_id_fkey(job_family_id)");
-  if (workspaceId) trendsUsersQ = trendsUsersQ.eq("workspace_id", workspaceId);
+  trendsUsersQ = trendsUsersQ.eq("workspace_id", workspaceId);
   const { data: usersData, error: trendsUsersErr } = await trendsUsersQ;
   if (trendsUsersErr) console.error("Failed to fetch trends users:", trendsUsersErr.message);
 
@@ -469,6 +470,7 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
 }
 
 async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceId: string | undefined): Promise<HeatmapData> {
+  if (!workspaceId) return { competencies: [], groups: [], cells: {}, overallByGroup: {}, overallByComp: {}, grandTotal: { sum: 0, count: 0 } };
   const supabase = await createServerSupabaseClient();
 
   // Fetch configurable tenure buckets if needed
@@ -486,7 +488,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   let heatmapUsersQ = supabase
     .from("users")
     .select("id, role, department, start_date, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family_id)");
-  if (workspaceId) heatmapUsersQ = heatmapUsersQ.eq("workspace_id", workspaceId);
+  heatmapUsersQ = heatmapUsersQ.eq("workspace_id", workspaceId);
   const { data: usersRaw, error: heatmapUsersErr } = await heatmapUsersQ;
   if (heatmapUsersErr) console.error("Failed to fetch heatmap users:", heatmapUsersErr.message);
 
@@ -515,7 +517,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
 
   // 2. Scope responses to workspace cycles
   let hmCyclesQ = supabase.from("performance_cycles").select("id");
-  if (workspaceId) hmCyclesQ = hmCyclesQ.eq("workspace_id", workspaceId);
+  hmCyclesQ = hmCyclesQ.eq("workspace_id", workspaceId);
   const { data: hmCyclesData, error: hmCyclesErr } = await hmCyclesQ;
   if (hmCyclesErr) console.error("Failed to fetch heatmap cycles:", hmCyclesErr.message);
   const hmCycleIdSet = new Set((hmCyclesData || []).map((c: any) => c.id));
@@ -628,6 +630,7 @@ export interface CyclesComparisonData {
 // ─── Cycles comparison data fetching ─────────────────────────────────────────
 
 async function getCyclesComparisonData(workspaceId: string | undefined, showAll: boolean): Promise<CyclesComparisonData> {
+  if (!workspaceId) return { cycles: [], byDepartment: {}, byFunction: {}, byManager: {}, topManagers: [], bottomManagers: [], hasMore: false, allManagers: [] } as CyclesComparisonData;
   const supabase = await createServerSupabaseClient();
 
   // 1. Fetch cycles
@@ -636,7 +639,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
     .select("id, name, status, start_date, end_date")
     .in("status", ["active", "in_review", "completed", "closed"])
     .order("start_date", { ascending: false });
-  if (workspaceId) cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
+  cyclesQ = cyclesQ.eq("workspace_id", workspaceId);
   if (!showAll) cyclesQ = cyclesQ.limit(4);
 
   const { data: cyclesRaw, error: cyclesErr } = await cyclesQ;
@@ -649,7 +652,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
       .from("performance_cycles")
       .select("id", { count: "exact", head: true })
       .in("status", ["active", "in_review", "completed", "closed"]);
-    if (workspaceId) countQ = countQ.eq("workspace_id", workspaceId);
+    countQ = countQ.eq("workspace_id", workspaceId);
     const { count } = await countQ;
     hasMore = (count || 0) > 4;
   }
@@ -673,7 +676,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   let usersQ = supabase
     .from("users")
     .select("id, department, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family:job_families(name))");
-  if (workspaceId) usersQ = usersQ.eq("workspace_id", workspaceId);
+  usersQ = usersQ.eq("workspace_id", workspaceId);
   const { data: usersRaw, error: usersErr } = await usersQ;
   if (usersErr) console.error("Failed to fetch cycles users:", usersErr.message);
   const allUsers = usersRaw || [];
