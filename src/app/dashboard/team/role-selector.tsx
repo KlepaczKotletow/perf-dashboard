@@ -27,20 +27,18 @@ export function RoleSelector({ userId, currentRole, canEdit, workspaceId }: Role
 
   const handleRoleChange = async (newRole: string) => {
     if (newRole === localRole) return;
+    if (!workspaceId) return;
 
     setLocalRole(newRole);
     setRoleError(null);
     setUpdating(true);
     try {
       const supabase = createClient();
-      let query = supabase
+      const { error } = await supabase
         .from("users")
         .update({ role: newRole })
-        .eq("id", userId);
-      if (workspaceId) {
-        query = query.eq("workspace_id", workspaceId);
-      }
-      const { error } = await query;
+        .eq("id", userId)
+        .eq("workspace_id", workspaceId);
 
       if (error) throw error;
       router.refresh();

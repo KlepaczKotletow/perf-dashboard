@@ -75,6 +75,8 @@ async function getContinuousFeedback(
   role: string | undefined,
   hasDirectReports?: boolean,
 ) {
+  if (!workspaceId) return [];
+
   // If scope is an empty array we know there's nothing to return
   if (scope.userIds !== null && scope.userIds.length === 0) return [];
 
@@ -84,11 +86,8 @@ async function getContinuousFeedback(
     .from("continuous_feedback")
     .select("*, from_user:users!continuous_feedback_from_user_id_fkey(slack_name), to_user:users!continuous_feedback_to_user_id_fkey(slack_name)")
     .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (workspaceId) {
-    query = query.eq("workspace_id", workspaceId);
-  }
+    .limit(50)
+    .eq("workspace_id", workspaceId);
 
   if (scope.userIds !== null) {
     if (isManagerOrAbove(role) || hasDirectReports) {

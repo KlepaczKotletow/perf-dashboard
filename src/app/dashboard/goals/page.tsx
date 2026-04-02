@@ -8,6 +8,8 @@ async function getGoals(
   currentUserId: string | null,
   hasDirectReports?: boolean,
 ) {
+  if (!workspaceId) return [];
+
   const supabase = await createServerSupabaseClient();
 
   let query = supabase
@@ -19,11 +21,8 @@ async function getGoals(
       employee:users!goals_employee_id_fkey(id, slack_name, department),
       cycle:performance_cycles!goals_cycle_id_fkey(id, name)
     `)
-    .order("created_at", { ascending: false });
-
-  if (workspaceId) {
-    query = query.eq("workspace_id", workspaceId);
-  }
+    .order("created_at", { ascending: false })
+    .eq("workspace_id", workspaceId);
 
   // HR / Admin — unrestricted
   if (isHROrAbove(role)) {
@@ -67,33 +66,27 @@ async function getGoals(
 }
 
 async function getCycles(workspaceId: string | undefined) {
+  if (!workspaceId) return [];
+
   const supabase = await createServerSupabaseClient();
-  let query = supabase
+  const { data, error } = await supabase
     .from("performance_cycles")
     .select("id, name")
-    .order("created_at", { ascending: false });
-
-  if (workspaceId) {
-    query = query.eq("workspace_id", workspaceId);
-  }
-
-  const { data, error } = await query;
+    .order("created_at", { ascending: false })
+    .eq("workspace_id", workspaceId);
   if (error) console.error("Failed to fetch cycles for goals:", error.message);
   return data || [];
 }
 
 async function getEmployees(workspaceId: string | undefined) {
+  if (!workspaceId) return [];
+
   const supabase = await createServerSupabaseClient();
-  let query = supabase
+  const { data, error } = await supabase
     .from("users")
     .select("id, slack_name")
-    .order("slack_name");
-
-  if (workspaceId) {
-    query = query.eq("workspace_id", workspaceId);
-  }
-
-  const { data, error } = await query;
+    .order("slack_name")
+    .eq("workspace_id", workspaceId);
   if (error) console.error("Failed to fetch employees for goals:", error.message);
   return data || [];
 }
