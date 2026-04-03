@@ -274,6 +274,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
+    employee_id: "",
     goal_direction: "increase",
     metric_target: "" as string,
     metric_unit: "",
@@ -595,6 +596,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     setEditForm({
       title: goal.title,
       description: goal.description || "",
+      employee_id: goal.employee?.id || "",
       goal_direction: goal.goal_direction || "increase",
       metric_target: goal.metric_target != null ? String(goal.metric_target) : "",
       metric_unit: goal.metric_unit || "",
@@ -618,6 +620,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
       const { error } = await supabase.from("goals").update({
         title: editForm.title,
         description: editForm.description || null,
+        employee_id: editForm.employee_id || null,
         goal_direction: editForm.goal_direction,
         metric_target: editForm.metric_target ? Number(editForm.metric_target) : null,
         metric_unit: editForm.metric_unit || null,
@@ -870,30 +873,30 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead className="w-[30%]">
+                <TableHead className="min-w-[180px]">
                   <button onClick={() => toggleSort("title")} className="flex items-center gap-1 text-xs font-medium">
                     Goal <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="w-[120px]">
                   <button onClick={() => toggleSort("owner")} className="flex items-center gap-1 text-xs font-medium">
                     Owner <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </TableHead>
-                <TableHead>Cycle</TableHead>
-                <TableHead className="w-[90px]">Status</TableHead>
-                <TableHead className="w-[70px]">
+                <TableHead className="w-[100px]">Cycle</TableHead>
+                <TableHead className="w-[80px]">Status</TableHead>
+                <TableHead className="w-[60px]">
                   <button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">
-                    Weight <ArrowUpDown className="h-3 w-3" />
+                    Wt <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </TableHead>
-                <TableHead>Metric</TableHead>
-                <TableHead className="w-[160px]">
+                <TableHead className="w-[160px]">Metric</TableHead>
+                <TableHead className="w-[140px]">
                   <button onClick={() => toggleSort("progress")} className="flex items-center gap-1 text-xs font-medium">
                     Progress <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </TableHead>
-                <TableHead className="w-[110px]">Status</TableHead>
+                <TableHead className="w-[90px]">Health</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -1183,6 +1186,17 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
             <div className="space-y-1.5">
               <Label>Goal title *</Label>
               <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Owner</Label>
+              <Select value={editForm.employee_id} onValueChange={(v) => setEditForm({ ...editForm, employee_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Select owner" /></SelectTrigger>
+                <SelectContent>
+                  {(employees || []).map((e: any) => (
+                    <SelectItem key={e.id} value={e.id}>{e.slack_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
