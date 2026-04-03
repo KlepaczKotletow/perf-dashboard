@@ -1,22 +1,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callSlackApi } from "../_shared/slack-api.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL") || "https://nami-ochre.vercel.app";
+const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL") || "https://namihr.com";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function sendSlackDM(botToken: string, slackUserId: string, text: string): Promise<boolean> {
   try {
-    const res = await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${botToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ channel: slackUserId, text }),
-    });
-    const data = await res.json();
+    const data = await callSlackApi(botToken, "chat.postMessage", { channel: slackUserId, text });
     return data.ok === true;
   } catch {
     return false;
