@@ -17,7 +17,7 @@ async function getGoals(
     .select(`
       id, parent_id, title, description, status, progress,
       weight, metric_start, metric_current, metric_target, metric_unit,
-      tracking_status, scope, due_date,
+      tracking_status, scope, goal_direction, due_date,
       employee:users!goals_employee_id_fkey(id, slack_name, department),
       cycle:performance_cycles!goals_cycle_id_fkey(id, name)
     `)

@@ -45,6 +45,7 @@ interface GoalDetailClientProps {
     metric_current: number | null;
     metric_target: number | null;
     metric_unit: string | null;
+    goal_direction: string | null;
     tracking_status: string | null;
     scope: string;
     due_date: string | null;
@@ -75,6 +76,7 @@ interface EditForm {
   metric_current: string;
   due_date: string;
   weight: number;
+  goal_direction: string;
 }
 
 // ─── Tracking status config ──────────────────────────────────────────────────
@@ -161,6 +163,7 @@ export default function GoalDetailClient({
     metric_current: goal.metric_current != null ? String(goal.metric_current) : "",
     due_date: goal.due_date ? goal.due_date.slice(0, 10) : "",
     weight: goal.weight,
+    goal_direction: goal.goal_direction || "increase",
   });
 
   function handleCancel() {
@@ -173,6 +176,7 @@ export default function GoalDetailClient({
       metric_current: goal.metric_current != null ? String(goal.metric_current) : "",
       due_date: goal.due_date ? goal.due_date.slice(0, 10) : "",
       weight: goal.weight,
+      goal_direction: goal.goal_direction || "increase",
     });
     setSaveError(null);
     setEditing(false);
@@ -198,6 +202,7 @@ export default function GoalDetailClient({
       metric_current: metricCurrentVal,
       due_date: form.due_date || null,
       weight: Number(form.weight),
+      goal_direction: form.goal_direction,
     };
 
     const { error } = await supabase.from("goals").update(payload).eq("id", goal.id).eq("workspace_id", workspaceId);
@@ -233,6 +238,7 @@ export default function GoalDetailClient({
       metric_target: goal.metric_target,
       metric_unit: goal.metric_unit,
       metric_current: goal.metric_start,
+      goal_direction: goal.goal_direction,
       due_date: goal.due_date,
       status: "draft",
       progress: 0,
@@ -576,7 +582,20 @@ export default function GoalDetailClient({
                 Metric
               </p>
               {editing ? (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Direction</Label>
+                    <Select value={form.goal_direction} onValueChange={(v) => setForm((f) => ({ ...f, goal_direction: v }))}>
+                      <SelectTrigger className="h-8 text-sm max-w-[180px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="increase">↑ Increase to</SelectItem>
+                        <SelectItem value="decrease">↓ Decrease to</SelectItem>
+                        <SelectItem value="above">≥ Stay above</SelectItem>
+                        <SelectItem value="below">≤ Stay below</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-muted-foreground">
                     {goal.metric_start ?? 0}
                     {goal.metric_unit ? ` ${goal.metric_unit}` : ""}
@@ -607,6 +626,7 @@ export default function GoalDetailClient({
                     {goal.metric_target}
                     {goal.metric_unit ? ` ${goal.metric_unit}` : ""}
                   </span>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground tabular-nums">
@@ -616,7 +636,10 @@ export default function GoalDetailClient({
                     {goal.metric_current ?? goal.metric_start ?? 0}
                   </span>
                   <span className="text-muted-foreground/40">→</span>
-                  <span>{goal.metric_target}</span>
+                  <span>
+                    {goal.goal_direction === "decrease" ? "↓ " : goal.goal_direction === "above" ? "≥ " : goal.goal_direction === "below" ? "≤ " : "↑ "}
+                    {goal.metric_target}
+                  </span>
                   {goal.metric_unit && (
                     <span className="text-xs text-muted-foreground/60">{goal.metric_unit}</span>
                   )}

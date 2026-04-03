@@ -257,6 +257,7 @@ export interface ReviewResponse {
 export type GoalStatus = 'draft' | 'active' | 'completed' | 'cancelled' | 'archived'
 export type GoalTrackingStatus = 'on_track' | 'at_risk' | 'delayed' | 'achieved'
 export type GoalScope = 'company' | 'team' | 'individual'
+export type GoalDirection = 'increase' | 'decrease' | 'above' | 'below'
 
 export interface Goal {
   id: string
@@ -275,6 +276,7 @@ export interface Goal {
   metric_unit: string | null
   tracking_status: GoalTrackingStatus | null
   scope: GoalScope
+  goal_direction: GoalDirection
   due_date: string | null
   created_at: string | null
   updated_at: string | null
