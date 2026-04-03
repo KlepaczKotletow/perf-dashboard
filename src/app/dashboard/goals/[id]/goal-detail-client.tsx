@@ -53,7 +53,7 @@ interface GoalDetailClientProps {
     cycle?: { id: string; name: string } | null;
     parent?: { id: string; title: string } | null;
   };
-  children: Array<{
+  childGoals: Array<{
     id: string;
     title: string;
     status: string;
@@ -138,7 +138,7 @@ function scopeLabel(scope: string): string {
 
 export default function GoalDetailClient({
   goal,
-  children,
+  childGoals,
   canEdit,
   cycles,
   employees,
@@ -675,19 +675,19 @@ export default function GoalDetailClient({
       )}
 
       {/* ── Child Goals card ──────────────────────────────────────────────── */}
-      {children.length > 0 && (
+      {childGoals.length > 0 && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold">
               Child Goals
               <span className="ml-2 text-sm font-normal text-muted-foreground">
-                ({children.length})
+                ({childGoals.length})
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border/50">
-              {children.map((child) => {
+              {childGoals.map((child) => {
                 const childTc = child.tracking_status
                   ? trackingConfig[child.tracking_status]
                   : null;

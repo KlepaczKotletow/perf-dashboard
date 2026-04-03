@@ -32,7 +32,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
   if (!goal) notFound();
 
   // Fetch child goals
-  const { data: children } = await supabase
+  const { data: childGoals } = await supabase
     .from("goals")
     .select("id, title, status, progress, tracking_status, weight")
     .eq("parent_id", id)
@@ -57,7 +57,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
   return (
     <GoalDetailClient
       goal={goal as any}
-      children={children || []}
+      childGoals={childGoals || []}
       canEdit={canEdit}
       cycles={cycles || []}
       employees={employees || []}
