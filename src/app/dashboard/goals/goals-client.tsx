@@ -221,6 +221,12 @@ function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
   return result;
 }
 
+// ─── Column reordering ─────────────────────────────────
+
+type ColumnKey = "goal" | "owner" | "cycle" | "status" | "weight" | "metric" | "progress" | "health";
+
+const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["goal", "owner", "cycle", "status", "weight", "metric", "progress", "health"];
+
 // ─── Component ──────────────────────────────────────────
 
 export default function GoalsClient({ goals: rawGoals, cycles, employees = [], role, workspaceId }: GoalsClientProps) {
@@ -343,6 +349,11 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
   const [sortKey, setSortKey] = useState<string>("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  // Column reordering
+  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(DEFAULT_COLUMN_ORDER);
+  const [draggedCol, setDraggedCol] = useState<ColumnKey | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<ColumnKey | null>(null);
+
   // ─── Filtered & sorted data ─────────────────────────
 
   const filtered = useMemo(() => {
@@ -380,6 +391,10 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
         case "weight":
           aVal = a.weight;
           bVal = b.weight;
+          break;
+        case "cycle":
+          aVal = (a.cycle?.name || "").toLowerCase();
+          bVal = (b.cycle?.name || "").toLowerCase();
           break;
         case "progress":
           aVal = a.progress;
@@ -447,6 +462,151 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     } else {
       setSortKey(key);
       setSortDir("asc");
+    }
+  }
+
+  function handleDragStart(col: ColumnKey) {
+    setDraggedCol(col);
+  }
+
+  function handleDragOver(e: React.DragEvent, col: ColumnKey) {
+    e.preventDefault();
+    if (col !== draggedCol) setDragOverCol(col);
+  }
+
+  function handleDrop(col: ColumnKey) {
+    if (!draggedCol || draggedCol === col) {
+      setDraggedCol(null);
+      setDragOverCol(null);
+      return;
+    }
+    const newOrder = [...columnOrder];
+    const fromIdx = newOrder.indexOf(draggedCol);
+    const toIdx = newOrder.indexOf(col);
+    newOrder.splice(fromIdx, 1);
+    newOrder.splice(toIdx, 0, draggedCol);
+    setColumnOrder(newOrder);
+    setDraggedCol(null);
+    setDragOverCol(null);
+  }
+
+  function handleDragEnd() {
+    setDraggedCol(null);
+    setDragOverCol(null);
+  }
+
+  function renderColumnHeader(col: ColumnKey) {
+    const dragCls = `cursor-grab active:cursor-grabbing transition-colors ${dragOverCol === col ? "bg-primary/10" : ""} ${draggedCol === col ? "opacity-40" : ""}`;
+    const dragEvents = {
+      draggable: true as const,
+      onDragStart: () => handleDragStart(col),
+      onDragOver: (e: React.DragEvent) => handleDragOver(e, col),
+      onDrop: () => handleDrop(col),
+      onDragEnd: handleDragEnd,
+    };
+
+    switch (col) {
+      case "goal":
+        return <TableHead key={col} className={`min-w-[180px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("title")} className="flex items-center gap-1 text-xs font-medium">Goal <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+      case "owner":
+        return <TableHead key={col} className={`w-[120px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("owner")} className="flex items-center gap-1 text-xs font-medium">Owner <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+      case "cycle":
+        return <TableHead key={col} className={`w-[100px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("cycle")} className="flex items-center gap-1 text-xs font-medium">Cycle <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+      case "status":
+        return <TableHead key={col} className={`w-[80px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Status</span></TableHead>;
+      case "weight":
+        return <TableHead key={col} className={`w-[60px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">Wt <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+      case "metric":
+        return <TableHead key={col} className={`w-[160px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Metric</span></TableHead>;
+      case "progress":
+        return <TableHead key={col} className={`w-[140px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("progress")} className="flex items-center gap-1 text-xs font-medium">Progress <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+      case "health":
+        return <TableHead key={col} className={`w-[90px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Health</span></TableHead>;
+    }
+  }
+
+  function renderColumnCell(col: ColumnKey, goal: typeof flat[0], tc: { label: string; color: string; barColor: string }) {
+    switch (col) {
+      case "goal":
+        return (
+          <TableCell key={col}>
+            <div className="flex items-center gap-1.5" style={{ paddingLeft: goal.depth * 24 }}>
+              {goal.children.length > 0 ? (
+                <button onClick={() => toggleExpand(goal.id)} className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
+                  {expanded.has(goal.id) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                </button>
+              ) : (
+                <span className="w-[18px] shrink-0" />
+              )}
+              <button onClick={() => openEditPanel(goal)} className="text-sm font-medium text-foreground truncate hover:underline text-left">{goal.title}</button>
+              {goal.status === "draft" && <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">Draft</Badge>}
+            </div>
+          </TableCell>
+        );
+      case "owner":
+        return <TableCell key={col}><span className="text-sm text-muted-foreground truncate">{goal.employee?.slack_name || "\u2014"}</span></TableCell>;
+      case "cycle":
+        return <TableCell key={col}><span className="text-sm text-muted-foreground truncate">{goal.cycle?.name || "\u2014"}</span></TableCell>;
+      case "status":
+        return (
+          <TableCell key={col}>
+            <Badge className={`text-[10px] font-medium ${
+              goal.status === "active" ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10"
+              : goal.status === "completed" ? "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10"
+              : "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10"
+            }`}>
+              {goal.status === "active" ? "Active" : goal.status === "completed" ? "Completed" : goal.status === "cancelled" ? "Cancelled" : "Draft"}
+            </Badge>
+          </TableCell>
+        );
+      case "weight":
+        return <TableCell key={col}><span className="text-sm text-muted-foreground">{goal.weight === 1 ? "1\u00d7" : `${goal.weight % 1 === 0 ? goal.weight.toFixed(0) : goal.weight.toFixed(1)}\u00d7`}</span></TableCell>;
+      case "metric":
+        return (
+          <TableCell key={col}>
+            {goal.metric_target != null ? (
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {goal.metric_start ?? 0}<span className="mx-1 text-muted-foreground/40">\u2192</span>
+                <span className="font-medium text-foreground">{goal.metric_current ?? goal.metric_start ?? 0}</span>
+                <span className="mx-1 text-muted-foreground/40">\u2192</span>
+                {directionIcon(goal.goal_direction)} {goal.metric_target}
+                {goal.metric_unit && <span className="ml-1 text-xs text-muted-foreground/60">{goal.metric_unit}</span>}
+              </span>
+            ) : (
+              <span className="text-sm text-muted-foreground/40">\u2014</span>
+            )}
+          </TableCell>
+        );
+      case "progress":
+        return (
+          <TableCell key={col}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-300 ${tc.barColor}`} style={{ width: `${Math.min(100, goal.progress)}%` }} />
+              </div>
+              <span className="text-xs font-medium text-foreground w-8 text-right tabular-nums">{goal.progress}%</span>
+            </div>
+          </TableCell>
+        );
+      case "health":
+        return (
+          <TableCell key={col}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={updatingIds.has(goal.id)}>
+                <button className="focus:outline-none disabled:opacity-50 disabled:cursor-wait">
+                  <Badge className={`text-[10px] font-medium cursor-pointer ${tc.color}`}>{tc.label}</Badge>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {Object.entries(trackingConfig).map(([key, cfg]) => (
+                  <DropdownMenuItem key={key} onClick={() => updateTrackingStatus(goal.id, key, goal.employee?.id ?? undefined)} className="text-xs">
+                    <div className={`h-2 w-2 rounded-full ${cfg.barColor} mr-2`} />{cfg.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        );
     }
   }
 
@@ -873,169 +1033,17 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                <TableHead className="min-w-[180px]">
-                  <button onClick={() => toggleSort("title")} className="flex items-center gap-1 text-xs font-medium">
-                    Goal <ArrowUpDown className="h-3 w-3" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[120px]">
-                  <button onClick={() => toggleSort("owner")} className="flex items-center gap-1 text-xs font-medium">
-                    Owner <ArrowUpDown className="h-3 w-3" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[100px]">Cycle</TableHead>
-                <TableHead className="w-[80px]">Status</TableHead>
-                <TableHead className="w-[60px]">
-                  <button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">
-                    Wt <ArrowUpDown className="h-3 w-3" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[160px]">Metric</TableHead>
-                <TableHead className="w-[140px]">
-                  <button onClick={() => toggleSort("progress")} className="flex items-center gap-1 text-xs font-medium">
-                    Progress <ArrowUpDown className="h-3 w-3" />
-                  </button>
-                </TableHead>
-                <TableHead className="w-[90px]">Health</TableHead>
+                {columnOrder.map(renderColumnHeader)}
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {flat.map((goal) => {
                 const tc = trackingConfig[goal.tracking_status] || trackingConfig.on_track;
-                const hasChildren = goal.children.length > 0;
-                const isExpanded = expanded.has(goal.id);
-                const indent = goal.depth * 24;
 
                 return (
                   <TableRow key={goal.id} className="group">
-                    {/* Goal title */}
-                    <TableCell>
-                      <div className="flex items-center gap-1.5" style={{ paddingLeft: indent }}>
-                        {hasChildren ? (
-                          <button
-                            onClick={() => toggleExpand(goal.id)}
-                            className="p-0.5 rounded hover:bg-muted transition-colors shrink-0"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="w-[18px] shrink-0" />
-                        )}
-                        <button
-                          onClick={() => openEditPanel(goal)}
-                          className="text-sm font-medium text-foreground truncate hover:underline text-left"
-                        >
-                          {goal.title}
-                        </button>
-                        {goal.status === "draft" && (
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">
-                            Draft
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* Owner */}
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground truncate">
-                        {goal.employee?.slack_name || "—"}
-                      </span>
-                    </TableCell>
-
-                    {/* Cycle */}
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground truncate">
-                        {goal.cycle?.name || "—"}
-                      </span>
-                    </TableCell>
-
-                    {/* Status (active/draft/completed/cancelled) */}
-                    <TableCell>
-                      <Badge className={`text-[10px] font-medium ${
-                        goal.status === "active"
-                          ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10"
-                          : goal.status === "completed"
-                          ? "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10"
-                          : "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10"
-                      }`}>
-                        {goal.status === "active" ? "Active" : goal.status === "completed" ? "Completed" : goal.status === "cancelled" ? "Cancelled" : "Draft"}
-                      </Badge>
-                    </TableCell>
-
-                    {/* Weight */}
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {goal.weight === 1 ? "1×" : `${goal.weight % 1 === 0 ? goal.weight.toFixed(0) : goal.weight.toFixed(1)}×`}
-                      </span>
-                    </TableCell>
-
-                    {/* Metric */}
-                    <TableCell>
-                      {goal.metric_target != null ? (
-                        <span className="text-sm text-muted-foreground tabular-nums">
-                          {goal.metric_start ?? 0}
-                          <span className="mx-1 text-muted-foreground/40">→</span>
-                          <span className="font-medium text-foreground">
-                            {goal.metric_current ?? goal.metric_start ?? 0}
-                          </span>
-                          <span className="mx-1 text-muted-foreground/40">→</span>
-                          {directionIcon(goal.goal_direction)} {goal.metric_target}
-                          {goal.metric_unit && (
-                            <span className="ml-1 text-xs text-muted-foreground/60">
-                              {goal.metric_unit}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-sm text-muted-foreground/40">—</span>
-                      )}
-                    </TableCell>
-
-                    {/* Progress */}
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${tc.barColor}`}
-                            style={{ width: `${Math.min(100, goal.progress)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium text-foreground w-8 text-right tabular-nums">
-                          {goal.progress}%
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    {/* Status (inline editable) */}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild disabled={updatingIds.has(goal.id)}>
-                          <button className="focus:outline-none disabled:opacity-50 disabled:cursor-wait">
-                            <Badge className={`text-[10px] font-medium cursor-pointer ${tc.color}`}>
-                              {tc.label}
-                            </Badge>
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {Object.entries(trackingConfig).map(([key, cfg]) => (
-                            <DropdownMenuItem
-                              key={key}
-                              onClick={() => updateTrackingStatus(goal.id, key, goal.employee?.id ?? undefined)}
-                              className="text-xs"
-                            >
-                              <div className={`h-2 w-2 rounded-full ${cfg.barColor} mr-2`} />
-                              {cfg.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-
+                    {columnOrder.map((col) => renderColumnCell(col, goal, tc))}
                     {/* Actions */}
                     <TableCell className="w-10 pr-4">
                       <DropdownMenu>
