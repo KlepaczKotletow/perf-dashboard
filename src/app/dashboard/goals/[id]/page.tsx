@@ -7,9 +7,12 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
   const workspace = await getUserWorkspace();
-  if (!workspace?.workspaceId) notFound();
+  if (!workspace?.workspaceId) {
+    console.error("[goal-detail] No workspace found, user may not be authenticated");
+    notFound();
+  }
 
-  const { data: goal } = await supabase
+  const { data: goal, error: goalError } = await supabase
     .from("goals")
     .select(`
       id, parent_id, title, description, status, progress,
@@ -20,9 +23,12 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
       parent:goals!goals_parent_id_fkey(id, title)
     `)
     .eq("id", id)
-    .eq("workspace_id", workspace?.workspaceId ?? "")
+    .eq("workspace_id", workspace.workspaceId)
     .single();
 
+  if (goalError) {
+    console.error("[goal-detail] Query error:", goalError.message, "| goal_id:", id, "| workspace_id:", workspace.workspaceId);
+  }
   if (!goal) notFound();
 
   // Fetch child goals
