@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import {
   Slack, Shield, BarChart3, MessageSquare, Users, Star,
   Check, Target, TrendingUp, Flag, ChevronRight,
-  Grid3X3, Bot, Bell, Zap, Send,
+  Grid3X3, Bot, Bell, Zap, Send, Clock, BookOpen, MousePointerClick,
 } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
@@ -20,169 +20,163 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
-      {/* ── Header ── */}
-      <header className="border-b border-border/60 backdrop-blur-md bg-white/80 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-white text-xs font-bold">P</span>
+      {/* ── Header + Hero (seamless) ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5]">
+
+        {/* Sticky nav */}
+        <header className="sticky top-0 z-50 backdrop-blur-md bg-[#fafaf5]/80">
+          <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-[34px] font-black tracking-tight text-foreground">Nami</span>
+            </Link>
+            <div className="hidden lg:flex items-center gap-6">
+              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
+              <a href="#goals" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
+              <a href="#analytics" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Analytics</a>
+              <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+              <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
+              <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
+                <a href={addToSlackUrl}>
+                  <Slack className="h-4 w-4 mr-1.5" />
+                  Add to Slack
+                </a>
+              </Button>
             </div>
-            <span className="font-semibold tracking-tight text-foreground">Nami</span>
-          </Link>
-          <div className="hidden lg:flex items-center gap-3">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#goals" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Goals</a>
-            <a href="#analytics" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Analytics</a>
-            <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href={signInWithSlackUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</a>
-            <Button size="sm" asChild>
-              <a href={addToSlackUrl}>
-                <Slack className="h-3.5 w-3.5 mr-1" />
-                Add to Slack
-              </a>
-            </Button>
+            <MobileNav signInUrl={signInWithSlackUrl} addToSlackUrl={addToSlackUrl} />
           </div>
-          <MobileNav signInUrl={signInWithSlackUrl} addToSlackUrl={addToSlackUrl} />
-        </div>
-      </header>
+        </header>
 
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5] px-6">
-        <div className="absolute top-[-80px] right-[-100px] w-[500px] h-[500px] bg-gradient-to-br from-primary/10 to-secondary/6 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-[-60px] left-[-80px] w-[350px] h-[350px] bg-gradient-to-tr from-secondary/8 to-primary/5 rounded-full blur-3xl pointer-events-none" />
+        {/* Hero — two-card Deel-style layout */}
+        <div className="max-w-6xl mx-auto px-4 pb-4">
+          <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[580px]">
 
-        <div className="max-w-5xl mx-auto relative">
-          <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-end">
+            {/* Left card — dark with copy */}
+            <div className="relative rounded-3xl bg-[#1a1a2e] overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col justify-between">
+              {/* Subtle gradient orb */}
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-            {/* Left: text */}
-            <div className="py-14 lg:py-18">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/[0.07] text-xs text-primary/80 mb-5">
-                <Bot className="h-3.5 w-3.5 text-primary" />
-                Meet Nami — your performance assistant in Slack
+              <div className="relative">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 mb-6">
+                  <Bot className="h-3.5 w-3.5 text-primary" />
+                  Meet Nami — your performance assistant in Slack
+                </div>
+
+                <h1 className="text-3xl sm:text-4xl lg:text-[48px] font-bold tracking-tight text-white leading-[1.1]">
+                  Performance reviews your team will{" "}
+                  <span className="text-primary">actually complete.</span>
+                </h1>
+
+                <p className="mt-5 text-base text-white/60 leading-relaxed max-w-[420px]">
+                  Nami lives in your team&apos;s Slack and handles everything — 360° reviews, goal tracking, surveys, and analytics. No new tools. No forms.
+                </p>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-[56px] font-bold tracking-tight text-foreground leading-[1.08]">
-                Performance reviews your team will{" "}
-                <span className="text-primary">actually complete</span>
-              </h1>
-
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-[440px]">
-                Nami lives in your team&apos;s Slack and handles everything — 360° reviews, goal tracking, surveys, and analytics. Your team just talks to Nami. No new tools. No forms.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-start gap-3 mt-10">
-                <Button size="lg" className="h-12 px-7 text-sm font-semibold" asChild>
-                  <a href={addToSlackUrl}>
-                    <Slack className="h-4 w-4 mr-2" />
-                    Add to Slack — free
-                  </a>
-                </Button>
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  className="h-12 px-7 text-sm text-foreground/65 hover:text-foreground hover:bg-foreground/[0.06] border border-foreground/15"
-                  asChild
-                >
-                  <a href={signInWithSlackUrl}>Sign in with Slack</a>
-                </Button>
+              <div className="relative mt-8">
+                <div className="flex flex-col sm:flex-row items-start gap-3">
+                  <Button size="lg" className="h-12 px-7 text-sm font-semibold rounded-full" asChild>
+                    <a href={addToSlackUrl}>
+                      <Slack className="h-4 w-4 mr-2" />
+                      Add to Slack — free
+                    </a>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    className="h-12 px-7 text-sm text-white/60 hover:text-white hover:bg-white/10 border border-white/15 rounded-full"
+                    asChild
+                  >
+                    <a href={signInWithSlackUrl}>Sign in with Slack</a>
+                  </Button>
+                </div>
+                <p className="mt-4 text-xs text-white/30 tracking-wide">
+                  Free for up to 10 people · No credit card · Installs in 60 seconds
+                </p>
               </div>
-
-              <p className="mt-8 text-xs text-muted-foreground/60 tracking-wide">
-                Free for up to 10 people · No credit card · Installs in 60 seconds
-              </p>
             </div>
 
-            {/* Right: Analytics dashboard mockup — desktop only */}
-            <div className="hidden lg:block relative pt-10">
-              <div className="absolute -inset-6 bg-primary/[0.10] blur-3xl rounded-full -z-10 pointer-events-none" />
-
-              <div className="rounded-t-2xl border border-border/60 border-b-0 overflow-hidden shadow-2xl shadow-primary/10">
+            {/* Right card — light with dashboard mockup */}
+            <div className="relative rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] overflow-hidden flex items-end justify-center">
+              {/* Dashboard mockup */}
+              <div className="w-[92%] mt-8 rounded-t-2xl border border-border/60 border-b-0 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
                 {/* Browser chrome */}
-                <div className="bg-muted/80 border-b border-border/60 px-4 py-3 flex items-center gap-3">
+                <div className="bg-muted/80 border-b border-border/60 px-4 py-2.5 flex items-center gap-3">
                   <div className="flex gap-1.5">
-                    <div className="h-3 w-3 rounded-full bg-foreground/20" />
-                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
-                    <div className="h-3 w-3 rounded-full bg-foreground/15" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/20" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
                   </div>
-                  <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
-                    app.perf.team/dashboard/analytics
+                  <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[10px] text-muted-foreground font-mono">
+                    app.nami.team/dashboard/analytics
                   </div>
                 </div>
 
-                <div className="bg-white">
-                  <div className="flex h-[340px] sm:h-[380px] overflow-hidden">
-                    {/* Sidebar */}
-                    <div className="hidden sm:flex w-44 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
-                      <div className="px-2 py-1.5 mb-1">
-                        <div className="flex items-center gap-2">
-                          <div className="h-5 w-5 rounded bg-primary flex items-center justify-center">
-                            <span className="text-white text-[9px] font-bold">P</span>
-                          </div>
-                          <span className="text-xs font-semibold text-foreground">Nami</span>
-                        </div>
+                <div className="flex h-[320px] sm:h-[380px] lg:h-[440px] overflow-hidden">
+                  {/* Sidebar */}
+                  <div className="hidden sm:flex w-40 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
+                    <div className="px-2 py-1.5 mb-1">
+                      <span className="text-xs font-bold text-foreground">Nami</span>
+                    </div>
+                    {[
+                      { label: "Overview", active: false },
+                      { label: "Cycles", active: false },
+                      { label: "Goals", active: false },
+                      { label: "Team", active: false },
+                      { label: "Analytics", active: true },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className={`px-2.5 py-1.5 rounded-md text-[12px] ${
+                          item.active
+                            ? "bg-primary/10 text-primary font-medium"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {item.label}
                       </div>
+                    ))}
+                  </div>
+
+                  {/* Analytics content */}
+                  <div className="flex-1 p-5 overflow-hidden">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm font-semibold text-foreground">Analytics</p>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-[10px] text-muted-foreground">
+                        Q1 2025
+                      </div>
+                    </div>
+
+                    {/* KPI tiles */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                       {[
-                        { label: "Overview", active: false },
-                        { label: "Cycles", active: false },
-                        { label: "Goals", active: false },
-                        { label: "Team", active: false },
-                        { label: "Analytics", active: true },
-                      ].map((item) => (
-                        <div
-                          key={item.label}
-                          className={`px-2.5 py-1.5 rounded-md text-[12px] ${
-                            item.active
-                              ? "bg-primary/10 text-primary font-medium"
-                              : "text-muted-foreground"
-                          }`}
-                        >
-                          {item.label}
+                        { label: "Overall Rating", value: "4.2/5", color: "text-yellow-500" },
+                        { label: "Completion", value: "91%", color: "text-emerald-600" },
+                        { label: "Participants", value: "47", color: "text-primary" },
+                        { label: "Active Cycles", value: "2", color: "text-orange-500" },
+                      ].map((tile) => (
+                        <div key={tile.label} className="bg-muted/30 rounded-xl p-2.5 border border-border/40">
+                          <p className="text-[10px] text-muted-foreground mb-1">{tile.label}</p>
+                          <p className={`text-base font-bold ${tile.color}`}>{tile.value}</p>
                         </div>
                       ))}
                     </div>
 
-                    {/* Analytics content */}
-                    <div className="flex-1 p-5 overflow-hidden">
-                      <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-semibold text-foreground">Analytics</p>
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-[10px] text-muted-foreground">
-                          Q1 2025
+                    {/* Competency bar chart */}
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Avg. by Competency</p>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Leadership", score: 4.3, pct: 86 },
+                        { name: "Execution", score: 3.9, pct: 78 },
+                        { name: "Collaboration", score: 4.4, pct: 88 },
+                        { name: "Communication", score: 3.7, pct: 74 },
+                      ].map((c) => (
+                        <div key={c.name} className="flex items-center gap-2">
+                          <p className="text-[10px] text-muted-foreground w-[90px] shrink-0 truncate">{c.name}</p>
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: `${c.pct}%` }} />
+                          </div>
+                          <span className="text-[10px] font-semibold text-foreground w-5 text-right tabular-nums">{c.score}</span>
                         </div>
-                      </div>
-
-                      {/* KPI tiles */}
-                      <div className="grid grid-cols-2 gap-2 mb-4">
-                        {[
-                          { label: "Overall Rating", value: "4.2/5", color: "text-yellow-500" },
-                          { label: "Completion", value: "91%", color: "text-emerald-600" },
-                          { label: "Participants", value: "47", color: "text-primary" },
-                          { label: "Active Cycles", value: "2", color: "text-orange-500" },
-                        ].map((tile) => (
-                          <div key={tile.label} className="bg-muted/30 rounded-xl p-2.5 border border-border/40">
-                            <p className="text-[10px] text-muted-foreground mb-1">{tile.label}</p>
-                            <p className={`text-base font-bold ${tile.color}`}>{tile.value}</p>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Competency bar chart */}
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Avg. by Competency</p>
-                      <div className="space-y-2">
-                        {[
-                          { name: "Leadership", score: 4.3, pct: 86 },
-                          { name: "Execution", score: 3.9, pct: 78 },
-                          { name: "Collaboration", score: 4.4, pct: 88 },
-                          { name: "Communication", score: 3.7, pct: 74 },
-                        ].map((c) => (
-                          <div key={c.name} className="flex items-center gap-2">
-                            <p className="text-[10px] text-muted-foreground w-[90px] shrink-0 truncate">{c.name}</p>
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full" style={{ width: `${c.pct}%` }} />
-                            </div>
-                            <span className="text-[10px] font-semibold text-foreground w-5 text-right tabular-nums">{c.score}</span>
-                          </div>
-                        ))}
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -217,16 +211,358 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Feature Spotlight 1: Reviews ── */}
-      <section id="features" className="bg-white py-20 lg:py-24">
+      {/* ── Feature Spotlight: Goals (moved up) ── */}
+      <section id="goals" className="bg-white py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
 
-            {/* Left: copy */}
+            {/* Left: Goals mockup — desktop only */}
+            <ScrollReveal scale>
+              <div className="relative lg:sticky lg:top-24">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
+                  {/* Header */}
+                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Goals</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Q1 2025 · 4 active goals</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
+                      3 on track
+                    </div>
+                  </div>
+
+                  {/* Goal rows */}
+                  <div className="divide-y divide-border/50">
+                    {[
+                      {
+                        title: "Achieve 90%+ review completion org-wide",
+                        progress: 100,
+                        statusLabel: "Achieved",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Launch competency framework for all IC levels",
+                        progress: 75,
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                      {
+                        title: "Reduce time-to-hire for Engineering by 20%",
+                        progress: 38,
+                        statusLabel: "At Risk",
+                        statusColor: "text-amber-700 bg-amber-50",
+                        ringColor: "#f59e0b",
+                      },
+                      {
+                        title: "Complete 360 reviews for all senior ICs",
+                        progress: 88,
+                        statusLabel: "On Track",
+                        statusColor: "text-emerald-700 bg-emerald-50",
+                        ringColor: "#10b981",
+                      },
+                    ].map((goal) => {
+                      const circumference = 2 * Math.PI * 14;
+                      const dash = (goal.progress / 100) * circumference;
+                      return (
+                        <div key={goal.title} className="px-5 py-4 flex items-center gap-4">
+                          {/* SVG ring indicator */}
+                          <div className="relative h-11 w-11 shrink-0">
+                            <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke="currentColor"
+                                className="text-muted/50"
+                                strokeWidth="3.5"
+                              />
+                              <circle
+                                cx="18" cy="18" r="14"
+                                fill="none"
+                                stroke={goal.ringColor}
+                                strokeWidth="3.5"
+                                strokeDasharray={`${dash} ${circumference}`}
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
+                              {goal.progress}%
+                            </span>
+                          </div>
+                          {/* Text */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">{goal.title}</p>
+                            <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${goal.statusColor}`}>
+                              {goal.statusLabel}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-5 py-3 border-t border-border/60 bg-muted/20 flex items-center justify-between">
+                    <p className="text-[11px] text-muted-foreground">Goal progress syncs with review data</p>
+                    <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
+                      View all <ChevronRight className="h-3 w-3" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slack notification mockup */}
+                <div className="mt-6 rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-primary/10 bg-white">
+                  <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
+                    <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[7px] font-bold">N</span>
+                    </div>
+                    <span className="text-white text-xs font-semibold">Nami</span>
+                    <span className="text-white/40 text-[10px]">DM</span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex gap-2.5">
+                      <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-[9px] font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 mb-1">
+                          <span className="text-[12px] font-bold text-foreground">Nami</span>
+                          <span className="text-[10px] text-muted-foreground">2:14 PM</span>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg rounded-tl-sm p-3">
+                          <p className="text-[11px] font-semibold text-amber-800 flex items-center gap-1.5">
+                            <Flag className="h-3 w-3" />
+                            Goal status changed to At Risk
+                          </p>
+                          <p className="text-[11px] text-amber-700 mt-1.5 leading-relaxed">
+                            <span className="font-medium">Sarah Chen</span>&apos;s goal &ldquo;Reduce time-to-hire for Engineering by 20%&rdquo; moved from <span className="font-medium">On Track</span> to <span className="font-medium">At Risk</span>. Progress: 38%.
+                          </p>
+                          <p className="text-[10px] text-amber-600 mt-2 italic">
+                            Consider checking in during your next 1:1.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Goal achieved message */}
+                    <div className="flex gap-2.5">
+                      <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-[9px] font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-1.5 mb-1">
+                          <span className="text-[12px] font-bold text-foreground">Nami</span>
+                          <span className="text-[10px] text-muted-foreground">4:02 PM</span>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg rounded-tl-sm p-3">
+                          <p className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5">
+                            <Check className="h-3 w-3" />
+                            Goal achieved
+                          </p>
+                          <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed">
+                            Your team hit &ldquo;Achieve 90%+ review completion org-wide&rdquo; — current completion is <span className="font-medium">96%</span>. Nice work!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: copy */}
             <ScrollReveal>
               <div>
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
-                  360° Reviews
+                  Goals & OKRs
+                </span>
+                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                  Set a goal in 30 seconds. Track it forever.
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                  Most goal tools are glorified spreadsheets. Nami makes goals effortless — create one in seconds from a template, and it stays connected to reviews, analytics, and your team&apos;s Slack.
+                </p>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Zap,
+                      title: "One-click goal templates",
+                      body: "Pick from pre-built templates — Improve a Metric, Complete a Project, Team Development — and the goal form is pre-filled. Edit the brackets, hit save. Done in 30 seconds.",
+                    },
+                    {
+                      icon: Flag,
+                      title: "Individual and team goals with live tracking",
+                      body: "Every goal has an owner, due date, and status: On Track, At Risk, Delayed, or Achieved. Metrics update in real time — no manual check-ins needed.",
+                    },
+                    {
+                      icon: Send,
+                      title: "Status changes notify managers on Slack",
+                      body: "When a goal moves to At Risk or Delayed, the employee\u2019s manager gets a Slack DM instantly. No surprises at review time — issues surface the moment they happen.",
+                    },
+                    {
+                      icon: Users,
+                      title: "Full context in every 1:1",
+                      body: "Open any team member\u2019s profile and their goal progress is right there. Managers walk into every 1:1 knowing exactly where things stand — no \u2018what were you working on?\u2019",
+                    },
+                    {
+                      icon: TrendingUp,
+                      title: "Goals roll up into org-wide Analytics",
+                      body: "See what percentage of the org is on track at any moment. Spot which teams are slipping and which are flying — before it shows up in quarterly results.",
+                    },
+                    {
+                      icon: BarChart3,
+                      title: "Goal data feeds directly into reviews",
+                      body: "When a review cycle opens, historical goal progress is already in the competency framework. Ratings reflect real outcomes — not recency bias or guesswork.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ── Template Library ── */}
+      <section id="templates" className="bg-[#f8f6f0] border-y border-border/40 py-20 lg:py-24">
+        <div className="max-w-5xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-6">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              Template Library
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              Don&apos;t build frameworks from scratch — use ours
+            </h2>
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
+              Pre-built by HR researchers. Import in one click. Customise to fit your org.
+            </p>
+          </ScrollReveal>
+
+          {/* Value pills */}
+          <ScrollReveal className="flex flex-wrap justify-center gap-3 mb-12">
+            {[
+              { icon: Clock, text: "Saves weeks of setup" },
+              { icon: BookOpen, text: "Research-backed frameworks" },
+              { icon: MousePointerClick, text: "One-click import" },
+            ].map((pill) => (
+              <span key={pill.text} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground shadow-sm">
+                <pill.icon className="h-3.5 w-3.5 text-primary" />
+                {pill.text}
+              </span>
+            ))}
+          </ScrollReveal>
+
+          <ScrollReveal>
+            <p className="text-center text-sm text-muted-foreground mb-4">
+              8 frameworks included — Software Engineering, Data &amp; Analytics, Product Management, Design, and more
+            </p>
+          </ScrollReveal>
+
+          {/* Matrix preview — Software Engineering */}
+          <ScrollReveal>
+            <div className="rounded-2xl border border-border/60 bg-white shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-[15px] text-foreground">Software Engineering</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Career framework covering coding, architecture, and leadership skills across five seniority levels.</p>
+                </div>
+                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-primary/[0.08] text-primary">
+                  System Template
+                </span>
+              </div>
+
+              {/* Matrix */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/30">
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-muted-foreground w-[260px]">Competency</th>
+                      {["Junior", "Mid", "Senior", "Staff", "Principal"].map((level) => (
+                        <th key={level} className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground">{level}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: "Coding & Quality", desc: "Writing clean, maintainable, well-tested code", scores: [2, 3, 4, 5, 5] },
+                      { name: "System Design", desc: "Designing scalable, reliable systems and APIs", scores: [2, 2, 3, 4, 5] },
+                      { name: "Debugging & Problem Solving", desc: "Diagnosing and resolving complex technical issues", scores: [2, 3, 4, 5, 5] },
+                      { name: "Delivery & Execution", desc: "Shipping quality work on time", scores: [2, 3, 4, 5, 4] },
+                      { name: "Communication", desc: "Collaborating effectively across teams", scores: [2, 3, 3, 4, 4] },
+                      { name: "Mentorship & Leadership", desc: "Growing others through guidance and teaching", scores: [2, 2, 3, 4, 5] },
+                    ].map((comp) => (
+                      <tr key={comp.name} className="border-b border-border/20 last:border-0">
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-foreground text-[13px]">{comp.name}</p>
+                          <p className="text-[11px] text-muted-foreground">{comp.desc}</p>
+                        </td>
+                        {comp.scores.map((score, i) => {
+                          const colors: Record<number, string> = {
+                            2: "bg-orange-100 text-orange-700 border-orange-200",
+                            3: "bg-yellow-100 text-yellow-700 border-yellow-200",
+                            4: "bg-green-100 text-green-700 border-green-200",
+                            5: "bg-emerald-100 text-emerald-700 border-emerald-200",
+                          };
+                          return (
+                            <td key={i} className="text-center px-3 py-3">
+                              <span className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold border ${colors[score] || ""}`}>
+                                {score}
+                              </span>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Score descriptor example */}
+              <div className="px-5 py-4 bg-[#faf9f6] border-t border-border/30">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Score Descriptors</p>
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold border bg-green-100 text-green-700 border-green-200 mt-0.5 shrink-0">4</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <span className="font-medium text-foreground">Coding &amp; Quality:</span> Champions code quality across the team by establishing review standards, introducing static analysis tooling, and refactoring legacy code. Writes code that others use as a reference.
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-200 mt-0.5 shrink-0">5</span>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      <span className="font-medium text-foreground">Coding &amp; Quality:</span> Sets org-wide coding standards and quality benchmarks adopted across multiple teams. Designs testing strategies and CI/CD quality gates that measurably reduce production incidents.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ── Feature Spotlight: Reviews ── */}
+      <section id="features" className="bg-white py-20 lg:py-24">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
+
+            {/* Left: copy */}
+            <ScrollReveal>
+              <div className="lg:sticky lg:top-24">
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Performance Reviews &amp; 360
                 </span>
                 <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
                   Reviews that actually get completed — because they live in Slack
@@ -256,6 +592,21 @@ export default function Home() {
                       icon: Shield,
                       title: "Grade-gated results",
                       body: "Employees only see their results after HR releases grades. You control the timing — not Slack, not the reviewer.",
+                    },
+                    {
+                      icon: Grid3X3,
+                      title: "Full modal reviews — no browser needed",
+                      body: "Reviewers can complete the entire review in a Slack modal: competency ratings, expected scores, and open-ended comments. Never leaves Slack.",
+                    },
+                    {
+                      icon: Bell,
+                      title: "Smart reminders that actually work",
+                      body: "Nami sends automated deadline reminders via DM. Managers see who\u2019s outstanding in real time. No more spreadsheet tracking or manual follow-ups.",
+                    },
+                    {
+                      icon: Target,
+                      title: "Score descriptors for every competency",
+                      body: "Each rating shows what that score means for that specific competency and level. Reviewers give accurate, calibrated scores — not guesswork.",
                     },
                   ].map((item) => (
                     <li key={item.title} className="flex gap-4">
@@ -374,173 +725,51 @@ export default function Home() {
                 <p className="text-center mt-5 text-sm text-muted-foreground/70">
                   Nami shows what each score means for that exact competency — no guesswork, no tab-switching.
                 </p>
-              </div>
-            </ScrollReveal>
 
-          </div>
-        </div>
-      </section>
-
-      {/* ── Feature Spotlight 2: Goals ── */}
-      <section id="goals" className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
-
-            {/* Left: Goals mockup — desktop only */}
-            <ScrollReveal scale>
-              <div className="relative">
-                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
-                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
-                  {/* Header */}
-                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Goals</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">Q1 2025 · 4 active goals</p>
+                {/* Slack Modal mockup */}
+                <div className="mt-6 rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  {/* Modal header */}
+                  <div className="bg-white px-5 py-3 border-b border-border/60 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] text-muted-foreground cursor-pointer hover:text-foreground">Cancel</span>
                     </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
-                      3 on track
-                    </div>
+                    <h3 className="text-sm font-bold text-foreground">Manager Review</h3>
+                    <button className="px-3 py-1 rounded-md bg-primary text-white text-[12px] font-semibold">
+                      Submit
+                    </button>
                   </div>
 
-                  {/* Goal rows */}
-                  <div className="divide-y divide-border/50">
+                  <div className="p-5 space-y-4 max-h-[320px] overflow-hidden relative">
+                    {/* Header info */}
+                    <div className="text-[13px] text-foreground space-y-0.5">
+                      <p className="font-bold">Manager Review for Alex Kim</p>
+                      <p className="text-muted-foreground text-[11px]">Level: Software Engineer — Senior (L4)</p>
+                      <p className="text-muted-foreground text-[11px]">6 competencies to rate. 1 open-ended question.</p>
+                    </div>
+                    <div className="h-px bg-border/60" />
+
+                    {/* Competency dropdowns */}
                     {[
-                      {
-                        title: "Achieve 90%+ review completion org-wide",
-                        progress: 100,
-                        statusLabel: "Achieved",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                      {
-                        title: "Launch competency framework for all IC levels",
-                        progress: 75,
-                        statusLabel: "On Track",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                      {
-                        title: "Reduce time-to-hire for Engineering by 20%",
-                        progress: 38,
-                        statusLabel: "At Risk",
-                        statusColor: "text-amber-700 bg-amber-50",
-                        ringColor: "#f59e0b",
-                      },
-                      {
-                        title: "Complete 360 reviews for all senior ICs",
-                        progress: 88,
-                        statusLabel: "On Track",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                    ].map((goal) => {
-                      const circumference = 2 * Math.PI * 14;
-                      const dash = (goal.progress / 100) * circumference;
-                      return (
-                        <div key={goal.title} className="px-5 py-4 flex items-center gap-4">
-                          {/* SVG ring indicator */}
-                          <div className="relative h-11 w-11 shrink-0">
-                            <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
-                              <circle
-                                cx="18" cy="18" r="14"
-                                fill="none"
-                                stroke="currentColor"
-                                className="text-muted/50"
-                                strokeWidth="3.5"
-                              />
-                              <circle
-                                cx="18" cy="18" r="14"
-                                fill="none"
-                                stroke={goal.ringColor}
-                                strokeWidth="3.5"
-                                strokeDasharray={`${dash} ${circumference}`}
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
-                              {goal.progress}%
-                            </span>
-                          </div>
-                          {/* Text */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">{goal.title}</p>
-                            <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${goal.statusColor}`}>
-                              {goal.statusLabel}
-                            </div>
-                          </div>
+                      { label: "Coding & Quality (Technical) - expected: 4/5", selected: "4 - Exceeds expectations" },
+                      { label: "System Design (Technical) - expected: 3/5", selected: "4 - Exceeds expectations" },
+                      { label: "Debugging & Problem Solving (Technical) - expected: 4/5", selected: null },
+                    ].map((field) => (
+                      <div key={field.label} className="space-y-1">
+                        <label className="text-[12px] font-semibold text-foreground">{field.label}</label>
+                        <div className={`px-3 py-2 rounded-md border text-[12px] flex items-center justify-between ${field.selected ? 'border-border bg-white text-foreground' : 'border-border/60 bg-muted/30 text-muted-foreground'}`}>
+                          <span>{field.selected || "Select rating"}</span>
+                          <ChevronRight className="h-3 w-3 rotate-90 text-muted-foreground" />
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    ))}
 
-                  {/* Footer */}
-                  <div className="px-5 py-3 border-t border-border/60 bg-muted/20 flex items-center justify-between">
-                    <p className="text-[11px] text-muted-foreground">Goal progress syncs with review data</p>
-                    <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
-                      View all <ChevronRight className="h-3 w-3" />
-                    </div>
+                    {/* Fade overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                   </div>
                 </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Right: copy */}
-            <ScrollReveal>
-              <div>
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
-                  Goals & OKRs
-                </span>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
-                  Set a goal in 30 seconds. Track it forever.
-                </h2>
-                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  Most goal tools are glorified spreadsheets. Nami makes goals effortless — create one in seconds from a template, and it stays connected to reviews, analytics, and your team&apos;s Slack.
+                <p className="text-center mt-4 text-sm text-muted-foreground/70">
+                  Full reviews open as a Slack modal — no browser needed. Competencies, ratings, and comments in one form.
                 </p>
-
-                <ul className="mt-8 space-y-5">
-                  {[
-                    {
-                      icon: Zap,
-                      title: "One-click goal templates",
-                      body: "Pick from pre-built templates — Improve a Metric, Complete a Project, Team Development — and the goal form is pre-filled. Edit the brackets, hit save. Done in 30 seconds.",
-                    },
-                    {
-                      icon: Flag,
-                      title: "Individual and team goals with live tracking",
-                      body: "Every goal has an owner, due date, and status: On Track, At Risk, Delayed, or Achieved. Metrics update in real time — no manual check-ins needed.",
-                    },
-                    {
-                      icon: Send,
-                      title: "Status changes notify managers on Slack",
-                      body: "When a goal moves to At Risk or Delayed, the employee\u2019s manager gets a Slack DM instantly. No surprises at review time — issues surface the moment they happen.",
-                    },
-                    {
-                      icon: Users,
-                      title: "Full context in every 1:1",
-                      body: "Open any team member\u2019s profile and their goal progress is right there. Managers walk into every 1:1 knowing exactly where things stand — no \u2018what were you working on?\u2019",
-                    },
-                    {
-                      icon: TrendingUp,
-                      title: "Goals roll up into org-wide Analytics",
-                      body: "See what percentage of the org is on track at any moment. Spot which teams are slipping and which are flying — before it shows up in quarterly results.",
-                    },
-                    {
-                      icon: BarChart3,
-                      title: "Goal data feeds directly into reviews",
-                      body: "When a review cycle opens, historical goal progress is already in the competency framework. Ratings reflect real outcomes — not recency bias or guesswork.",
-                    },
-                  ].map((item) => (
-                    <li key={item.title} className="flex gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
-                        <item.icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </ScrollReveal>
 
@@ -549,7 +778,7 @@ export default function Home() {
       </section>
 
       {/* ── Feature Spotlight 3: Analytics ── */}
-      <section id="analytics" className="bg-white py-20 lg:py-24">
+      <section id="analytics" className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
 
@@ -961,49 +1190,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Built-in features strip ── */}
-      <section className="bg-[#f8f6f0] border-y border-border/40 py-14">
-        <div className="max-w-5xl mx-auto px-6">
-          <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-8">
-            Everything you need, built in
-          </p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { icon: Slack, title: "Slack Auto-Sync", desc: "Team members, photos, and emails imported automatically from your workspace" },
-              { icon: Grid3X3, title: "Pre-built Templates", desc: "Review, competency, goal, and cycle templates — ready to use or customise" },
-              { icon: Target, title: "Competency Frameworks", desc: "Engineering, Product, Management, and General frameworks with level expectations" },
-              { icon: BarChart3, title: "Real-time Analytics", desc: "Heatmaps, rankings, trend analysis, and department breakdowns — no exports needed" },
-            ].map((f) => (
-              <div key={f.title} className="rounded-xl border border-border/60 bg-white p-4 space-y-2">
-                <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center">
-                  <f.icon className="h-4.5 w-4.5 text-primary" />
-                </div>
-                <p className="text-sm font-semibold text-foreground">{f.title}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Stats strip ── */}
-      <section className="bg-gradient-to-r from-primary via-[#4338ca] to-[#3730a3] py-20">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="grid sm:grid-cols-3 gap-10 text-center">
-            {[
-              { metric: "95%+", label: "Average review completion — up from ~40% with traditional tools" },
-              { metric: "< 2 min", label: "Average time Nami takes to complete a review via Slack" },
-              { metric: "$1/user", label: "Everything included. No tiers. No add-ons. No upsells." },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="text-4xl font-black text-white">{stat.metric}</p>
-                <p className="mt-2 text-sm text-white/75 max-w-[200px] mx-auto">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Pricing ── */}
       <section id="pricing" className="bg-background border-t border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-24">
@@ -1101,10 +1287,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-              <div className="h-6 w-6 rounded-md bg-primary flex items-center justify-center">
-                <span className="text-white text-[10px] font-bold">P</span>
-              </div>
-              <span className="font-semibold text-foreground">Nami</span>
+              <span className="text-lg font-bold text-foreground">Nami</span>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex gap-6 text-sm">

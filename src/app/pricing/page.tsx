@@ -119,10 +119,7 @@ export default function PricingPage() {
       <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground text-xs font-bold">P</span>
-            </div>
-            <span className="font-semibold tracking-tight">Perf</span>
+            <span className="text-2xl font-black tracking-tight">Nami</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link
@@ -306,10 +303,8 @@ export default function PricingPage() {
         <div className="max-w-5xl mx-auto px-6 py-6">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="h-5 w-5 rounded bg-primary/10 flex items-center justify-center">
-                <span className="text-primary text-[10px] font-bold">P</span>
-              </div>
-              <span>&copy; {new Date().getFullYear()} Perf</span>
+              <span className="text-lg font-bold text-foreground">Nami</span>
+              <span>&copy; {new Date().getFullYear()}</span>
             </div>
             <div className="flex gap-6 text-sm">
               <Link
