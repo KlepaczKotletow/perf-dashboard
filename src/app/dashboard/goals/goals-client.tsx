@@ -64,6 +64,8 @@ import {
   Loader2,
   Download,
   Trash2,
+  Save,
+  Edit2,
 } from "lucide-react";
 import { isHROrAbove } from "@/lib/roles";
 import { getClientIdentity } from "@/lib/client-auth";
@@ -265,6 +267,27 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
   const [quickTitle, setQuickTitle] = useState("");
   const [quickEmployeeId, setQuickEmployeeId] = useState("");
   const [quickAdding, setQuickAdding] = useState(false);
+
+  // Edit panel
+  const [showEditPanel, setShowEditPanel] = useState(false);
+  const [editGoal, setEditGoal] = useState<NormalizedGoalRow | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    goal_direction: "increase",
+    metric_target: "" as string,
+    metric_unit: "",
+    metric_start: "" as string,
+    metric_current: "" as string,
+    cycle_id: "" as string,
+    due_date: "" as string,
+    scope: "individual",
+    parent_id: "" as string,
+    weight: "1",
+    status: "active",
+    tracking_status: "on_track",
+  });
+  const [editLoading, setEditLoading] = useState(false);
 
   async function handleQuickAdd() {
     if (!quickTitle.trim() || !quickEmployeeId) return;
@@ -567,6 +590,58 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     router.refresh();
   }
 
+  function openEditPanel(goal: NormalizedGoalRow) {
+    setEditGoal(goal);
+    setEditForm({
+      title: goal.title,
+      description: goal.description || "",
+      goal_direction: goal.goal_direction || "increase",
+      metric_target: goal.metric_target != null ? String(goal.metric_target) : "",
+      metric_unit: goal.metric_unit || "",
+      metric_start: goal.metric_start != null ? String(goal.metric_start) : "",
+      metric_current: goal.metric_current != null ? String(goal.metric_current) : "",
+      cycle_id: goal.cycle?.id || "",
+      due_date: goal.due_date || "",
+      scope: goal.scope || "individual",
+      parent_id: goal.parent_id || "",
+      weight: String(goal.weight ?? 1),
+      status: goal.status || "active",
+      tracking_status: goal.tracking_status || "on_track",
+    });
+    setShowEditPanel(true);
+  }
+
+  async function handleEdit() {
+    if (!editGoal || !editForm.title) return;
+    setEditLoading(true);
+    try {
+      const { error } = await supabase.from("goals").update({
+        title: editForm.title,
+        description: editForm.description || null,
+        goal_direction: editForm.goal_direction,
+        metric_target: editForm.metric_target ? Number(editForm.metric_target) : null,
+        metric_unit: editForm.metric_unit || null,
+        metric_start: editForm.metric_start ? Number(editForm.metric_start) : null,
+        metric_current: editForm.metric_current ? Number(editForm.metric_current) : null,
+        cycle_id: editForm.cycle_id || null,
+        due_date: editForm.due_date || null,
+        scope: editForm.scope,
+        parent_id: editForm.parent_id || null,
+        weight: Math.min(1, Math.max(0, Number(editForm.weight) || 1)),
+        status: editForm.status,
+        tracking_status: editForm.tracking_status,
+      }).eq("id", editGoal.id).eq("workspace_id", workspaceId);
+      if (error) throw error;
+      setShowEditPanel(false);
+      setEditGoal(null);
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to update goal:", err);
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
   // ─── Render ─────────────────────────────────────────
 
   return (
@@ -805,6 +880,8 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                     Owner <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </TableHead>
+                <TableHead>Cycle</TableHead>
+                <TableHead className="w-[90px]">Status</TableHead>
                 <TableHead className="w-[70px]">
                   <button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">
                     Weight <ArrowUpDown className="h-3 w-3" />
@@ -846,12 +923,12 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                         ) : (
                           <span className="w-[18px] shrink-0" />
                         )}
-                        <Link
-                          href={`/dashboard/goals/${goal.id}`}
-                          className="text-sm font-medium text-foreground truncate hover:underline"
+                        <button
+                          onClick={() => openEditPanel(goal)}
+                          className="text-sm font-medium text-foreground truncate hover:underline text-left"
                         >
                           {goal.title}
-                        </Link>
+                        </button>
                         {goal.status === "draft" && (
                           <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">
                             Draft
@@ -865,6 +942,26 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                       <span className="text-sm text-muted-foreground truncate">
                         {goal.employee?.slack_name || "—"}
                       </span>
+                    </TableCell>
+
+                    {/* Cycle */}
+                    <TableCell>
+                      <span className="text-sm text-muted-foreground truncate">
+                        {goal.cycle?.name || "—"}
+                      </span>
+                    </TableCell>
+
+                    {/* Status (active/draft/completed/cancelled) */}
+                    <TableCell>
+                      <Badge className={`text-[10px] font-medium ${
+                        goal.status === "active"
+                          ? "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10"
+                          : goal.status === "completed"
+                          ? "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10"
+                          : "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10"
+                      }`}>
+                        {goal.status === "active" ? "Active" : goal.status === "completed" ? "Completed" : goal.status === "cancelled" ? "Cancelled" : "Draft"}
+                      </Badge>
                     </TableCell>
 
                     {/* Weight */}
@@ -945,6 +1042,9 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditPanel(goal)}>
+                            <Edit2 className="h-3.5 w-3.5 mr-2" /> Edit
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicate(goal)}>
                             <Copy className="h-3.5 w-3.5 mr-2" /> Duplicate
                           </DropdownMenuItem>
@@ -1068,6 +1168,111 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
             <Button onClick={handleCreate} disabled={createLoading || !newGoal.title || !newGoal.employee_id} className="w-full">
               {createLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
               Create Goal
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showEditPanel} onOpenChange={setShowEditPanel}>
+        <SheetContent className="sm:max-w-md overflow-y-auto px-6">
+          <SheetHeader className="pb-4">
+            <SheetTitle>Edit Goal</SheetTitle>
+            <SheetDescription>Update this KPI target.</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <Label>Goal title *</Label>
+              <Input value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>KPI Target</Label>
+              <div className="flex gap-2">
+                <Select value={editForm.goal_direction} onValueChange={(v) => setEditForm({ ...editForm, goal_direction: v })}>
+                  <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="increase">&#8593; Increase to</SelectItem>
+                    <SelectItem value="decrease">&#8595; Decrease to</SelectItem>
+                    <SelectItem value="above">&#8805; Stay above</SelectItem>
+                    <SelectItem value="below">&#8804; Stay below</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input type="number" placeholder="Target" value={editForm.metric_target} onChange={(e) => setEditForm({ ...editForm, metric_target: e.target.value })} className="w-24" />
+                <Input placeholder="Unit" value={editForm.metric_unit} onChange={(e) => setEditForm({ ...editForm, metric_unit: e.target.value })} className="w-20" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Current value</Label>
+              <Input type="number" placeholder="Current" value={editForm.metric_current} onChange={(e) => setEditForm({ ...editForm, metric_current: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Baseline value</Label>
+              <Input type="number" placeholder="Starting value" value={editForm.metric_start} onChange={(e) => setEditForm({ ...editForm, metric_start: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Performance Cycle</Label>
+              <Select value={editForm.cycle_id} onValueChange={(v) => setEditForm({ ...editForm, cycle_id: v })}>
+                <SelectTrigger><SelectValue placeholder="None (standalone)" /></SelectTrigger>
+                <SelectContent>
+                  {cycles.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={editForm.due_date} onChange={(e) => setEditForm({ ...editForm, due_date: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Scope</Label>
+              <Select value={editForm.scope} onValueChange={(v) => setEditForm({ ...editForm, scope: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="team">Team</SelectItem>
+                  <SelectItem value="company">Company</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Tracking Status</Label>
+              <Select value={editForm.tracking_status} onValueChange={(v) => setEditForm({ ...editForm, tracking_status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="on_track">On Track</SelectItem>
+                  <SelectItem value="at_risk">At Risk</SelectItem>
+                  <SelectItem value="delayed">Delayed</SelectItem>
+                  <SelectItem value="achieved">Achieved</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea placeholder="What does success look like?" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} rows={3} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Weight</Label>
+              <Input type="number" step="0.1" min="0" max="1" value={editForm.weight} onChange={(e) => {
+                const val = Math.min(1, Math.max(0, Number(e.target.value) || 0));
+                setEditForm({ ...editForm, weight: String(val) });
+              }} className="w-24" />
+              <p className="text-[11px] text-muted-foreground">0 to 1.0 — relative importance</p>
+            </div>
+          </div>
+          <SheetFooter className="pt-6">
+            <Button onClick={handleEdit} disabled={editLoading || !editForm.title} className="w-full">
+              {editLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Changes
             </Button>
           </SheetFooter>
         </SheetContent>
