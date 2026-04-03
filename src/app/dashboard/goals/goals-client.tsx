@@ -471,7 +471,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
         scope: newGoal.scope,
         parent_id: newGoal.parent_id || null,
         description: newGoal.description || null,
-        weight: Number(newGoal.weight) || 1,
+        weight: Math.min(1, Math.max(0, Number(newGoal.weight) || 1)),
         status: "active",
         progress: 0,
       });
@@ -969,12 +969,12 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
         </div>
       )}
       <Sheet open={showCreatePanel} onOpenChange={setShowCreatePanel}>
-        <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader>
+        <SheetContent className="sm:max-w-md overflow-y-auto px-6">
+          <SheetHeader className="pb-4">
             <SheetTitle>Create Goal</SheetTitle>
             <SheetDescription>Set a KPI target for your team or individual.</SheetDescription>
           </SheetHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5">
             <div className="space-y-1.5">
               <Label>Goal title *</Label>
               <Input placeholder="e.g. Increase quarterly revenue" value={newGoal.title} onChange={(e) => setNewGoal({ ...newGoal, title: e.target.value })} />
@@ -1055,12 +1055,16 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                 </div>
                 <div className="space-y-1.5">
                   <Label>Weight</Label>
-                  <Input type="number" step="0.1" min="0" value={newGoal.weight} onChange={(e) => setNewGoal({ ...newGoal, weight: e.target.value })} className="w-24" />
+                  <Input type="number" step="0.1" min="0" max="1" value={newGoal.weight} onChange={(e) => {
+                    const val = Math.min(1, Math.max(0, Number(e.target.value) || 0));
+                    setNewGoal({ ...newGoal, weight: String(val) });
+                  }} className="w-24" />
+                  <p className="text-[11px] text-muted-foreground">0 to 1.0 — relative importance</p>
                 </div>
               </div>
             )}
           </div>
-          <SheetFooter>
+          <SheetFooter className="pt-6">
             <Button onClick={handleCreate} disabled={createLoading || !newGoal.title || !newGoal.employee_id} className="w-full">
               {createLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
               Create Goal
