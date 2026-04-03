@@ -48,6 +48,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
   const [notificationError, setNotificationError] = useState(false);
   const [notificationSent, setNotificationSent] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notifyOnRelease, setNotifyOnRelease] = useState(true);
 
   const isHR = userRole === "hr" || userRole === "admin";
 
@@ -279,11 +280,22 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
     try {
       const { error } = await supabase
         .from("performance_cycles")
-        .update({ grades_released: true, updated_at: new Date().toISOString() })
+        .update({ grades_released: true, status: "completed", updated_at: new Date().toISOString() })
         .eq("id", cycle.id)
         .eq("workspace_id", cycle.workspace_id);
 
       if (error) throw error;
+
+      if (notifyOnRelease) {
+        try {
+          await supabase.functions.invoke("nami-bot", {
+            body: { action: "release_grades", cycle_id: cycle.id },
+          });
+        } catch (notifErr) {
+          console.error("Grade release notification failed:", notifErr);
+        }
+      }
+
       router.refresh();
     } catch (err) {
       console.error("Error releasing grades:", err);
@@ -359,7 +371,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
               Close Cycle
             </DropdownMenuItem>
           )}
-          {isHR && !cycle.grades_released && (cycle.status === "active" || cycle.status === "completed") && (
+          {isHR && !cycle.grades_released && (cycle.status === "active" || cycle.status === "completed" || cycle.status === "closed") && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setShowReleaseDialog(true)} disabled={loading}>
@@ -474,17 +486,44 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Release Grades to Employees?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will make all ratings and final grades visible to employees in &quot;{cycle.name}&quot;.
-              Employees will be able to see their performance ratings and calibrated grades.
-              This action cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  This will make all ratings and final grades visible to employees in &quot;{cycle.name}&quot;.
+                </p>
+                {(submittedCount !== undefined || pendingManagerCount !== undefined) && (
+                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                    <p className="font-medium text-foreground">Summary</p>
+                    <p className="text-muted-foreground mt-1">
+                      {employeeCount} participant{employeeCount !== 1 ? "s" : ""}
+                      {submittedCount !== undefined && ` · ${submittedCount} completed`}
+                      {pendingManagerCount !== undefined && pendingManagerCount > 0 && (
+                        <span className="text-amber-600 dark:text-amber-400"> · {pendingManagerCount} missing</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifyOnRelease}
+                    onChange={(e) => setNotifyOnRelease(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm text-foreground">Notify employees via Slack</span>
+                </label>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={releaseGrades}>
-              <Medal className="h-4 w-4 mr-2" />
-              Release Grades
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={releaseGrades} disabled={loading}>
+              {loading ? "Releasing…" : (
+                <>
+                  <Medal className="h-4 w-4 mr-2" />
+                  Release Grades
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

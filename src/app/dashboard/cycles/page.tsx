@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Plus, CalendarClock, Lock, Users, ChevronRight } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { isManagerOrAbove } from "@/lib/roles";
-import { getCycleStatus } from "@/lib/status";
+import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
+import { MissingReviewsPopover } from "./missing-reviews-popover";
 
 async function getPerformanceCycles(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -15,12 +16,18 @@ async function getPerformanceCycles(workspaceId: string) {
       *,
       creator:users!performance_cycles_created_by_fkey(slack_name),
       employees:performance_cycle_employees(count),
-      assignments:review_assignments(status, assignment_type)
+      assignments:review_assignments(status, assignment_type, manager_id, employee:users!review_assignments_employee_id_fkey(slack_name), manager:users!review_assignments_manager_id_fkey(slack_name))
     `)
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
   if (error) console.error("Failed to fetch performance cycles:", error.message);
-  return data || [];
+  const sorted = (data || []).sort((a: any, b: any) => {
+    const aOverdue = isCycleOverdue(a) ? 0 : 1;
+    const bOverdue = isCycleOverdue(b) ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+    return 0;
+  });
+  return sorted;
 }
 
 export default async function CyclesPage() {
@@ -96,7 +103,7 @@ export default async function CyclesPage() {
           </div>
 
           {cycles.map((cycle: any) => {
-            const config = getCycleStatus(cycle.status);
+            const config = getCycleDisplayStatus(cycle);
             const employeeCount = cycle.employees?.[0]?.count || 0;
 
             const allAssignments: any[] = cycle.assignments || [];
@@ -139,6 +146,19 @@ export default async function CyclesPage() {
                   {cycle.description && (
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{cycle.description}</p>
                   )}
+                  {isCycleOverdue(cycle) && totalPeople > 0 && (() => {
+                    const selfMissingList = standardAssignments
+                      .filter((a: any) => a.status === "pending")
+                      .map((a: any) => ({ name: a.employee?.slack_name || "Unknown", status: a.status }));
+                    const managerMissingList = standardAssignments
+                      .filter((a: any) => a.status !== "completed" && a.manager_id)
+                      .map((a: any) => ({
+                        name: a.employee?.slack_name || "Unknown",
+                        managerName: a.manager?.slack_name || "Unknown",
+                        status: a.status,
+                      }));
+                    return <MissingReviewsPopover selfMissing={selfMissingList} managerMissing={managerMissingList} />;
+                  })()}
                 </div>
 
                 {/* Status badge */}

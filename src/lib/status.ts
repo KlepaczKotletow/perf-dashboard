@@ -59,6 +59,12 @@ export const CYCLE_STATUS: Record<string, StatusConfig> = {
   },
 };
 
+export const CYCLE_OVERDUE_STATUS: StatusConfig = {
+  label: "Overdue",
+  badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
+  dot: "bg-amber-500",
+};
+
 // ── Goal status ────────────────────────────────────────────────────────────────
 export const GOAL_STATUS: Record<string, StatusConfig> = {
   draft: {
@@ -164,4 +170,42 @@ export function getCycleStatus(status: string): StatusConfig {
     badge: "text-muted-foreground bg-muted",
     dot: "bg-muted-foreground",
   };
+}
+
+/**
+ * Compute the display status for a performance cycle.
+ * "Overdue" = active + past end_date + grades not released.
+ */
+export function getCycleDisplayStatus(cycle: {
+  status: string;
+  end_date?: string | null;
+  grades_released?: boolean;
+}): StatusConfig {
+  if (cycle.grades_released) {
+    return CYCLE_STATUS.completed;
+  }
+  if (
+    cycle.status === "active" &&
+    cycle.end_date &&
+    new Date(cycle.end_date) < new Date()
+  ) {
+    return CYCLE_OVERDUE_STATUS;
+  }
+  return getCycleStatus(cycle.status);
+}
+
+/**
+ * Returns true if the cycle is past its end date and grades haven't been released.
+ */
+export function isCycleOverdue(cycle: {
+  status: string;
+  end_date?: string | null;
+  grades_released?: boolean;
+}): boolean {
+  return (
+    cycle.status === "active" &&
+    !!cycle.end_date &&
+    new Date(cycle.end_date) < new Date() &&
+    !cycle.grades_released
+  );
 }

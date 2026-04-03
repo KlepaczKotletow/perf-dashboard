@@ -1,6 +1,6 @@
 // =============================================================================
 //  Nami Bot — Edge Function
-//  Actions: launch_cycle, launch_survey, run_reminders
+//  Actions: launch_cycle, launch_survey, run_reminders, release_grades
 // =============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -1158,6 +1158,119 @@ async function processSurveyReminder(
  * Uses auth.getUser() for cryptographic verification, then looks up the
  * workspace via the user's email (email is provider-set, not user-editable).
  */
+// =============================================================================
+//  Handle release grades — DM each employee their review results
+// =============================================================================
+
+async function handleReleaseGrades(cycleId: string) {
+  // Fetch cycle + workspace bot token
+  const { data: cycle } = await supabase
+    .from("performance_cycles")
+    .select("id, name, workspace_id, workspaces(bot_token)")
+    .eq("id", cycleId)
+    .single();
+
+  if (!cycle) return { sent: 0, skipped: 0, failed: 0, error: "Cycle not found" };
+
+  const botToken = (cycle as any).workspaces?.bot_token;
+  if (!botToken) return { sent: 0, skipped: 0, failed: 0, error: "No bot token" };
+
+  const workspaceId = cycle.workspace_id;
+
+  // Fetch all standard review assignments with employee info
+  const { data: assignments } = await supabase
+    .from("review_assignments")
+    .select(
+      `
+      id,
+      overall_rating,
+      final_grade,
+      employee:users!review_assignments_employee_id_fkey(id, slack_user_id, slack_name)
+    `,
+    )
+    .eq("cycle_id", cycleId)
+    .eq("assignment_type", "standard");
+
+  if (!assignments) return { sent: 0, skipped: 0, failed: 0 };
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (let _i = 0; _i < assignments.length; _i++) {
+    const a = assignments[_i];
+    const emp = (a as any).employee;
+
+    if (!emp?.slack_user_id) {
+      skipped++;
+      continue;
+    }
+
+    // Throttle between iterations to respect Slack rate limits
+    if (_i > 0) await throttle();
+
+    try {
+      const ratingLine = a.overall_rating
+        ? `*Overall rating:* ${a.overall_rating}`
+        : null;
+      const gradeLine = a.final_grade
+        ? `*Final grade:* ${a.final_grade}`
+        : null;
+
+      const blocks: any[] = [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `\u{1F4CB} *Your ${cycle.name} review results are ready*`,
+          },
+        },
+      ];
+
+      // Add rating/grade if available
+      if (ratingLine || gradeLine) {
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: [ratingLine, gradeLine].filter(Boolean).join("\n"),
+          },
+        });
+      }
+
+      // Add dashboard link
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `<${DASHBOARD_URL}/dashboard|View your full review in the dashboard>`,
+        },
+      });
+
+      const ok = await sendSlackBlocks(
+        botToken,
+        emp.slack_user_id,
+        `Your ${cycle.name} review results are ready`,
+        blocks,
+      );
+
+      if (ok) {
+        sent++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      console.error(
+        `Error sending grade release to ${emp.slack_name || emp.id}:`,
+        err,
+      );
+      failed++;
+    }
+  }
+
+  return { sent, skipped, failed };
+}
+
 async function resolveCallerWorkspace(
   token: string,
 ): Promise<{ workspaceId: string } | null> {
@@ -1298,6 +1411,26 @@ Deno.serve(async (req) => {
         }
       }
       const result = await handleSurveyLaunch(survey_id);
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "release_grades" && cycle_id) {
+      if (hasJwtAuth) {
+        const owns = await verifyResourceOwnership(
+          "performance_cycles",
+          cycle_id,
+          callerWorkspaceId!,
+        );
+        if (!owns) {
+          return new Response(
+            JSON.stringify({ error: "Forbidden: cycle belongs to another workspace" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+      const result = await handleReleaseGrades(cycle_id);
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

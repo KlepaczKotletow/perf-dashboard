@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { format } from "date-fns";
-import { ArrowLeft, User2, Calendar, Layers } from "lucide-react";
+import { ArrowLeft, User2, Calendar, Layers, TriangleAlert, Lock } from "lucide-react";
 import { ReviewDetailClient, type CompetencyRating } from "./review-detail-client";
 import { getAssignmentStatus } from "@/lib/status";
 
@@ -235,6 +235,26 @@ export default async function ReviewDetailPage({
           )}
         </div>
       </div>
+
+      {/* Overdue cycle warning */}
+      {cycle?.status === "active" && cycle.end_date && new Date(cycle.end_date) < new Date() && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-400/20 bg-amber-50 dark:bg-amber-400/10 px-4 py-3 flex items-center gap-2">
+          <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            This cycle&apos;s deadline has passed. Your submission may still be accepted.
+          </p>
+        </div>
+      )}
+
+      {/* Closed cycle notice */}
+      {cycle?.status === "closed" && (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 flex items-center gap-2">
+          <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            This cycle has been closed. Reviews can no longer be submitted.
+          </p>
+        </div>
+      )}
 
       {/* Competency ratings section */}
       <div>

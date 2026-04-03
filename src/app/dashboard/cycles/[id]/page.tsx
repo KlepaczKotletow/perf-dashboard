@@ -20,7 +20,7 @@ import {
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
 import { isManagerOrAbove, isHROrAbove, canAccessCalibration } from "@/lib/roles";
-import { getCycleStatus } from "@/lib/status";
+import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
 import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
@@ -199,6 +199,10 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const isDeadlineUrgent = daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 7;
   const isDeadlineOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
 
+  // Overdue banner counts
+  const selfMissing = standardAssignments.filter((a: any) => a.status === "pending").length;
+  const mgrMissing = pendingManagerCount;
+
   // Progress bar tracks manager review completion (true signal of cycle health)
   const managerCompletionRate = assignmentsWithManager.length > 0
     ? Math.round((managerDoneCount / assignmentsWithManager.length) * 100)
@@ -217,8 +221,8 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground">{cycle.name}</h1>
-              <Badge className={`text-[11px] font-medium ${getCycleStatus(cycle.status).badge}`}>
-                {getCycleStatus(cycle.status).label}
+              <Badge className={`text-[11px] font-medium ${getCycleDisplayStatus(cycle).badge}`}>
+                {getCycleDisplayStatus(cycle).label}
               </Badge>
               {cycle.grades_released && (
                 <Badge className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
@@ -253,6 +257,27 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             ? `Review deadline passed ${Math.abs(daysUntilDeadline!)} day${Math.abs(daysUntilDeadline!) !== 1 ? "s" : ""} ago`
             : `${daysUntilDeadline} day${daysUntilDeadline !== 1 ? "s" : ""} until review deadline`
           }
+        </div>
+      )}
+
+      {/* ── Overdue Action Banner ────────────────────────────────────────── */}
+      {isCycleOverdue(cycle) && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-400/20 bg-amber-50 dark:bg-amber-400/10 px-5 py-4">
+          <div className="flex items-start gap-3">
+            <TriangleAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                This cycle is past its end date
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                {selfMissing > 0 && `${selfMissing} self-review${selfMissing !== 1 ? "s" : ""}`}
+                {selfMissing > 0 && mgrMissing > 0 && " and "}
+                {mgrMissing > 0 && `${mgrMissing} manager review${mgrMissing !== 1 ? "s" : ""}`}
+                {(selfMissing > 0 || mgrMissing > 0) ? " still pending. " : "All reviews submitted. "}
+                {!cycle.grades_released && "Grades have not been released."}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

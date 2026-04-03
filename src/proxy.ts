@@ -38,6 +38,11 @@ export async function proxy(request: NextRequest) {
     // Refresh session if expired
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Authenticated users hitting the landing page → skip Slack OAuth, go straight to dashboard
+    if (request.nextUrl.pathname === '/' && user) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+
     // Protect dashboard routes
     if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
       const loginUrl = new URL('/', request.url)
