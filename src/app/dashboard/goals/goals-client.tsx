@@ -566,9 +566,9 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           <TableCell key={col}>
             {goal.metric_target != null ? (
               <span className="text-sm text-muted-foreground tabular-nums">
-                {goal.metric_start ?? 0}<span className="mx-1 text-muted-foreground/40">\u2192</span>
+                {goal.metric_start ?? 0}<span className="mx-1 text-muted-foreground/40">{"→"}</span>
                 <span className="font-medium text-foreground">{goal.metric_current ?? goal.metric_start ?? 0}</span>
-                <span className="mx-1 text-muted-foreground/40">\u2192</span>
+                <span className="mx-1 text-muted-foreground/40">{"→"}</span>
                 {directionIcon(goal.goal_direction)} {goal.metric_target}
                 {goal.metric_unit && <span className="ml-1 text-xs text-muted-foreground/60">{goal.metric_unit}</span>}
               </span>
