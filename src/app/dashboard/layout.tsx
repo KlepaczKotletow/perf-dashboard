@@ -67,19 +67,19 @@ export default async function DashboardLayout({
         { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
       ],
     },
-    // ── Managers: team management + their cycles ──
+    // ── Managers: team management ──
     {
       label: "Team",
       items: [
         { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
     // ── HR/Admin: org-wide tools ──
     {
       label: "Admin",
       items: [
+        { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: false, requiresHR: true, requiresAdmin: false },
