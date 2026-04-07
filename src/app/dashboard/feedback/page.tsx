@@ -210,54 +210,81 @@ export default async function FeedbackPage({
       )}
 
       {continuousFeedback.length > 0 && (
-        <Card className="border-border/60">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-5">From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="min-w-[300px]">Message</TableHead>
-                  <TableHead className="pr-5 text-right">Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {continuousFeedback.map((item: any) => {
-                  const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+        <>
+          {/* ── Desktop table (hidden below lg) ── */}
+          <Card className="border-border/60 hidden lg:block">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-5">From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="min-w-[300px]">Message</TableHead>
+                    <TableHead className="pr-5 text-right">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {continuousFeedback.map((item: any) => {
+                    const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="pl-5 font-medium">
+                          {item.is_anonymous ? (
+                            <span className="text-muted-foreground italic">Anonymous</span>
+                          ) : (
+                            item.from_user?.slack_name || "Unknown"
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {item.to_user?.slack_name || "Unknown"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`text-[10px] font-medium ${typeConf.className}`}>
+                            {typeConf.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-md">
+                          <p className="line-clamp-2 text-sm">{item.message}</p>
+                        </TableCell>
+                        <TableCell className="pr-5 text-right text-muted-foreground text-xs whitespace-nowrap">
+                          {item.created_at
+                            ? format(new Date(item.created_at), "MMM d, yyyy")
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="pl-5 font-medium">
-                        {item.is_anonymous ? (
-                          <span className="text-muted-foreground italic">Anonymous</span>
-                        ) : (
-                          item.from_user?.slack_name || "Unknown"
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {item.to_user?.slack_name || "Unknown"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`text-[10px] font-medium ${typeConf.className}`}>
-                          {typeConf.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground max-w-md">
-                        <p className="line-clamp-2 text-sm">{item.message}</p>
-                      </TableCell>
-                      <TableCell className="pr-5 text-right text-muted-foreground text-xs whitespace-nowrap">
-                        {item.created_at
-                          ? format(new Date(item.created_at), "MMM d, yyyy")
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          {/* ── Mobile card list (shown below lg) ── */}
+          <div className="lg:hidden space-y-2">
+            {continuousFeedback.map((item: any) => {
+              const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+              return (
+                <div key={item.id} className="p-4 rounded-xl border border-border/60 bg-card space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      {item.is_anonymous ? <span className="text-muted-foreground italic">Anonymous</span> : (item.from_user?.slack_name || "Unknown")}
+                      <span className="text-muted-foreground font-normal"> → </span>
+                      {item.to_user?.slack_name || "Unknown"}
+                    </p>
+                    <Badge className={`text-[10px] font-medium shrink-0 ${typeConf.className}`}>
+                      {typeConf.label}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{item.message}</p>
+                  <p className="text-xs text-muted-foreground/60">
+                    {item.created_at ? format(new Date(item.created_at), "MMM d, yyyy") : "—"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {feedbackTotal > 0 && (

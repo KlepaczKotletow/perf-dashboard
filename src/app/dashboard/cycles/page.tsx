@@ -92,8 +92,8 @@ export default async function CyclesPage() {
         </div>
       ) : (
         <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/50 overflow-hidden">
-          {/* Column headers */}
-          <div className="grid grid-cols-[1fr_100px_100px_160px_180px_40px] items-center gap-4 px-5 py-2.5 bg-muted/40">
+          {/* Column headers — hidden on mobile, shown on lg+ */}
+          <div className="hidden lg:grid grid-cols-[1fr_100px_100px_160px_180px_40px] items-center gap-4 px-5 py-2.5 bg-muted/40">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Name</span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Status</span>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">People</span>
@@ -136,10 +136,51 @@ export default async function CyclesPage() {
               <Link
                 key={cycle.id}
                 href={isDraft ? `/dashboard/cycles/new?draft=${cycle.id}` : `/dashboard/cycles/${cycle.id}`}
-                className="grid grid-cols-[1fr_100px_100px_160px_180px_40px] items-center gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors group"
+                className="block lg:grid lg:grid-cols-[1fr_100px_100px_160px_180px_40px] lg:items-center lg:gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors group"
               >
+                {/* ── Mobile card layout (below lg) ── */}
+                <div className="lg:hidden space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">{cycle.name}</p>
+                      {cycle.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{cycle.description}</p>}
+                    </div>
+                    <Badge className={`text-[10px] font-medium shrink-0 ${config.badge}`}>{config.label}</Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {employeeCount}</span>
+                    <span>
+                      {cycle.start_date && format(new Date(cycle.start_date), "MMM d")}
+                      {" — "}
+                      {endDate ? format(endDate, "MMM d, yyyy") : "—"}
+                    </span>
+                    {deadlineLabel && <span className={`font-medium ${deadlineColor}`}>{deadlineLabel}</span>}
+                  </div>
+                  {selfPct !== null && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>Self</span><span className="font-medium tabular-nums">{selfDone}/{totalPeople}</span>
+                        </div>
+                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${selfPct === 100 ? "bg-emerald-500" : "bg-sky-400"}`} style={{ width: `${selfPct}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
+                          <span>Manager</span><span className="font-medium tabular-nums">{mgrDone}/{totalPeople}</span>
+                        </div>
+                        <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${mgrPct === 100 ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${mgrPct!}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Desktop grid layout (lg+) ── */}
                 {/* Name + description */}
-                <div className="min-w-0">
+                <div className="min-w-0 hidden lg:block">
                   <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">
                     {cycle.name}
                   </p>
@@ -162,20 +203,20 @@ export default async function CyclesPage() {
                 </div>
 
                 {/* Status badge */}
-                <div>
+                <div className="hidden lg:block">
                   <Badge className={`text-[11px] font-medium ${config.badge}`}>
                     {config.label}
                   </Badge>
                 </div>
 
                 {/* Employee count */}
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <div className="hidden lg:flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Users className="h-3.5 w-3.5 shrink-0" />
                   <span>{employeeCount}</span>
                 </div>
 
                 {/* Timeline + deadline */}
-                <div>
+                <div className="hidden lg:block">
                   <p className="text-sm text-muted-foreground">
                     {cycle.start_date && format(new Date(cycle.start_date), "MMM d")}
                     {" — "}
@@ -187,10 +228,9 @@ export default async function CyclesPage() {
                 </div>
 
                 {/* Completion progress */}
-                <div>
+                <div className="hidden lg:block">
                   {selfPct !== null ? (
                     <div className="space-y-1.5">
-                      {/* Self-review progress */}
                       <div>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
                           <span>Self</span>
@@ -203,7 +243,6 @@ export default async function CyclesPage() {
                           />
                         </div>
                       </div>
-                      {/* Manager review progress */}
                       <div>
                         <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
                           <span>Manager</span>
@@ -223,7 +262,7 @@ export default async function CyclesPage() {
                 </div>
 
                 {/* Arrow */}
-                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors justify-self-end" />
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors justify-self-end hidden lg:block" />
               </Link>
             );
           })}
