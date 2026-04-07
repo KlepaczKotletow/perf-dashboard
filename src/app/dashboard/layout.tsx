@@ -86,7 +86,6 @@ export default async function DashboardLayout({
         { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresHR: true, requiresAdmin: false },
-        { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresHR: false, requiresAdmin: true },
       ],
     },
