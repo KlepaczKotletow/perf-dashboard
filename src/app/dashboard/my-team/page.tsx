@@ -222,7 +222,7 @@ export default async function MyTeamPage() {
                     <TableCell className="text-center">
                       {emp.needsAction ? (
                         <Badge className="text-[10px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
-                          Action Needed
+                          Needs Review
                         </Badge>
                       ) : (
                         <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">

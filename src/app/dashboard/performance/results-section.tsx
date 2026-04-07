@@ -48,7 +48,7 @@ function StarRating({
           key={star}
           className={`${cls} ${
             star <= rating
-              ? "fill-yellow-400 text-yellow-400"
+              ? "fill-amber-400 text-amber-400"
               : "text-muted-foreground/20"
           }`}
         />

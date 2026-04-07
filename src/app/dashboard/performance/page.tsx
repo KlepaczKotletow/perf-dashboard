@@ -147,7 +147,7 @@ function CycleCardHeader({
           <>
             {cycle.rating != null && (
               <span className="flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 <span className="text-sm font-medium tabular-nums text-foreground">
                   {Number(cycle.rating).toFixed(1)}/{ratingMax}
                 </span>

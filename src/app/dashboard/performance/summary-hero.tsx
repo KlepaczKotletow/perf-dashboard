@@ -28,8 +28,8 @@ export function PerformanceSummaryHero({
     },
     {
       icon: Star,
-      iconClass: "text-yellow-500",
-      bgClass: "bg-yellow-50 dark:bg-yellow-400/10",
+      iconClass: "text-amber-500",
+      bgClass: "bg-amber-50 dark:bg-amber-400/10",
       label: "Avg Rating",
       value: avgRating != null ? avgRating.toFixed(1) : "--",
       sublabel: avgRating != null ? `out of ${ratingMax}` : "no ratings yet",

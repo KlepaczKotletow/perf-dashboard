@@ -482,7 +482,7 @@ export default async function DashboardPage() {
               {[
                 { label: "Direct reports", value: teamSize, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10", icon: Users },
                 { label: "Ready to review", value: pendingMgrReviews.length, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10", icon: ClipboardCheck },
-                { label: "Awaiting self-review", value: waitingOnSelf.length, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10", icon: Clock },
+                { label: "Not started", value: waitingOnSelf.length, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10", icon: Clock },
               ].map((m) => (
                 <Card key={m.label} className="border-border/60">
                   <CardContent className="py-3 px-4">
@@ -530,7 +530,7 @@ export default async function DashboardPage() {
               </h2>
               <Link
                 href="/dashboard/performance"
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
               >
                 See all <ChevronRight className="h-3 w-3" />
               </Link>
@@ -580,7 +580,7 @@ export default async function DashboardPage() {
                         </Button>
                       ) : (
                         <Badge className="text-[10px] text-muted-foreground bg-muted flex items-center gap-1">
-                          <Clock className="h-3 w-3" /> Awaiting self
+                          <Clock className="h-3 w-3" /> Not Started
                         </Badge>
                       )}
                     </div>
@@ -600,7 +600,7 @@ export default async function DashboardPage() {
               </h2>
               <Link
                 href="/dashboard/cycles"
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
               >
                 Manage <ChevronRight className="h-3 w-3" />
               </Link>
@@ -673,7 +673,7 @@ export default async function DashboardPage() {
         {!showOnboarding && activeCycles.length > 0 && (
           <Link
             href="/dashboard/cycles"
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
           >
             Manage cycles <ChevronRight className="h-3 w-3" />
           </Link>
@@ -747,7 +747,7 @@ export default async function DashboardPage() {
             <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">My Direct Reports</h2>
             <Link
               href="/dashboard/my-team"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
             >
               View team <ChevronRight className="h-3 w-3" />
             </Link>
@@ -767,7 +767,7 @@ export default async function DashboardPage() {
                 </div>
                 <div className="flex-1 text-center px-4">
                   <p className="text-2xl font-bold text-foreground">{managerData.waitingOnSelf.length}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">Awaiting Self</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 uppercase tracking-wider">Not Started</p>
                 </div>
               </div>
             </CardContent>

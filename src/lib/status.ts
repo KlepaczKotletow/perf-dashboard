@@ -19,7 +19,7 @@ export interface StatusConfig {
 // ── Review assignment status ───────────────────────────────────────────────────
 export const ASSIGNMENT_STATUS: Record<string, StatusConfig> = {
   pending: {
-    label: "Pending",
+    label: "Not Started",
     badge: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
     dot: "bg-amber-400",
   },

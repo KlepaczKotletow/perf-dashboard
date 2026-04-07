@@ -30,9 +30,9 @@ export function CycleCard({
           className="w-full flex items-center gap-3 px-5 py-4 text-left group hover:bg-accent/30 transition-colors rounded-r-xl"
         >
           {open ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
           ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
           )}
           <div className="flex-1 min-w-0">{header}</div>
         </button>

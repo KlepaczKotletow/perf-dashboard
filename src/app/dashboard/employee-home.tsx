@@ -102,7 +102,7 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
             </h2>
             <Link
               href="/dashboard/performance"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
             >
               View history <ChevronRight className="h-3 w-3" />
             </Link>
@@ -122,11 +122,11 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
                 statusClass = "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10";
                 StatusIcon = EyeOff;
               } else if (a.selfSubmitted) {
-                statusLabel = a.manager_id ? "Waiting on manager" : "Self-review submitted";
+                statusLabel = "In Progress";
                 statusClass = "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10";
                 StatusIcon = Clock;
               } else {
-                statusLabel = "Self-review required";
+                statusLabel = "Not Started";
                 statusClass = "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10";
                 StatusIcon = AlertCircle;
               }
@@ -193,7 +193,7 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
             </h2>
             <Link
               href="/dashboard/feedback"
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
             >
               See all <ChevronRight className="h-3 w-3" />
             </Link>

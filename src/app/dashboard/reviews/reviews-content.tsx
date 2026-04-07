@@ -178,7 +178,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
               <div className="flex items-center gap-3 shrink-0 ml-4">
                 {incompleteCount > 0 && (
                   <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                    {incompleteCount} incomplete
+                    {incompleteCount} not completed
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground">{totalCount} review{totalCount !== 1 ? "s" : ""}</span>
@@ -194,7 +194,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
             {isCollapsed && incompleteCount > 0 && (
               <div className="px-5 py-2 flex items-center gap-2 text-xs text-muted-foreground bg-muted/5">
                 <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                {incompleteCount} assignment{incompleteCount !== 1 ? "s" : ""} incomplete
+                {incompleteCount} assignment{incompleteCount !== 1 ? "s" : ""} not completed
               </div>
             )}
 

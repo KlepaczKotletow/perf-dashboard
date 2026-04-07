@@ -104,7 +104,7 @@ export default async function ProfilePage() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Goals</h2>
-          <Link href="/dashboard/goals" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+          <Link href="/dashboard/goals" className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors">
             View all <ChevronRight className="h-3 w-3" />
           </Link>
         </div>
@@ -135,7 +135,7 @@ export default async function ProfilePage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Recent Reviews</h2>
-            <Link href="/dashboard/performance" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+            <Link href="/dashboard/performance" className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors">
               View history <ChevronRight className="h-3 w-3" />
             </Link>
           </div>

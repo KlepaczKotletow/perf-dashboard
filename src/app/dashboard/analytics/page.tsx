@@ -904,7 +904,7 @@ export default async function AnalyticsPage({
             <Card>
               <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
                 <p className="text-sm font-medium">Overall Rating</p>
-                <Star className="h-4 w-4 text-yellow-500" />
+                <Star className="h-4 w-4 text-amber-500" />
               </div>
               <div className="px-6 pb-6">
                 <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
@@ -1011,7 +1011,7 @@ export default async function AnalyticsPage({
             <Card>
               <div className="px-6 pt-6 pb-2">
                 <div className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-yellow-500" />
+                  <Star className="h-5 w-5 text-amber-500" />
                   <h2 className="text-base font-semibold">Performance Ranking</h2>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">

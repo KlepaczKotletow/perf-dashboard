@@ -555,7 +555,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
-                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-50 group-hover:opacity-100 transition-opacity" asChild>
                         <Link href={`/dashboard/reviews/${assignment.id}?from=cycle&cycleId=${id}`}>
                           <ExternalLink className="h-3.5 w-3.5" />
                           <span className="sr-only">View review for {assignment.employee?.slack_name}</span>
@@ -626,7 +626,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                       {assignment.overall_rating && (
                         <span className="text-xs font-bold text-foreground">{assignment.overall_rating}/{ratingMax}</span>
                       )}
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-50 group-hover:opacity-100 transition-opacity" asChild>
                         <Link href={`/dashboard/reviews/${assignment.id}?from=cycle&cycleId=${id}`}>
                           <ExternalLink className="h-3.5 w-3.5" />
                           <span className="sr-only">View upward feedback</span>
