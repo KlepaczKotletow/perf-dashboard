@@ -58,29 +58,29 @@ export default async function DashboardLayout({
 
   const sections: NavSection[] = [
     {
-      label: "Personal",
+      label: "",
       items: [
-        { href: "/dashboard", label: "Overview", icon: LayoutDashboard, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard", label: "Home", icon: LayoutDashboard, requiresManager: false, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
-      label: "People",
+      label: "Team",
       items: [
         { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
-      label: "Organization",
+      label: "Workspace",
       items: [
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
     {
@@ -114,7 +114,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       {/* Sidebar — wrapped in SidebarWrapper for mobile drawer behaviour */}
-      <SidebarWrapper>
+      <SidebarWrapper workspaceName={workspace?.workspaceName} workspaceLogoUrl={workspace?.logoUrl}>
         {/* Logo */}
         <div className="h-[64px] flex items-center px-4 border-b border-sidebar-border">
           <Link href="/dashboard" className="flex items-center gap-3.5 min-w-0">
@@ -135,8 +135,11 @@ export default async function DashboardLayout({
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-3">
           {filteredSections.map((section, idx) => (
-            <div key={section.label}>
+            <div key={section.label || `section-${idx}`}>
               {idx > 0 && <div className="my-2 mx-2 h-px bg-sidebar-border/60" />}
+              {section.label && filteredSections.length > 1 && (
+                <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider px-3 pt-2 pb-1">{section.label}</p>
+              )}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
                   <NavLink

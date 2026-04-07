@@ -29,6 +29,7 @@ import {
 import { isManagerOrAbove, canManageUsers, isHROrAbove } from "@/lib/roles";
 import { DashboardCharts, type DashboardChartData } from "./dashboard-charts";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
+import { EmployeeHome } from "./employee-home";
 
 // ─── Data fetchers ─────────────────────────────────────────────────────────────
 
@@ -407,194 +408,14 @@ export default async function DashboardPage() {
     isAdminOrHR ? getChartData(workspace?.workspaceId) : null,
   ]);
 
-  // ── Employees (without direct reports) go straight to Performance ──────────
-  if (role === "user" && !workspace?.hasDirectReports) {
-    redirect("/dashboard/performance");
-  }
-
-  // ── Employee dashboard (kept for reference, unreachable due to redirect above)
+  // ── Employee Home (all employees, including those with direct reports who have role=user)
   if (role === "user") {
-    const assignments = personal?.assignments || [];
-    const recentFeedback = personal?.recentFeedback || [];
-    const pendingSelf = assignments.filter((a: any) => !a.selfSubmitted && a.status !== "completed");
-    const inProgress = assignments.filter((a: any) => a.selfSubmitted && a.status !== "completed");
-    const completed = assignments.filter((a: any) => a.status === "completed");
-
     return (
-      <div className="space-y-8">
-        {/* Greeting */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Hey {firstName}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {pendingSelf.length > 0
-              ? `You have ${pendingSelf.length} self-review${pendingSelf.length !== 1 ? "s" : ""} waiting for your input.`
-              : inProgress.length > 0
-              ? "Your self-review is in — your manager is completing their side."
-              : "You're all caught up. Check back when a new review cycle starts."}
-          </p>
-        </div>
-
-        {/* Pending actions banner */}
-        {pendingSelf.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Action required
-            </h2>
-            {pendingSelf.map((a: any) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between p-4 rounded-xl border border-amber-200/70 bg-amber-50/40 dark:border-amber-400/20 dark:bg-amber-400/[0.04]"
-              >
-                <div className="flex items-center gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Self-review due — {a.cycle?.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Complete your self-assessment to kick off the review process
-                    </p>
-                  </div>
-                </div>
-                <Button size="sm" className="shrink-0" asChild>
-                  <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
-                    Start <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                  </Link>
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Active reviews */}
-        {assignments.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              My reviews
-            </h2>
-            <div className="space-y-2">
-              {assignments.map((a: any) => {
-                let statusLabel: string;
-                let statusClass: string;
-                let StatusIcon: React.ComponentType<{ className?: string }>;
-
-                if (a.status === "completed" && a.gradesReleased) {
-                  statusLabel = "Results available";
-                  statusClass = "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10";
-                  StatusIcon = CheckCircle2;
-                } else if (a.status === "completed") {
-                  statusLabel = "Review complete";
-                  statusClass = "text-violet-700 bg-violet-50 dark:text-violet-400 dark:bg-violet-400/10";
-                  StatusIcon = EyeOff;
-                } else if (a.selfSubmitted) {
-                  statusLabel = a.manager_id ? "Waiting on manager" : "Self-review submitted";
-                  statusClass = "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10";
-                  StatusIcon = Clock;
-                } else {
-                  statusLabel = "Self-review required";
-                  statusClass = "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10";
-                  StatusIcon = AlertCircle;
-                }
-
-                return (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between p-4 rounded-xl border border-border/60 bg-card"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-foreground">{a.cycle?.name}</p>
-                        <Badge className={`text-[10px] flex items-center gap-1 ${statusClass}`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {statusLabel}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {a.manager_id ? `Reviewed by: ${a.manager?.slack_name || "Unknown"}` : "No manager assigned"}
-                      </p>
-                    </div>
-                    {/* Show grade/rating when results released */}
-                    {a.gradesReleased && a.status === "completed" && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        {a.overall_rating && (
-                          <div className="flex items-center gap-1">
-                            <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                            <span className="text-sm font-semibold text-foreground">{a.overall_rating}/5</span>
-                          </div>
-                        )}
-                        {a.final_grade && (
-                          <Badge variant="outline" className="text-xs">
-                            <Medal className="h-3 w-3 mr-1" />
-                            {a.final_grade}
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="pt-1">
-              <Link
-                href="/dashboard/performance"
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-              >
-                View full review history <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* No reviews at all */}
-        {assignments.length === 0 && pendingSelf.length === 0 && (
-          <Card className="border-border/60">
-            <CardContent className="py-12 flex flex-col items-center text-center">
-              <ClipboardCheck className="h-10 w-10 text-muted-foreground/30 mb-3" />
-              <p className="text-sm font-medium text-foreground">No active reviews</p>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                You'll be notified when your manager adds you to a performance cycle.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Recent feedback */}
-        {recentFeedback.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent kudos
-              </h2>
-              <Link
-                href="/dashboard/feedback"
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-              >
-                See all <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-            <div className="space-y-2">
-              {recentFeedback.map((f: any) => (
-                <div key={f.id} className="p-4 rounded-xl border border-border/60 bg-card">
-                  <div className="flex items-start gap-3">
-                    <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[10px] font-medium text-primary">
-                        {f.sender?.slack_name?.[0]?.toUpperCase() || "?"}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-foreground">
-                        {f.sender?.slack_name || "Anonymous"}{" "}
-                        <span className="text-muted-foreground font-normal">· {f.sender?.job_title || ""}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{f.message}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <EmployeeHome
+        firstName={firstName}
+        assignments={personal?.assignments || []}
+        recentFeedback={personal?.recentFeedback || []}
+      />
     );
   }
 
@@ -626,7 +447,7 @@ export default async function DashboardPage() {
         {/* Own pending self-review */}
         {pendingSelf.length > 0 && (
           <div className="space-y-2">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
               Your action required
             </h2>
             {pendingSelf.map((a: any) => (
@@ -654,7 +475,7 @@ export default async function DashboardPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Team stats */}
           <div className="lg:col-span-1 space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
               Team overview
             </h2>
             <div className="grid gap-2">
@@ -704,7 +525,7 @@ export default async function DashboardPage() {
           {/* Team to review list */}
           <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
                 {pendingMgrReviews.length > 0 ? "Ready for your review" : "Team review status"}
               </h2>
               <Link
@@ -774,7 +595,7 @@ export default async function DashboardPage() {
         {activeCycles.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
                 Active cycles
               </h2>
               <Link
@@ -815,7 +636,8 @@ export default async function DashboardPage() {
   const stats = orgData?.stats ?? { totalReviews: 0, activeCycles: 0, totalFeedback: 0, totalUsers: 0 };
   const setup = orgData?.setup ?? { users: 0, competencies: 0, cycles: 0, hasManagers: false };
   const activeCycles = orgData?.activeCycles ?? [];
-  const setupComplete = setup.users >= 2 && setup.competencies > 0 && setup.cycles > 0;
+  const hasActiveCycle = (activeCycles?.length || 0) > 0;
+  const setupComplete = setup.users >= 2 && setup.competencies > 0 && hasActiveCycle;
   const showOnboarding = isAdminUser && !setupComplete;
 
   const steps = [
@@ -823,7 +645,7 @@ export default async function DashboardPage() {
     { id: "org", label: "Set up org structure", description: "Assign managers, departments, and job levels", href: "/dashboard/team", icon: GitBranch, done: setup.hasManagers },
     { id: "competencies", label: "Define competencies", description: "Create the skills and behaviors your org values", href: "/dashboard/competencies", icon: Target, done: setup.competencies > 0 },
     { id: "matrix", label: "Map competencies to levels", description: "Set expected proficiency per role in the matrix", href: "/dashboard/competencies/matrix", icon: Layers, done: setup.competencies > 0 && setup.hasManagers },
-    { id: "cycle", label: "Launch your first review cycle", description: "Create a performance review cycle and notify your team", href: "/dashboard/cycles/new", icon: Rocket, done: setup.cycles > 0 },
+    { id: "cycle", label: "Launch your first review cycle", description: "Create a performance review cycle and notify your team", href: "/dashboard/cycles/new", icon: Rocket, done: hasActiveCycle },
   ];
   const completedSteps = steps.filter((s) => s.done).length;
 
@@ -922,7 +744,7 @@ export default async function DashboardPage() {
       {managerData && managerData.teamSize > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">My Direct Reports</h2>
+            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">My Direct Reports</h2>
             <Link
               href="/dashboard/my-team"
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
@@ -956,7 +778,7 @@ export default async function DashboardPage() {
       {/* Active cycles quick view */}
       {activeCycles.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Active Cycles</h2>
+          <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Active Cycles</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {activeCycles.map((cycle: any) => {
               const daysLeft = cycle.review_deadline

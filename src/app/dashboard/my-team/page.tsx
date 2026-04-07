@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } from "lucide-react";
 import { isManagerOrAbove } from "@/lib/roles";
 import { getAssignmentStatus } from "@/lib/status";
+import TeamGoalsTable from "./team-goals-table";
 
 export default async function MyTeamPage() {
   const workspace = await getUserWorkspace();
@@ -59,18 +60,31 @@ export default async function MyTeamPage() {
     reviewAssignments = data || [];
   }
 
-  // 3. Get goals for direct reports
+  // 3. Get goals for direct reports (full shape for team goals table)
   let teamGoals: any[] = [];
   if (reportIds.length > 0) {
     const { data } = await supabase
       .from("goals")
-      .select("id, title, status, progress, employee_id, due_date")
+      .select(`
+        id, parent_id, title, description, status, progress, weight,
+        metric_start, metric_current, metric_target, metric_unit,
+        tracking_status, scope, goal_direction, due_date, employee_id,
+        employee:users!goals_employee_id_fkey(id, slack_name, department),
+        cycle:performance_cycles!goals_cycle_id_fkey(id, name)
+      `)
       .in("employee_id", reportIds)
       .eq("workspace_id", workspace.workspaceId)
       .in("status", ["active", "draft"])
       .order("due_date");
     teamGoals = data || [];
   }
+
+  // 4. Get cycles for filter dropdown
+  const { data: cycles } = await supabase
+    .from("performance_cycles")
+    .select("id, name")
+    .eq("workspace_id", workspace.workspaceId)
+    .order("created_at", { ascending: false });
 
   // Build aggregated view per employee
   const employeeSummaries = (directReports || []).map((emp: any) => {
@@ -239,7 +253,7 @@ export default async function MyTeamPage() {
       {/* Pending Review Assignments for your team — active cycles only */}
       {reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active").length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Pending Team Reviews</h2>
+          <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Pending Team Reviews</h2>
           <Card className="border-border/60">
             <CardContent className="p-0">
               <Table>
@@ -276,6 +290,21 @@ export default async function MyTeamPage() {
               </Table>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Team Goals */}
+      {teamGoals.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Team Goals</h2>
+          <TeamGoalsTable
+            goals={teamGoals}
+            cycles={cycles || []}
+            employees={(directReports || []).map((r: any) => ({
+              id: r.id,
+              slack_name: r.slack_name,
+            }))}
+          />
         </div>
       )}
     </div>

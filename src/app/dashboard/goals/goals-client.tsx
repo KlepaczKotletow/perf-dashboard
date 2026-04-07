@@ -66,82 +66,25 @@ import {
   Trash2,
   Save,
   Edit2,
+  Info,
+  SlidersHorizontal,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { isHROrAbove } from "@/lib/roles";
 import { getClientIdentity } from "@/lib/client-auth";
-
-// ─── Types ──────────────────────────────────────────────
-
-interface EmployeeRef { id: string; slack_name: string; department: string | null }
-interface CycleRef { id: string; name: string }
-
-interface GoalRow {
-  id: string;
-  parent_id: string | null;
-  title: string;
-  description: string | null;
-  status: string;
-  progress: number;
-  weight: number;
-  metric_start: number | null;
-  metric_current: number | null;
-  metric_target: number | null;
-  metric_unit: string | null;
-  tracking_status: string;
-  scope: string;
-  goal_direction?: string;
-  due_date: string | null;
-  // Supabase FK joins may return arrays or single objects depending on query shape
-  employee?: EmployeeRef | EmployeeRef[] | null;
-  cycle?: CycleRef | CycleRef[] | null;
-}
-
-/** A goal row after FK join arrays have been unwrapped into single objects */
-interface NormalizedGoalRow extends Omit<GoalRow, "employee" | "cycle"> {
-  employee: EmployeeRef | null;
-  cycle: CycleRef | null;
-}
-
-/** Normalize a Supabase FK join that may be an array or a single object */
-function unwrap<T>(val: T | T[] | null | undefined): T | null {
-  if (val == null) return null;
-  if (Array.isArray(val)) return val[0] ?? null;
-  return val;
-}
-
-/** Calculate progress based on goal direction */
-function calculateProgress(
-  direction: string | undefined,
-  start: number | null,
-  current: number | null,
-  target: number | null
-): number {
-  if (current == null || target == null) return 0;
-  const s = start ?? 0;
-
-  switch (direction) {
-    case "decrease":
-      if (s === target) return current <= target ? 100 : 0;
-      return Math.min(100, Math.max(0, Math.round(((s - current) / (s - target)) * 100)));
-    case "above":
-      return current >= target ? 100 : 0;
-    case "below":
-      return current <= target ? 100 : 0;
-    case "increase":
-    default:
-      if (s === target) return current >= target ? 100 : 0;
-      return Math.min(100, Math.max(0, Math.round(((current - s) / (target - s)) * 100)));
-  }
-}
-
-function directionIcon(d: string | undefined): string {
-  switch (d) {
-    case "decrease": return "↓";
-    case "above": return "≥";
-    case "below": return "≤";
-    default: return "↑";
-  }
-}
+import {
+  type EmployeeRef,
+  type CycleRef,
+  type GoalRow,
+  type NormalizedGoalRow,
+  type GoalNode,
+  unwrap,
+  calculateProgress,
+  directionIcon,
+  trackingConfig,
+  buildTree,
+  flattenTree,
+} from "@/lib/goals-utils";
 
 interface Cycle {
   id: string;
@@ -156,76 +99,21 @@ interface GoalsClientProps {
   workspaceId: string;
 }
 
-// ─── Tracking status config ─────────────────────────────
-
-const trackingConfig: Record<string, { label: string; color: string; barColor: string }> = {
-  on_track: {
-    label: "On track",
-    color: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
-    barColor: "bg-emerald-500",
-  },
-  at_risk: {
-    label: "At risk",
-    color: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
-    barColor: "bg-amber-500",
-  },
-  delayed: {
-    label: "Delayed",
-    color: "text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-400/10",
-    barColor: "bg-red-500",
-  },
-  achieved: {
-    label: "Achieved",
-    color: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
-    barColor: "bg-emerald-600",
-  },
-};
-
-// ─── Tree builder ───────────────────────────────────────
-
-interface GoalNode extends NormalizedGoalRow {
-  children: GoalNode[];
-  depth: number;
-}
-
-function buildTree(goals: NormalizedGoalRow[]): GoalNode[] {
-  const map = new Map<string, GoalNode>();
-  const roots: GoalNode[] = [];
-
-  goals.forEach((g) => map.set(g.id, { ...g, children: [], depth: 0 }));
-
-  map.forEach((node) => {
-    if (node.parent_id && map.has(node.parent_id)) {
-      const parent = map.get(node.parent_id)!;
-      node.depth = parent.depth + 1;
-      parent.children.push(node);
-    } else {
-      roots.push(node);
-    }
-  });
-
-  return roots;
-}
-
-function flattenTree(nodes: GoalNode[], expanded: Set<string>): GoalNode[] {
-  const result: GoalNode[] = [];
-  function walk(list: GoalNode[]) {
-    for (const node of list) {
-      result.push(node);
-      if (node.children.length > 0 && expanded.has(node.id)) {
-        walk(node.children);
-      }
-    }
-  }
-  walk(nodes);
-  return result;
-}
-
-// ─── Column reordering ─────────────────────────────────
+// ─── Column visibility ─────────────────────────────────
 
 type ColumnKey = "goal" | "owner" | "cycle" | "status" | "weight" | "metric" | "progress" | "health";
 
-const DEFAULT_COLUMN_ORDER: ColumnKey[] = ["goal", "owner", "cycle", "status", "weight", "metric", "progress", "health"];
+const DEFAULT_VISIBLE: ColumnKey[] = ["goal", "owner", "progress", "health"];
+const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
+  { key: "goal", label: "Goal" },
+  { key: "owner", label: "Owner" },
+  { key: "cycle", label: "Cycle" },
+  { key: "status", label: "Status" },
+  { key: "weight", label: "Weight" },
+  { key: "metric", label: "Metric" },
+  { key: "progress", label: "Progress" },
+  { key: "health", label: "Health" },
+];
 
 // ─── Component ──────────────────────────────────────────
 
@@ -349,10 +237,8 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
   const [sortKey, setSortKey] = useState<string>("title");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
-  // Column reordering
-  const [columnOrder, setColumnOrder] = useState<ColumnKey[]>(DEFAULT_COLUMN_ORDER);
-  const [draggedCol, setDraggedCol] = useState<ColumnKey | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<ColumnKey | null>(null);
+  // Column visibility
+  const [visibleColumns, setVisibleColumns] = useState<Set<ColumnKey>>(new Set(DEFAULT_VISIBLE));
 
   // ─── Filtered & sorted data ─────────────────────────
 
@@ -465,63 +351,37 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     }
   }
 
-  function handleDragStart(col: ColumnKey) {
-    setDraggedCol(col);
+  function toggleColumn(col: ColumnKey) {
+    setVisibleColumns((prev) => {
+      const next = new Set(prev);
+      // Always keep "goal" visible
+      if (col === "goal") return next;
+      if (next.has(col)) next.delete(col);
+      else next.add(col);
+      return next;
+    });
   }
 
-  function handleDragOver(e: React.DragEvent, col: ColumnKey) {
-    e.preventDefault();
-    if (col !== draggedCol) setDragOverCol(col);
-  }
-
-  function handleDrop(col: ColumnKey) {
-    if (!draggedCol || draggedCol === col) {
-      setDraggedCol(null);
-      setDragOverCol(null);
-      return;
-    }
-    const newOrder = [...columnOrder];
-    const fromIdx = newOrder.indexOf(draggedCol);
-    const toIdx = newOrder.indexOf(col);
-    newOrder.splice(fromIdx, 1);
-    newOrder.splice(toIdx, 0, draggedCol);
-    setColumnOrder(newOrder);
-    setDraggedCol(null);
-    setDragOverCol(null);
-  }
-
-  function handleDragEnd() {
-    setDraggedCol(null);
-    setDragOverCol(null);
-  }
+  const activeColumns = ALL_COLUMNS.filter((c) => visibleColumns.has(c.key));
 
   function renderColumnHeader(col: ColumnKey) {
-    const dragCls = `cursor-grab active:cursor-grabbing transition-colors ${dragOverCol === col ? "bg-primary/10" : ""} ${draggedCol === col ? "opacity-40" : ""}`;
-    const dragEvents = {
-      draggable: true as const,
-      onDragStart: () => handleDragStart(col),
-      onDragOver: (e: React.DragEvent) => handleDragOver(e, col),
-      onDrop: () => handleDrop(col),
-      onDragEnd: handleDragEnd,
-    };
-
     switch (col) {
       case "goal":
-        return <TableHead key={col} className={`min-w-[180px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("title")} className="flex items-center gap-1 text-xs font-medium">Goal <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+        return <TableHead key={col} className="min-w-[180px]"><button onClick={() => toggleSort("title")} className="flex items-center gap-1 text-xs font-medium">Goal <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
       case "owner":
-        return <TableHead key={col} className={`w-[120px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("owner")} className="flex items-center gap-1 text-xs font-medium">Owner <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+        return <TableHead key={col} className="w-[120px]"><button onClick={() => toggleSort("owner")} className="flex items-center gap-1 text-xs font-medium">Owner <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
       case "cycle":
-        return <TableHead key={col} className={`w-[100px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("cycle")} className="flex items-center gap-1 text-xs font-medium">Cycle <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+        return <TableHead key={col} className="w-[100px]"><button onClick={() => toggleSort("cycle")} className="flex items-center gap-1 text-xs font-medium">Cycle <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
       case "status":
-        return <TableHead key={col} className={`w-[80px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Status</span></TableHead>;
+        return <TableHead key={col} className="w-[80px]"><span className="text-xs font-medium">Status</span></TableHead>;
       case "weight":
-        return <TableHead key={col} className={`w-[60px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">Wt <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+        return <TableHead key={col} className="w-[60px]"><button onClick={() => toggleSort("weight")} className="flex items-center gap-1 text-xs font-medium">Wt <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
       case "metric":
-        return <TableHead key={col} className={`w-[160px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Metric</span></TableHead>;
+        return <TableHead key={col} className="w-[160px]"><span className="text-xs font-medium">Metric</span></TableHead>;
       case "progress":
-        return <TableHead key={col} className={`w-[140px] ${dragCls}`} {...dragEvents}><button onClick={() => toggleSort("progress")} className="flex items-center gap-1 text-xs font-medium">Progress <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
+        return <TableHead key={col} className="w-[140px]"><button onClick={() => toggleSort("progress")} className="flex items-center gap-1 text-xs font-medium">Progress <ArrowUpDown className="h-3 w-3" /></button></TableHead>;
       case "health":
-        return <TableHead key={col} className={`w-[90px] ${dragCls}`} {...dragEvents}><span className="text-xs font-medium">Health</span></TableHead>;
+        return <TableHead key={col} className="w-[90px]"><span className="text-xs font-medium">Health</span></TableHead>;
     }
   }
 
@@ -985,7 +845,46 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
             Clear
           </Button>
         )}
+
+        {/* Column visibility toggle */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs ml-auto">
+              <SlidersHorizontal className="h-3 w-3 mr-1.5" />
+              Columns
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            {ALL_COLUMNS.map((col) => (
+              <label
+                key={col.key}
+                className="flex items-center gap-2 px-2 py-1.5 text-xs cursor-pointer hover:bg-muted/50 rounded-sm"
+              >
+                <Checkbox
+                  checked={visibleColumns.has(col.key)}
+                  disabled={col.key === "goal"}
+                  onCheckedChange={() => toggleColumn(col.key)}
+                />
+                {col.label}
+              </label>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      {/* Hierarchy warning when filters active */}
+      {hasActiveFilter && goals.some((g) => g.parent_id) && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-sky-50 dark:bg-sky-400/5 text-sky-700 dark:text-sky-300 text-xs">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          <span>Goal hierarchy is hidden while filters are active.</span>
+          <button
+            onClick={() => { setSearch(""); setCycleFilter("all"); setScopeFilter("all"); setStatusFilter("all"); }}
+            className="underline ml-0.5"
+          >
+            Clear filters
+          </button>
+        </div>
+      )}
 
       {/* Update error banner */}
       {updateError && (
@@ -1033,7 +932,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30">
-                {columnOrder.map(renderColumnHeader)}
+                {activeColumns.map((c) => renderColumnHeader(c.key))}
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -1043,7 +942,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
 
                 return (
                   <TableRow key={goal.id} className="group">
-                    {columnOrder.map((col) => renderColumnCell(col, goal, tc))}
+                    {activeColumns.map((c) => renderColumnCell(c.key, goal, tc))}
                     {/* Actions */}
                     <TableCell className="w-10 pr-4">
                       <DropdownMenu>
@@ -1102,7 +1001,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>KPI Target</Label>
+              <Label>Tracking</Label>
               <div className="flex gap-2">
                 <Select value={newGoal.goal_direction} onValueChange={(v) => setNewGoal({ ...newGoal, goal_direction: v })}>
                   <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
@@ -1116,6 +1015,14 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                 <Input type="number" placeholder="Target" value={newGoal.metric_target} onChange={(e) => setNewGoal({ ...newGoal, metric_target: e.target.value })} className="w-24" />
                 <Input placeholder="Unit" value={newGoal.metric_unit} onChange={(e) => setNewGoal({ ...newGoal, metric_unit: e.target.value })} className="w-20" />
               </div>
+              <div className="flex gap-2 mt-2">
+                <Input type="number" placeholder="Baseline" value={newGoal.metric_start} onChange={(e) => setNewGoal({ ...newGoal, metric_start: e.target.value })} className="w-24" />
+                <p className="text-[11px] text-muted-foreground self-center">Starting value for progress calculation</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea placeholder="What does success look like?" value={newGoal.description} onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })} rows={3} />
             </div>
             <button type="button" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1" onClick={() => setShowAdvanced(!showAdvanced)}>
               {showAdvanced ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -1155,14 +1062,6 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
                       {goals.map((g: any) => (<SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>))}
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Baseline value</Label>
-                  <Input type="number" placeholder="Starting value" value={newGoal.metric_start} onChange={(e) => setNewGoal({ ...newGoal, metric_start: e.target.value })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Description</Label>
-                  <Textarea placeholder="What does success look like?" value={newGoal.description} onChange={(e) => setNewGoal({ ...newGoal, description: e.target.value })} rows={3} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Weight</Label>

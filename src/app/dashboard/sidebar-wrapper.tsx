@@ -6,7 +6,13 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function SidebarWrapper({ children }: { children: React.ReactNode }) {
+interface SidebarWrapperProps {
+  children: React.ReactNode;
+  workspaceName?: string;
+  workspaceLogoUrl?: string | null;
+}
+
+export function SidebarWrapper({ children, workspaceName, workspaceLogoUrl }: SidebarWrapperProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -39,10 +45,14 @@ export function SidebarWrapper({ children }: { children: React.ReactNode }) {
           <Menu className="h-5 w-5" />
         </button>
         <Link href="/dashboard" className="flex items-center gap-3.5">
-          <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-base font-bold">P</span>
-          </div>
-          <span className="font-semibold text-[17px] text-sidebar-foreground tracking-tight">Perf</span>
+          {workspaceLogoUrl ? (
+            <img src={workspaceLogoUrl} alt="" className="h-11 w-11 rounded-lg object-cover shrink-0" />
+          ) : (
+            <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground text-base font-bold">{(workspaceName || "N").charAt(0).toUpperCase()}</span>
+            </div>
+          )}
+          <span className="font-semibold text-[17px] text-sidebar-foreground tracking-tight">{workspaceName || "Nami"}</span>
         </Link>
       </div>
 

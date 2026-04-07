@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAllArticles } from "@/lib/help-articles";
+import { EmptyState } from "@/components/ui/empty-state";
+import { HelpCircle } from "lucide-react";
 
 export default function HelpPage() {
   const articles = getAllArticles();
@@ -9,13 +11,16 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <h1 className="text-2xl font-semibold text-foreground mb-2">
-        Help Center
-      </h1>
-      <p className="text-muted-foreground">
-        No articles available yet. Check back soon!
-      </p>
+    <div className="py-8">
+      <EmptyState
+        icon={HelpCircle}
+        title="Help Center"
+        description="No articles available yet. Need help? Reach out to our support team."
+        actions={[
+          { label: "Contact Support", href: "mailto:support@namihr.com" },
+          { label: "Back to Dashboard", href: "/dashboard", variant: "outline" },
+        ]}
+      />
     </div>
   );
 }
