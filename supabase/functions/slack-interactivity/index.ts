@@ -2064,6 +2064,49 @@ Deno.serve(async (req) => {
             status: "in_progress",
             updated_at: new Date().toISOString(),
           });
+
+          // Notify the manager that this employee's self-review is done
+          (async () => {
+            try {
+              const assignments = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=manager_id,cycle_id,cycle:performance_cycles!review_assignments_cycle_id_fkey(name)`);
+              const a = assignments?.[0];
+              if (a?.manager_id) {
+                const managers = await dbQuery("users", `id=eq.${a.manager_id}&select=slack_user_id,slack_name`);
+                const mgr = managers?.[0];
+                if (mgr?.slack_user_id) {
+                  const cycleName = a.cycle?.name || "the current cycle";
+                  await slackApi(botToken, "chat.postMessage", {
+                    channel: mgr.slack_user_id,
+                    text: `${conv.employee_name} has completed their self-review`,
+                    blocks: [
+                      {
+                        type: "section",
+                        text: {
+                          type: "mrkdwn",
+                          text: `:white_check_mark: *${conv.employee_name}* has completed their self-review for *${cycleName}*.\n\nYou can now start your manager review.`,
+                        },
+                      },
+                      { type: "divider" },
+                      {
+                        type: "actions",
+                        elements: [
+                          {
+                            type: "button",
+                            text: { type: "plain_text", text: "Start review :pencil:", emoji: true },
+                            style: "primary",
+                            action_id: "nami_start_review",
+                            value: `mgr_${conv.assignment_id}`,
+                          },
+                        ],
+                      },
+                    ],
+                  });
+                }
+              }
+            } catch (e) {
+              console.error("Failed to notify manager of self-review completion:", e);
+            }
+          })();
         }
 
         // Send confirmation

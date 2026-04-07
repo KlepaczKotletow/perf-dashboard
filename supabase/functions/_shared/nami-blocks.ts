@@ -482,15 +482,21 @@ export function buildSurveyQuestionPrompt(
   };
 
   if (question.type === "rating_7") {
-    const buttons = Array.from({ length: 7 }, (_, i) => ({
-      type: "button" as const,
-      text: { type: "plain_text" as const, text: `${i + 1}` },
-      action_id: `nami_survey_rate_${i + 1}`,
-      value: JSON.stringify({ convId, surveyId, questionIndex: index, rating: i + 1 }),
-    }));
+    const scaleLabels: Record<number, string> = { 1: "Strongly disagree", 4: "Neutral", 7: "Strongly agree" };
+    const buttons = Array.from({ length: 7 }, (_, i) => {
+      const n = i + 1;
+      const label = scaleLabels[n] ? `${n} - ${scaleLabels[n]}` : `${n}`;
+      return {
+        type: "button" as const,
+        text: { type: "plain_text" as const, text: label },
+        action_id: `nami_survey_rate_${n}`,
+        value: JSON.stringify({ convId, surveyId, questionIndex: index, rating: n }),
+      };
+    });
     // Slack actions blocks have a max of 5 elements — split into two rows
     return [
       header,
+      { type: "context", elements: [{ type: "mrkdwn", text: "_1 = Strongly disagree · 4 = Neutral · 7 = Strongly agree_" }] },
       { type: "actions", elements: buttons.slice(0, 4) },
       { type: "actions", elements: buttons.slice(4) },
     ];

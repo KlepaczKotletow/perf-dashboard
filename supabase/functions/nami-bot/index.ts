@@ -1210,42 +1210,52 @@ async function handleReleaseGrades(cycleId: string) {
     if (_i > 0) await throttle();
 
     try {
-      const ratingLine = a.overall_rating
-        ? `*Overall rating:* ${a.overall_rating}`
+      // Build a rich results message — this is the most important notification an employee receives
+      const ratingMax = 5; // TODO: read from workspace settings if customized
+      const ratingStr = a.overall_rating
+        ? `${(Math.round(a.overall_rating * 10) / 10)}/${ratingMax}`
         : null;
-      const gradeLine = a.final_grade
-        ? `*Final grade:* ${a.final_grade}`
-        : null;
+      const gradeStr = a.final_grade || null;
+
+      // Summary line combining rating + grade
+      const resultParts: string[] = [];
+      if (ratingStr) resultParts.push(`:star: *${ratingStr}*`);
+      if (gradeStr) resultParts.push(`:medal: *${gradeStr}*`);
+      const resultLine = resultParts.length > 0
+        ? resultParts.join("  ·  ")
+        : "_No rating available_";
 
       const blocks: any[] = [
         {
           type: "section",
           text: {
             type: "mrkdwn",
-            text: `\u{1F4CB} *Your ${cycle.name} review results are ready*`,
+            text: `:tada: *Your ${cycle.name} results are in!*\n\n${resultLine}`,
           },
+        },
+        {
+          type: "context",
+          elements: [
+            {
+              type: "mrkdwn",
+              text: "View your full results including competency breakdown and feedback on the dashboard.",
+            },
+          ],
+        },
+        { type: "divider" },
+        {
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: { type: "plain_text", text: "View my results :chart_with_upwards_trend:", emoji: true },
+              style: "primary",
+              url: `${DASHBOARD_URL}/dashboard/performance`,
+              action_id: "open_results",
+            },
+          ],
         },
       ];
-
-      // Add rating/grade if available
-      if (ratingLine || gradeLine) {
-        blocks.push({
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: [ratingLine, gradeLine].filter(Boolean).join("\n"),
-          },
-        });
-      }
-
-      // Add dashboard link
-      blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `<${DASHBOARD_URL}/dashboard|View your full review in the dashboard>`,
-        },
-      });
 
       const ok = await sendSlackBlocks(
         botToken,
