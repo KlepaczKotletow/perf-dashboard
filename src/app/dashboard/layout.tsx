@@ -57,6 +57,7 @@ export default async function DashboardLayout({
   const canAccessHRFeatures = isHROrAbove(workspace?.role);
 
   const sections: NavSection[] = [
+    // ── Everyone sees this (no label for employees, acts as flat list) ──
     {
       label: "",
       items: [
@@ -66,28 +67,25 @@ export default async function DashboardLayout({
         { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
       ],
     },
+    // ── Managers: team management + their cycles ──
     {
       label: "Team",
       items: [
         { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
-      ],
-    },
-    {
-      label: "Workspace",
-      items: [
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
+    // ── HR/Admin: org-wide tools ──
     {
-      label: "Settings",
+      label: "Admin",
       items: [
-        { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/surveys", label: "Surveys", icon: ClipboardList, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/templates", label: "Templates", icon: ListChecks, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresHR: true, requiresAdmin: false },
+        { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings/forms", label: "Forms", icon: SlidersHorizontal, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresHR: false, requiresAdmin: true },
       ],
