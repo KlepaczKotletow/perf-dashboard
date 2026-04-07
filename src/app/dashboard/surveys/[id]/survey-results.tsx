@@ -39,20 +39,34 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
               <p className="text-sm text-muted-foreground">No responses yet.</p>
             ) : (
               <>
-                <div className="text-5xl font-bold text-foreground mb-1">{score > 0 ? `+${score}` : score}</div>
-                <p className="text-xs text-muted-foreground mb-4">Range: −100 to +100 · Global benchmark ~+20</p>
+                <div className="flex items-baseline gap-2 mb-3">
+                  <span className="text-4xl font-bold text-foreground">{score > 0 ? `+${score}` : score}</span>
+                  <span className="text-xs text-muted-foreground">Based on {scores.length} response{scores.length !== 1 ? "s" : ""}</span>
+                </div>
+                {/* Score gauge bar */}
+                <div className="relative h-3 rounded-full overflow-hidden mb-4">
+                  <div className="absolute inset-0 flex">
+                    <div className="h-full bg-red-400/60" style={{ width: "50%" }} />
+                    <div className="h-full bg-amber-400/60" style={{ width: "15%" }} />
+                    <div className="h-full bg-emerald-400/60" style={{ width: "35%" }} />
+                  </div>
+                  <div
+                    className="absolute top-0 h-full w-1 bg-foreground rounded-full"
+                    style={{ left: `${Math.min(100, Math.max(0, ((score + 100) / 200) * 100))}%` }}
+                  />
+                </div>
                 <div className="flex gap-6 text-sm">
                   <div className="text-center">
                     <div className="text-2xl font-semibold text-green-600">{promoters}</div>
-                    <div className="text-xs text-muted-foreground">Promoters (9–10)</div>
+                    <div className="text-xs text-muted-foreground">Promoters (9-10)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-semibold text-yellow-600">{passives}</div>
-                    <div className="text-xs text-muted-foreground">Passives (7–8)</div>
+                    <div className="text-xs text-muted-foreground">Passives (7-8)</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-semibold text-red-500">{detractors}</div>
-                    <div className="text-xs text-muted-foreground">Detractors (0–6)</div>
+                    <div className="text-xs text-muted-foreground">Detractors (0-6)</div>
                   </div>
                 </div>
               </>
@@ -128,19 +142,22 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                   ? <p className="text-sm text-muted-foreground">No responses yet.</p>
                   : (
                     <div className="space-y-1.5">
-                      {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                        <div key={n} className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground w-3 text-right">{n}</span>
-                          <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
-                            <div
-                              className="h-full bg-primary/70 rounded transition-all"
-                              style={{ width: `${(counts[n - 1] / max) * 100}%` }}
-                            />
+                      {[1, 2, 3, 4, 5, 6, 7].map(n => {
+                        const pct = numericResponses.length > 0 ? Math.round((counts[n - 1] / numericResponses.length) * 100) : 0;
+                        return (
+                          <div key={n} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-3 text-right">{n}</span>
+                            <div className="flex-1 h-5 bg-muted rounded overflow-hidden">
+                              <div
+                                className="h-full bg-primary/70 rounded transition-all"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground w-12 text-right">{counts[n - 1]} ({pct}%)</span>
                           </div>
-                          <span className="text-xs text-muted-foreground w-5 text-right">{counts[n - 1]}</span>
-                        </div>
-                      ))}
-                      <p className="text-xs text-muted-foreground mt-1">{qResponses.length} response{qResponses.length !== 1 ? "s" : ""}</p>
+                        );
+                      })}
+                      <p className="text-xs text-muted-foreground mt-1">{numericResponses.length} response{numericResponses.length !== 1 ? "s" : ""}</p>
                     </div>
                   )}
               </CardContent>
@@ -189,19 +206,19 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
           </div>
         )}
 
-        {othersResp.length < MIN_RATERS ? (
+        {othersResp.length === 0 && !selfResp ? (
           <Card>
             <CardContent className="pt-6 text-center py-8">
-              <p className="text-sm text-muted-foreground">
-                Results will be visible once at least <strong>{MIN_RATERS}</strong> raters have responded.
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {othersResp.length} of {MIN_RATERS} required responses received
-              </p>
+              <p className="text-sm text-muted-foreground">No responses yet.</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
+            {othersResp.length < MIN_RATERS && othersResp.length > 0 && (
+              <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+                {othersResp.length} of {MIN_RATERS} raters responded — anonymity threshold not yet met. Results shown to admins only.
+              </div>
+            )}
             {questions.filter((q: any) => q.type === "rating_7").map((q: any) => {
               const selfScore = selfResp ? parseFloat(selfResp.answers?.[q.id]) : null;
               const otherScores = othersResp
@@ -229,10 +246,14 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                       </div>
                       {gap !== null && (
                         <div className="text-center">
-                          <div className={`text-2xl font-bold ${gap > 0 ? "text-green-600" : gap < 0 ? "text-amber-600" : "text-muted-foreground"}`}>
-                            {gap > 0 ? "▲" : gap < 0 ? "▼" : "="} {Math.abs(gap).toFixed(1)}
+                          <div className={`text-2xl font-bold ${
+                            Math.abs(gap) <= 0.5 ? "text-muted-foreground"
+                            : Math.abs(gap) <= 1.5 ? "text-amber-600"
+                            : "text-red-600"
+                          }`}>
+                            {gap > 0 ? "+" : ""}{gap.toFixed(1)}
                           </div>
-                          <div className="text-xs text-muted-foreground">Gap</div>
+                          <div className="text-xs text-muted-foreground" title="Others' average minus Self score">Gap</div>
                         </div>
                       )}
                     </div>

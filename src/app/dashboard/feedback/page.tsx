@@ -7,6 +7,7 @@ import { FeedbackFilter } from "./feedback-filter";
 import { Suspense } from "react";
 import { MessageSquare } from "lucide-react";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
+import { Pagination } from "@/components/ui/pagination";
 
 interface FeedbackFilters {
   type?: string;
@@ -67,6 +68,8 @@ async function getScope(
   return { userIds: [currentUserId] };
 }
 
+const PAGE_SIZE = 30;
+
 async function getContinuousFeedback(
   filters: FeedbackFilters,
   scope: FeedbackScope,
@@ -74,19 +77,19 @@ async function getContinuousFeedback(
   currentUserId: string | null,
   role: string | undefined,
   hasDirectReports?: boolean,
-) {
-  if (!workspaceId) return [];
+  page: number = 1,
+): Promise<{ data: any[]; total: number }> {
+  if (!workspaceId) return { data: [], total: 0 };
 
   // If scope is an empty array we know there's nothing to return
-  if (scope.userIds !== null && scope.userIds.length === 0) return [];
+  if (scope.userIds !== null && scope.userIds.length === 0) return { data: [], total: 0 };
 
   const supabase = await createServerSupabaseClient();
 
   let query = supabase
     .from("continuous_feedback")
-    .select("*, from_user:users!continuous_feedback_from_user_id_fkey(slack_name), to_user:users!continuous_feedback_to_user_id_fkey(slack_name)")
+    .select("*, from_user:users!continuous_feedback_from_user_id_fkey(slack_name), to_user:users!continuous_feedback_to_user_id_fkey(slack_name)", { count: "exact" })
     .order("created_at", { ascending: false })
-    .limit(50)
     .eq("workspace_id", workspaceId);
 
   if (scope.userIds !== null) {
@@ -124,7 +127,12 @@ async function getContinuousFeedback(
     }
   }
 
-  const { data, error: continuousFeedbackErr } = await query;
+  // Apply search filter server-side if possible, otherwise client-side post-fetch
+  // For now, apply pagination to the base query
+  const offset = (page - 1) * PAGE_SIZE;
+  query = query.range(offset, offset + PAGE_SIZE - 1);
+
+  const { data, count, error: continuousFeedbackErr } = await query;
   if (continuousFeedbackErr) console.error("Failed to fetch continuous feedback:", continuousFeedbackErr.message);
   let results = data || [];
 
@@ -137,15 +145,16 @@ async function getContinuousFeedback(
     );
   }
 
-  return results;
+  return { data: results, total: count || 0 };
 }
 
 export default async function FeedbackPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; search?: string; from?: string; to?: string; period?: string }>;
+  searchParams: Promise<{ type?: string; search?: string; from?: string; to?: string; period?: string; page?: string }>;
 }) {
   const params = await searchParams;
+  const currentPage = Math.max(1, parseInt(params.page || "1", 10) || 1);
   const workspace = await getUserWorkspace();
   const role = workspace?.role;
   const currentUserId = workspace?.appUserId ?? null;
@@ -173,7 +182,7 @@ export default async function FeedbackPage({
     userList = (users || []).map((u: any) => ({ id: u.id, name: u.slack_name || "Unknown" }));
   }
 
-  const continuousFeedback = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role, workspace?.hasDirectReports);
+  const { data: continuousFeedback, total: feedbackTotal } = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role, workspace?.hasDirectReports, currentPage);
 
   return (
     <div className="space-y-6">
@@ -247,13 +256,20 @@ export default async function FeedbackPage({
                 })}
               </TableBody>
             </Table>
-            {continuousFeedback.length === 50 && (
-              <p className="text-xs text-muted-foreground text-center py-3 border-t border-border/60">
-                Showing first 50 results. Use filters to narrow down.
-              </p>
-            )}
           </CardContent>
         </Card>
+      )}
+
+      {feedbackTotal > 0 && (
+        <Pagination
+          page={currentPage}
+          pageSize={PAGE_SIZE}
+          total={feedbackTotal}
+          basePath="/dashboard/feedback"
+          searchParams={Object.fromEntries(
+            Object.entries(params).filter(([k, v]) => k !== "page" && v)
+          ) as Record<string, string>}
+        />
       )}
 
     </div>

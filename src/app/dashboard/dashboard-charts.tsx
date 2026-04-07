@@ -40,22 +40,47 @@ export function DashboardCharts({ data }: DashboardChartsProps) {
             : null
         }
       >
-        <div className="flex justify-center py-2">
-          <ProgressRing value={data.completionRate} size={100} strokeWidth={8} />
+        <div className="flex flex-col items-center gap-3 py-3">
+          <span className="text-4xl font-bold text-foreground tabular-nums">{data.completionRate}%</span>
+          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                data.completionRate >= 70 ? "bg-emerald-500" : data.completionRate >= 40 ? "bg-amber-500" : "bg-red-500"
+              }`}
+              style={{ width: `${data.completionRate}%` }}
+            />
+          </div>
         </div>
       </ChartCard>
     );
   }
 
   if (hasGoalData) {
+    const totalGoals = data.goalDistribution.reduce((sum, d) => sum + d.value, 0);
     charts.push(
-      <ChartCard key="goals" title="Goal Progress">
-        <DonutChart
-          data={data.goalDistribution}
-          height={140}
-          innerRadius={36}
-          outerRadius={52}
-        />
+      <ChartCard key="goals" title="Goal Health" subtitle={`${totalGoals} total goals`}>
+        <div className="space-y-2 py-2">
+          {/* Stacked horizontal bar */}
+          <div className="flex h-4 rounded-full overflow-hidden">
+            {data.goalDistribution.filter(d => d.value > 0).map((d) => (
+              <div
+                key={d.name}
+                className="h-full transition-all"
+                style={{ width: `${(d.value / totalGoals) * 100}%`, backgroundColor: d.color }}
+                title={`${d.name}: ${d.value}`}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {data.goalDistribution.filter(d => d.value > 0).map((d) => (
+              <div key={d.name} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                {d.name} <span className="font-medium text-foreground">{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </ChartCard>
     );
   }
@@ -63,7 +88,7 @@ export function DashboardCharts({ data }: DashboardChartsProps) {
   if (hasReviewTrend) {
     charts.push(
       <ChartCard key="trend" title="Review Trend" subtitle="Last 6 months">
-        <AppLineChart data={data.reviewTrend} height={160} />
+        <AppLineChart data={data.reviewTrend} height={220} />
       </ChartCard>
     );
   }
@@ -73,7 +98,7 @@ export function DashboardCharts({ data }: DashboardChartsProps) {
       <ChartCard key="dept" title="By Department" subtitle="Avg rating">
         <AppBarChart
           data={data.departmentPerformance}
-          height={160}
+          height={220}
           layout="horizontal"
           valueFormatter={(v) => v.toFixed(1)}
         />
@@ -106,7 +131,7 @@ export function DashboardCharts({ data }: DashboardChartsProps) {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Analytics</h2>
+      <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Analytics</h2>
       <div className={`grid gap-4 ${gridCols}`}>
         {charts}
       </div>
