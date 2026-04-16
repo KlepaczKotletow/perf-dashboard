@@ -456,6 +456,29 @@ export default function ReviewFormPage({
         .insert(responses);
 
       if (insertError) {
+        const code = (insertError as { code?: string }).code;
+        if (code === "42501") {
+          setError(
+            "You are not authorized to submit this review in this role. " +
+              "If you believe this is wrong, refresh the page and try again.",
+          );
+          setSubmitting(false);
+          return;
+        }
+        if (code === "23505") {
+          // Unique constraint on (assignment_id, reviewer_id, reviewer_role, competency_id)
+          // — the review was already submitted. Treat as success: clear draft and redirect.
+          try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
+          const fromCycle = searchParams.get("from") === "cycle";
+          const fromCycleId = searchParams.get("cycleId");
+          if (fromCycle && fromCycleId) {
+            router.push(`/dashboard/cycles/${fromCycleId}`);
+          } else {
+            router.push(`/dashboard/performance`);
+          }
+          router.refresh();
+          return;
+        }
         setError(insertError.message);
         setSubmitting(false);
         return;
