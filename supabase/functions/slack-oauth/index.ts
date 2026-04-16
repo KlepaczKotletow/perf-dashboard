@@ -137,6 +137,41 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=${tokenData.error}`, 302);
     }
 
+    // Validate that Slack actually granted every scope Nami needs. If the
+    // admin dropped one during reinstall (or Slack's scope-upgrade flow
+    // didn't complete), fail loudly at install time instead of letting a
+    // later slash-command / DM silently error out with "missing_scope".
+    const REQUIRED_BOT_SCOPES = [
+      "chat:write",
+      "commands",
+      "users:read",
+      "users:read.email",
+      "team:read",
+      "im:write",
+      "im:history",
+      "app_mentions:read",
+      "reactions:read",
+      "channels:read",
+    ];
+    const grantedScopes = String(tokenData.scope ?? "")
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+    const missingScopes = REQUIRED_BOT_SCOPES.filter(
+      (s) => !grantedScopes.includes(s),
+    );
+    if (missingScopes.length > 0) {
+      console.error(
+        "[slack-oauth] install rejected, missing scopes:",
+        missingScopes.join(","),
+      );
+      const errQuery = new URLSearchParams({
+        error: "missing_scopes",
+        scopes: missingScopes.join(","),
+      }).toString();
+      return Response.redirect(`${DASHBOARD_URL}/auth/error?${errQuery}`, 302);
+    }
+
     const { team, access_token, refresh_token, expires_in, bot_user_id } = tokenData;
     const authedUserId = tokenData.authed_user?.id;
     const authedUserToken = tokenData.authed_user?.access_token;

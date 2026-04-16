@@ -650,23 +650,126 @@ Deno.serve(async (req) => {
         try {
           const { data: workspace } = await supabase
             .from("workspaces")
-            .select("id")
+            .select("id, bot_token")
             .eq("team_id", teamId)
             .single();
 
-          if (workspace) {
-            const { error } = await supabase
-              .from("users")
-              .update({ employee_status: "deactivated", updated_at: new Date().toISOString() })
-              .eq("slack_user_id", slackUserId)
-              .eq("workspace_id", workspace.id);
+          if (!workspace) return;
 
-            if (error) {
-              console.error("[slack-events] Failed to deactivate user:", error.message);
+          // Look up the app user row so we can also close their open reviews.
+          const { data: appUser } = await supabase
+            .from("users")
+            .select("id, slack_name, manager_id")
+            .eq("slack_user_id", slackUserId)
+            .eq("workspace_id", workspace.id)
+            .single();
+
+          // 1. Deactivate the user row (existing behaviour)
+          const { error: userErr } = await supabase
+            .from("users")
+            .update({ employee_status: "deactivated", updated_at: new Date().toISOString() })
+            .eq("slack_user_id", slackUserId)
+            .eq("workspace_id", workspace.id);
+          if (userErr) {
+            console.error("[slack-events] Failed to deactivate user:", userErr.message);
+          }
+
+          if (!appUser) {
+            console.log("[slack-events] team_leave: no app user for slack_user_id", slackUserId);
+            return;
+          }
+
+          // 2. Close any open review_assignments where the departing user is
+          //    the subject, the reviewer, or the manager. Matches Lattice /
+          //    Leapsome behaviour: in-flight reviews don't silently carry on
+          //    against someone who is no longer in the company.
+          const { data: affected } = await supabase
+            .from("review_assignments")
+            .select(
+              `
+              id, cycle_id, employee_id, reviewer_id, manager_id, assignment_type, status,
+              cycle:performance_cycles!review_assignments_cycle_id_fkey(name),
+              manager:users!review_assignments_manager_id_fkey(id, slack_user_id, slack_name)
+              `,
+            )
+            .in("status", ["pending", "in_progress"])
+            .or(
+              `employee_id.eq.${appUser.id},reviewer_id.eq.${appUser.id},manager_id.eq.${appUser.id}`,
+            );
+
+          if (affected && affected.length > 0) {
+            const ids = affected.map((a) => a.id);
+            const { error: closeErr } = await supabase
+              .from("review_assignments")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .in("id", ids);
+            if (closeErr) {
+              console.error("[slack-events] Failed to cancel assignments:", closeErr.message);
             } else {
-              console.log("[slack-events] Deactivated user:", slackUserId, "from workspace:", teamId);
+              console.log(
+                `[slack-events] Cancelled ${ids.length} review_assignments for ${slackUserId}`,
+              );
+            }
+
+            // 3. DM affected managers so they know their team roster changed.
+            // One DM per distinct manager summarising what was closed.
+            const byManager = new Map<string, { slackId: string; name: string; items: string[] }>();
+            for (const a of affected as Array<{
+              id: string;
+              assignment_type: string;
+              cycle?: { name?: string } | null;
+              manager?: { id?: string; slack_user_id?: string; slack_name?: string } | null;
+            }>) {
+              const mgr = a.manager;
+              if (!mgr?.slack_user_id) continue;
+              const key = mgr.slack_user_id;
+              const entry = byManager.get(key) ?? { slackId: mgr.slack_user_id, name: mgr.slack_name ?? "", items: [] };
+              entry.items.push(
+                `• ${a.cycle?.name ?? "cycle"} — ${a.assignment_type} review`,
+              );
+              byManager.set(key, entry);
+            }
+
+            if (workspace.bot_token && byManager.size > 0) {
+              for (const entry of byManager.values()) {
+                try {
+                  // Open / reuse the DM channel, then post.
+                  const open = await fetch("https://slack.com/api/conversations.open", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${workspace.bot_token}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ users: entry.slackId }),
+                  }).then((r) => r.json());
+                  const channelId = open?.channel?.id;
+                  if (!channelId) continue;
+
+                  const text = [
+                    `:wave: *${appUser.slack_name ?? "A team member"}* has left the Slack workspace.`,
+                    "",
+                    "I've cancelled the following reviews so nothing lingers:",
+                    ...entry.items,
+                    "",
+                    "If you expected them back, your admin can re-invite them to Slack and I'll restore the rows.",
+                  ].join("\n");
+
+                  await fetch("https://slack.com/api/chat.postMessage", {
+                    method: "POST",
+                    headers: {
+                      Authorization: `Bearer ${workspace.bot_token}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ channel: channelId, text }),
+                  });
+                } catch (dmErr) {
+                  console.error("[slack-events] manager DM failed:", dmErr);
+                }
+              }
             }
           }
+
+          console.log("[slack-events] Deactivated user + closed reviews:", slackUserId);
         } catch (err) {
           console.error("[slack-events] Error handling team_leave:", err);
         }

@@ -6,6 +6,8 @@
  *   /kudos  – opens the dynamic feedback modal built via the Form Builder
  */
 
+import { callSlackApi } from "../_shared/slack-api.ts";
+
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
@@ -33,7 +35,11 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   const hex = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  return `v0=${hex}` === slackSig;
+  // Timing-safe comparison to prevent timing attacks
+  const computed = encoder.encode(`v0=${hex}`);
+  const received = encoder.encode(slackSig);
+  if (computed.byteLength !== received.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(computed, received);
 }
 
 async function dbQuery(table: string, query: string) {
@@ -88,15 +94,7 @@ async function getFreshBotToken(ws: any): Promise<string> {
 }
 
 async function slackApi(token: string, method: string, body: Record<string, unknown>) {
-  const res = await fetch(`https://slack.com/api/${method}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  return res.json();
+  return callSlackApi(token, method, body);
 }
 
 // ── Modal builder ────────────────────────────────────────────────────────────
@@ -289,8 +287,24 @@ Deno.serve(async (req) => {
 
     if (!result.ok) {
       console.error("views.open failed:", result.error);
+      // Disambiguate the common failure modes so users know whether to retry,
+      // reinstall, or contact their admin. Matches what Lattice / Leapsome
+      // surface when a workspace install is misconfigured.
+      const err = String(result.error ?? "");
+      let msg: string;
+      if (err.includes("invalid_auth") || err.includes("token")) {
+        msg = ":warning: Nami's connection to Slack looks expired. Ask your workspace admin to reinstall Nami, then try again.";
+      } else if (err.includes("missing_scope") || err === "not_allowed_token_type") {
+        msg = ":warning: Nami is missing a Slack permission it needs. Ask your workspace admin to reinstall Nami to grant the required scopes.";
+      } else if (err.includes("trigger")) {
+        msg = ":warning: Slack trigger expired before the form could open. Try the command again — this usually happens after a 3-second pause.";
+      } else if (err.includes("ratelimited")) {
+        msg = ":hourglass: Slack is rate-limiting Nami right now. Try again in about a minute.";
+      } else {
+        msg = `:warning: Couldn't open the form (Slack error: ${err || "unknown"}). If this keeps happening, let your admin know.`;
+      }
       return new Response(
-        JSON.stringify({ response_type: "ephemeral", text: "Failed to open form. Please try again." }),
+        JSON.stringify({ response_type: "ephemeral", text: msg }),
         { headers: { "Content-Type": "application/json" } },
       );
     }

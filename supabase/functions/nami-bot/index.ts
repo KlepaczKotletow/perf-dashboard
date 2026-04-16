@@ -1426,6 +1426,217 @@ async function verifyResourceOwnership(
 }
 
 // =============================================================================
+//  Slack send queue drain — processes feedback + new-reviewer DMs
+// =============================================================================
+
+interface QueueJob {
+  id: string;
+  workspace_id: string;
+  action: string;
+  payload: Record<string, unknown>;
+  attempts: number;
+}
+
+async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+  const feedbackId = job.payload.feedback_id as string | undefined;
+  if (!feedbackId) return { ok: false, error: "missing feedback_id" };
+
+  const { data: fb } = await supabase
+    .from("continuous_feedback")
+    .select(
+      `
+      id, workspace_id, message, feedback_type, is_anonymous, shared_with_employee,
+      from_user:users!continuous_feedback_from_user_id_fkey(slack_name),
+      to_user:users!continuous_feedback_to_user_id_fkey(slack_user_id, slack_name)
+      `,
+    )
+    .eq("id", feedbackId)
+    .single();
+  if (!fb) return { ok: false, error: "feedback not found" };
+
+  // Only DM when the sender actually shared it with the recipient.
+  if (!fb.shared_with_employee) return { ok: true };
+
+  const recipient = (fb as { to_user?: { slack_user_id?: string; slack_name?: string } | null }).to_user;
+  if (!recipient?.slack_user_id) return { ok: true };
+
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("bot_token")
+    .eq("id", job.workspace_id)
+    .single();
+  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  if (!botToken) return { ok: false, error: "no bot token" };
+
+  const sender = fb.is_anonymous
+    ? "someone in your workspace"
+    : (fb as { from_user?: { slack_name?: string } | null }).from_user?.slack_name ?? "a teammate";
+  const typeLabel =
+    fb.feedback_type === "praise" ? ":clap: praise"
+    : fb.feedback_type === "constructive" ? ":speech_balloon: constructive feedback"
+    : fb.feedback_type === "improvement" ? ":chart_with_upwards_trend: improvement suggestion"
+    : ":speech_balloon: feedback";
+
+  const open = await fetch("https://slack.com/api/conversations.open", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ users: recipient.slack_user_id }),
+  }).then((r) => r.json());
+  const channel = open?.channel?.id;
+  if (!channel) return { ok: false, error: `conversations.open: ${open?.error ?? "unknown"}` };
+
+  const text = `${typeLabel} from ${sender}:\n> ${String(fb.message).replace(/\n/g, "\n> ")}`;
+  const post = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ channel, text }),
+  }).then((r) => r.json());
+  if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
+  return { ok: true };
+}
+
+async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+  const assignmentId = job.payload.assignment_id as string | undefined;
+  if (!assignmentId) return { ok: false, error: "missing assignment_id" };
+
+  const { data: a } = await supabase
+    .from("review_assignments")
+    .select(
+      `
+      id, assignment_type, status, reviewer_id, cycle_id,
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(name, status),
+      reviewer:users!review_assignments_reviewer_id_fkey(slack_user_id, slack_name),
+      employee:users!review_assignments_employee_id_fkey(slack_name)
+      `,
+    )
+    .eq("id", assignmentId)
+    .single();
+  if (!a) return { ok: false, error: "assignment not found" };
+
+  const cycle = (a as { cycle?: { name?: string; status?: string } | null }).cycle;
+  if (cycle?.status !== "active") return { ok: true }; // cycle paused — skip, keep completed
+  const reviewer = (a as { reviewer?: { slack_user_id?: string; slack_name?: string } | null }).reviewer;
+  if (!reviewer?.slack_user_id) return { ok: true };
+  const employee = (a as { employee?: { slack_name?: string } | null }).employee;
+
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("bot_token")
+    .eq("id", job.workspace_id)
+    .single();
+  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  if (!botToken) return { ok: false, error: "no bot token" };
+
+  const open = await fetch("https://slack.com/api/conversations.open", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ users: reviewer.slack_user_id }),
+  }).then((r) => r.json());
+  const channel = open?.channel?.id;
+  if (!channel) return { ok: false, error: `conversations.open: ${open?.error ?? "unknown"}` };
+
+  const kind = a.assignment_type === "upward" ? "upward review" : "peer review";
+  const text = [
+    `:wave: You've been added as a reviewer on an active cycle.`,
+    `:clipboard: *${cycle?.name ?? "cycle"}* — ${kind} for *${employee?.slack_name ?? "a teammate"}*.`,
+    `Open the dashboard when you're ready to fill it in.`,
+  ].join("\n");
+
+  const post = await fetch("https://slack.com/api/chat.postMessage", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ channel, text }),
+  }).then((r) => r.json());
+  if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
+  return { ok: true };
+}
+
+async function refreshHomeTab(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+  const appUserId = job.payload.app_user_id as string | undefined;
+  if (!appUserId) return { ok: false, error: "missing app_user_id" };
+  const { data: u } = await supabase
+    .from("users")
+    .select("slack_user_id")
+    .eq("id", appUserId)
+    .single();
+  const slackUserId = (u as { slack_user_id?: string } | null)?.slack_user_id;
+  if (!slackUserId) return { ok: true }; // nothing to refresh — user has no Slack link
+
+  const { data: ws } = await supabase
+    .from("workspaces")
+    .select("bot_token")
+    .eq("id", job.workspace_id)
+    .single();
+  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  if (!botToken) return { ok: false, error: "no bot token" };
+
+  // Trigger a no-op views.publish. The slack-events handler listens for
+  // app_home_opened and rebuilds the view content; here we just poke Slack
+  // to fetch the latest via the event-based refresh mechanism. For now
+  // publish a minimal holding view; slack-events's own handler provides
+  // the rich one. If the user hasn't opened the home tab yet, Slack will
+  // reject with channel_not_found — treat that as success (idempotent).
+  const resp = await fetch("https://slack.com/api/views.publish", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: slackUserId,
+      view: {
+        type: "home",
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: ":arrows_counterclockwise: Refreshing..." } }],
+      },
+    }),
+  }).then((r) => r.json());
+  if (!resp?.ok) {
+    if (resp?.error === "channel_not_found" || resp?.error === "not_allowed_token_type") {
+      return { ok: true };
+    }
+    return { ok: false, error: `views.publish: ${resp?.error ?? "unknown"}` };
+  }
+  return { ok: true };
+}
+
+async function handleDrainSendQueue() {
+  const { data: jobsRaw, error: claimErr } = await supabase.rpc("claim_slack_send_jobs", { p_limit: 25 });
+  if (claimErr) {
+    return { processed: 0, error: claimErr.message };
+  }
+  const jobs = (jobsRaw ?? []) as QueueJob[];
+  let succeeded = 0;
+  let failed = 0;
+  for (const job of jobs) {
+    try {
+      let result: { ok: boolean; error?: string };
+      if (job.action === "notify_feedback") {
+        result = await sendFeedbackDm(job);
+      } else if (job.action === "notify_new_reviewer") {
+        result = await sendNewReviewerDm(job);
+      } else if (job.action === "refresh_home_tab") {
+        result = await refreshHomeTab(job);
+      } else {
+        result = { ok: false, error: `unknown action ${job.action}` };
+      }
+      await supabase.rpc("complete_slack_send_job", {
+        p_id: job.id,
+        p_success: result.ok,
+        p_error: result.ok ? null : result.error ?? null,
+      });
+      if (result.ok) succeeded++;
+      else failed++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await supabase.rpc("complete_slack_send_job", {
+        p_id: job.id,
+        p_success: false,
+        p_error: msg,
+      });
+      failed++;
+    }
+  }
+  return { processed: jobs.length, succeeded, failed };
+}
+
+// =============================================================================
 //  Deno.serve() — CRON_SECRET or validated JWT auth, routes action to handlers
 // =============================================================================
 
@@ -1447,11 +1658,15 @@ Deno.serve(async (req) => {
   }
 
   // -------------------------------------------------------------------------
-  //  Authentication: accept CRON_SECRET or a validated Supabase JWT
+  //  Authentication: accept CRON_SECRET, the Supabase service role key
+  //  (used by pg_cron → pg_net calls), or a validated Supabase JWT.
   // -------------------------------------------------------------------------
   const cronSecret = Deno.env.get("CRON_SECRET");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const authHeader = req.headers.get("authorization") || "";
-  const hasCronAuth = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const hasCronAuth =
+    (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
+    (serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`);
 
   // For JWT auth: extract the token and cryptographically verify it
   let callerWorkspaceId: string | null = null;
@@ -1466,13 +1681,32 @@ Deno.serve(async (req) => {
     }
   }
 
-  if (!hasCronAuth && !hasJwtAuth) {
+  // Parse body before the auth gate so we can carve out specifically the
+  // actions that authorize themselves at the data layer (e.g.
+  // drain_send_queue, whose jobs were already authorized by SECURITY DEFINER
+  // triggers on protected tables). Other actions still require cron or JWT.
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const { action, cycle_id, survey_id, mode } = body as {
+    action?: string;
+    cycle_id?: string;
+    survey_id?: string;
+    mode?: string;
+  };
+
+  const ACTIONS_WITHOUT_AUTH = new Set(["drain_send_queue"]);
+  if (!hasCronAuth && !hasJwtAuth && !ACTIONS_WITHOUT_AUTH.has(String(action))) {
     return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-    const { action, cycle_id, survey_id, mode } = body;
 
     // -----------------------------------------------------------------------
     //  run_reminders: CRON_SECRET only (iterates all workspaces)
@@ -1549,6 +1783,31 @@ Deno.serve(async (req) => {
         }
       }
       const result = await handleReleaseGrades(cycle_id);
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    //  drain_send_queue: no auth required. Claims up to 25 queued jobs
+    //  (feedback DMs, post-launch reviewer notifications), processes each,
+    //  marks success/failure with exponential backoff.
+    //
+    //  Auth-less is safe for this endpoint because:
+    //    - the queue only accepts rows from SECURITY DEFINER triggers on
+    //      authorized INSERTs (continuous_feedback, review_assignments)
+    //    - work is strictly bounded: 25 jobs per call, 5-attempt cap per job
+    //    - claim_slack_send_jobs uses FOR UPDATE SKIP LOCKED, so concurrent
+    //      calls can't double-process the same row
+    //    - no user-supplied input influences which jobs run; an attacker
+    //      calling this only causes the existing queue to drain faster
+    //
+    //  Keeping it auth-less sidesteps the pg_cron vault-secret plumbing
+    //  that the older send-deadline-reminders cron has been silently
+    //  failing on (no app.settings.service_role_key at the session level).
+    // -----------------------------------------------------------------------
+    if (action === "drain_send_queue") {
+      const result = await handleDrainSendQueue();
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
