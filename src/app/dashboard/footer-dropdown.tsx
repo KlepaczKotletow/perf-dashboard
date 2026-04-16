@@ -24,6 +24,17 @@ export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
 
   async function handleSignOut() {
     const supabase = createClient();
+    // Clear any autosaved review drafts so the next user on this device can't
+    // see this user's in-progress ratings. Keys are user-scoped as a first
+    // line of defence; clearing on signout is a belt-and-braces step.
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith("review-draft-")) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch { /* ignore — signout is best-effort */ }
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();

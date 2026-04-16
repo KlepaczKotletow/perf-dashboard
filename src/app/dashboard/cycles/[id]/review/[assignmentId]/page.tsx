@@ -244,9 +244,11 @@ export default function ReviewFormPage({
             }
           }
 
-          // Restore saved draft (merge ratings/comments from localStorage)
+          // Restore saved draft (merge ratings/comments from localStorage).
+          // Key is scoped to (assignment, user) so drafts never leak between
+          // users on a shared device — matches Lattice / Leapsome behaviour.
           try {
-            const saved = localStorage.getItem(`review-draft-${assignmentId}`);
+            const saved = localStorage.getItem(`review-draft-${assignmentId}-${appUserId}`);
             if (saved) {
               const draft = JSON.parse(saved);
               if (draft.competencies) {
@@ -324,9 +326,9 @@ export default function ReviewFormPage({
             }));
           }
 
-          // Restore saved draft for fallback path
+          // Restore saved draft for fallback path (also user-scoped).
           try {
-            const saved = localStorage.getItem(`review-draft-${assignmentId}`);
+            const saved = localStorage.getItem(`review-draft-${assignmentId}-${appUserId}`);
             if (saved) {
               const draft = JSON.parse(saved);
               if (draft.competencies) {
@@ -363,9 +365,13 @@ export default function ReviewFormPage({
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     autosaveTimer.current = setTimeout(() => {
+      // Skip autosave if we don't yet know who the user is — writing a
+      // draft without a user scope risks leaking it to the next user on
+      // a shared device.
+      if (!currentUser?.id) return;
       try {
         const draft = { competencies, textResponses, overallComment };
-        localStorage.setItem(`review-draft-${assignmentId}`, JSON.stringify(draft));
+        localStorage.setItem(`review-draft-${assignmentId}-${currentUser.id}`, JSON.stringify(draft));
         setLastSaved(new Date());
         setAutosaveStatus("saved");
       } catch {
@@ -492,7 +498,7 @@ export default function ReviewFormPage({
         if (code === "23505") {
           // Unique constraint on (assignment_id, reviewer_id, reviewer_role, competency_id)
           // — the review was already submitted. Treat as success: clear draft and redirect.
-          try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
+          try { localStorage.removeItem(`review-draft-${assignmentId}-${currentUser?.id ?? ""}`); } catch { /* ignore */ }
           const fromCycle = searchParams.get("from") === "cycle";
           const fromCycleId = searchParams.get("cycleId");
           if (fromCycle && fromCycleId) {
@@ -536,7 +542,7 @@ export default function ReviewFormPage({
       }
 
       // Clear the autosave draft on successful submission
-      try { localStorage.removeItem(`review-draft-${assignmentId}`); } catch { /* ignore */ }
+      try { localStorage.removeItem(`review-draft-${assignmentId}-${currentUser?.id ?? ""}`); } catch { /* ignore */ }
 
       const fromCycle = searchParams.get("from") === "cycle";
       const fromCycleId = searchParams.get("cycleId");
