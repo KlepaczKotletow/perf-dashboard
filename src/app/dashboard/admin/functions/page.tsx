@@ -22,8 +22,8 @@ export default async function FunctionsPage() {
     { data: users },
     { data: scoreDescriptors },
   ] = await Promise.all([
-    supabase.from("job_families").select("id, name, description").eq("workspace_id", workspace.workspaceId).order("name"),
-    supabase.from("levels").select("id, name, grade, sort_order, job_family_id").eq("workspace_id", workspace.workspaceId).order("sort_order"),
+    supabase.from("job_families").select("id, name, description").eq("workspace_id", workspace.workspaceId).is("archived_at", null).order("name"),
+    supabase.from("levels").select("id, name, grade, sort_order, job_family_id").eq("workspace_id", workspace.workspaceId).is("archived_at", null).order("sort_order"),
     supabase.from("competencies").select("id, name, description, category, is_core, job_family_id, workspace_id").eq("workspace_id", workspace.workspaceId).order("name"),
     supabase.from("level_competencies").select("id, level_id, competency_id, expected_level, workspace_id").eq("workspace_id", workspace.workspaceId),
     supabase.from("users").select("id, level_id").eq("workspace_id", workspace.workspaceId),

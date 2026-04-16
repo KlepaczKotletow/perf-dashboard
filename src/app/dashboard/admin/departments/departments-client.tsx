@@ -104,23 +104,19 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
     const dept = deleteTarget;
     setDeleteLoading(true);
     try {
-      const count = initialCounts[dept.name] || 0;
-      if (count > 0) {
-        await supabase
-          .from("users")
-          .update({ department: null })
-          .eq("department", dept.name)
-          .eq("workspace_id", workspaceId);
-      }
+      // Archive rather than hard-delete so existing users retain the historical
+      // dept label on their profile. Archived depts drop out of the admin list
+      // and out of assignment dropdowns, but past associations stay intact —
+      // matches Lattice / Leapsome taxonomy semantics.
       const { error: err } = await supabase
         .from("departments")
-        .delete()
+        .update({ archived_at: new Date().toISOString() })
         .eq("id", dept.id)
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
     } catch (e: any) {
-      setError(e.message ?? "Failed to delete department");
+      setError(e.message ?? "Failed to archive department");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);
@@ -197,7 +193,7 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
                     <button
                       onClick={() => setDeleteTarget(dept)}
                       className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                      title="Delete"
+                      title="Archive"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -232,15 +228,15 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
         )}
       </div>
 
-      {/* Delete confirmation dialog */}
+      {/* Archive confirmation dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogTitle>Archive &ldquo;{deleteTarget?.name}&rdquo;?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteCount > 0
-                ? `${deleteCount} ${deleteCount === 1 ? "person is" : "people are"} in this department and will be unassigned. This cannot be undone.`
-                : "This department has no members and will be permanently removed."}
+                ? `${deleteCount} ${deleteCount === 1 ? "person is" : "people are"} in this department. Their profiles will keep the department label for historical context, but it will no longer appear in the admin list or assignment dropdowns.`
+                : "This department will be hidden from the admin list and assignment dropdowns. Past associations are preserved."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -250,7 +246,7 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
               disabled={deleteLoading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteLoading ? "Deleting…" : "Delete"}
+              {deleteLoading ? "Archiving…" : "Archive"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

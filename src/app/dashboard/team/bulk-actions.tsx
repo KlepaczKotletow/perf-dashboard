@@ -48,9 +48,9 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         { data: deptsData },
       ] = await Promise.all([
         supabase.from("users").select("id, slack_name").eq("workspace_id", wsId).order("slack_name"),
-        supabase.from("job_families").select("id, name").eq("workspace_id", wsId).order("name"),
-        supabase.from("levels").select("id, name, grade, job_family_id").eq("workspace_id", wsId).order("sort_order"),
-        supabase.from("departments").select("id, name").eq("workspace_id", wsId).order("name"),
+        supabase.from("job_families").select("id, name").eq("workspace_id", wsId).is("archived_at", null).order("name"),
+        supabase.from("levels").select("id, name, grade, job_family_id").eq("workspace_id", wsId).is("archived_at", null).order("sort_order"),
+        supabase.from("departments").select("id, name").eq("workspace_id", wsId).is("archived_at", null).order("name"),
       ]);
       setAllUsers(usersData || []);
       setFunctions(functionsData || []);

@@ -429,16 +429,22 @@ export function FunctionsClient({
   async function handleDeleteFunction(id: string) {
     const memberCount = memberCountByFunction[id] ?? 0;
     const msg = memberCount > 0
-      ? `This function has ${memberCount} member${memberCount !== 1 ? "s" : ""}. Deleting it will unassign them. Continue?`
-      : "Delete this function and all its levels and skills?";
+      ? `This function has ${memberCount} member${memberCount !== 1 ? "s" : ""}. Archiving it hides it from the admin list and from new assignments, but existing members keep their level history. Continue?`
+      : "Archive this function? It will be hidden from the admin list and new-assignment dropdowns. Past associations stay intact.";
     if (!confirm(msg)) return;
     try {
-      const { error: err } = await supabase.from("job_families").delete().eq("id", id).eq("workspace_id", workspaceId);
+      // Soft-delete: preserves FK integrity for users/competencies referencing
+      // this job_family. Matches Lattice / Leapsome taxonomy behaviour.
+      const { error: err } = await supabase
+        .from("job_families")
+        .update({ archived_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (err) throw err;
       if (selectedId === id) setSelectedId(initialFunctions.find(f => f.id !== id)?.id ?? null);
       router.refresh();
     } catch (e: any) {
-      setError(e.message ?? "Failed to delete function");
+      setError(e.message ?? "Failed to archive function");
     }
   }
 
@@ -488,15 +494,21 @@ export function FunctionsClient({
       .select("id", { count: "exact", head: true })
       .eq("level_id", id)
       .eq("workspace_id", workspaceId);
-    if ((count ?? 0) > 0) {
-      if (!confirm(`${count} ${count !== 1 ? "people are" : "person is"} at this level. Deleting it will unassign them. Continue?`)) return;
-    }
+    const msg = (count ?? 0) > 0
+      ? `${count} ${count !== 1 ? "people are" : "person is"} at this level. Archiving hides it from new assignments, but their level history stays intact. Continue?`
+      : "Archive this level? It will be hidden from new-assignment dropdowns; past associations stay intact.";
+    if (!confirm(msg)) return;
     try {
-      const { error: err } = await supabase.from("levels").delete().eq("id", id).eq("workspace_id", workspaceId);
+      // Soft-delete: preserves users.level_id FK for historical lookup.
+      const { error: err } = await supabase
+        .from("levels")
+        .update({ archived_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
     } catch (e: any) {
-      setError(e.message ?? "Failed to delete level");
+      setError(e.message ?? "Failed to archive level");
     }
   }
 
