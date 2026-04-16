@@ -940,7 +940,13 @@ export function CompetenciesClient({
                                 <tr key={comp.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group/row">
                                   <td className="py-2.5 px-4 border-r border-border/30">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="text-xs font-medium text-foreground">{comp.name}</span>
+                                      <a
+                                        href={`/dashboard/competencies/${comp.id}/descriptors`}
+                                        className="text-xs font-medium text-foreground hover:text-primary hover:underline"
+                                        title="Edit score descriptors for this competency"
+                                      >
+                                        {comp.name}
+                                      </a>
                                       {comp.is_core && (
                                         <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-primary/30 text-primary">Core</Badge>
                                       )}
