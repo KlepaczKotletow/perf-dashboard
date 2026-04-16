@@ -94,8 +94,20 @@ async function getContinuousFeedback(
 
   if (scope.userIds !== null) {
     if (isManagerOrAbove(role) || hasDirectReports) {
-      // Managers: see all kudos for their reports (regardless of shared flag) + own sent
-      query = query.or(`to_user_id.in.(${scope.userIds.join(",")}),from_user_id.in.(${scope.userIds.join(",")})`);
+      // Managers see:
+      //   - feedback they themselves authored (any target in their report scope)
+      //   - feedback delivered to one of their reports (shared_with_employee=true)
+      // They do NOT see private drafts / unshared notes authored by someone else
+      // about their reports. Private feedback is between sender and recipient.
+      // Matches Lattice / Leapsome / Culture Amp semantics.
+      const ids = scope.userIds.join(",");
+      const conditions: string[] = [`from_user_id.in.(${ids})`];
+      conditions.push(`and(to_user_id.in.(${ids}),shared_with_employee.eq.true)`);
+      if (currentUserId) {
+        // Manager's own authored feedback is always visible to them, even if drafted.
+        conditions.push(`from_user_id.eq.${currentUserId}`);
+      }
+      query = query.or(conditions.join(","));
     } else if (currentUserId) {
       // Employees: see kudos they sent + kudos they received IF shared_with_employee=true
       query = query.or(
