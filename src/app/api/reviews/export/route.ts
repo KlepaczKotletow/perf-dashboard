@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove } from "@/lib/roles";
+import { csvFile } from "@/lib/csv";
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,31 +50,21 @@ export async function GET(request: NextRequest) {
       "Type", "Status", "Overall Rating", "Final Grade",
     ];
 
-    const rows: string[][] = [header];
-    for (const a of (assignments || [])) {
+    const csv = csvFile(header, (assignments || []).map((a) => {
       const emp = a.employee as any;
       const mgr = a.manager as any;
-      rows.push([
-        (a.cycle as any)?.name || "",
-        emp?.slack_name || "",
-        emp?.department || "",
-        emp?.job_title || "",
-        mgr?.slack_name || "",
+      return [
+        (a.cycle as any)?.name,
+        emp?.slack_name,
+        emp?.department,
+        emp?.job_title,
+        mgr?.slack_name,
         a.assignment_type || "standard",
-        a.status || "",
-        a.overall_rating ? String(a.overall_rating) : "",
-        a.final_grade || "",
-      ]);
-    }
-
-    const csv = rows
-      .map((row) =>
-        row.map((cell) =>
-          cell.includes(",") || cell.includes('"') || cell.includes("\n")
-            ? `"${cell.replace(/"/g, '""')}"`
-            : cell
-        ).join(",")
-      ).join("\n");
+        a.status,
+        a.overall_rating,
+        a.final_grade,
+      ];
+    }));
 
     return new NextResponse(csv, {
       headers: {
