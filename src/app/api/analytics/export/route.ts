@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isManagerOrAbove } from "@/lib/roles";
-import { csvFile } from "@/lib/csv";
+import { csvStreamResponse } from "@/lib/csv";
+
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,77 +20,43 @@ export async function GET(request: NextRequest) {
     const functionId = searchParams.get("functionId") || null;
     const department = searchParams.get("department") || null;
 
-    // 1. Users with level -> job_family, manager
-    const { data: usersData } = await supabase
-      .from("users")
-      .select(
-        "id, department, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family_id, job_family:job_families(name))"
-      )
-      .eq("workspace_id", workspaceId);
-
+    // Pre-load the small metadata tables once. users and cycles are bounded
+    // by workspace size — staying in-memory is safe even at 500+ people.
+    const [{ data: usersData }, { data: cyclesData }] = await Promise.all([
+      supabase
+        .from("users")
+        .select(
+          "id, department, slack_name, manager_id, level:levels!users_level_id_fkey(name, job_family_id, job_family:job_families(name))",
+        )
+        .eq("workspace_id", workspaceId),
+      supabase
+        .from("performance_cycles")
+        .select("id, name")
+        .eq("workspace_id", workspaceId),
+    ]);
     const allUsers = usersData || [];
-    const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
-
-    // Apply filters to users
-    let filteredUsers = allUsers;
-    if (department) {
-      filteredUsers = filteredUsers.filter((u: any) => u.department === department);
-    }
-    if (functionId) {
-      filteredUsers = filteredUsers.filter(
-        (u: any) => u.level?.job_family_id === functionId
-      );
-    }
-    const filteredUserIds = new Set(filteredUsers.map((u: any) => u.id));
-
-    // 2. Workspace cycle IDs
-    let cyclesQ = supabase
-      .from("performance_cycles")
-      .select("id, name")
-      .eq("workspace_id", workspaceId);
-    const { data: cyclesData } = await cyclesQ;
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
     const cycles = cyclesData || [];
-    const cycleMap = new Map(cycles.map((c: any) => [c.id, c.name]));
-    const wsCycleIds = cycles.map((c: any) => c.id);
-
-    // 3. Assignments
-    let assignments: any[] = [];
-    if (wsCycleIds.length > 0) {
-      let assignQ = supabase
-        .from("review_assignments")
-        .select("id, status, employee_id, cycle_id");
-
-      if (cycleId) {
-        assignQ = assignQ.eq("cycle_id", cycleId);
-      } else {
-        assignQ = assignQ.in("cycle_id", wsCycleIds);
-      }
-
-      const { data: assignRaw } = await assignQ;
-      assignments = (assignRaw || []).filter((a: any) =>
-        filteredUserIds.has(a.employee_id)
-      );
+    const cycleMap = new Map(cycles.map((c) => [c.id, c.name]));
+    const wsCycleIds = cycles.map((c) => c.id);
+    if (wsCycleIds.length === 0) {
+      return new NextResponse("No cycles found", { status: 404 });
     }
 
-    const assignmentIds = assignments.map((a: any) => a.id);
-
-    // 4. Responses with competency names
-    let responses: any[] = [];
-    if (assignmentIds.length > 0) {
-      const { data: respRaw } = await supabase
-        .from("review_responses")
-        .select("rating, assignment_id, competency:competencies(name)")
-        .in("assignment_id", assignmentIds)
-        .not("rating", "is", null);
-      responses = respRaw || [];
-    }
-
-    // Build assignment lookup
-    const assignmentMap = new Map(
-      assignments.map((a: any) => [a.id, a])
+    // Users filtered by dept/function. Only these employees' assignments appear
+    // in the export. Set lookup keeps the stream hot-path fast.
+    type UserRow = (typeof allUsers)[number];
+    const filteredUserIds = new Set(
+      allUsers
+        .filter((u: UserRow) => {
+          if (department && (u as { department?: string }).department !== department) return false;
+          const lvl = (u as { level?: { job_family_id?: string } | null }).level;
+          if (functionId && lvl?.job_family_id !== functionId) return false;
+          return true;
+        })
+        .map((u: UserRow) => u.id),
     );
 
-    // 5. Build CSV rows
     const header = [
       "cycle_name",
       "employee_name",
@@ -99,62 +67,54 @@ export async function GET(request: NextRequest) {
       "rating",
       "assignment_status",
     ];
-    const dataRows: unknown[][] = [];
 
-    for (const resp of responses) {
-      const assignment = assignmentMap.get(resp.assignment_id);
-      if (!assignment) continue;
-
-      const employee = userMap.get(assignment.employee_id);
-      if (!employee) continue;
-
-      const manager = employee.manager_id
-        ? userMap.get(employee.manager_id)
-        : null;
-
-      dataRows.push([
-        cycleMap.get(assignment.cycle_id),
-        employee.slack_name,
-        employee.department,
-        (employee.level as any)?.job_family?.name,
-        manager?.slack_name,
-        (resp.competency as any)?.name,
-        resp.rating,
-        assignment.status,
-      ]);
-    }
-
-    // If no responses, still include employees with assignments (no ratings yet)
-    if (responses.length === 0) {
-      for (const assignment of assignments) {
-        const employee = userMap.get(assignment.employee_id);
-        if (!employee) continue;
-
-        const manager = employee.manager_id
-          ? userMap.get(employee.manager_id)
-          : null;
-
-        dataRows.push([
-          cycleMap.get(assignment.cycle_id),
-          employee.slack_name,
-          employee.department,
-          (employee.level as any)?.job_family?.name,
-          manager?.slack_name,
-          "",
-          "",
-          assignment.status,
-        ]);
-      }
-    }
-
-    // 6. Convert to CSV string
-    const csvContent = csvFile(header, dataRows);
-
-    return new NextResponse(csvContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": 'attachment; filename="analytics-export.csv"',
+    return csvStreamResponse({
+      filename: "analytics-export.csv",
+      header,
+      pageSize: 500,
+      fetchPage: async (offset, limit) => {
+        // Stream review_responses with assignment embed so each row has the
+        // cycle + employee FK. Joined metadata is resolved from the in-memory
+        // userMap / cycleMap below, keeping memory flat regardless of row count.
+        let q = supabase
+          .from("review_responses")
+          .select(`
+            rating,
+            assignment:review_assignments!inner(
+              id, status, employee_id, cycle_id
+            ),
+            competency:competencies(name)
+          `)
+          .not("rating", "is", null)
+          .order("id");
+        if (cycleId) {
+          q = q.eq("assignment.cycle_id", cycleId);
+        } else {
+          q = q.in("assignment.cycle_id", wsCycleIds);
+        }
+        const { data } = await q.range(offset, offset + limit - 1);
+        return (data ?? []).filter((r) => {
+          const a = (r as { assignment?: { employee_id?: string } | null }).assignment;
+          return a?.employee_id ? filteredUserIds.has(a.employee_id) : false;
+        });
+      },
+      toRow: (r) => {
+        const a = (r as { assignment?: { employee_id?: string; cycle_id?: string; status?: string } | null }).assignment!;
+        const employee = userMap.get(a.employee_id as string) as UserRow | undefined;
+        const mgrId = (employee as { manager_id?: string } | undefined)?.manager_id;
+        const manager = mgrId ? (userMap.get(mgrId) as UserRow | undefined) : undefined;
+        const competency = (r as { competency?: { name?: string } | null }).competency;
+        const lvl = (employee as { level?: { job_family?: { name?: string } } } | undefined)?.level;
+        return [
+          cycleMap.get(a.cycle_id as string),
+          (employee as { slack_name?: string } | undefined)?.slack_name,
+          (employee as { department?: string } | undefined)?.department,
+          lvl?.job_family?.name,
+          (manager as { slack_name?: string } | undefined)?.slack_name,
+          competency?.name,
+          (r as { rating?: number | null }).rating,
+          a.status,
+        ];
       },
     });
   } catch (err: unknown) {
