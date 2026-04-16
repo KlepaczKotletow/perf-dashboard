@@ -1,5 +1,6 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { NextRequest, NextResponse } from "next/server";
+import { csvFile } from "@/lib/csv";
 
 export async function GET(
   _req: NextRequest,
@@ -69,45 +70,40 @@ export async function GET(
 
   if (survey.type === "enps") {
     // eNPS: respondent, score, follow_up, submitted_at
-    csv = "Respondent,Score,Follow-up Response,Submitted At\n";
-    for (const r of responses || []) {
+    const header = ["Respondent", "Score", "Follow-up Response", "Submitted At"];
+    const dataRows = (responses || []).map((r) => {
       const part = partMap[r.participant_id];
       const respondent = part ? nameMap[part.user_id] || "Unknown" : "Unknown";
       const score = r.answers?.score ?? "";
-      const followUp = (r.answers?.follow_up || "").replace(/"/g, '""');
+      const followUp = r.answers?.follow_up || "";
       const submitted = r.submitted_at ? new Date(r.submitted_at).toISOString() : "";
-      csv += `"${respondent}","${score}","${followUp}","${submitted}"\n`;
-    }
+      return [respondent, score, followUp, submitted];
+    });
+    csv = csvFile(header, dataRows);
   } else if (survey.type === "pulse") {
     // Pulse: respondent, q1, q2, ..., submitted_at
-    const headers = ["Respondent", ...questions.map(q => q.label), "Submitted At"];
-    csv = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
-    for (const r of responses || []) {
+    const header = ["Respondent", ...questions.map(q => q.label), "Submitted At"];
+    const dataRows = (responses || []).map((r) => {
       const part = partMap[r.participant_id];
       const respondent = part ? nameMap[part.user_id] || "Unknown" : "Unknown";
-      const answers = questions.map(q => {
-        const val = r.answers?.[q.id] ?? "";
-        return `"${String(val).replace(/"/g, '""')}"`;
-      });
+      const answers = questions.map(q => r.answers?.[q.id] ?? "");
       const submitted = r.submitted_at ? new Date(r.submitted_at).toISOString() : "";
-      csv += `"${respondent}",${answers.join(",")},"${submitted}"\n`;
-    }
+      return [respondent, ...answers, submitted];
+    });
+    csv = csvFile(header, dataRows);
   } else if (survey.type === "360") {
     // 360: subject, rater, role, q1, q2, ..., submitted_at
-    const headers = ["Subject", "Rater", "Rater Role", ...questions.map(q => q.label), "Submitted At"];
-    csv = headers.map(h => `"${h.replace(/"/g, '""')}"`).join(",") + "\n";
-    for (const r of responses || []) {
+    const header = ["Subject", "Rater", "Rater Role", ...questions.map(q => q.label), "Submitted At"];
+    const dataRows = (responses || []).map((r) => {
       const part = partMap[r.participant_id];
       const rater = part ? nameMap[part.user_id] || "Unknown" : "Unknown";
       const subject = r.subject_user_id ? nameMap[r.subject_user_id] || "Unknown" : "Unknown";
       const role = part?.role || "unknown";
-      const answers = questions.map(q => {
-        const val = r.answers?.[q.id] ?? "";
-        return `"${String(val).replace(/"/g, '""')}"`;
-      });
+      const answers = questions.map(q => r.answers?.[q.id] ?? "");
       const submitted = r.submitted_at ? new Date(r.submitted_at).toISOString() : "";
-      csv += `"${subject}","${rater}","${role}",${answers.join(",")},"${submitted}"\n`;
-    }
+      return [subject, rater, role, ...answers, submitted];
+    });
+    csv = csvFile(header, dataRows);
   }
 
   const filename = `${survey.name.replace(/[^a-zA-Z0-9]/g, "_")}_export.csv`;
