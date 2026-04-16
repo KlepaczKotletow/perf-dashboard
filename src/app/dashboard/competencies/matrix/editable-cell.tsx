@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ interface EditableCellProps {
   canEdit: boolean;
 }
 
-export function EditableCell({
+function EditableCellInner({
   levelId,
   competencyId,
   workspaceId,
@@ -317,3 +317,32 @@ export function EditableCell({
     </>
   );
 }
+
+function arraysShallowEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+/**
+ * React.memo wrapper: a competency matrix can render 50 × 8 = 400+ EditableCell
+ * instances. Without memoization, typing into any one cell re-renders every
+ * cell in the grid (each one does its own state machine + effects). Custom
+ * comparator handles `initialBehaviors`'s array identity explicitly so a new
+ * array reference with the same contents doesn't force a re-render.
+ */
+export const EditableCell = memo(EditableCellInner, (prev, next) => {
+  return (
+    prev.levelId === next.levelId &&
+    prev.competencyId === next.competencyId &&
+    prev.workspaceId === next.workspaceId &&
+    prev.initialValue === next.initialValue &&
+    prev.existingId === next.existingId &&
+    prev.competencyName === next.competencyName &&
+    prev.levelLabel === next.levelLabel &&
+    prev.canEdit === next.canEdit &&
+    arraysShallowEqual(prev.initialBehaviors, next.initialBehaviors)
+  );
+});
+EditableCell.displayName = "EditableCell";
