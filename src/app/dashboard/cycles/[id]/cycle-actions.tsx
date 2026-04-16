@@ -189,54 +189,19 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
 
       const allAssignments = [...standardAssignments, ...upwardAssignments];
 
-      // Delete existing rows only once we have a valid replacement set ready
-      // Safe: review_assignments scoped through cycle_id (workspace-verified cycle)
-      const { error: deleteError } = await supabase
-        .from("review_assignments")
-        .delete()
-        .eq("cycle_id", cycle.id);
-      if (deleteError) throw deleteError;
+      // Launch atomically via RPC. The function serialises concurrent launches
+      // with an advisory transaction lock and inserts assignments with ON
+      // CONFLICT DO NOTHING against the uniq_review_assignment index — so two
+      // admins clicking Launch at the same time can no longer produce duplicate
+      // review_assignments. The RPC also activates the first phase, flips the
+      // cycle status to active, and moves cycle employees to in_progress in
+      // the same transaction.
+      const { error: launchError } = await supabase.rpc("launch_cycle", {
+        p_cycle_id: cycle.id,
+        p_assignments: allAssignments,
+      });
 
-      // Insert all assignments in one batch — if this fails the cycle stays
-      // in draft so the admin can retry (the next launch attempt re-deletes & re-inserts)
-      if (allAssignments.length > 0) {
-        const { error: insertError } = await supabase
-          .from("review_assignments")
-          .insert(allAssignments);
-        if (insertError) throw insertError;
-      }
-
-      // 4. Activate the first phase if any exist
-      // Safe: cycle_phases scoped through cycle_id (workspace-verified cycle)
-      const { data: phases } = await supabase
-        .from("cycle_phases")
-        .select("id")
-        .eq("cycle_id", cycle.id)
-        .order("sort_order")
-        .limit(1);
-
-      if (phases && phases.length > 0) {
-        await supabase
-          .from("cycle_phases")
-          .update({ status: "active" })
-          .eq("id", phases[0].id);
-      }
-
-      // 5. Set cycle status to active
-      const { error: statusError } = await supabase
-        .from("performance_cycles")
-        .update({ status: "active", updated_at: new Date().toISOString() })
-        .eq("id", cycle.id)
-        .eq("workspace_id", cycle.workspace_id);
-
-      if (statusError) throw statusError;
-
-      // 6. Update performance_cycle_employees to in_progress
-      // Safe: performance_cycle_employees scoped through cycle_id (workspace-verified cycle)
-      await supabase
-        .from("performance_cycle_employees")
-        .update({ status: "in_progress" })
-        .eq("performance_cycle_id", cycle.id);
+      if (launchError) throw launchError;
 
       // 7. Send Slack notifications — check the returned error (functions.invoke never throws)
       await sendNotifications();
