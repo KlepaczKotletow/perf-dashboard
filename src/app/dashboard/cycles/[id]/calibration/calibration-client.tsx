@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -418,6 +419,45 @@ export default function CalibrationClient({
     [],
   );
 
+  // ── Bulk apply: one RPC call instead of one UPDATE per unset row ────────
+  const router = useRouter();
+  const [bulkGrade, setBulkGrade] = useState<string>("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+
+  const unsetAssignments = useMemo(
+    () => assignments.filter((a) => !a.final_grade && a.overall_rating != null),
+    [assignments],
+  );
+
+  async function handleBulkApply() {
+    if (!bulkGrade || unsetAssignments.length === 0) return;
+    setBulkSaving(true);
+    setBulkError(null);
+    try {
+      const changes = unsetAssignments.map((a) => ({
+        assignment_id: a.id,
+        grade: bulkGrade,
+      }));
+      const { error } = await supabase.rpc("update_calibration_grades", {
+        p_changes: changes,
+      });
+      if (error) throw error;
+      // Optimistic: fill liveGrades so the distribution chart updates now.
+      setLiveGrades((prev) => {
+        const next = { ...prev };
+        for (const a of unsetAssignments) next[a.id] = bulkGrade;
+        return next;
+      });
+      setBulkGrade("");
+      router.refresh();
+    } catch (e) {
+      setBulkError(e instanceof Error ? e.message : "Bulk apply failed");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
   const sorted = useMemo(() => {
     return [...assignments].sort((a, b) => {
       const ra = getDisplayAvg(a.responses) ?? a.overall_rating ?? 0;
@@ -523,6 +563,42 @@ export default function CalibrationClient({
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Bulk apply toolbar (only when there are unset rows to apply to) ── */}
+      {!cycle.grades_released && unsetAssignments.length > 1 && (
+        <Card className="border-border/60">
+          <CardContent className="py-3 px-4 flex flex-wrap items-center gap-2.5">
+            <span className="text-xs text-muted-foreground">
+              {unsetAssignments.length} employees still need a grade.
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-muted-foreground">Set all unset to:</span>
+              <Select value={bulkGrade} onValueChange={setBulkGrade}>
+                <SelectTrigger className="h-8 w-[180px] text-xs">
+                  <SelectValue placeholder="Choose a grade…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GRADE_OPTIONS.map((g) => (
+                    <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleBulkApply}
+                disabled={!bulkGrade || bulkSaving}
+                className="h-8 text-xs"
+              >
+                {bulkSaving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                Apply to {unsetAssignments.length}
+              </Button>
+            </div>
+            {bulkError && (
+              <span className="w-full text-xs text-destructive">{bulkError}</span>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Table ─────────────────────────────────────────────────────────── */}
       <Card className="border-border/60">
