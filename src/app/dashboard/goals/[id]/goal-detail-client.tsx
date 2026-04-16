@@ -65,6 +65,19 @@ interface GoalDetailClientProps {
   cycles: Array<{ id: string; name: string }>;
   employees: Array<{ id: string; slack_name: string }>;
   workspaceId: string;
+  history?: Array<{
+    id: string;
+    created_at: string;
+    old_progress: number | null;
+    new_progress: number | null;
+    old_metric_current: number | null;
+    new_metric_current: number | null;
+    old_status: string | null;
+    new_status: string | null;
+    old_tracking_status: string | null;
+    new_tracking_status: string | null;
+    actor: { id: string; slack_name: string } | null;
+  }>;
 }
 
 interface EditForm {
@@ -143,6 +156,7 @@ export default function GoalDetailClient({
   cycles,
   employees,
   workspaceId,
+  history = [],
 }: GoalDetailClientProps) {
   const router = useRouter();
   const supabase = createBrowserClient(
@@ -743,6 +757,61 @@ export default function GoalDetailClient({
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Progress history ─────────────────────────────────────────────── */}
+      {history.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader className="border-b border-border/60 bg-muted/20 py-3 px-6">
+            <h3 className="text-sm font-semibold text-foreground">History</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Changes to progress, status, and tracking status. Most recent first.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ol className="divide-y divide-border/60">
+              {history.map((e) => {
+                const parts: string[] = [];
+                if (e.old_progress !== e.new_progress) {
+                  parts.push(`progress ${e.old_progress ?? "–"}% → ${e.new_progress ?? "–"}%`);
+                }
+                if (
+                  (e.old_metric_current ?? null) !== (e.new_metric_current ?? null)
+                ) {
+                  parts.push(
+                    `current ${e.old_metric_current ?? "–"} → ${e.new_metric_current ?? "–"}`,
+                  );
+                }
+                if (e.old_status !== e.new_status) {
+                  parts.push(`status ${e.old_status ?? "–"} → ${e.new_status ?? "–"}`);
+                }
+                if (e.old_tracking_status !== e.new_tracking_status) {
+                  parts.push(
+                    `tracking ${e.old_tracking_status ?? "–"} → ${e.new_tracking_status ?? "–"}`,
+                  );
+                }
+                if (parts.length === 0) return null;
+                const when = new Date(e.created_at).toLocaleString(undefined, {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                });
+                return (
+                  <li key={e.id} className="px-6 py-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="text-sm font-medium text-foreground">
+                      {e.actor?.slack_name ?? "System"}
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {when}
+                    </span>
+                    <span className="text-xs text-muted-foreground w-full sm:w-auto sm:ml-auto">
+                      {parts.join(" · ")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
           </CardContent>
         </Card>
       )}

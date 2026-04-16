@@ -45,8 +45,8 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
 
     const canEdit = isManagerOrAbove(workspace?.role as string | undefined) || !!workspace?.hasDirectReports;
 
-    // Fetch cycles and employees for edit form
-    const [{ data: cycles }, { data: employees }] = await Promise.all([
+    // Fetch cycles, employees, and progress history
+    const [{ data: cycles }, { data: employees }, { data: historyRaw }] = await Promise.all([
       supabase
         .from("performance_cycles")
         .select("id, name")
@@ -57,6 +57,19 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
         .select("id, slack_name")
         .eq("workspace_id", workspace.workspaceId)
         .order("slack_name"),
+      supabase
+        .from("goal_progress_events")
+        .select(`
+          id, created_at,
+          old_progress, new_progress,
+          old_metric_current, new_metric_current,
+          old_status, new_status,
+          old_tracking_status, new_tracking_status,
+          actor:users!goal_progress_events_actor_user_id_fkey(id, slack_name)
+        `)
+        .eq("goal_id", id)
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
 
     console.log("[goal-detail] rendering GoalDetailClient");
@@ -69,6 +82,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
         cycles={cycles || []}
         employees={employees || []}
         workspaceId={workspace.workspaceId}
+        history={(historyRaw || []) as any}
       />
     );
   } catch (err: any) {
