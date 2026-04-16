@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isManagerOrAbove } from "@/lib/roles";
+import { csvFile } from "@/lib/csv";
 
 export async function GET(request: NextRequest) {
   try {
@@ -88,7 +89,6 @@ export async function GET(request: NextRequest) {
     );
 
     // 5. Build CSV rows
-    const rows: string[][] = [];
     const header = [
       "cycle_name",
       "employee_name",
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
       "rating",
       "assignment_status",
     ];
-    rows.push(header);
+    const dataRows: unknown[][] = [];
 
     for (const resp of responses) {
       const assignment = assignmentMap.get(resp.assignment_id);
@@ -112,15 +112,15 @@ export async function GET(request: NextRequest) {
         ? userMap.get(employee.manager_id)
         : null;
 
-      rows.push([
-        cycleMap.get(assignment.cycle_id) || "",
-        employee.slack_name || "",
-        employee.department || "",
-        (employee.level as any)?.job_family?.name || "",
-        manager?.slack_name || "",
-        (resp.competency as any)?.name || "",
-        String(resp.rating ?? ""),
-        assignment.status || "",
+      dataRows.push([
+        cycleMap.get(assignment.cycle_id),
+        employee.slack_name,
+        employee.department,
+        (employee.level as any)?.job_family?.name,
+        manager?.slack_name,
+        (resp.competency as any)?.name,
+        resp.rating,
+        assignment.status,
       ]);
     }
 
@@ -134,33 +134,21 @@ export async function GET(request: NextRequest) {
           ? userMap.get(employee.manager_id)
           : null;
 
-        rows.push([
-          cycleMap.get(assignment.cycle_id) || "",
-          employee.slack_name || "",
-          employee.department || "",
-          (employee.level as any)?.job_family?.name || "",
-          manager?.slack_name || "",
+        dataRows.push([
+          cycleMap.get(assignment.cycle_id),
+          employee.slack_name,
+          employee.department,
+          (employee.level as any)?.job_family?.name,
+          manager?.slack_name,
           "",
           "",
-          assignment.status || "",
+          assignment.status,
         ]);
       }
     }
 
     // 6. Convert to CSV string
-    const csvContent = rows
-      .map((row) =>
-        row
-          .map((cell) => {
-            // Escape double quotes and wrap in quotes if needed
-            if (cell.includes(",") || cell.includes('"') || cell.includes("\n")) {
-              return `"${cell.replace(/"/g, '""')}"`;
-            }
-            return cell;
-          })
-          .join(",")
-      )
-      .join("\n");
+    const csvContent = csvFile(header, dataRows);
 
     return new NextResponse(csvContent, {
       status: 200,
