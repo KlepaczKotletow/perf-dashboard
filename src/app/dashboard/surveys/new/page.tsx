@@ -29,6 +29,7 @@ interface TeamMember {
   slack_name: string;
   job_title: string | null;
   manager_id: string | null;
+  department: string | null;
 }
 
 const SURVEY_TYPES = [
@@ -100,6 +101,15 @@ const GUIDANCE: Record<string, { title: string; content: string[] }> = {
       "Use a consistent rating scale. A 5-point or 7-point scale works best for reliable data.",
     ],
   },
+  participants: {
+    title: "Who receives this survey?",
+    content: [
+      "By default, everyone in your workspace will receive this survey.",
+      "You can target specific departments or individual people instead.",
+      "For eNPS, we recommend surveying the whole organisation for a representative score.",
+      "For pulse surveys, targeting specific teams lets you check in on groups that need attention.",
+    ],
+  },
   review: {
     title: "Before you launch",
     content: [
@@ -117,10 +127,16 @@ export default function NewSurveyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNamiConfirm, setShowNamiConfirm] = useState(false);
-  const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule">("now");
+  const [namiScheduleMode, setNamiScheduleMode] = useState<"now" | "schedule" | "recurring">("now");
+  const [recurrence, setRecurrence] = useState<"weekly" | "biweekly" | "monthly">("biweekly");
+  const [recurrenceDay, setRecurrenceDay] = useState("monday");
   const [namiScheduleDate, setNamiScheduleDate] = useState("");
   const [pendingSurveyId, setPendingSurveyId] = useState<string | null>(null);
   const [namiParticipantCount, setNamiParticipantCount] = useState(0);
+  const [targetMode, setTargetMode] = useState<"all" | "departments" | "people">("all");
+  const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
+  const [selectedPeople, setSelectedPeople] = useState<Set<string>>(new Set());
+  const [peopleSearch, setPeopleSearch] = useState("");
 
   // Active guidance section for the right panel
   const [activeGuide, setActiveGuide] = useState<string>("type-360");
@@ -165,7 +181,7 @@ export default function NewSurveyPage() {
       const identity = await getClientIdentity(supabase);
       if (!identity) return;
       const wsId = identity.workspaceId;
-      const { data } = await supabase.from("users").select("id, slack_name, job_title, manager_id").eq("workspace_id", wsId).order("slack_name");
+      const { data } = await supabase.from("users").select("id, slack_name, job_title, manager_id, department").eq("workspace_id", wsId).order("slack_name");
       setTeam(data || []);
     }
     loadTeam();
@@ -187,6 +203,11 @@ export default function NewSurveyPage() {
     }
     return { selfCount, managerCount, directReportCount };
   }, [selectedSubjects, team]);
+
+  const departments = useMemo(() => {
+    const depts = new Set(team.filter(u => u.department).map(u => u.department!));
+    return Array.from(depts).sort();
+  }, [team]);
 
   function addQuestion(set: "360" | "pulse") {
     const q: Question = { id: crypto.randomUUID(), type: "rating_7", label: "", required: true };
@@ -234,9 +255,27 @@ export default function NewSurveyPage() {
           min_raters_to_show: 3,
         };
       } else if (surveyType === "pulse") {
-        config = { questions: pulseQuestions };
+        config = {
+          questions: pulseQuestions,
+          ...(targetMode !== "all" && {
+            targeting: {
+              mode: targetMode,
+              ...(targetMode === "departments" && { departments: Array.from(selectedDepartments) }),
+              ...(targetMode === "people" && { user_ids: Array.from(selectedPeople) }),
+            },
+          }),
+        };
       } else {
-        config = { follow_up: enpsFollowUp };
+        config = {
+          follow_up: enpsFollowUp,
+          ...(targetMode !== "all" && {
+            targeting: {
+              mode: targetMode,
+              ...(targetMode === "departments" && { departments: Array.from(selectedDepartments) }),
+              ...(targetMode === "people" && { user_ids: Array.from(selectedPeople) }),
+            },
+          }),
+        };
       }
 
       const { data: survey, error: surveyErr } = await supabase
@@ -287,8 +326,17 @@ export default function NewSurveyPage() {
           // They'll be assigned via a nomination step after launch
         }
       } else {
-        const { data: wsUsers } = await supabase.from("users").select("id").eq("workspace_id", wsId);
-        for (const wu of (wsUsers || [])) {
+        let targetUsers: { id: string }[] = [];
+        if (targetMode === "all") {
+          const { data } = await supabase.from("users").select("id").eq("workspace_id", wsId);
+          targetUsers = data || [];
+        } else if (targetMode === "departments") {
+          const { data } = await supabase.from("users").select("id, department").eq("workspace_id", wsId);
+          targetUsers = (data || []).filter((u: any) => selectedDepartments.has(u.department || ""));
+        } else {
+          targetUsers = Array.from(selectedPeople).map(id => ({ id }));
+        }
+        for (const wu of targetUsers) {
           participants.push({ survey_id: survey.id, user_id: wu.id, role: "respondent", workspace_id: wsId });
         }
       }
@@ -327,10 +375,24 @@ export default function NewSurveyPage() {
       const identity = await getClientIdentity(supabase);
       const wsId = identity?.workspaceId;
 
-      await supabase.from("surveys").update({
-        nami_send_at: sendAt, nami_confirmed: true, status: "active"
-      }).eq("id", pendingSurveyId).eq("workspace_id", wsId);
+      const updatePayload: any = { nami_confirmed: true, status: "active" };
 
+      if (namiScheduleMode === "recurring") {
+        // Fetch current config and merge recurrence settings
+        const { data: currentSurvey } = await supabase.from("surveys").select("config").eq("id", pendingSurveyId).single();
+        updatePayload.config = {
+          ...(currentSurvey?.config || {}),
+          recurrence,
+          recurrence_day: recurrenceDay,
+          last_recurrence_at: null,
+        };
+      } else {
+        updatePayload.nami_send_at = sendAt;
+      }
+
+      await supabase.from("surveys").update(updatePayload).eq("id", pendingSurveyId).eq("workspace_id", wsId);
+
+      // Send immediately for "now" mode or first send of recurring
       if (!sendAt) {
         await supabase.functions.invoke("nami-bot", {
           body: { action: "launch_survey", survey_id: pendingSurveyId },
@@ -575,6 +637,69 @@ export default function NewSurveyPage() {
                 </div>
               )}
 
+              {(surveyType === "pulse" || surveyType === "enps") && (
+                <div className="space-y-3" onFocus={() => setActiveGuide("participants")}>
+                  <Label>Who should receive this survey?</Label>
+                  <div className="space-y-2">
+                    {[
+                      { value: "all" as const, label: "All workspace members", desc: `Everyone in your workspace (${team.length} people)` },
+                      { value: "departments" as const, label: "Select departments", desc: "Target specific departments" },
+                      { value: "people" as const, label: "Select specific people", desc: "Hand-pick individual participants" },
+                    ].map((opt) => (
+                      <label key={opt.value} className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${targetMode === opt.value ? "border-primary bg-primary/5" : "border-border hover:border-border/80"}`}>
+                        <input type="radio" name="targetMode" checked={targetMode === opt.value} onChange={() => { setTargetMode(opt.value); setActiveGuide("participants"); }} className="accent-primary mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium">{opt.label}</p>
+                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {targetMode === "departments" && (
+                    <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1.5">
+                      {departments.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">No departments found. Assign departments to team members in the Directory.</p>
+                      ) : departments.map((dept) => (
+                        <label key={dept} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={selectedDepartments.has(dept)}
+                            onCheckedChange={(checked) => {
+                              const next = new Set(selectedDepartments);
+                              if (checked) next.add(dept); else next.delete(dept);
+                              setSelectedDepartments(next);
+                            }}
+                          />
+                          <span>{dept}</span>
+                          <span className="text-xs text-muted-foreground ml-auto">{team.filter(u => u.department === dept).length} people</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {targetMode === "people" && (
+                    <div className="space-y-2">
+                      <Input placeholder="Search people..." value={peopleSearch} onChange={e => setPeopleSearch(e.target.value)} />
+                      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1.5">
+                        {team.filter(u => !peopleSearch || u.slack_name?.toLowerCase().includes(peopleSearch.toLowerCase())).map((u) => (
+                          <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                            <Checkbox
+                              checked={selectedPeople.has(u.id)}
+                              onCheckedChange={(checked) => {
+                                const next = new Set(selectedPeople);
+                                if (checked) next.add(u.id); else next.delete(u.id);
+                                setSelectedPeople(next);
+                              }}
+                            />
+                            <span>{u.slack_name}</span>
+                            {u.department && <span className="text-xs text-muted-foreground ml-auto">{u.department}</span>}
+                          </label>
+                        ))}
+                      </div>
+                      {selectedPeople.size > 0 && <p className="text-xs text-muted-foreground">{selectedPeople.size} people selected</p>}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => { setStep(1); setActiveGuide(surveyType ? `type-${surveyType}` : "type-360"); }}>
                   <ArrowLeft className="h-4 w-4 mr-1.5" />Back
@@ -646,6 +771,12 @@ export default function NewSurveyPage() {
                       <span>{pulseQuestions.length}</span>
                     </div>
                   )}
+                  {(surveyType === "pulse" || surveyType === "enps") && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Participants</span>
+                      <span>{targetMode === "all" ? "All members" : targetMode === "departments" ? `${selectedDepartments.size} department${selectedDepartments.size !== 1 ? "s" : ""}` : `${selectedPeople.size} people`}</span>
+                    </div>
+                  )}
                   {closesAt && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Closes</span>
@@ -698,7 +829,7 @@ export default function NewSurveyPage() {
             <p className="text-sm text-muted-foreground">
               <strong>{namiParticipantCount}</strong> participants will receive a Slack DM to complete the survey.
             </p>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="radio" name="namiSchedule" checked={namiScheduleMode === "now"}
                   onChange={() => setNamiScheduleMode("now")} className="accent-primary" />
@@ -709,11 +840,42 @@ export default function NewSurveyPage() {
                   onChange={() => setNamiScheduleMode("schedule")} className="accent-primary" />
                 Schedule
               </label>
+              {(surveyType === "pulse" || surveyType === "enps") && (
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input type="radio" name="namiSchedule" checked={namiScheduleMode === "recurring"}
+                    onChange={() => setNamiScheduleMode("recurring")} className="accent-primary" />
+                  Recurring
+                </label>
+              )}
             </div>
             {namiScheduleMode === "schedule" && (
               <input type="datetime-local" value={namiScheduleDate}
                 onChange={(e) => setNamiScheduleDate(e.target.value)}
                 className="w-full border border-border rounded-lg px-3 py-2 text-sm" />
+            )}
+            {namiScheduleMode === "recurring" && (
+              <div className="space-y-3 rounded-lg border border-border p-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Frequency</Label>
+                  <div className="flex gap-2">
+                    {([["weekly", "Weekly"], ["biweekly", "Every 2 weeks"], ["monthly", "Monthly"]] as const).map(([val, label]) => (
+                      <label key={val} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs cursor-pointer border ${recurrence === val ? "border-primary bg-primary/5 font-medium" : "border-border"}`}>
+                        <input type="radio" name="recurrence" checked={recurrence === val} onChange={() => setRecurrence(val)} className="sr-only" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Day of the week</Label>
+                  <select value={recurrenceDay} onChange={e => setRecurrenceDay(e.target.value)} className="w-full border border-border rounded-md px-3 py-1.5 text-sm bg-background">
+                    {["monday", "tuesday", "wednesday", "thursday", "friday"].map(d => (
+                      <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-muted-foreground">Nami will automatically send this survey on the selected day. First send happens immediately.</p>
+              </div>
             )}
             <div className="flex gap-3 pt-2">
               <Button onClick={confirmNamiSend} disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}

@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Perf",
-  description: "Terms of Service for Perf, the modern performance management platform powered by Slack.",
+  title: "Terms of Service — Nami",
+  description: "Terms of Service for Nami, the modern performance management platform powered by Slack.",
 };
 
 export default function TermsPage() {
@@ -31,9 +31,9 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Agreement to Terms</h2>
             <p className="mb-3">
               These Terms of Service (&quot;Terms&quot;) constitute a legally binding agreement between you
-              (&quot;Customer,&quot; &quot;you,&quot; or &quot;your&quot;) and Perf (&quot;Company,&quot;
+              (&quot;Customer,&quot; &quot;you,&quot; or &quot;your&quot;) and Nami (&quot;Company,&quot;
               &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) governing your access to and use of the
-              Perf platform, including the web application, Slack integration, APIs, and all related
+              Nami platform, including the web application, Slack integration, APIs, and all related
               services (collectively, the &quot;Service&quot;).
             </p>
             <p className="mb-3">
@@ -52,7 +52,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">2. Description of Service</h2>
             <p className="mb-3">
-              Perf is a cloud-based performance management platform that integrates with Slack. The
+              Nami is a cloud-based performance management platform that integrates with Slack. The
               Service enables organizations to:
             </p>
             <ul className="list-disc pl-6 space-y-1 mb-3">
@@ -76,7 +76,7 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-foreground mb-3">3. Accounts and Access</h2>
             <p className="mb-3">
               Access to the Service is authenticated through your Slack workspace using Slack&apos;s
-              OAuth 2.0 protocol. The individual who installs the Perf Slack application and completes
+              OAuth 2.0 protocol. The individual who installs the Nami Slack application and completes
               the subscription setup becomes the initial workspace administrator
               (&quot;Admin&quot;). Admins may assign roles (Admin, HR, Manager, Employee) to other
               workspace members.
@@ -260,12 +260,12 @@ export default function TermsPage() {
             <p className="mb-3">
               The Service and its original content (excluding Customer Data), features, functionality,
               design, code, documentation, trademarks, logos, and all related intellectual property
-              are and will remain the exclusive property of Perf and its licensors. The Service is
+              are and will remain the exclusive property of Nami and its licensors. The Service is
               protected by copyright, trademark, and other laws.
             </p>
             <p>
-              These Terms do not grant you any right, title, or interest in the Service, the Perf
-              name, the Perf logo, or any other intellectual property owned by us, except for the
+              These Terms do not grant you any right, title, or interest in the Service, the Nami
+              name, the Nami logo, or any other intellectual property owned by us, except for the
               limited right to use the Service in accordance with these Terms.
             </p>
           </section>
@@ -367,7 +367,7 @@ export default function TermsPage() {
               To the maximum extent permitted by applicable law:
             </p>
             <p className="mb-3">
-              In no event shall Perf, its officers, directors, employees, agents, partners, suppliers,
+              In no event shall Nami, its officers, directors, employees, agents, partners, suppliers,
               or licensors be liable for any indirect, incidental, special, consequential, exemplary,
               or punitive damages, including but not limited to damages for loss of profits, goodwill,
               revenue, data, business opportunities, use, or other intangible losses, arising out of
@@ -428,7 +428,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">12. Indemnification</h2>
             <p>
-              You agree to defend, indemnify, and hold harmless Perf, its officers, directors,
+              You agree to defend, indemnify, and hold harmless Nami, its officers, directors,
               employees, agents, and licensors from and against any and all claims, damages,
               obligations, losses, liabilities, costs, and expenses (including reasonable
               attorneys&apos; fees) arising from: (a) your use of and access to the Service; (b)
@@ -530,7 +530,7 @@ export default function TermsPage() {
             <h3 className="font-medium text-foreground mt-4 mb-2">17.1 Entire Agreement</h3>
             <p className="mb-3">
               These Terms, together with the Privacy Policy and any order forms or Enterprise
-              agreements, constitute the entire agreement between you and Perf regarding the Service
+              agreements, constitute the entire agreement between you and Nami regarding the Service
               and supersede all prior agreements, understandings, and communications.
             </p>
 

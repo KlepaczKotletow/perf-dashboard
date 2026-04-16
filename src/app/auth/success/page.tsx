@@ -69,7 +69,7 @@ function AuthSuccessContent() {
             You&apos;re all set!
           </h1>
           <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-            {team ? `${team} is now connected to Perf.` : "Your workspace is now connected to Perf."}{" "}
+            {team ? `${team} is now connected to Nami.` : "Your workspace is now connected to Nami."}{" "}
             Here&apos;s what to do next:
           </p>
         </div>

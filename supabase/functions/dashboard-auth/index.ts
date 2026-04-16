@@ -96,7 +96,13 @@ Deno.serve(async (req) => {
       .limit(1);
 
     if (!workspaces || workspaces.length === 0) {
-      return Response.redirect(`${DASHBOARD_URL}/auth/error?message=Workspace+not+found.+Please+install+the+Slack+app+first.`, 302);
+      // Workspace doesn't exist yet — redirect to install flow instead of dead-end error
+      const scopes = "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
+      const userScopes = "identity.basic,identity.email";
+      const installRedirectUri = `${SUPABASE_URL}/functions/v1/slack-oauth`;
+      const oauthState = `nonce_${crypto.randomUUID()}`;
+      const installUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(installRedirectUri)}&state=${oauthState}`;
+      return Response.redirect(installUrl, 302);
     }
 
     const workspace = workspaces[0];

@@ -3,10 +3,12 @@ import {
   Slack, Shield, BarChart3, MessageSquare, Users, Star,
   Check, Target, TrendingUp, Flag, ChevronRight,
   Grid3X3, Bot, Bell, Zap, Send, Clock, BookOpen, MousePointerClick,
+  Activity, Heart, ClipboardList, AlertTriangle, Smile,
 } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { MobileNav } from "@/components/landing/mobile-nav";
+import { AnimatedCounter } from "@/components/landing/animated-counter";
 
 export default function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
@@ -27,13 +29,13 @@ export default function Home() {
         <header className="sticky top-0 z-50 backdrop-blur-md bg-[#fafaf5]/80">
           <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-[34px] font-black tracking-tight text-foreground">Nami</span>
+              <span className="text-[40px] font-black tracking-tight text-foreground">Nami</span>
             </Link>
             <div className="hidden lg:flex items-center gap-6">
               <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
-              <a href="#goals" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
-              <a href="#analytics" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Analytics</a>
+              <a href="#surveys" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
               <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+              <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
               <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
                 <a href={addToSlackUrl}>
@@ -47,13 +49,13 @@ export default function Home() {
         </header>
 
         {/* Hero — two-card Deel-style layout */}
-        <div className="max-w-6xl mx-auto px-4 pb-4">
-          <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[580px]">
+        <div className="max-w-6xl mx-auto px-4 pt-4 pb-4">
+          <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[560px]">
 
             {/* Left card — dark with copy */}
             <div className="relative rounded-3xl bg-[#1a1a2e] overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col justify-between">
               {/* Subtle gradient orb */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl pointer-events-none animate-orb-drift" />
 
               <div className="relative">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 mb-6">
@@ -61,19 +63,19 @@ export default function Home() {
                   Meet Nami — your performance assistant in Slack
                 </div>
 
-                <h1 className="text-3xl sm:text-4xl lg:text-[48px] font-bold tracking-tight text-white leading-[1.1]">
+                <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-bold tracking-tight text-white leading-[1.1]">
                   Performance reviews your team will{" "}
-                  <span className="text-primary">actually complete.</span>
+                  <span className="text-primary text-shimmer">actually complete.</span>
                 </h1>
 
-                <p className="mt-5 text-base text-white/60 leading-relaxed max-w-[420px]">
+                <p className="mt-5 text-lg text-white/60 leading-relaxed max-w-[480px]">
                   Nami lives in your team&apos;s Slack and handles everything — 360° reviews, goal tracking, surveys, and analytics. No new tools. No forms.
                 </p>
               </div>
 
               <div className="relative mt-8">
                 <div className="flex flex-col sm:flex-row items-start gap-3">
-                  <Button size="lg" className="h-12 px-7 text-sm font-semibold rounded-full" asChild>
+                  <Button size="lg" className="h-12 px-7 text-sm font-semibold rounded-full btn-glow" asChild>
                     <a href={addToSlackUrl}>
                       <Slack className="h-4 w-4 mr-2" />
                       Add to Slack — free
@@ -95,11 +97,11 @@ export default function Home() {
             </div>
 
             {/* Right card — light with dashboard mockup */}
-            <div className="relative rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] overflow-hidden flex items-end justify-center">
-              {/* Dashboard mockup */}
-              <div className="w-[92%] mt-8 rounded-t-2xl border border-border/60 border-b-0 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
+            <div className="relative rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] overflow-hidden flex items-stretch">
+              {/* Dashboard mockup — fills the whole card */}
+              <div className="w-full m-3 rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white flex flex-col">
                 {/* Browser chrome */}
-                <div className="bg-muted/80 border-b border-border/60 px-4 py-2.5 flex items-center gap-3">
+                <div className="bg-muted/80 border-b border-border/60 px-4 py-2 flex items-center gap-3 shrink-0">
                   <div className="flex gap-1.5">
                     <div className="h-2.5 w-2.5 rounded-full bg-foreground/20" />
                     <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
@@ -110,73 +112,196 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="flex h-[320px] sm:h-[380px] lg:h-[440px] overflow-hidden">
-                  {/* Sidebar */}
-                  <div className="hidden sm:flex w-40 border-r border-border/60 flex-col bg-muted/20 p-3 gap-0.5 shrink-0">
+                <div className="flex flex-1 overflow-hidden">
+                  {/* Sidebar — matches real app */}
+                  <div className="hidden sm:flex w-[140px] border-r border-border/60 flex-col bg-muted/20 p-2.5 gap-0.5 shrink-0 overflow-hidden">
+                    {/* Logo */}
                     <div className="px-2 py-1.5 mb-1">
-                      <span className="text-xs font-bold text-foreground">Nami</span>
+                      <span className="text-[11px] font-bold text-foreground">Nami</span>
+                      <span className="block text-[7px] text-muted-foreground/50 italic" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
                     </div>
+                    {/* Nav items — matching real sidebar */}
                     {[
-                      { label: "Overview", active: false },
-                      { label: "Cycles", active: false },
+                      { label: "Home", active: false },
+                      { label: "Performance", active: false },
                       { label: "Goals", active: false },
-                      { label: "Team", active: false },
-                      { label: "Analytics", active: true },
+                      { label: "Kudos", active: false },
                     ].map((item) => (
-                      <div
-                        key={item.label}
-                        className={`px-2.5 py-1.5 rounded-md text-[12px] ${
-                          item.active
-                            ? "bg-primary/10 text-primary font-medium"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {item.label}
-                      </div>
+                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
+                    ))}
+                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Team</p>
+                    {[
+                      { label: "My Team", active: false },
+                      { label: "Reviews", active: false },
+                    ].map((item) => (
+                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
+                    ))}
+                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Admin</p>
+                    {[
+                      { label: "Cycles", active: false },
+                      { label: "Directory", active: false },
+                      { label: "Surveys", active: false },
+                      { label: "Templates", active: false },
+                      { label: "Analytics", active: true },
+                      { label: "Settings", active: false },
+                    ].map((item) => (
+                      <div key={item.label} className={`px-2 py-1 rounded-md text-[10px] ${item.active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"}`}>{item.label}</div>
                     ))}
                   </div>
 
-                  {/* Analytics content */}
-                  <div className="flex-1 p-5 overflow-hidden">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-sm font-semibold text-foreground">Analytics</p>
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 text-[10px] text-muted-foreground">
-                        Q1 2025
+                  {/* Analytics content — matches real dashboard */}
+                  <div className="flex-1 p-4 overflow-hidden bg-[#fafaf9]">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Analytics</p>
+                        <p className="text-[9px] text-muted-foreground">Performance insights for Acme Corp</p>
+                      </div>
+                      <div className="px-2 py-1 rounded-md bg-muted/60 text-[9px] text-muted-foreground border border-border/40">Export</div>
+                    </div>
+
+                    {/* Tabs */}
+                    <div className="flex gap-3 mb-3 border-b border-border/40 pb-1.5">
+                      {["Overview", "Heatmap", "Cycles"].map((tab, i) => (
+                        <span key={tab} className={`text-[9px] font-medium pb-1 ${i === 0 ? "text-primary border-b border-primary" : "text-muted-foreground"}`}>{tab}</span>
+                      ))}
+                    </div>
+
+                    {/* Filters */}
+                    <div className="flex gap-1.5 mb-3">
+                      {["All Cycles", "All Functions", "All Depts"].map((f) => (
+                        <div key={f} className="px-2 py-0.5 rounded-md bg-white border border-border/50 text-[8px] text-muted-foreground">{f}</div>
+                      ))}
+                    </div>
+
+                    {/* 5 KPI cards — matches real app layout */}
+                    <div className="grid grid-cols-5 gap-1.5 mb-3">
+                      {[
+                        { icon: "★", label: "Overall Rating", value: "4.2/5", color: "text-amber-500", iconBg: "bg-amber-50" },
+                        { icon: "↗", label: "Completion", value: "91%", color: "text-emerald-600", iconBg: "bg-emerald-50" },
+                        { icon: "▊", label: "Total Ratings", value: "312", color: "text-primary", iconBg: "bg-primary/10" },
+                        { icon: "◉", label: "Participants", value: "47", color: "text-purple-600", iconBg: "bg-purple-50" },
+                        { icon: "⊞", label: "Active Cycles", value: "2", color: "text-orange-500", iconBg: "bg-orange-50" },
+                      ].map((kpi) => (
+                        <div key={kpi.label} className="bg-white rounded-lg p-2 border border-border/40">
+                          <div className={`h-4 w-4 rounded-md ${kpi.iconBg} flex items-center justify-center text-[8px] mb-1`}>{kpi.icon}</div>
+                          <p className={`text-sm font-bold ${kpi.color}`}>{kpi.value}</p>
+                          <p className="text-[7px] text-muted-foreground mt-0.5 leading-tight">{kpi.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Rating Distribution + Competency Ratings side by side */}
+                    <div className="grid grid-cols-2 gap-1.5 mb-3">
+                      {/* Rating Distribution */}
+                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
+                        <p className="text-[9px] font-semibold text-foreground mb-2">Rating Distribution</p>
+                        <div className="flex items-end gap-1 h-12">
+                          {[
+                            { score: "1", pct: 3, color: "bg-red-400" },
+                            { score: "2", pct: 8, color: "bg-orange-400" },
+                            { score: "3", pct: 28, color: "bg-yellow-400" },
+                            { score: "4", pct: 42, color: "bg-green-400" },
+                            { score: "5", pct: 19, color: "bg-emerald-500" },
+                          ].map((bar) => (
+                            <div key={bar.score} className="flex-1 flex flex-col items-center gap-0.5">
+                              <div className={`w-full ${bar.color} rounded-t-sm`} style={{ height: `${bar.pct * 1.1}px` }} />
+                              <span className="text-[7px] text-muted-foreground">{bar.score}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Competency Ratings */}
+                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
+                        <p className="text-[9px] font-semibold text-foreground mb-2">Competency Ratings</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { name: "Collaboration", score: 4.4 },
+                            { name: "Leadership", score: 4.3 },
+                            { name: "Execution", score: 3.9 },
+                            { name: "Communication", score: 3.7 },
+                          ].map((c) => (
+                            <div key={c.name} className="flex items-center gap-1.5">
+                              <p className="text-[8px] text-muted-foreground w-[70px] shrink-0 truncate">{c.name}</p>
+                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-primary rounded-full" style={{ width: `${(c.score / 5) * 100}%` }} />
+                              </div>
+                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{c.score}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    {/* KPI tiles */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {[
-                        { label: "Overall Rating", value: "4.2/5", color: "text-yellow-500" },
-                        { label: "Completion", value: "91%", color: "text-emerald-600" },
-                        { label: "Participants", value: "47", color: "text-primary" },
-                        { label: "Active Cycles", value: "2", color: "text-orange-500" },
-                      ].map((tile) => (
-                        <div key={tile.label} className="bg-muted/30 rounded-xl p-2.5 border border-border/40">
-                          <p className="text-[10px] text-muted-foreground mb-1">{tile.label}</p>
-                          <p className={`text-base font-bold ${tile.color}`}>{tile.value}</p>
-                        </div>
-                      ))}
+                    {/* Performance Ranking table */}
+                    <div className="bg-white rounded-lg p-2.5 border border-border/40">
+                      <div className="flex items-center gap-1 mb-2">
+                        <span className="text-[9px]">⭐</span>
+                        <p className="text-[9px] font-semibold text-foreground">Performance Ranking</p>
+                      </div>
+                      <div className="space-y-1">
+                        {[
+                          { rank: 1, name: "Alex Johnson", fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
+                          { rank: 2, name: "Maria Garcia", fn: "Product", rating: 4.2, tier: "Strong", tierColor: "text-green-700 bg-green-50" },
+                          { rank: 3, name: "Chris Lee", fn: "Design", rating: 3.6, tier: "Solid", tierColor: "text-sky-700 bg-sky-50" },
+                          { rank: 4, name: "Priya Nair", fn: "Engineering", rating: 2.8, tier: "Needs Dev", tierColor: "text-amber-700 bg-amber-50" },
+                        ].map((emp) => (
+                          <div key={emp.name} className="flex items-center gap-2 py-0.5">
+                            <span className="text-[8px] text-muted-foreground w-3 shrink-0 font-mono">{emp.rank}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[9px] font-medium text-foreground truncate">{emp.name}</p>
+                            </div>
+                            <span className="text-[8px] text-muted-foreground shrink-0">{emp.fn}</span>
+                            <div className="w-10 h-1 bg-muted rounded-full overflow-hidden shrink-0">
+                              <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
+                            </div>
+                            <span className="text-[8px] font-semibold text-foreground tabular-nums shrink-0">{emp.rating}</span>
+                            <span className={`px-1 py-0.5 rounded text-[7px] font-semibold shrink-0 ${emp.tierColor}`}>{emp.tier}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
-                    {/* Competency bar chart */}
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-2">Avg. by Competency</p>
-                    <div className="space-y-2">
-                      {[
-                        { name: "Leadership", score: 4.3, pct: 86 },
-                        { name: "Execution", score: 3.9, pct: 78 },
-                        { name: "Collaboration", score: 4.4, pct: 88 },
-                        { name: "Communication", score: 3.7, pct: 74 },
-                      ].map((c) => (
-                        <div key={c.name} className="flex items-center gap-2">
-                          <p className="text-[10px] text-muted-foreground w-[90px] shrink-0 truncate">{c.name}</p>
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: `${c.pct}%` }} />
-                          </div>
-                          <span className="text-[10px] font-semibold text-foreground w-5 text-right tabular-nums">{c.score}</span>
+                    {/* Completion by Department + Avg Rating by Department */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
+                        <p className="text-[9px] font-semibold text-foreground mb-2">Completion by Dept</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { name: "Engineering", pct: 96 },
+                            { name: "Product", pct: 88 },
+                            { name: "Design", pct: 100 },
+                            { name: "Marketing", pct: 75 },
+                          ].map((d) => (
+                            <div key={d.name} className="flex items-center gap-1.5">
+                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
+                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${d.pct}%` }} />
+                              </div>
+                              <span className="text-[8px] font-semibold text-foreground w-6 text-right tabular-nums">{d.pct}%</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
+                        <p className="text-[9px] font-semibold text-foreground mb-2">Avg Rating by Dept</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { name: "Engineering", rating: 4.3 },
+                            { name: "Product", rating: 4.1 },
+                            { name: "Design", rating: 3.8 },
+                            { name: "Marketing", rating: 3.5 },
+                          ].map((d) => (
+                            <div key={d.name} className="flex items-center gap-1.5">
+                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
+                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-primary rounded-full" style={{ width: `${(d.rating / 5) * 100}%` }} />
+                              </div>
+                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{d.rating}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -201,9 +326,9 @@ export default function Home() {
               { stat: "51%", label: "lower turnover", detail: "at organisations with high employee engagement", source: "Gallup, 2024" },
             ].map((item) => (
               <div key={item.stat} className="text-center space-y-1.5">
-                <p className="text-3xl lg:text-4xl font-bold tracking-tight text-primary">{item.stat}</p>
-                <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{item.detail}</p>
+                <AnimatedCounter value={item.stat} className="text-3xl lg:text-4xl font-bold tracking-tight text-primary block" />
+                <p className="text-base font-semibold text-foreground">{item.label}</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{item.detail}</p>
                 <p className="text-[10px] text-muted-foreground/60 italic">{item.source}</p>
               </div>
             ))}
@@ -211,227 +336,54 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Feature Spotlight: Goals (moved up) ── */}
-      <section id="goals" className="bg-white py-20 lg:py-24">
+      {/* ── Goals & Analytics — compact cards ── */}
+      <section className="bg-white py-16 lg:py-20">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-start">
+          <ScrollReveal className="text-center mb-10">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+              Goals, analytics, and everything in between
+            </h2>
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[17px]">
+              Nami doesn&apos;t just handle reviews. It tracks goals, surfaces analytics, and keeps your whole performance stack connected.
+            </p>
+          </ScrollReveal>
 
-            {/* Left: Goals mockup — desktop only */}
-            <ScrollReveal scale>
-              <div className="relative lg:sticky lg:top-24">
-                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
-                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white">
-                  {/* Header */}
-                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Goals</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">Q1 2025 · 4 active goals</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-semibold">
-                      3 on track
-                    </div>
-                  </div>
-
-                  {/* Goal rows */}
-                  <div className="divide-y divide-border/50">
-                    {[
-                      {
-                        title: "Achieve 90%+ review completion org-wide",
-                        progress: 100,
-                        statusLabel: "Achieved",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                      {
-                        title: "Launch competency framework for all IC levels",
-                        progress: 75,
-                        statusLabel: "On Track",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                      {
-                        title: "Reduce time-to-hire for Engineering by 20%",
-                        progress: 38,
-                        statusLabel: "At Risk",
-                        statusColor: "text-amber-700 bg-amber-50",
-                        ringColor: "#f59e0b",
-                      },
-                      {
-                        title: "Complete 360 reviews for all senior ICs",
-                        progress: 88,
-                        statusLabel: "On Track",
-                        statusColor: "text-emerald-700 bg-emerald-50",
-                        ringColor: "#10b981",
-                      },
-                    ].map((goal) => {
-                      const circumference = 2 * Math.PI * 14;
-                      const dash = (goal.progress / 100) * circumference;
-                      return (
-                        <div key={goal.title} className="px-5 py-4 flex items-center gap-4">
-                          {/* SVG ring indicator */}
-                          <div className="relative h-11 w-11 shrink-0">
-                            <svg viewBox="0 0 36 36" className="h-11 w-11 -rotate-90">
-                              <circle
-                                cx="18" cy="18" r="14"
-                                fill="none"
-                                stroke="currentColor"
-                                className="text-muted/50"
-                                strokeWidth="3.5"
-                              />
-                              <circle
-                                cx="18" cy="18" r="14"
-                                fill="none"
-                                stroke={goal.ringColor}
-                                strokeWidth="3.5"
-                                strokeDasharray={`${dash} ${circumference}`}
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-foreground">
-                              {goal.progress}%
-                            </span>
-                          </div>
-                          {/* Text */}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2">{goal.title}</p>
-                            <div className={`mt-1.5 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${goal.statusColor}`}>
-                              {goal.statusLabel}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Footer */}
-                  <div className="px-5 py-3 border-t border-border/60 bg-muted/20 flex items-center justify-between">
-                    <p className="text-[11px] text-muted-foreground">Goal progress syncs with review data</p>
-                    <div className="flex items-center gap-1 text-[11px] text-primary font-medium">
-                      View all <ChevronRight className="h-3 w-3" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Slack notification mockup */}
-                <div className="mt-6 rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-primary/10 bg-white">
-                  <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
-                    <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <span className="text-white text-[7px] font-bold">N</span>
-                    </div>
-                    <span className="text-white text-xs font-semibold">Nami</span>
-                    <span className="text-white/40 text-[10px]">DM</span>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="flex gap-2.5">
-                      <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <span className="text-white text-[9px] font-bold">N</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 mb-1">
-                          <span className="text-[12px] font-bold text-foreground">Nami</span>
-                          <span className="text-[10px] text-muted-foreground">2:14 PM</span>
-                        </div>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg rounded-tl-sm p-3">
-                          <p className="text-[11px] font-semibold text-amber-800 flex items-center gap-1.5">
-                            <Flag className="h-3 w-3" />
-                            Goal status changed to At Risk
-                          </p>
-                          <p className="text-[11px] text-amber-700 mt-1.5 leading-relaxed">
-                            <span className="font-medium">Sarah Chen</span>&apos;s goal &ldquo;Reduce time-to-hire for Engineering by 20%&rdquo; moved from <span className="font-medium">On Track</span> to <span className="font-medium">At Risk</span>. Progress: 38%.
-                          </p>
-                          <p className="text-[10px] text-amber-600 mt-2 italic">
-                            Consider checking in during your next 1:1.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Goal achieved message */}
-                    <div className="flex gap-2.5">
-                      <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <span className="text-white text-[9px] font-bold">N</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-1.5 mb-1">
-                          <span className="text-[12px] font-bold text-foreground">Nami</span>
-                          <span className="text-[10px] text-muted-foreground">4:02 PM</span>
-                        </div>
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg rounded-tl-sm p-3">
-                          <p className="text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5">
-                            <Check className="h-3 w-3" />
-                            Goal achieved
-                          </p>
-                          <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed">
-                            Your team hit &ldquo;Achieve 90%+ review completion org-wide&rdquo; — current completion is <span className="font-medium">96%</span>. Nice work!
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Right: copy */}
+          <div className="grid sm:grid-cols-3 gap-5">
             <ScrollReveal>
-              <div>
-                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
-                  Goals & OKRs
-                </span>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
-                  Set a goal in 30 seconds. Track it forever.
-                </h2>
-                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  Most goal tools are glorified spreadsheets. Nami makes goals effortless — create one in seconds from a template, and it stays connected to reviews, analytics, and your team&apos;s Slack.
+              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
+                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
+                  <Flag className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Goals &amp; OKRs</h3>
+                <p className="text-[15px] text-muted-foreground leading-relaxed">
+                  Create goals in 30 seconds from templates. Track status (On Track, At Risk, Achieved) in real time. Goals feed directly into reviews and analytics — no manual data entry.
                 </p>
-
-                <ul className="mt-8 space-y-5">
-                  {[
-                    {
-                      icon: Zap,
-                      title: "One-click goal templates",
-                      body: "Pick from pre-built templates — Improve a Metric, Complete a Project, Team Development — and the goal form is pre-filled. Edit the brackets, hit save. Done in 30 seconds.",
-                    },
-                    {
-                      icon: Flag,
-                      title: "Individual and team goals with live tracking",
-                      body: "Every goal has an owner, due date, and status: On Track, At Risk, Delayed, or Achieved. Metrics update in real time — no manual check-ins needed.",
-                    },
-                    {
-                      icon: Send,
-                      title: "Status changes notify managers on Slack",
-                      body: "When a goal moves to At Risk or Delayed, the employee\u2019s manager gets a Slack DM instantly. No surprises at review time — issues surface the moment they happen.",
-                    },
-                    {
-                      icon: Users,
-                      title: "Full context in every 1:1",
-                      body: "Open any team member\u2019s profile and their goal progress is right there. Managers walk into every 1:1 knowing exactly where things stand — no \u2018what were you working on?\u2019",
-                    },
-                    {
-                      icon: TrendingUp,
-                      title: "Goals roll up into org-wide Analytics",
-                      body: "See what percentage of the org is on track at any moment. Spot which teams are slipping and which are flying — before it shows up in quarterly results.",
-                    },
-                    {
-                      icon: BarChart3,
-                      title: "Goal data feeds directly into reviews",
-                      body: "When a review cycle opens, historical goal progress is already in the competency framework. Ratings reflect real outcomes — not recency bias or guesswork.",
-                    },
-                  ].map((item) => (
-                    <li key={item.title} className="flex gap-4">
-                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
-                        <item.icon className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </ScrollReveal>
 
+            <ScrollReveal delay={80}>
+              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
+                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Analytics &amp; Heatmaps</h3>
+                <p className="text-[15px] text-muted-foreground leading-relaxed">
+                  Competency heatmaps, performance rankings, completion breakdowns — sliced by role, department, level, and tenure. See exactly where to invest, not just a pie chart.
+                </p>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={160}>
+              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
+                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">Trends &amp; Reporting</h3>
+                <p className="text-[15px] text-muted-foreground leading-relaxed">
+                  Cross-cycle trends show if your org is improving. Completion rates, average ratings, and goal attainment — all tracked over time so you know your investment in people is working.
+                </p>
+              </div>
+            </ScrollReveal>
           </div>
         </div>
       </section>
@@ -443,10 +395,10 @@ export default function Home() {
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
               Template Library
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
               Don&apos;t build frameworks from scratch — use ours
             </h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
+            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[17px]">
               Pre-built by HR researchers. Import in one click. Customise to fit your org.
             </p>
           </ScrollReveal>
@@ -564,10 +516,10 @@ export default function Home() {
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
                   Performance Reviews &amp; 360
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
+                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground leading-tight">
                   Reviews that actually get completed — because they live in Slack
                 </h2>
-                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
+                <p className="mt-4 text-muted-foreground text-[17px] leading-relaxed">
                   Most teams struggle with 40–60% review completion. Nami fixes this by meeting people where they already work.
                 </p>
 
@@ -576,37 +528,22 @@ export default function Home() {
                     {
                       icon: MessageSquare,
                       title: "Slack DMs, not another form",
-                      body: "Nami sends review requests as Slack DMs. Your team responds in the thread — no new tab, no new login, no context switch. Completion rates climb from ~40% to 95%+.",
-                    },
-                    {
-                      icon: Users,
-                      title: "Every angle covered: self, manager, peer, upward",
-                      body: "One cycle covers all reviewer types. Nami auto-assigns based on reporting lines, sends reminders, and tracks who's outstanding — without you chasing anyone.",
-                    },
-                    {
-                      icon: Star,
-                      title: "Calibration built in, not bolted on",
-                      body: "After collection, HR uses the 9-box calibration grid to align grades across managers before releasing results. No more calibration spreadsheets.",
+                      body: "Review requests arrive as Slack DMs. Your team responds right there — no new tab, no login, no context switch. Completion rates climb from ~40% to 95%+.",
                     },
                     {
                       icon: Shield,
-                      title: "Grade-gated results",
-                      body: "Employees only see their results after HR releases grades. You control the timing — not Slack, not the reviewer.",
+                      title: "Airtight data visibility — nothing leaks early",
+                      body: "Managers can\u2019t see upward feedback until they\u2019ve submitted their own review — and vice versa. Employees only see results after HR releases grades. Compliance-ready by design.",
+                    },
+                    {
+                      icon: Star,
+                      title: "9-box calibration built in",
+                      body: "After collection, HR aligns grades across managers using the calibration grid before releasing results. No spreadsheets.",
                     },
                     {
                       icon: Grid3X3,
-                      title: "Full modal reviews — no browser needed",
-                      body: "Reviewers can complete the entire review in a Slack modal: competency ratings, expected scores, and open-ended comments. Never leaves Slack.",
-                    },
-                    {
-                      icon: Bell,
-                      title: "Smart reminders that actually work",
-                      body: "Nami sends automated deadline reminders via DM. Managers see who\u2019s outstanding in real time. No more spreadsheet tracking or manual follow-ups.",
-                    },
-                    {
-                      icon: Target,
-                      title: "Score descriptors for every competency",
-                      body: "Each rating shows what that score means for that specific competency and level. Reviewers give accurate, calibrated scores — not guesswork.",
+                      title: "Full reviews in a Slack modal",
+                      body: "Competency ratings, expected scores, open-ended comments — all inside a Slack modal. Reviewers never open a browser.",
                     },
                   ].map((item) => (
                     <li key={item.title} className="flex gap-4">
@@ -614,8 +551,8 @@ export default function Home() {
                         <item.icon className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                        <p className="text-base font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{item.body}</p>
                       </div>
                     </li>
                   ))}
@@ -629,29 +566,28 @@ export default function Home() {
                 <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
                 <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
                   {/* Slack header */}
-                  <div className="bg-[#1e1b4b] px-5 py-3 flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-5 w-5 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                        <span className="text-white text-[8px] font-bold">N</span>
-                      </div>
-                      <span className="text-white text-sm font-semibold">Nami</span>
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
                     </div>
-                    <span className="text-white/40 text-xs">app</span>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
                   </div>
 
                   {/* Conversation */}
                   <div className="p-5 space-y-5 bg-white">
                     {/* Nami → competency review with score descriptors */}
                     <div className="flex gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
                         <span className="text-white text-xs font-bold">N</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
                           <span className="text-[11px] text-muted-foreground">10:32 AM</span>
                         </div>
-                        <div className="bg-muted/50 rounded-xl rounded-tl-sm p-4 border border-border/60 space-y-3">
+                        <div className="border-l-[3px] border-l-primary pl-3 py-1 space-y-3">
                           <p className="text-[13px] font-semibold text-foreground">
                             2/6: Product Strategy
                           </p>
@@ -673,7 +609,7 @@ export default function Home() {
                                 { n: 4, label: "Exceeds expectations" },
                                 { n: 5, label: "Exceptional" },
                               ].map((btn) => (
-                                <div key={btn.n} className={`px-3 py-1.5 rounded-md text-[10px] font-medium ${btn.n === 4 ? 'bg-primary text-white ring-2 ring-primary/30' : 'bg-muted border border-border text-foreground'}`}>
+                                <div key={btn.n} className={`px-3 py-1.5 rounded text-[10px] font-medium ${btn.n === 4 ? 'border border-primary bg-primary/10 text-primary font-semibold' : 'border border-border bg-white text-foreground hover:bg-muted/30'}`}>
                                   {btn.n} - {btn.label}
                                 </div>
                               ))}
@@ -701,12 +637,13 @@ export default function Home() {
 
                     {/* Nami confirmation + next */}
                     <div className="flex gap-3">
-                      <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
                         <span className="text-white text-xs font-bold">N</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
                           <span className="text-[11px] text-muted-foreground">10:33 AM</span>
                         </div>
                         <p className="text-[13px] text-foreground leading-relaxed">
@@ -777,45 +714,45 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Feature Spotlight 3: Analytics ── */}
-      <section id="analytics" className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
+      {/* ── Feature Spotlight 3: Surveys & Pulse Checks ── */}
+      <section id="surveys" className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
 
             {/* Left: copy */}
             <ScrollReveal>
-              <div>
+              <div className="lg:sticky lg:top-24">
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
-                  Analytics
+                  Surveys &amp; Pulse Checks
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground leading-tight">
-                  Analytics that tell you something — not just pretty charts
+                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground leading-tight">
+                  Real-time employee sentiment — without the annual survey
                 </h2>
-                <p className="mt-4 text-muted-foreground text-[15px] leading-relaxed">
-                  Most HR tools give you a pie chart and call it analytics. Nami gives you actionable data sliced by role, department, level, and tenure — so you know exactly where to invest.
+                <p className="mt-4 text-muted-foreground text-[17px] leading-relaxed">
+                  Stop guessing how your team feels. Nami delivers pulse surveys, eNPS, and custom questionnaires straight to Slack — and collects responses in under a minute.
                 </p>
 
                 <ul className="mt-8 space-y-5">
                   {[
                     {
-                      icon: Grid3X3,
-                      title: "Competency Heatmap — one table, zero spreadsheets",
-                      body: "See which competencies are strong and which need development, broken down by role, department, seniority level, or tenure. Instantly spot that Directors score low on Collaboration, or that new hires are struggling with Execution.",
-                    },
-                    {
-                      icon: Star,
-                      title: "Performance Ranking with tier badges",
-                      body: "Every employee ranked by average rating with a clear tier: Exceptional, Strong, Solid, or Needs Development. Filterable by function and department. Useful for calibration, promotion decisions, and headcount planning.",
+                      icon: Activity,
+                      title: "Pulse surveys in Slack DMs",
+                      body: "Quick temperature checks — 5–15 questions, under 2 minutes. Delivered where your team already works.",
                     },
                     {
                       icon: TrendingUp,
-                      title: "Cross-cycle trend analysis",
-                      body: "See whether your org's average rating and completion rate are improving cycle over cycle — not just a snapshot of today. Know if your investment in people is working.",
+                      title: "eNPS — one number that tells you everything",
+                      body: "0–10 Net Promoter Score with follow-up question. Track promoters, passives, and detractors over time.",
                     },
                     {
-                      icon: Target,
-                      title: "Filter by cycle, function, or department",
-                      body: "Every analytics view is filterable. Compare Engineering vs. Product. Look at just the last cycle. Drill into a specific department. The data adjusts in real time — no waiting for reports to run.",
+                      icon: ClipboardList,
+                      title: "Custom surveys for anything",
+                      body: "Rating scales, open-ended questions, single-select. Onboarding feedback, exit interviews, team retros — your call.",
+                    },
+                    {
+                      icon: Shield,
+                      title: "Anonymous and aggregated",
+                      body: "Names are never shown. People answer honestly because they trust the process.",
                     },
                   ].map((item) => (
                     <li key={item.title} className="flex gap-4">
@@ -823,8 +760,8 @@ export default function Home() {
                         <item.icon className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                        <p className="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">{item.body}</p>
+                        <p className="text-base font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{item.body}</p>
                       </div>
                     </li>
                   ))}
@@ -832,113 +769,123 @@ export default function Home() {
               </div>
             </ScrollReveal>
 
-            {/* Right: Heatmap + Ranking mockup — desktop only */}
+            {/* Right: Slack DM mockup — pulse survey + eNPS */}
             <ScrollReveal scale>
-              <div className="relative space-y-4">
-                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+              <div className="relative">
+                <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
 
-                {/* Heatmap table */}
-                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-xl shadow-primary/8 bg-white">
-                  <div className="px-5 py-4 border-b border-border/60 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">Competency Heatmap</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">Avg ratings × role — Q1 2025</p>
+                {/* Pulse survey DM */}
+                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      {[
-                        { label: "≥4.5", color: "bg-emerald-100" },
-                        { label: "≥3.5", color: "bg-primary/10" },
-                        { label: "<3.5", color: "bg-amber-100" },
-                      ].map((l) => (
-                        <div key={l.label} className="flex items-center gap-1">
-                          <div className={`h-2.5 w-2.5 rounded-sm ${l.color}`} />
-                          <span className="text-[9px] text-muted-foreground">{l.label}</span>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
+                  </div>
+                  <div className="p-5 space-y-5 bg-white">
+                    {/* Nami → pulse survey intro */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="border-b border-border/40 bg-muted/20">
-                          <th className="px-4 py-2 text-left font-medium text-muted-foreground w-32">Competency</th>
-                          {["All", "IC", "Manager", "Director"].map((g) => (
-                            <th key={g} className="px-3 py-2 text-center font-medium text-muted-foreground min-w-[60px]">{g}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {[
-                          { name: "Leadership",    scores: [3.9, 3.5, 4.2, 4.8] },
-                          { name: "Execution",     scores: [4.1, 4.3, 4.0, 3.8] },
-                          { name: "Collaboration", scores: [4.4, 4.5, 4.3, 4.6] },
-                          { name: "Communication", scores: [3.6, 3.5, 3.8, 4.1] },
-                        ].map((row) => (
-                          <tr key={row.name} className="border-t border-border/40 hover:bg-muted/10 transition-colors">
-                            <td className="px-4 py-2.5 font-medium text-foreground">{row.name}</td>
-                            {row.scores.map((score, i) => (
-                              <td
-                                key={`${row.name}-${i}`}
-                                className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
-                                  score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
-                                  score >= 3.5 ? "bg-primary/5 text-primary" :
-                                  "bg-amber-50 text-amber-700"
-                                }`}
-                              >
-                                {score.toFixed(1)}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                        {/* Overall row */}
-                        <tr className="border-t-2 border-border/60 bg-muted/30 font-semibold">
-                          <td className="px-4 py-2.5 text-foreground">Overall</td>
-                          {[4.0, 4.0, 4.1, 4.3].map((score, i) => (
-                            <td key={`overall-${i}`} className={`px-3 py-2.5 text-center font-semibold tabular-nums ${
-                              score >= 4.5 ? "bg-emerald-50 text-emerald-700" :
-                              score >= 3.5 ? "bg-primary/5 text-primary" :
-                              "bg-amber-50 text-amber-700"
-                            }`}>
-                              {score.toFixed(1)}
-                            </td>
-                          ))}
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Performance ranking snippet */}
-                <div className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/5 bg-white">
-                  <div className="px-5 py-3.5 border-b border-border/60 flex items-center gap-2">
-                    <Star className="h-4 w-4 text-yellow-500" />
-                    <p className="text-[13px] font-semibold text-foreground">Performance Ranking</p>
-                  </div>
-                  <div className="divide-y divide-border/40">
-                    {[
-                      { name: "Alex Johnson", fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
-                      { name: "Maria Garcia", fn: "Product",     rating: 4.2, tier: "Strong",      tierColor: "text-green-700 bg-green-50" },
-                      { name: "Chris Lee",    fn: "Design",      rating: 3.6, tier: "Solid",       tierColor: "text-sky-700 bg-sky-50" },
-                      { name: "Priya Nair",   fn: "Engineering", rating: 2.8, tier: "Needs Dev",   tierColor: "text-amber-700 bg-amber-50" },
-                    ].map((emp, i) => (
-                      <div key={emp.name} className="px-5 py-3 flex items-center gap-3">
-                        <span className="text-[10px] text-muted-foreground font-mono w-4 shrink-0">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-medium text-foreground">{emp.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{emp.fn}</p>
+                        <p className="text-[13px] text-foreground leading-relaxed mb-3">
+                          Hey! You&apos;ve been invited to take the <span className="font-semibold">March Pulse Survey</span>. It&apos;s quick — 5 questions, ~1 min.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-3">
+                          <Shield className="h-3 w-3" /> Your responses are anonymous and aggregated.
+                        </p>
+                        {/* Question with left border */}
+                        <div className="border-l-[3px] border-l-primary pl-3 py-1 mb-3">
+                          <p className="text-[12px] font-semibold text-foreground mb-1">1/5: I feel supported by my manager</p>
+                          <p className="text-[10px] text-muted-foreground italic">Rate from 1 (Strongly disagree) to 7 (Strongly agree)</p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
-                          </div>
-                          <span className="text-[11px] font-semibold text-foreground tabular-nums">{emp.rating}</span>
-                          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${emp.tierColor}`}>{emp.tier}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                            <div key={n} className={`px-3 py-1.5 rounded text-[11px] font-medium ${n === 6 ? 'border-2 border-primary bg-primary/10 text-primary' : 'border border-border bg-white text-foreground'}`}>
+                              {n}
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Nami confirmation */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
+                        </div>
+                        <p className="text-[13px] text-foreground leading-relaxed">
+                          Got it — <span className="font-semibold text-primary">6/7</span>. Next: <span className="font-semibold">I have the tools I need to do my job well</span>
+                        </p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full" style={{ width: '20%' }} />
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-medium">1/5</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
+                {/* eNPS mockup */}
+                <div className="mt-6 rounded-2xl border border-border/60 bg-white overflow-hidden shadow-xl shadow-primary/10">
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
+                    </div>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
+                  </div>
+                  <div className="p-5 bg-white">
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:05 AM</span>
+                        </div>
+                        <div className="border-l-[3px] border-l-emerald-500 pl-3 py-1 mb-3">
+                          <p className="text-[12px] font-semibold text-foreground mb-1">eNPS Survey</p>
+                          <p className="text-[11px] text-muted-foreground">On a scale of 0–10, how likely are you to recommend this company as a great place to work?</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                            <div key={n} className={`w-7 h-7 rounded flex items-center justify-center text-[10px] font-medium ${
+                              n === 9 ? 'border-2 border-emerald-500 bg-emerald-50 text-emerald-700' : 'border border-border bg-white text-foreground'
+                            }`}>
+                              {n}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between mt-1.5 text-[9px] text-muted-foreground">
+                          <span>Not at all likely</span>
+                          <span>Extremely likely</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-center mt-5 text-sm text-muted-foreground/70">
+                  Pulse surveys and eNPS — answered in Slack in under 60 seconds.
+                </p>
               </div>
             </ScrollReveal>
 
@@ -946,190 +893,177 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Nami Does It All ── */}
-      <section className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
+      {/* ── Feature Spotlight 4: Wellbeing & Engagement ── */}
+      <section className="bg-white py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              Powered by Nami
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">One bot. Everything your team needs.</h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[15px]">
-              Nami handles reviews, reminders, surveys, and results — all through Slack DMs. Your team never leaves their workflow.
-            </p>
-          </ScrollReveal>
+          <div className="grid lg:grid-cols-2 gap-16 items-start">
 
-          <div className="grid sm:grid-cols-2 gap-5">
-            {/* Card 1: Competency-Aware Reviews */}
+            {/* Left: Slack check-in mockup + manager alert */}
+            <ScrollReveal scale>
+              <div className="relative lg:sticky lg:top-24">
+                <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+                {/* Check-in DM */}
+                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
+                    </div>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
+                  </div>
+                  <div className="p-5 space-y-5 bg-white">
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">Monday 9:00 AM</span>
+                        </div>
+                        <p className="text-[13px] text-foreground leading-relaxed mb-3">
+                          Hey Sarah! Quick bi-weekly check-in — how are you feeling about work right now?
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {[
+                            { emoji: "😊", label: "Great", selected: false },
+                            { emoji: "🙂", label: "Good", selected: false },
+                            { emoji: "😐", label: "Okay", selected: true },
+                            { emoji: "😟", label: "Not great", selected: false },
+                            { emoji: "😞", label: "Struggling", selected: false },
+                          ].map((opt) => (
+                            <div key={opt.label} className={`px-3 py-2 rounded-lg text-[11px] font-medium flex items-center gap-1.5 ${
+                              opt.selected ? 'border-2 border-amber-400 bg-amber-50 text-amber-800' : 'border border-border bg-white text-foreground'
+                            }`}>
+                              <span className="text-sm">{opt.emoji}</span> {opt.label}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Follow-up */}
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
+                        </div>
+                        <p className="text-[13px] text-foreground leading-relaxed">
+                          Thanks for sharing. Anything specific on your mind? <span className="text-muted-foreground">(optional — just type your reply)</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Manager alert */}
+                <div className="mt-6 rounded-2xl border border-border/60 bg-white overflow-hidden shadow-xl shadow-primary/10">
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
+                    </div>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
+                  </div>
+                  <div className="p-5 bg-white">
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:15 AM</span>
+                        </div>
+                        <div className="border-l-[3px] border-l-amber-400 pl-3 py-1">
+                          <p className="text-[12px] font-semibold text-amber-800 flex items-center gap-1.5">
+                            <AlertTriangle className="h-3 w-3" />
+                            Wellbeing alert — engagement dropping
+                          </p>
+                          <p className="text-[11px] text-amber-700 mt-1.5 leading-relaxed">
+                            <span className="font-medium">Sarah Chen</span>&apos;s check-in score dropped from <span className="font-medium">4.2</span> to <span className="font-medium">2.8</span> over the last 3 check-ins. Consider checking in during your next 1:1.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: copy */}
             <ScrollReveal>
-              <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
-                <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
-                  <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                    <span className="text-white text-[7px] font-bold">N</span>
-                  </div>
-                  <span className="text-white text-xs font-semibold">Nami</span>
-                </div>
-                <div className="p-4 space-y-2.5">
-                  <div className="flex gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                      <span className="text-white text-[9px] font-bold">N</span>
+              <div>
+                <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
+                  Frictionless Check-ins
+                </span>
+                <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground leading-tight">
+                  Set it once. Nami checks in on your team forever.
+                </h2>
+                <p className="mt-4 text-muted-foreground text-[17px] leading-relaxed">
+                  Pick a group, pick a frequency, and you&apos;re done. Every two weeks (or weekly, or monthly) Nami sends a 30-second check-in straight to Slack. No forms, no reminders to send, no chasing. Your team taps one button and you see the results instantly.
+                </p>
+
+                {/* How it works mini-flow */}
+                <div className="mt-6 flex items-center gap-3 flex-wrap">
+                  {[
+                    "Pick your people",
+                    "Set the schedule",
+                    "Nami handles the rest",
+                  ].map((s, i) => (
+                    <div key={s} className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <span className="text-sm font-medium text-foreground">{s}</span>
+                      {i < 2 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold text-foreground">2/6: Product Strategy</p>
-                      <p className="text-[10px] text-muted-foreground italic mt-0.5">Defining product vision, roadmap, and positioning</p>
-                      <div className="space-y-1 mt-2 text-[10px] text-muted-foreground border-l-2 border-border/60 pl-2">
-                        <p><span className="font-bold text-orange-600">2</span> — Contributes to roadmap discussions</p>
-                        <p><span className="font-bold text-yellow-600">3</span> — Owns a product area&apos;s roadmap</p>
-                        <p><span className="font-bold text-green-600">4</span> — Defines multi-quarter strategy</p>
-                        <p><span className="font-bold text-emerald-600">5</span> — Sets company-wide product vision</p>
-                      </div>
-                      <div className="flex gap-1 mt-2.5">
-                        {[
-                          { n: 3, label: "3" },
-                          { n: 4, label: "4" },
-                          { n: 5, label: "5" },
-                        ].map((btn) => (
-                          <div key={btn.n} className={`px-2.5 py-1 rounded text-[10px] font-medium ${btn.n === 4 ? 'bg-primary text-white' : 'bg-muted border border-border/60 text-muted-foreground'}`}>{btn.label}</div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-                <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Competency-Aware Reviews</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Score descriptors built into every rating — no guesswork</p>
-                </div>
+
+                <ul className="mt-8 space-y-5">
+                  {[
+                    {
+                      icon: Zap,
+                      title: "30 seconds in Slack — that\u2019s the whole thing",
+                      body: "One emoji tap and an optional comment. Response rates stay above 90% because it\u2019s effortless.",
+                    },
+                    {
+                      icon: Clock,
+                      title: "Runs on autopilot — weekly, bi-weekly, or monthly",
+                      body: "Set the frequency once. Nami sends it, collects responses, and closes it. You never touch it again.",
+                    },
+                    {
+                      icon: Heart,
+                      title: "Spot burnout before it becomes a resignation",
+                      body: "Track wellbeing scores over time. When sentiment drops across consecutive check-ins, you\u2019ll know weeks early.",
+                    },
+                    {
+                      icon: Bell,
+                      title: "Managers get alerts when scores drop",
+                      body: "Significant score drops trigger a private Slack DM to the manager. The signal comes to you — no monitoring needed.",
+                    },
+                  ].map((item) => (
+                    <li key={item.title} className="flex gap-4">
+                      <div className="h-9 w-9 rounded-xl bg-primary/[0.08] flex items-center justify-center shrink-0 mt-0.5">
+                        <item.icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-foreground">{item.title}</p>
+                        <p className="mt-1 text-[15px] leading-relaxed text-muted-foreground">{item.body}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </ScrollReveal>
 
-            {/* Card 2: Manager Context + Competency Expectations */}
-            <ScrollReveal delay={80}>
-              <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
-                <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
-                  <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                    <span className="text-white text-[7px] font-bold">N</span>
-                  </div>
-                  <span className="text-white text-xs font-semibold">Nami</span>
-                </div>
-                <div className="p-4">
-                  <div className="flex gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                      <span className="text-white text-[9px] font-bold">N</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] text-foreground leading-relaxed mb-2">
-                        Before you rate Alex, here&apos;s some context:
-                      </p>
-                      <div className="space-y-1.5 p-2.5 rounded-lg bg-muted/40 border border-border/50 text-[10px]">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Self-assessment avg</span>
-                          <span className="font-semibold text-foreground">4.2/5</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Active goals</span>
-                          <span className="font-semibold text-emerald-600">3 (2 on track)</span>
-                        </div>
-                      </div>
-                      <div className="mt-2 space-y-1 p-2.5 rounded-lg bg-muted/40 border border-border/50 text-[10px]">
-                        <p className="font-semibold text-foreground mb-1">Senior PM expectations:</p>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Product Strategy</span>
-                          <span className="font-semibold">target: <span className="text-primary">4/5</span></span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Stakeholder Mgmt</span>
-                          <span className="font-semibold">target: <span className="text-primary">4/5</span> <span className="text-emerald-600">&#10003;</span></span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Execution</span>
-                          <span className="font-semibold">target: <span className="text-primary">5/5</span></span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Framework-Powered Context</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Expected scores from the competency matrix — right in Slack</p>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Card 3: Smart Reminders */}
-            <ScrollReveal delay={160}>
-              <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
-                <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
-                  <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                    <span className="text-white text-[7px] font-bold">N</span>
-                  </div>
-                  <span className="text-white text-xs font-semibold">Nami</span>
-                </div>
-                <div className="p-4">
-                  <div className="flex gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                      <span className="text-white text-[9px] font-bold">N</span>
-                    </div>
-                    <div>
-                      <p className="text-[12px] text-foreground leading-relaxed">
-                        Hey! You have <span className="font-semibold">2 reviews</span> left for the Q1 cycle. Want to knock them out now?
-                      </p>
-                      <div className="flex gap-1.5 mt-2.5">
-                        <div className="px-3 py-1.5 rounded-md bg-primary text-white text-[10px] font-medium">Let&apos;s go</div>
-                        <div className="px-3 py-1.5 rounded-md bg-muted border border-border/60 text-foreground text-[10px] font-medium">Remind me later</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
-                  <div className="flex items-center gap-2">
-                    <Bell className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Smart Reminders</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Gentle nudges, never annoying</p>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            {/* Card 4: Instant Results */}
-            <ScrollReveal delay={240}>
-              <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-lg shadow-primary/5">
-                <div className="bg-[#1e1b4b] px-4 py-2.5 flex items-center gap-2">
-                  <div className="h-4 w-4 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                    <span className="text-white text-[7px] font-bold">N</span>
-                  </div>
-                  <span className="text-white text-xs font-semibold">Nami</span>
-                </div>
-                <div className="p-4">
-                  <div className="flex gap-2.5">
-                    <div className="h-7 w-7 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                      <span className="text-white text-[9px] font-bold">N</span>
-                    </div>
-                    <div>
-                      <p className="text-[12px] text-foreground leading-relaxed">
-                        Q1 Performance Review is complete! <span className="font-semibold">47 participants</span> &middot; Avg rating: <span className="font-semibold text-primary">4.2/5</span>
-                      </p>
-                      <div className="flex gap-1.5 mt-2.5">
-                        <div className="px-3 py-1.5 rounded-md bg-primary text-white text-[10px] font-medium">View Dashboard</div>
-                        <div className="px-3 py-1.5 rounded-md bg-muted border border-border/60 text-foreground text-[10px] font-medium">Start Calibration</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-4 py-3 border-t border-border/40 bg-muted/20">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-3.5 w-3.5 text-primary" />
-                    <p className="text-[11px] font-medium text-foreground">Instant Results</p>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">HR gets notified the moment a cycle wraps</p>
-                </div>
-              </div>
-            </ScrollReveal>
           </div>
         </div>
       </section>
@@ -1141,8 +1075,8 @@ export default function Home() {
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
               How it works
             </span>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
-            <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[15px]">
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
+            <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[17px]">
               No lengthy onboarding. No training. No new tool for your team to learn. Just add Nami to Slack and you&apos;re set.
             </p>
           </ScrollReveal>
@@ -1180,8 +1114,8 @@ export default function Home() {
                         {item.step}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-[15px] text-foreground">{item.title}</h3>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
+                    <h3 className="font-semibold text-base text-foreground">{item.title}</h3>
+                    <p className="mt-1.5 text-[15px] leading-relaxed text-muted-foreground">{item.description}</p>
                   </li>
                 </ScrollReveal>
               ))}
@@ -1197,64 +1131,104 @@ export default function Home() {
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
               Pricing
             </span>
-            <h2 className="text-3xl font-bold tracking-tight text-foreground">Other tools charge $8–15/user. Nami is $1.</h2>
-            <p className="mt-3 text-muted-foreground text-[15px]">Less than a coffee. More than most enterprise tools.</p>
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">Simple pricing. No surprises.</h2>
+            <p className="mt-3 text-muted-foreground text-[17px]">Everything included in one plan. Or partner with us for a custom deal.</p>
           </ScrollReveal>
 
-          <ScrollReveal>
-            <div className="flex flex-col items-center max-w-lg mx-auto p-8 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] relative">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-white text-xs font-bold">
-                Everything included
-              </div>
-              <p className="text-5xl font-black text-foreground mt-3 mb-1">$1<span className="text-lg font-normal text-muted-foreground">/user/mo</span></p>
-              <p className="text-[13px] text-muted-foreground mb-6">7-day free trial · No credit card · Cancel anytime</p>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Pro plan */}
+            <ScrollReveal>
+              <div className="relative p-8 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] h-full flex flex-col card-hover">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-white text-xs font-bold">
+                  Most popular
+                </div>
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-bold text-foreground mb-1">Pro</h3>
+                  <p className="text-5xl font-black text-foreground">$5<span className="text-lg font-normal text-muted-foreground">/user/mo</span></p>
+                  <p className="text-[13px] text-muted-foreground mt-2">14-day free trial · No credit card · Cancel anytime</p>
+                </div>
 
-              <div className="grid sm:grid-cols-3 gap-6 w-full text-left">
-                <div>
-                  <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Reviews</p>
-                  <ul className="space-y-1.5">
-                    {["Unlimited cycles", "360° via Slack (Nami)", "9-box calibration"].map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
-                        <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-left mb-8 flex-1">
+                  {[
+                    "Unlimited review cycles",
+                    "360° reviews via Slack",
+                    "9-box calibration",
+                    "Competency frameworks",
+                    "Goal & OKR tracking",
+                    "Pulse surveys & eNPS",
+                    "Competency heatmaps",
+                    "Performance rankings",
+                    "Smart Slack reminders",
+                    "Recurring check-ins",
+                    "CSV team import",
+                    "Trend analytics",
+                  ].map((f) => (
+                    <div key={f} className="flex items-start gap-1.5 text-[13px] text-muted-foreground py-0.5">
+                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                      {f}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Goals</p>
-                  <ul className="space-y-1.5">
-                    {["OKR tracking", "Status updates", "Manager visibility"].map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
-                        <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-primary uppercase tracking-wider mb-2">Analytics</p>
-                  <ul className="space-y-1.5">
-                    {["Competency heatmap", "Performance ranking", "Trend analysis"].map((f) => (
-                      <li key={f} className="flex items-start gap-1.5 text-[12px] text-muted-foreground">
-                        <Check className="h-3 w-3 text-primary mt-0.5 shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
 
-              <Button className="mt-8 w-full" asChild>
-                <a href={addToSlackUrl}>
-                  <Slack className="h-4 w-4 mr-2" />
-                  Start your free trial
-                </a>
-              </Button>
-            </div>
-          </ScrollReveal>
+                <Button className="w-full" size="lg" asChild>
+                  <a href={addToSlackUrl}>
+                    <Slack className="h-4 w-4 mr-2" />
+                    Start free trial
+                  </a>
+                </Button>
+              </div>
+            </ScrollReveal>
+
+            {/* Partner programme */}
+            <ScrollReveal delay={80}>
+              <div className="relative p-8 rounded-2xl border border-border/60 bg-gradient-to-br from-[#faf8f2] to-white h-full flex flex-col card-hover">
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-bold text-foreground mb-1">Partners Programme</h3>
+                  <p className="text-4xl font-black text-foreground">Let&apos;s talk</p>
+                  <p className="text-[13px] text-muted-foreground mt-2">For early adopters who want to shape the product</p>
+                </div>
+
+                <div className="text-left mb-8 flex-1 space-y-4">
+                  <p className="text-[15px] text-muted-foreground leading-relaxed">
+                    Join a small group of launch partners shaping Nami from the ground up. Get early access, direct input on the roadmap, and a product built around your workflow.
+                  </p>
+                  <p className="text-[15px] text-muted-foreground leading-relaxed">
+                    We&apos;re looking for teams who care about performance management and want to be part of building something great.
+                  </p>
+                  <p className="text-[13px] text-muted-foreground/70 italic">
+                    Limited spots available.
+                  </p>
+                </div>
+
+                <Button variant="outline" className="w-full" size="lg" asChild>
+                  <a href="mailto:hello@namihr.com">
+                    <Send className="h-4 w-4 mr-2" />
+                    Inquire about the programme
+                  </a>
+                </Button>
+                <p className="text-center text-xs text-muted-foreground mt-3">hello@namihr.com</p>
+              </div>
+            </ScrollReveal>
+          </div>
         </div>
       </section>
+
+      {/* ── Roadmap callout ── */}
+      <ScrollReveal>
+        <div className="max-w-5xl mx-auto px-6 pb-16 -mt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-border/60 bg-gradient-to-r from-primary/[0.04] to-background p-6 sm:p-8">
+            <div className="text-center sm:text-left">
+              <h3 className="text-xl font-bold text-foreground">Missing a feature that would make you switch?</h3>
+              <p className="mt-1.5 text-[15px] text-muted-foreground">Check our public roadmap — or suggest it and we&apos;ll build it.</p>
+            </div>
+            <Button variant="outline" className="shrink-0 rounded-full px-6" asChild>
+              <Link href="/roadmap">
+                View Roadmap <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </ScrollReveal>
 
       {/* ── CTA ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#faf8f2] via-background to-[#f5f5f0] py-20">
@@ -1262,7 +1236,7 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="max-w-5xl mx-auto px-6 text-center relative">
           <ScrollReveal>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
+            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
               Ready to let Nami handle your{" "}
               <span className="text-primary">performance management?</span>
             </h2>
@@ -1270,7 +1244,7 @@ export default function Home() {
               Add Nami to your Slack workspace in under a minute. She&apos;ll handle reviews, goals, surveys, and analytics — so you don&apos;t have to.
             </p>
             <div className="mt-10">
-              <Button size="lg" className="h-13 px-8 text-base font-semibold" asChild>
+              <Button size="lg" className="h-13 px-8 text-base font-semibold btn-glow" asChild>
                 <a href={addToSlackUrl}>
                   <Slack className="h-5 w-5 mr-2" />
                   Add to Slack — it&apos;s free
@@ -1294,6 +1268,7 @@ export default function Home() {
               <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
               <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
+              <Link href="/roadmap" className="text-muted-foreground/60 hover:text-foreground transition-colors">Roadmap</Link>
             </div>
           </div>
         </div>

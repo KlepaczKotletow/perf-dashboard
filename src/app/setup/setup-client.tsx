@@ -68,7 +68,7 @@ export function SetupClient({ plan, email, addToSlackUrl }: SetupClientProps) {
               Connect your Slack workspace
             </h2>
             <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-              Install Perf in your Slack workspace so your team can run reviews
+              Install Nami in your Slack workspace so your team can run reviews
               and give feedback directly from Slack.
             </p>
 
