@@ -112,6 +112,7 @@ export default function ImportPage() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [validated, setValidated] = useState<ValidatedUser[]>([]);
   const [applying, setApplying] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult] = useState<ApplyResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -326,42 +327,78 @@ export default function ImportPage() {
     let managersSet = 0;
 
     const applicable = validated.filter((v) => v.errors.length === 0);
-    const toCreate = applicable.filter((v) => v.action === "create");
-    const toUpdate = applicable.filter((v) => v.action === "update" && v.matchedUserId);
 
-    // Handle ALL rows (creates + updates + manager linking) via edge function
-    // This ensures the two-pass manager resolution works across creates AND updates
-    if (applicable.length > 0 && workspaceId) {
-      try {
-        const { data, error } = await supabase.functions.invoke("import-csv-users", {
-          body: {
-            workspace_id: workspaceId,
-            rows: applicable.map((row) => ({
-              email: row.email,
-              name: row.name || undefined,
-              department: row.department || undefined,
-              job_title: row.job_title || undefined,
-              manager_email: row.manager_email || undefined,
-              role: row.role && VALID_ROLES.includes(row.role) ? row.role : undefined,
-              start_date: row.start_date || undefined,
-              avatar_url: row.avatar_url || undefined,
-            })),
-          },
-        });
-
-        if (error) {
-          errors.push(`Import failed: ${error.message}`);
-        } else if (data) {
-          created = data.created || 0;
-          updated = data.updated || 0;
-          managersSet = data.managersSet || 0;
-          if (data.errors?.length) errors.push(...data.errors);
-        }
-      } catch (err: any) {
-        errors.push(`Import error: ${err?.message || "Unknown error"}`);
-      }
-    } else if (!workspaceId) {
+    if (!workspaceId) {
       errors.push("Could not determine workspace. Please refresh and try again.");
+      setResult({ created, updated, managersSet, skipped: validated.length - applicable.length, errors });
+      setStep("done");
+      setApplying(false);
+      return;
+    }
+
+    if (applicable.length > 0) {
+      // Chunk the import so the edge function never sees more than CHUNK_SIZE
+      // rows per invocation. Each invocation creates/updates within its chunk;
+      // cross-chunk manager references are resolved via link_user_managers
+      // RPC once all chunks have finished. This lifts the ~500-row ceiling
+      // imposed by Supabase edge function timeouts.
+      const CHUNK_SIZE = 100;
+      const rows = applicable.map((row) => ({
+        email: row.email,
+        name: row.name || undefined,
+        department: row.department || undefined,
+        job_title: row.job_title || undefined,
+        manager_email: row.manager_email || undefined,
+        role: row.role && VALID_ROLES.includes(row.role) ? row.role : undefined,
+        start_date: row.start_date || undefined,
+        avatar_url: row.avatar_url || undefined,
+      }));
+
+      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        const chunk = rows.slice(i, i + CHUNK_SIZE);
+        setImportProgress({ done: i, total: rows.length });
+        try {
+          const { data, error } = await supabase.functions.invoke("import-csv-users", {
+            body: { workspace_id: workspaceId, rows: chunk },
+          });
+          if (error) {
+            errors.push(`Chunk ${Math.floor(i / CHUNK_SIZE) + 1} failed: ${error.message}`);
+          } else if (data) {
+            created += data.created || 0;
+            updated += data.updated || 0;
+            managersSet += data.managersSet || 0;
+            if (data.errors?.length) errors.push(...data.errors);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          errors.push(`Chunk ${Math.floor(i / CHUNK_SIZE) + 1} error: ${msg}`);
+        }
+      }
+      setImportProgress({ done: rows.length, total: rows.length });
+
+      // Second pass: resolve cross-chunk manager references. Within-chunk
+      // references were already set by the edge function; this RPC only
+      // finds and fills the ones it couldn't see.
+      const managerPairs = rows
+        .filter((r) => r.manager_email && r.email)
+        .map((r) => ({ email: r.email, manager_email: r.manager_email }));
+      if (managerPairs.length > 0) {
+        try {
+          const { data: linkData, error: linkErr } = await supabase.rpc(
+            "link_user_managers",
+            { p_pairs: managerPairs },
+          );
+          if (linkErr) {
+            errors.push(`Manager linking failed: ${linkErr.message}`);
+          } else if (linkData) {
+            const rpcResult = linkData as { linked?: number };
+            managersSet = Math.max(managersSet, rpcResult.linked ?? 0);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          errors.push(`Manager linking error: ${msg}`);
+        }
+      }
     }
 
     const skipped = validated.filter((v) => v.errors.length > 0).length;
@@ -751,7 +788,9 @@ export default function ImportPage() {
                 {applying ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    Importing...
+                    {importProgress
+                      ? `Importing ${importProgress.done}/${importProgress.total}…`
+                      : "Importing…"}
                   </>
                 ) : (
                   <>
