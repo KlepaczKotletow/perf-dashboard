@@ -142,6 +142,30 @@ export default function ReviewFormPage({
           currentReviewerRole = "manager";
         }
 
+        // Phase lock: the review phase matching the reviewer role must be active.
+        // Mirrors Lattice / Leapsome — submissions hard-block once a phase closes,
+        // but the autosave draft is preserved so HR can reopen without data loss.
+        const requiredPhaseType =
+          currentReviewerRole === "self" ? "self_assessment"
+          : currentReviewerRole === "peer" ? "peer_review"
+          : "manager_review"; // manager + upward
+        const { data: activePhase } = await supabase
+          .from("cycle_phases")
+          .select("phase_type, name, end_date")
+          .eq("cycle_id", assignmentData.cycle_id)
+          .eq("phase_type", requiredPhaseType)
+          .eq("status", "active")
+          .limit(1)
+          .maybeSingle();
+        if (!activePhase) {
+          setError(
+            `The ${requiredPhaseType.replace("_", " ")} phase is not active right now, so this review can't be submitted. ` +
+            `Your draft is saved — contact your admin to reopen the phase or wait for the next one.`,
+          );
+          setLoading(false);
+          return;
+        }
+
         // Check if already submitted FOR THIS SPECIFIC ROLE
         // (A user can be both employee and manager on the same assignment,
         //  so we must check per-role, not just per-reviewer)
