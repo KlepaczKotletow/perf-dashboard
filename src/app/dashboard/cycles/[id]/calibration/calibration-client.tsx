@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -222,7 +222,11 @@ function GradeDistribution({ grades }: { grades: Record<string, string> }) {
 
 // ── Per-row save state ────────────────────────────────────────────────────────
 
-function useRowSave(assignmentId: string, supabase: ReturnType<typeof createBrowserClient>) {
+function useRowSave(
+  assignmentId: string,
+  supabase: ReturnType<typeof createBrowserClient>,
+  onSuccess?: (grade: string) => void,
+) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -232,18 +236,21 @@ function useRowSave(assignmentId: string, supabase: ReturnType<typeof createBrow
   async function save(grade: string) {
     setSaving(true);
     setSaveError(null);
+    const normalized = !grade || grade === "__clear__" ? "" : grade;
     // Safe: assignment was loaded from a workspace-scoped cycle page; no direct workspace_id on review_assignments
     const { error } = await supabase
       .from("review_assignments")
-      .update({ final_grade: grade || null })
+      .update({ final_grade: normalized || null })
       .eq("id", assignmentId);
     setSaving(false);
     if (error) {
       setSaveError(error.message);
-    } else {
-      setSavedAt(Date.now());
-      setTimeout(() => setSavedAt(null), 3000);
+      return { ok: false as const, error };
     }
+    setSavedAt(Date.now());
+    setTimeout(() => setSavedAt(null), 3000);
+    onSuccess?.(normalized);
+    return { ok: true as const };
   }
 
   return { saving, showSaved, saveError, save };
@@ -254,12 +261,18 @@ function useRowSave(assignmentId: string, supabase: ReturnType<typeof createBrow
 function AssignmentTableRow({
   assignment,
   supabase,
+  onGradeSaved,
 }: {
   assignment: AssignmentRow;
   supabase: ReturnType<typeof createBrowserClient>;
+  onGradeSaved?: (assignmentId: string, grade: string) => void;
 }) {
   const [grade, setGrade] = useState(assignment.final_grade || "");
-  const { saving, showSaved, saveError, save } = useRowSave(assignment.id, supabase);
+  const { saving, showSaved, saveError, save } = useRowSave(
+    assignment.id,
+    supabase,
+    (g) => onGradeSaved?.(assignment.id, g),
+  );
 
   const displayAvg = getDisplayAvg(assignment.responses);
   const gradeOption = GRADE_OPTIONS.find((g) => g.value === grade);
@@ -389,10 +402,21 @@ export default function CalibrationClient({
     return map;
   });
 
-  // Wrap supabase so grade changes feed into liveGrades for distribution
-  const trackedSupabase = useMemo(() => {
-    return new Proxy(supabase, {});
-  }, [supabase]);
+  // Keep liveGrades in sync with saves so the distribution chart updates live.
+  const handleGradeSaved = useCallback(
+    (assignmentId: string, grade: string) => {
+      setLiveGrades((prev) => {
+        const next = { ...prev };
+        if (!grade) {
+          delete next[assignmentId];
+        } else {
+          next[assignmentId] = grade;
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const sorted = useMemo(() => {
     return [...assignments].sort((a, b) => {
@@ -543,7 +567,8 @@ export default function CalibrationClient({
                 <AssignmentTableRow
                   key={assignment.id}
                   assignment={assignment}
-                  supabase={trackedSupabase}
+                  supabase={supabase}
+                  onGradeSaved={handleGradeSaved}
                 />
               ))}
             </div>
