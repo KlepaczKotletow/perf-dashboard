@@ -24,6 +24,7 @@ import { isManagerOrAbove, isAdmin, isHROrAbove, ROLE_LABELS, UserRole } from "@
 import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
 import { RoleWatcher } from "./role-watcher";
+import { WidgetErrorBoundary } from "@/components/widget-error-boundary";
 
 interface NavSection {
   label: string;
@@ -179,7 +180,7 @@ export default async function DashboardLayout({
           — mobile: full width with top padding for the fixed mobile header */}
       <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
         <div className="px-4 lg:px-8 py-6 lg:py-8">
-          {children}
+          <WidgetErrorBoundary label="page">{children}</WidgetErrorBoundary>
         </div>
       </main>
     </div>

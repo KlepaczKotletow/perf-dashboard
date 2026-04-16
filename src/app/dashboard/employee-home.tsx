@@ -171,15 +171,31 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
         </div>
       )}
 
-      {/* No reviews at all */}
+      {/* No reviews at all — keep the page inviting by pointing people at
+          what they CAN do right now (track goals, give kudos) rather than
+          leaving them staring at a "waiting" state. */}
       {assignments.length === 0 && pendingSelf.length === 0 && (
         <Card className="border-border/60">
-          <CardContent className="py-12 flex flex-col items-center text-center">
+          <CardContent className="py-10 flex flex-col items-center text-center">
             <ClipboardCheck className="h-10 w-10 text-muted-foreground/30 mb-3" />
-            <p className="text-sm font-medium text-foreground">No active reviews</p>
-            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-              You'll be notified when your manager adds you to a performance cycle.
+            <p className="text-sm font-medium text-foreground">No active reviews right now</p>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+              You&apos;ll be added to the next performance cycle when one kicks off. In the meantime, keep your goals fresh and send some kudos.
             </p>
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/dashboard/goals">
+                  <Flag className="h-3.5 w-3.5 mr-1.5" />
+                  Update my goals
+                </Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <Link href="/dashboard/feedback">
+                  <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
+                  Give kudos
+                </Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

@@ -218,3 +218,41 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.4 0 0);
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Dashboard design tokens (spacing + typographic rhythms)
+   Adding these as utility classes gives us a single vocabulary for the
+   patterns that were flagged as inconsistent in the audit (card padding,
+   section headings, muted link buttons). Existing pages can migrate
+   incrementally; new code should prefer these.
+   ──────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Card padding scale — pick based on density, not ad-hoc py-3/pt-5/py-10 */
+  .card-pad-compact { @apply px-4 py-3; }   /* list rows, stat tiles */
+  .card-pad         { @apply p-5; }          /* standard panels */
+  .card-pad-cozy    { @apply p-6; }          /* featured content */
+  .card-pad-generous { @apply p-8; }         /* hero-ish blocks, empty states */
+
+  /* Section heading — the border-l-2 primary accent pattern that dashboard
+     pages already use inconsistently. Apply this class instead of re-copying
+     the classes every time. */
+  .section-heading {
+    @apply text-sm font-semibold text-foreground tracking-wide
+           border-l-2 border-primary/40 pl-3;
+  }
+
+  /* "See all" / inline-link affordance — replaces the custom <a className="text-xs text-primary ..."> anchors */
+  .inline-link {
+    @apply text-xs text-primary font-medium hover:text-primary/80
+           inline-flex items-center gap-1 transition-colors;
+  }
+
+  /* Vertical rhythm for stacked dashboard sections — 32px between groups.
+     Works with the existing space-y-8 pattern but centralises the value. */
+  .dashboard-stack { @apply space-y-8; }
+
+  /* Empty-state card content wrapper — consistent padding + centering */
+  .empty-state {
+    @apply py-10 flex flex-col items-center text-center;
+  }
+}

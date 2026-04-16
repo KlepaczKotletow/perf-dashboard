@@ -8,6 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
@@ -42,6 +52,7 @@ export default function ReviewFormPage({
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignment, setAssignment] = useState<any>(null);
   const [employee, setEmployee] = useState<any>(null);
@@ -780,12 +791,76 @@ export default function ReviewFormPage({
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/performance">Cancel</Link>
           </Button>
-          <Button size="sm" onClick={handleSubmit} disabled={submitting}>
+          <Button
+            size="sm"
+            onClick={() => {
+              // Run the cheap validations before opening the confirm so we
+              // don't show a "Submit for real?" dialog that will immediately
+              // reject itself.
+              for (const tq of textResponses) {
+                if (tq.required && !tq.response.trim()) {
+                  setError(`Please answer: "${tq.prompt}"`);
+                  return;
+                }
+              }
+              setError(null);
+              setConfirmOpen(true);
+            }}
+            disabled={submitting}
+          >
             {submitting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
             Submit
           </Button>
         </div>
       </div>
+
+      {/* Final confirmation dialog — review submission is irreversible.
+          Summarises the filled ratings + any required-text check so the
+          reviewer can eyeball before committing. Matches Lattice's
+          "one more look" confirmation pattern. */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit this review?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Once submitted, you can&apos;t edit or re-submit — so this is the moment to double-check.
+                </p>
+                <p>
+                  You&apos;ve rated{" "}
+                  <span className="font-medium text-foreground">
+                    {competencies.filter((c) => c.rating !== null).length} of {competencies.length}
+                  </span>{" "}
+                  competencies
+                  {textResponses.length > 0 && (
+                    <>
+                      {" "}and answered{" "}
+                      <span className="font-medium text-foreground">
+                        {textResponses.filter((t) => t.response.trim()).length} of {textResponses.length}
+                      </span>{" "}
+                      questions
+                    </>
+                  )}
+                  .
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmOpen(false);
+                await handleSubmit();
+              }}
+              disabled={submitting}
+            >
+              {submitting ? "Submitting…" : "Submit review"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

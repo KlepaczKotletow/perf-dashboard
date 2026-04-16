@@ -806,9 +806,24 @@ Deno.serve(async (req) => {
       // -- CYCLE REVIEW SUBMIT --
       if (cbId === "cycle_review_submit") {
         const meta = safeParse(payload.view.private_metadata);
-        const { assignmentId, reviewRole, competencyIds, textQuestionIds, workspaceId } = meta;
+        const { assignmentId, reviewRole, competencyIds, textQuestionIds } = meta;
 
-        const reviewer = await getOrCreateUser(workspaceId || ws.id, payload.user.id, botToken);
+        // CRITICAL: verify the target assignment belongs to this caller's
+        // workspace BEFORE any writes. Service_role bypasses RLS so the
+        // application layer is the only boundary; a malicious workspace
+        // admin who obtains another workspace's assignment_id could
+        // otherwise cross tenants here.
+        if (!(await validateAssignmentWorkspace(assignmentId))) {
+          return json({
+            response_action: "errors",
+            errors: { comment_block: "This review belongs to a different workspace." },
+          });
+        }
+
+        // Always use the signature-derived ws.id. Ignoring any workspaceId
+        // hint in private_metadata removes the spoofing surface where an
+        // attacker could craft a view with a foreign workspaceId.
+        const reviewer = await getOrCreateUser(ws.id, payload.user.id, botToken);
         if (!reviewer) return json({ response_action: "clear" });
 
         // Check if already submitted (avoid duplicates)

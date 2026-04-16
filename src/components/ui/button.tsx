@@ -50,6 +50,28 @@ function Button({
   }) {
   const Comp = asChild ? Slot.Root : "button"
 
+  // Dev-only: warn when an icon-only button renders without an accessible
+  // name. title= covers most browsers but screen readers prefer aria-label.
+  // Prod builds strip this via the NODE_ENV check.
+  const a11yProps = props as {
+    "aria-label"?: string;
+    "aria-labelledby"?: string;
+    title?: string;
+  };
+  if (
+    process.env.NODE_ENV !== "production" &&
+    typeof size === "string" &&
+    size.startsWith("icon") &&
+    !a11yProps["aria-label"] &&
+    !a11yProps["aria-labelledby"] &&
+    !a11yProps.title
+  ) {
+    console.warn(
+      "[Button] icon-only button has no aria-label, aria-labelledby, or title — " +
+        "screen readers won't know what it does.",
+    );
+  }
+
   return (
     <Comp
       data-slot="button"

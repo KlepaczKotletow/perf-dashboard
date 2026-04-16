@@ -234,8 +234,9 @@ export default function NewSurveyPage() {
     }
     if (surveyType === "360" || surveyType === "pulse") {
       const activeQuestions = surveyType === "360" ? questions360 : pulseQuestions;
-      if (activeQuestions.some(q => !q.label.trim())) {
-        setError("All questions must have text.");
+      const firstEmptyIndex = activeQuestions.findIndex(q => !q.label.trim());
+      if (firstEmptyIndex >= 0) {
+        setError(`Question ${firstEmptyIndex + 1} is empty — every question needs a label before you can save.`);
         return;
       }
     }
@@ -708,8 +709,9 @@ export default function NewSurveyPage() {
                   onClick={() => {
                     if (surveyType === "360" || surveyType === "pulse") {
                       const activeQuestions = surveyType === "360" ? questions360 : pulseQuestions;
-                      if (activeQuestions.some(q => !q.label.trim())) {
-                        setError("All questions must have text.");
+                      const firstEmptyIndex = activeQuestions.findIndex(q => !q.label.trim());
+                      if (firstEmptyIndex >= 0) {
+                        setError(`Question ${firstEmptyIndex + 1} is empty — every question needs a label before you can continue.`);
                         return;
                       }
                     }
@@ -803,8 +805,9 @@ export default function NewSurveyPage() {
           )}
         </div>
 
-        {/* Right side — Contextual guidance panel */}
-        <div className="w-72 shrink-0 hidden lg:block">
+        {/* Right side — Contextual guidance panel.
+            Shown at md+ (was lg-only) so tablet users don't lose this key help. */}
+        <div className="w-64 md:w-72 shrink-0 hidden md:block">
           <div className="sticky top-6">
             <div className="rounded-lg border bg-muted/20 p-5 space-y-3">
               <div className="flex items-start gap-2">
