@@ -88,12 +88,23 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
         max: Math.min(7, Math.max(ratingScale.max, ratingScale.min + 1)),
       };
       const supabase = createClient();
+
+      // Publish the rating scale via RPC so a new rating_scales row is created
+      // (rather than mutating the existing one in place). Cycles launched
+      // from now on stamp this new scale; previously-launched cycles keep
+      // their original stamped scale — matches Lattice / Leapsome.
+      const { error: scaleErr } = await supabase.rpc("publish_rating_scale", {
+        p_min: clampedScale.min,
+        p_max: clampedScale.max,
+        p_labels: clampedScale.labels ?? {},
+      });
+      if (scaleErr) throw scaleErr;
+
       await supabase
         .from("workspaces")
         .update({
           team_name: teamName,
           logo_url: logoUrl,
-          rating_scale: clampedScale,
           updated_at: new Date().toISOString(),
         })
         .eq("id", workspace.id);

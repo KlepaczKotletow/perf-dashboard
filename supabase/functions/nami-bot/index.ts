@@ -597,6 +597,80 @@ async function handleSurveyLaunch(surveyId: string) {
 }
 
 // =============================================================================
+//  Recurring survey helpers
+// =============================================================================
+
+function shouldRecurrenceFire(
+  now: Date, lastAt: Date | null, recurrence: string, dayOfWeek: string
+): boolean {
+  const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  if (days[now.getDay()] !== (dayOfWeek || "monday").toLowerCase()) return false;
+  if (!lastAt) return true;
+  const daysSinceLast = (now.getTime() - lastAt.getTime()) / (1000 * 60 * 60 * 24);
+  switch (recurrence) {
+    case "weekly": return daysSinceLast >= 6;
+    case "biweekly": return daysSinceLast >= 13;
+    case "monthly": return daysSinceLast >= 27;
+    default: return false;
+  }
+}
+
+async function cloneAndLaunchRecurringSurvey(
+  templateSurveyId: string, workspaceId: string, config: Record<string, any>, surveyType: string
+): Promise<string | null> {
+  const { data: template } = await supabase
+    .from("surveys")
+    .select("name, type, config, created_by")
+    .eq("id", templateSurveyId)
+    .single();
+  if (!template) return null;
+
+  const dateSuffix = new Date().toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+  const { data: newSurvey } = await supabase
+    .from("surveys")
+    .insert({
+      workspace_id: workspaceId,
+      type: template.type,
+      name: `${template.name} — ${dateSuffix}`,
+      status: "active",
+      config: { ...(template.config as any), parent_survey_id: templateSurveyId },
+      created_by: template.created_by,
+      nami_confirmed: true,
+    })
+    .select("id")
+    .single();
+  if (!newSurvey) return null;
+
+  // Create participants based on targeting config
+  const targeting = config.targeting || { mode: "all" };
+  const { data: wsUsers } = await supabase
+    .from("users")
+    .select("id, department")
+    .eq("workspace_id", workspaceId);
+
+  let targetUsers = wsUsers || [];
+  if (targeting.mode === "departments" && targeting.departments?.length) {
+    targetUsers = targetUsers.filter((u: any) => targeting.departments.includes(u.department));
+  } else if (targeting.mode === "people" && targeting.user_ids?.length) {
+    const idSet = new Set(targeting.user_ids);
+    targetUsers = targetUsers.filter((u: any) => idSet.has(u.id));
+  }
+
+  const participants = targetUsers.map((u: any) => ({
+    survey_id: newSurvey.id,
+    user_id: u.id,
+    role: "respondent",
+    workspace_id: workspaceId,
+  }));
+
+  if (participants.length) {
+    await supabase.from("survey_participants").insert(participants);
+  }
+
+  return newSurvey.id;
+}
+
+// =============================================================================
 //  Handle reminders (the reminder ladder)
 // =============================================================================
 
@@ -670,6 +744,35 @@ async function handleReminders() {
         const result = await handleSurveyLaunch(survey.id);
         sent += result.sent;
       }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  //  Part 0b: Recurring survey launches
+  // -----------------------------------------------------------------------
+  const { data: recurringSurveys } = await supabase
+    .from("surveys")
+    .select("id, config, workspace_id, type")
+    .eq("status", "active")
+    .eq("nami_confirmed", true);
+
+  for (const survey of recurringSurveys || []) {
+    const config = (survey.config || {}) as Record<string, any>;
+    if (!config.recurrence) continue;
+
+    const lastAt = config.last_recurrence_at ? new Date(config.last_recurrence_at) : null;
+    if (!shouldRecurrenceFire(now, lastAt, config.recurrence, config.recurrence_day)) continue;
+
+    // Clone the survey and create fresh participants
+    const newSurveyId = await cloneAndLaunchRecurringSurvey(survey.id, survey.workspace_id, config, survey.type);
+    if (newSurveyId) {
+      // Update last_recurrence_at on the template survey
+      await supabase.from("surveys").update({
+        config: { ...config, last_recurrence_at: now.toISOString() },
+      }).eq("id", survey.id);
+
+      const result = await handleSurveyLaunch(newSurveyId);
+      sent += result.sent;
     }
   }
 
@@ -1163,10 +1266,14 @@ async function processSurveyReminder(
 // =============================================================================
 
 async function handleReleaseGrades(cycleId: string) {
-  // Fetch cycle + workspace bot token
+  // Fetch cycle + workspace bot token + stamped rating scale so the DM
+  // reflects the scale that was active at this cycle's launch (Lattice /
+  // Leapsome semantics: cycles freeze their scale at kickoff).
   const { data: cycle } = await supabase
     .from("performance_cycles")
-    .select("id, name, workspace_id, workspaces(bot_token)")
+    .select(
+      "id, name, workspace_id, rating_scale_id, workspaces(bot_token), rating_scale:rating_scales!performance_cycles_rating_scale_id_fkey(max_value)",
+    )
     .eq("id", cycleId)
     .single();
 
@@ -1176,6 +1283,8 @@ async function handleReleaseGrades(cycleId: string) {
   if (!botToken) return { sent: 0, skipped: 0, failed: 0, error: "No bot token" };
 
   const workspaceId = cycle.workspace_id;
+  // Fall back to 5 only if the cycle has no stamped scale (pre-backfill data).
+  const ratingMax: number = (cycle as any).rating_scale?.max_value ?? 5;
 
   // Fetch all standard review assignments with employee info
   const { data: assignments } = await supabase
@@ -1211,7 +1320,6 @@ async function handleReleaseGrades(cycleId: string) {
 
     try {
       // Build a rich results message — this is the most important notification an employee receives
-      const ratingMax = 5; // TODO: read from workspace settings if customized
       const ratingStr = a.overall_rating
         ? `${(Math.round(a.overall_rating * 10) / 10)}/${ratingMax}`
         : null;
