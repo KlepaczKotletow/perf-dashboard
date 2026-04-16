@@ -123,138 +123,104 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
   const filteredUserIds = new Set(functionFilteredUsers.map((u: any) => u.id));
   const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
 
-  // 2. Assignments — scoped to workspace cycles, optionally filtered by specific cycle
-  // First get workspace cycle IDs to scope assignments
-  let wsCyclesQ = supabase.from("performance_cycles").select("id");
-  wsCyclesQ = wsCyclesQ.eq("workspace_id", workspaceId);
-  const { data: wsCyclesData, error: wsCyclesErr } = await wsCyclesQ;
-  if (wsCyclesErr) console.error("Failed to fetch workspace cycles:", wsCyclesErr.message);
-  const wsCycleIds = (wsCyclesData || []).map((c: any) => c.id);
+  // 2. Pre-aggregated analytics via RPCs. Replaces what used to be unbounded
+  // SELECTs on review_assignments + review_responses with two focused,
+  // workspace-scoped SQL functions. This keeps the page responsive at 500+
+  // employees and tens of thousands of review_response rows.
+  const [{ data: respAgg }, { data: compAgg }] = await Promise.all([
+    supabase.rpc("get_analytics_response_aggregates", {
+      p_cycle_id: filters.cycleId,
+      p_function_id: filters.functionId,
+      p_department: filters.department,
+    }),
+    supabase.rpc("get_analytics_completion_aggregates", {
+      p_cycle_id: filters.cycleId,
+      p_function_id: filters.functionId,
+      p_department: filters.department,
+    }),
+  ]);
 
-  let assignments: any[] = [];
-  if (wsCycleIds.length > 0) {
-    let assignmentsQuery = supabase
-      .from("review_assignments")
-      .select("id, status, employee_id, cycle_id");
+  type RpcResp = {
+    overall: { avg: number | null; n: number };
+    distribution: Array<{ rating: number; n: number }>;
+    by_competency: Array<{ competency_id: string; name: string | null; category: string | null; avg_rating: number; n: number }>;
+    by_employee: Array<{ employee_id: string; avg_rating: number; n: number }>;
+    by_department: Array<{ name: string; avg_rating: number; n: number }>;
+    by_function: Array<{ name: string; avg_rating: number; n: number }>;
+  };
+  type RpcComp = {
+    overall: { total: number; completed: number; participants: number };
+    by_department: Array<{ name: string; total: number; completed: number }>;
+    by_function: Array<{ name: string; total: number; completed: number }>;
+  };
 
-    if (filters.cycleId) {
-      assignmentsQuery = assignmentsQuery.eq("cycle_id", filters.cycleId);
-    } else {
-      assignmentsQuery = assignmentsQuery.in("cycle_id", wsCycleIds);
-    }
+  const responseAgg = (respAgg ?? {
+    overall: { avg: null, n: 0 }, distribution: [], by_competency: [],
+    by_employee: [], by_department: [], by_function: [],
+  }) as RpcResp;
+  const completionAgg = (compAgg ?? {
+    overall: { total: 0, completed: 0, participants: 0 },
+    by_department: [], by_function: [],
+  }) as RpcComp;
 
-    const { data: assignmentsRaw, error: assignmentsErr } = await assignmentsQuery;
-    if (assignmentsErr) console.error("Failed to fetch analytics assignments:", assignmentsErr.message);
-    assignments = (assignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
-  }
-
-  const assignmentIds = new Set(assignments.map((a: any) => a.id));
-  const assignmentEmployeeMap = new Map(assignments.map((a: any) => [a.id, a.employee_id]));
-
-  // 3. Review responses for those assignments
-  let responses: any[] = [];
-  const assignmentIdList = [...assignmentIds];
-  if (assignmentIdList.length > 0) {
-    const { data: responsesRaw, error: responsesErr } = await supabase
-      .from("review_responses")
-      .select("id, rating, assignment_id, competency:competencies(name, category)")
-      .in("assignment_id", assignmentIdList)
-      .not("rating", "is", null);
-    if (responsesErr) console.error("Failed to fetch analytics responses:", responsesErr.message);
-    responses = responsesRaw || [];
-  }
-
-  // 4. Goals (not filtered by cycle — workspace-wide)
+  // 3. Goals (workspace-wide, small — keep client-side)
   let goalsQ = supabase.from("goals").select("id, tracking_status, status");
   goalsQ = goalsQ.eq("workspace_id", workspaceId);
   const { data: goalsData, error: goalsErr } = await goalsQ;
   if (goalsErr) console.error("Failed to fetch analytics goals:", goalsErr.message);
 
-  // 5. All cycles (for cycle stats tile)
+  // 4. All cycles (for cycle stats tile — small)
   let allCyclesQ = supabase.from("performance_cycles").select("id, status");
   allCyclesQ = allCyclesQ.eq("workspace_id", workspaceId);
   const { data: allCycles, error: allCyclesErr } = await allCyclesQ;
   if (allCyclesErr) console.error("Failed to fetch all cycles:", allCyclesErr.message);
 
-  // ── Derived metrics ──
+  // ── Derived metrics (now mostly lookups into pre-aggregated jsonb) ──
+  void functionFilteredUsers; // filter scope already applied inside the RPCs
 
-  const allRatings = responses.map((r: any) => r.rating as number);
-  const overallAvg = allRatings.length > 0
-    ? allRatings.reduce((a: number, b: number) => a + b, 0) / allRatings.length
-    : 0;
+  const overallAvg = Number(responseAgg.overall.avg ?? 0);
+  const totalRatings = responseAgg.overall.n;
 
-  // Rating distribution 1–5
+  // Rating distribution 1–5 (keep five-bucket shape for the existing chart)
   const ratingDist = [0, 0, 0, 0, 0];
-  allRatings.forEach((r: number) => { ratingDist[Math.min(Math.max(r - 1, 0), 4)]++; });
+  for (const d of responseAgg.distribution) {
+    const idx = Math.min(Math.max(d.rating - 1, 0), 4);
+    ratingDist[idx] += d.n;
+  }
 
-  // Completion rate
-  const totalAssignments = assignments.length;
-  const completedAssignments = assignments.filter((a: any) => a.status === "completed").length;
-  const completionRate = totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+  const totalAssignments = completionAgg.overall.total;
+  const completedAssignments = completionAgg.overall.completed;
+  const completionRate = totalAssignments > 0
+    ? Math.round((completedAssignments / totalAssignments) * 100)
+    : 0;
+  const participants = completionAgg.overall.participants;
 
-  // Participants (distinct employees in filtered assignments)
-  const participants = new Set(assignments.map((a: any) => a.employee_id)).size;
-
-  // Competency averages
-  const compRatings: Record<string, number[]> = {};
-  responses.forEach((r: any) => {
-    const name = r.competency?.name;
-    if (name) {
-      if (!compRatings[name]) compRatings[name] = [];
-      compRatings[name].push(r.rating);
-    }
-  });
-
-  const competencyRatings = Object.entries(compRatings)
-    .map(([name, vals]) => ({ name, value: vals.reduce((a, b) => a + b, 0) / vals.length }))
+  const competencyRatings = responseAgg.by_competency
+    .filter((c) => c.name)
+    .map((c) => ({ name: c.name as string, value: Number(c.avg_rating) }))
     .sort((a, b) => b.value - a.value);
 
-  // Per-employee averages
-  const empRatings: Record<string, number[]> = {};
-  responses.forEach((r: any) => {
-    const empId = assignmentEmployeeMap.get(r.assignment_id);
-    if (empId) {
-      if (!empRatings[empId]) empRatings[empId] = [];
-      empRatings[empId].push(r.rating);
-    }
-  });
-
-  const rankingData = Object.entries(empRatings).map(([empId, ratings]) => {
-    const user = userMap.get(empId) as any;
+  const rankingData = responseAgg.by_employee.map((e) => {
+    const user = userMap.get(e.employee_id) as any;
     return {
-      id: empId,
+      id: e.employee_id,
       name: user?.slack_name || "Unknown",
       department: user?.department || "—",
       functionName: (user?.level as any)?.job_family?.name || "—",
       levelName: (user?.level as any)?.name || "—",
-      avgRating: ratings.reduce((a, b) => a + b, 0) / ratings.length,
-      reviewCount: ratings.length,
+      avgRating: Number(e.avg_rating),
+      reviewCount: e.n,
     };
   }).sort((a, b) => b.avgRating - a.avgRating);
 
-  // Function performance (avg per job_family)
-  const funcRatings: Record<string, number[]> = {};
-  rankingData.forEach((emp) => {
-    if (emp.functionName !== "—") {
-      if (!funcRatings[emp.functionName]) funcRatings[emp.functionName] = [];
-      funcRatings[emp.functionName].push(emp.avgRating);
-    }
-  });
-  const functionPerformance = Object.entries(funcRatings)
-    .map(([name, vals]) => ({ name, value: vals.reduce((a, b) => a + b, 0) / vals.length }))
+  const functionPerformance = responseAgg.by_function
+    .filter((f) => f.name !== "Unknown")
+    .map((f) => ({ name: f.name, value: Number(f.avg_rating) }))
     .sort((a, b) => b.value - a.value);
 
-  // Department performance
-  const deptRatings: Record<string, number[]> = {};
-  rankingData.forEach((emp) => {
-    const dept = emp.department;
-    if (dept !== "—") {
-      if (!deptRatings[dept]) deptRatings[dept] = [];
-      deptRatings[dept].push(emp.avgRating);
-    }
-  });
-  const departmentPerformance = Object.entries(deptRatings)
-    .map(([name, vals]) => ({ name, value: vals.reduce((a, b) => a + b, 0) / vals.length }))
+  const departmentPerformance = responseAgg.by_department
+    .filter((d) => d.name !== "Unknown")
+    .map((d) => ({ name: d.name, value: Number(d.avg_rating) }))
     .sort((a, b) => b.value - a.value);
 
   // Goal status
@@ -287,76 +253,33 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     goalStatusDistribution,
   };
 
-  // ── Breakdown: Completion Rate by Department ──
-  const completionByDepartment: { name: string; value: number }[] = [];
-  const deptCompletionGroups = new Map<string, { completed: number; total: number }>();
-  for (const a of assignments) {
-    const emp = userMap.get(a.employee_id);
-    const dept = (emp as any)?.department || "Unknown";
-    const g = deptCompletionGroups.get(dept) || { completed: 0, total: 0 };
-    g.total++;
-    if (a.status === "completed") g.completed++;
-    deptCompletionGroups.set(dept, g);
-  }
-  for (const [name, g] of deptCompletionGroups) {
-    completionByDepartment.push({ name, value: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0 });
-  }
-  completionByDepartment.sort((a, b) => b.value - a.value);
+  // ── Breakdowns (pre-aggregated by RPCs above) ──
+  const completionByDepartment = completionAgg.by_department
+    .map((d) => ({
+      name: d.name,
+      value: d.total > 0 ? Math.round((d.completed / d.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
 
-  // ── Breakdown: Completion Rate by Function (job_family) ──
-  const completionByFunction: { name: string; value: number }[] = [];
-  const funcCompletionGroups = new Map<string, { completed: number; total: number }>();
-  for (const a of assignments) {
-    const emp = userMap.get(a.employee_id);
-    const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
-    const g = funcCompletionGroups.get(funcName) || { completed: 0, total: 0 };
-    g.total++;
-    if (a.status === "completed") g.completed++;
-    funcCompletionGroups.set(funcName, g);
-  }
-  for (const [name, g] of funcCompletionGroups) {
-    completionByFunction.push({ name, value: g.total > 0 ? Math.round((g.completed / g.total) * 100) : 0 });
-  }
-  completionByFunction.sort((a, b) => b.value - a.value);
+  const completionByFunction = completionAgg.by_function
+    .map((f) => ({
+      name: f.name,
+      value: f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
 
-  // ── Breakdown: Avg Rating by Department ──
-  const avgRatingByDepartment: { name: string; value: number }[] = [];
-  const deptRatingGroups = new Map<string, number[]>();
-  for (const r of responses) {
-    const empId = assignmentEmployeeMap.get(r.assignment_id);
-    if (!empId) continue;
-    const emp = userMap.get(empId);
-    const dept = (emp as any)?.department || "Unknown";
-    const list = deptRatingGroups.get(dept) || [];
-    list.push(r.rating as number);
-    deptRatingGroups.set(dept, list);
-  }
-  for (const [name, vals] of deptRatingGroups) {
-    avgRatingByDepartment.push({ name, value: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) });
-  }
-  avgRatingByDepartment.sort((a, b) => b.value - a.value);
+  const avgRatingByDepartment = responseAgg.by_department
+    .map((d) => ({ name: d.name, value: parseFloat(Number(d.avg_rating).toFixed(1)) }))
+    .sort((a, b) => b.value - a.value);
 
-  // ── Breakdown: Avg Rating by Function (job_family) ──
-  const avgRatingByFunction: { name: string; value: number }[] = [];
-  const funcRatingGroups = new Map<string, number[]>();
-  for (const r of responses) {
-    const empId = assignmentEmployeeMap.get(r.assignment_id);
-    if (!empId) continue;
-    const emp = userMap.get(empId);
-    const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
-    const list = funcRatingGroups.get(funcName) || [];
-    list.push(r.rating as number);
-    funcRatingGroups.set(funcName, list);
-  }
-  for (const [name, vals] of funcRatingGroups) {
-    avgRatingByFunction.push({ name, value: parseFloat((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)) });
-  }
-  avgRatingByFunction.sort((a, b) => b.value - a.value);
+  const avgRatingByFunction = responseAgg.by_function
+    .map((f) => ({ name: f.name, value: parseFloat(Number(f.avg_rating).toFixed(1)) }))
+    .sort((a, b) => b.value - a.value);
 
   return {
     overallAvg: overallAvg.toFixed(1),
     completionRate,
-    totalRatings: allRatings.length,
+    totalRatings,
     participants,
     totalAssignments,
     completedAssignments,
