@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove } from "@/lib/roles";
+import { csvFile } from "@/lib/csv";
 
 export async function GET() {
   try {
@@ -30,37 +31,27 @@ export async function GET() {
       "Metric Target", "Metric Unit", "Weight", "Due Date", "Created",
     ];
 
-    const rows: string[][] = [header];
-    for (const g of (goals || [])) {
+    const csv = csvFile(header, (goals || []).map((g) => {
       const emp = g.employee as any;
       const cycle = g.cycle as any;
-      rows.push([
-        g.title || "",
-        emp?.slack_name || "",
-        emp?.department || "",
-        cycle?.name || "",
-        g.scope || "",
-        g.status || "",
-        g.tracking_status || "",
-        String(g.progress ?? ""),
-        String(g.metric_start ?? ""),
-        String(g.metric_current ?? ""),
-        String(g.metric_target ?? ""),
-        g.metric_unit || "",
-        String(g.weight ?? ""),
-        g.due_date || "",
+      return [
+        g.title,
+        emp?.slack_name,
+        emp?.department,
+        cycle?.name,
+        g.scope,
+        g.status,
+        g.tracking_status,
+        g.progress,
+        g.metric_start,
+        g.metric_current,
+        g.metric_target,
+        g.metric_unit,
+        g.weight,
+        g.due_date,
         g.created_at ? new Date(g.created_at).toISOString().split("T")[0] : "",
-      ]);
-    }
-
-    const csv = rows
-      .map((row) =>
-        row.map((cell) =>
-          cell.includes(",") || cell.includes('"') || cell.includes("\n")
-            ? `"${cell.replace(/"/g, '""')}"`
-            : cell
-        ).join(",")
-      ).join("\n");
+      ];
+    }));
 
     return new NextResponse(csv, {
       headers: {
