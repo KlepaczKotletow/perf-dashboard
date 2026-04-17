@@ -198,7 +198,7 @@ export default async function FeedbackPage({
   const { data: continuousFeedback, total: feedbackTotal } = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role, workspace?.hasDirectReports, currentPage);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader hat="my-work" title="Kudos" subtitle={pageDescription} />
 
       <Suspense fallback={<div className="h-10" />}>

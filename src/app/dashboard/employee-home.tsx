@@ -55,7 +55,7 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
     : "You're all caught up. Check back when a new review cycle starts.";
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       <PageHeader
         hat="my-work"
         title={`Hey ${firstName}`}

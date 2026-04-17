@@ -764,7 +764,7 @@ export default function GoalsClient({
   // ─── Render ─────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="my-work"
         title="Goals"
@@ -938,23 +938,19 @@ export default function GoalsClient({
         })}
       </nav>
 
-      {/* Summary Stats */}
-      <div className="flex items-center gap-6 p-4 rounded-xl border border-border/60 bg-card">
-        <div>
-          <span className="text-3xl font-bold text-primary">{weightedProgress}%</span>
-          <p className="text-xs text-muted-foreground mt-0.5">Goals</p>
-        </div>
-        <div className="h-8 w-px bg-border" />
-        <div>
-          <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-            {roadmapPct}%
-          </span>
-          <p className="text-xs text-muted-foreground mt-0.5">Roadmap</p>
-        </div>
-        <div className="flex-1" />
-        <div className="text-xs text-muted-foreground">
+      {/* Summary Stats — compact */}
+      <div className="flex items-baseline gap-6 text-sm">
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-xl font-semibold text-primary tabular-nums">{weightedProgress}%</span>
+          <span className="text-xs text-muted-foreground">Goals</span>
+        </span>
+        <span className="flex items-baseline gap-1.5">
+          <span className="text-xl font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{roadmapPct}%</span>
+          <span className="text-xs text-muted-foreground">Roadmap</span>
+        </span>
+        <span className="ml-auto text-xs text-muted-foreground">
           {goals.length} total &middot; {activeGoals.length} active
-        </div>
+        </span>
       </div>
 
       {/* Filter toolbar */}

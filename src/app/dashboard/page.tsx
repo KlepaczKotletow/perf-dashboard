@@ -430,7 +430,7 @@ export default async function DashboardPage() {
     const completionPct = totalTeamInCycle > 0 ? Math.round((completedCount / totalTeamInCycle) * 100) : 0;
 
     return (
-      <div className="space-y-8">
+      <div className="max-w-6xl mx-auto space-y-8">
         <PageHeader
           hat="my-work"
           title="Home"
@@ -673,7 +673,7 @@ export default async function DashboardPage() {
   const adminPendingSelf = adminPersonalAssignments.filter((a: any) => !a.selfSubmitted && a.status !== "completed");
 
   return (
-    <div className="space-y-10">
+    <div className="max-w-6xl mx-auto space-y-10">
       <PageHeader
         hat="my-work"
         title={showOnboarding ? `Welcome, ${firstName}` : `Hey ${firstName}`}
