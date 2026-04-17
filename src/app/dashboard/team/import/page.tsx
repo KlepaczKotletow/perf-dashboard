@@ -100,6 +100,12 @@ const TARGET_FIELDS = [
 
 const VALID_ROLES = ["user", "hr", "admin"];
 
+// Pragmatic email regex — matches HTML5 input[type=email] semantics (RFC 5322
+// full compliance is impractical and not useful here). Catches obvious junk
+// like "notanemail", "foo@", "@bar", "a@b" while tolerating +addressing and
+// dotted locals like "first.last+work@company.co.uk".
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 // ----------------------------------------------------------------
 // Component
 // ----------------------------------------------------------------
@@ -278,7 +284,7 @@ export default function ImportPage() {
       // Email match — classify as create or update
       if (!m.email) {
         errors.push("Missing email");
-      } else if (!m.email.includes("@")) {
+      } else if (!EMAIL_RE.test(m.email)) {
         errors.push("Invalid email format");
       } else {
         const user = emailToUser.get(m.email);
@@ -292,14 +298,18 @@ export default function ImportPage() {
 
       // Manager match
       if (m.manager_email) {
-        const mgr = emailToUser.get(m.manager_email);
-        if (mgr) {
-          matchedManagerId = mgr.id;
-        } else if (csvEmails.has(m.manager_email)) {
-          // Manager is in the same CSV — will be resolved in the edge function
-          warnings.push(`info:manager_in_csv:Manager "${m.manager_email}" will be created in this import`);
+        if (!EMAIL_RE.test(m.manager_email)) {
+          warnings.push(`warn:manager_invalid:Manager email "${m.manager_email}" is not a valid email address — manager won't be linked`);
         } else {
-          warnings.push(`warn:manager_missing:Manager "${m.manager_email}" not found in system`);
+          const mgr = emailToUser.get(m.manager_email);
+          if (mgr) {
+            matchedManagerId = mgr.id;
+          } else if (csvEmails.has(m.manager_email)) {
+            // Manager is in the same CSV — will be resolved in the edge function
+            warnings.push(`info:manager_in_csv:Manager "${m.manager_email}" will be created in this import`);
+          } else {
+            warnings.push(`warn:manager_missing:Manager "${m.manager_email}" not found — import the manager first or link manually in Team Settings`);
+          }
         }
       }
 
