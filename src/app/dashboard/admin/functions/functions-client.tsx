@@ -246,11 +246,21 @@ export function FunctionsClient({
   const [renameLevelValue, setRenameLevelValue] = useState("");
   const [levels, setLevels] = useState<Level[]>(initialLevels);
 
-  // Skills
+  // Skills (function-specific)
   const [showAddSkill, setShowAddSkill] = useState(false);
   const [newSkillName, setNewSkillName] = useState("");
   const [newSkillDesc, setNewSkillDesc] = useState("");
   const [addSkillLoading, setAddSkillLoading] = useState(false);
+
+  // Core skills (apply to every function)
+  const [showAddCoreSkill, setShowAddCoreSkill] = useState(false);
+  const [newCoreSkillName, setNewCoreSkillName] = useState("");
+  const [newCoreSkillDesc, setNewCoreSkillDesc] = useState("");
+  const [addCoreSkillLoading, setAddCoreSkillLoading] = useState(false);
+  const [renamingCoreSkillId, setRenamingCoreSkillId] = useState<string | null>(null);
+  const [renameCoreSkillValue, setRenameCoreSkillValue] = useState("");
+  const [editingCoreDescId, setEditingCoreDescId] = useState<string | null>(null);
+  const [editingCoreDescValue, setEditingCoreDescValue] = useState("");
 
   // Score picker — key is `${level_id}-${competency_id}`
   const [pickerKey, setPickerKey] = useState<string | null>(null);
@@ -600,6 +610,112 @@ export function FunctionsClient({
       router.refresh();
     } catch (e: any) {
       setError(e.message ?? "Failed to remove skill");
+    }
+  }
+
+  // ── Core-skill handlers ────────────────────────────────────────────────
+  // Core skills have job_family_id = NULL and is_core = true.
+  // They apply to every function.
+
+  async function handleAddCoreSkill() {
+    if (!newCoreSkillName.trim()) return;
+    setAddCoreSkillLoading(true);
+    try {
+      const { wsId } = await getAuthUser();
+      const { error: err } = await supabase.from("competencies").insert({
+        name: newCoreSkillName.trim(),
+        description: newCoreSkillDesc.trim() || null,
+        job_family_id: null,
+        workspace_id: wsId,
+        is_core: true,
+      });
+      if (err) throw err;
+      setNewCoreSkillName("");
+      setNewCoreSkillDesc("");
+      setShowAddCoreSkill(false);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to add core skill");
+    } finally {
+      setAddCoreSkillLoading(false);
+    }
+  }
+
+  async function handleRenameCoreSkill(competencyId: string, newName: string, onDone: () => void) {
+    const trimmed = newName.trim();
+    if (!trimmed) { onDone(); return; }
+    try {
+      const { error: err } = await supabase
+        .from("competencies")
+        .update({ name: trimmed })
+        .eq("id", competencyId)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to rename core skill");
+    } finally {
+      onDone();
+    }
+  }
+
+  async function handleUpdateCoreSkillDesc(competencyId: string, newDesc: string) {
+    try {
+      const { error: err } = await supabase
+        .from("competencies")
+        .update({ description: newDesc.trim() || null })
+        .eq("id", competencyId)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+      setEditingCoreDescId(null);
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to update description");
+    }
+  }
+
+  async function handleDeleteCoreSkill(competencyId: string) {
+    // Count total level_competencies using this skill across all functions
+    const linkedCount = initialLevelCompetencies.filter(lc => lc.competency_id === competencyId).length;
+    const scoreCount = scoreDescriptors.filter(sd => sd.competency_id === competencyId).length;
+    const warnings: string[] = [];
+    if (linkedCount > 0) warnings.push(`${linkedCount} expected score${linkedCount !== 1 ? "s" : ""}`);
+    if (scoreCount > 0) warnings.push(`${scoreCount} score descriptor${scoreCount !== 1 ? "s" : ""}`);
+    const warnMsg = warnings.length > 0
+      ? `This core skill is used across all functions. Removing it will also delete ${warnings.join(" and ")}. Continue?`
+      : "Remove this core skill? This affects every function.";
+    if (!confirm(warnMsg)) return;
+    try {
+      const { error: err } = await supabase
+        .from("competencies")
+        .delete()
+        .eq("id", competencyId)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to remove core skill");
+    }
+  }
+
+  // Flip a function-specific skill to core, or a core skill back to function-specific.
+  async function handleToggleCore(competencyId: string, makeCore: boolean, attachToFunctionId?: string) {
+    try {
+      const updates: { is_core: boolean; job_family_id: string | null } = {
+        is_core: makeCore,
+        // Core skills must have job_family_id = NULL.
+        // Function-specific skills attach to a job family.
+        job_family_id: makeCore ? null : (attachToFunctionId ?? selectedId ?? null),
+      };
+      const { error: err } = await supabase
+        .from("competencies")
+        .update(updates)
+        .eq("id", competencyId)
+        .eq("workspace_id", workspaceId);
+      if (err) throw err;
+      router.refresh();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to toggle core status");
     }
   }
 
@@ -1048,31 +1164,121 @@ export function FunctionsClient({
                       {/* Core skills divider */}
                       {coreSkills.length > 0 && (
                         <>
-                          <tr className="bg-muted/10 border-y border-border/40 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => setCoreSkillsOpen(!coreSkillsOpen)}>
+                          <tr className="bg-muted/10 border-y border-border/40 hover:bg-muted/20 transition-colors">
                             <td colSpan={functionLevels.length + (canEdit ? 2 : 1)} className="py-1.5 px-4">
-                              <div className="flex items-center gap-1.5">
-                                <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${coreSkillsOpen ? "rotate-90" : ""}`} />
-                                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                                  Core skills ({coreSkills.length}) — apply to all functions
-                                </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <button
+                                  onClick={() => setCoreSkillsOpen(!coreSkillsOpen)}
+                                  className="flex items-center gap-1.5"
+                                >
+                                  <ChevronRight className={`h-3 w-3 text-muted-foreground transition-transform ${coreSkillsOpen ? "rotate-90" : ""}`} />
+                                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                    Core skills ({coreSkills.length}) — apply to all functions
+                                  </span>
+                                </button>
+                                {canEdit && !showAddCoreSkill && (
+                                  <button
+                                    onClick={() => { setShowAddCoreSkill(true); setCoreSkillsOpen(true); }}
+                                    className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
+                                  >
+                                    <Plus className="h-3 w-3" /> Add core skill
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
+
+                          {/* Inline add-core-skill row */}
+                          {coreSkillsOpen && showAddCoreSkill && canEdit && (
+                            <tr className="border-b border-border/30 bg-primary/5">
+                              <td colSpan={functionLevels.length + (canEdit ? 2 : 1)} className="py-3 px-4">
+                                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                                  <Input
+                                    autoFocus
+                                    value={newCoreSkillName}
+                                    onChange={(e) => setNewCoreSkillName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && newCoreSkillName.trim()) handleAddCoreSkill();
+                                      if (e.key === "Escape") { setShowAddCoreSkill(false); setNewCoreSkillName(""); setNewCoreSkillDesc(""); }
+                                    }}
+                                    placeholder="Core skill name (e.g. Communication)"
+                                    className="h-8 text-xs flex-1"
+                                  />
+                                  <Input
+                                    value={newCoreSkillDesc}
+                                    onChange={(e) => setNewCoreSkillDesc(e.target.value)}
+                                    placeholder="Short description (optional)"
+                                    className="h-8 text-xs flex-[2]"
+                                  />
+                                  <div className="flex gap-1">
+                                    <Button size="sm" className="h-8 px-3 text-xs gap-1" onClick={handleAddCoreSkill} disabled={addCoreSkillLoading || !newCoreSkillName.trim()}>
+                                      {addCoreSkillLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                      Add
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setShowAddCoreSkill(false); setNewCoreSkillName(""); setNewCoreSkillDesc(""); }}>
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+
                           {coreSkillsOpen && coreSkills.map((skill) => (
-                            <tr key={skill.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors">
+                            <tr key={skill.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group">
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    className="text-xs font-medium text-foreground hover:text-primary transition-colors text-left"
-                                    onClick={() => setExpandedSkillId(expandedSkillId === skill.id ? null : skill.id)}
-                                  >
-                                    {skill.name}
-                                    {skill.description && <ChevronRight className={`inline h-3 w-3 ml-1 transition-transform ${expandedSkillId === skill.id ? "rotate-90" : ""}`} />}
-                                  </button>
+                                  {renamingCoreSkillId === skill.id ? (
+                                    <Input
+                                      autoFocus
+                                      value={renameCoreSkillValue}
+                                      onChange={(e) => setRenameCoreSkillValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleRenameCoreSkill(skill.id, renameCoreSkillValue, () => setRenamingCoreSkillId(null));
+                                        if (e.key === "Escape") setRenamingCoreSkillId(null);
+                                      }}
+                                      onBlur={() => handleRenameCoreSkill(skill.id, renameCoreSkillValue, () => setRenamingCoreSkillId(null))}
+                                      className="h-6 text-xs px-1.5 py-0 w-44"
+                                    />
+                                  ) : (
+                                    <button
+                                      className="text-xs font-medium text-foreground hover:text-primary transition-colors text-left"
+                                      onClick={() => setExpandedSkillId(expandedSkillId === skill.id ? null : skill.id)}
+                                    >
+                                      {skill.name}
+                                      {(skill.description || expandedSkillId === skill.id) && (
+                                        <ChevronRight className={`inline h-3 w-3 ml-1 transition-transform ${expandedSkillId === skill.id ? "rotate-90" : ""}`} />
+                                      )}
+                                    </button>
+                                  )}
                                   <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/30 text-primary">Core</Badge>
                                 </div>
-                                {expandedSkillId === skill.id && skill.description && (
-                                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed max-w-xs">{skill.description}</p>
+                                {expandedSkillId === skill.id && (
+                                  editingCoreDescId === skill.id ? (
+                                    <Input
+                                      autoFocus
+                                      value={editingCoreDescValue}
+                                      onChange={(e) => setEditingCoreDescValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") handleUpdateCoreSkillDesc(skill.id, editingCoreDescValue);
+                                        if (e.key === "Escape") setEditingCoreDescId(null);
+                                      }}
+                                      onBlur={() => handleUpdateCoreSkillDesc(skill.id, editingCoreDescValue)}
+                                      placeholder="Short description…"
+                                      className="h-7 text-[11px] mt-1 max-w-xs"
+                                    />
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (!canEdit) return;
+                                        setEditingCoreDescId(skill.id);
+                                        setEditingCoreDescValue(skill.description ?? "");
+                                      }}
+                                      className={`block text-[11px] mt-0.5 leading-relaxed max-w-xs text-left ${skill.description ? "text-muted-foreground" : "text-muted-foreground/40 italic"} ${canEdit ? "hover:text-foreground transition-colors" : ""}`}
+                                    >
+                                      {skill.description ?? (canEdit ? "Add a description…" : "No description")}
+                                    </button>
+                                  )
                                 )}
                               </td>
                               {functionLevels.map((level) => {
@@ -1109,7 +1315,44 @@ export function FunctionsClient({
                                   </td>
                                 );
                               })}
-                              {canEdit && <td />}
+                              {canEdit && (
+                                <td className="py-2 pr-3 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted">
+                                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-44">
+                                      <DropdownMenuItem onClick={() => {
+                                        setRenamingCoreSkillId(skill.id);
+                                        setRenameCoreSkillValue(skill.name);
+                                      }}>
+                                        <Pencil className="h-3.5 w-3.5 mr-2" /> Rename
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
+                                        setExpandedSkillId(skill.id);
+                                        setEditingCoreDescId(skill.id);
+                                        setEditingCoreDescValue(skill.description ?? "");
+                                      }}>
+                                        <Pencil className="h-3.5 w-3.5 mr-2" /> Edit description
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => handleToggleCore(skill.id, false, selectedId ?? undefined)}
+                                        disabled={!selectedId}
+                                      >
+                                        Make function-specific
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => handleDeleteCoreSkill(skill.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </>
