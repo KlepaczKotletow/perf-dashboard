@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Loader2, Plus, X, Users, BarChart2, TrendingUp, Info, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 
 type SurveyType = "360" | "pulse" | "enps";
 type PeerMode = "subject_nominates" | "manager_nominates" | "admin_assigns";
@@ -410,15 +411,39 @@ export default function NewSurveyPage() {
   // Determine which guidance to show
   const currentGuide = GUIDANCE[activeGuide] || GUIDANCE["type-360"];
 
+  const STEP_LABELS = ["Choose type", "Configure", "Review & Send"];
+
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/surveys"><ArrowLeft className="h-4 w-4 mr-1" />Back</Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">New Survey</h1>
-          <p className="text-sm text-muted-foreground">Step {step} of 3</p>
+      <PageHeader
+        hat="manage"
+        title="New survey"
+        subtitle="360 reviews, pulse checks, and eNPS delivered via Slack"
+        actions={
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/surveys">
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Link>
+          </Button>
+        }
+      />
+
+      {/* Slim step indicator — matches cycles/new */}
+      <div className="space-y-2 mb-6">
+        <div className="flex items-baseline gap-2 text-xs flex-wrap">
+          <span className="text-muted-foreground">Step {step} of {STEP_LABELS.length}</span>
+          <span className="text-muted-foreground/40">·</span>
+          <span className="font-semibold text-foreground">{STEP_LABELS[step - 1]}</span>
+        </div>
+        <div className="flex gap-1" aria-hidden="true">
+          {STEP_LABELS.map((_, idx) => {
+            const stepNum = idx + 1;
+            const color =
+              stepNum < step ? "bg-emerald-500"
+              : stepNum === step ? "bg-primary"
+              : "bg-muted";
+            return <div key={idx} className={`h-1.5 flex-1 rounded-full ${color}`} title={STEP_LABELS[idx]} />;
+          })}
         </div>
       </div>
 
@@ -824,68 +849,118 @@ export default function NewSurveyPage() {
         </div>
       </div>
 
-      {/* Nami confirm modal */}
+      {/* Nami confirm modal — modernised picker */}
       {showNamiConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-card rounded-xl p-6 max-w-md w-full mx-4 space-y-4 shadow-xl">
-            <h3 className="text-lg font-semibold">Nami will message participants</h3>
-            <p className="text-sm text-muted-foreground">
-              <strong>{namiParticipantCount}</strong> participants will receive a Slack DM to complete the survey.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "now"}
-                  onChange={() => setNamiScheduleMode("now")} className="accent-primary" />
-                Send now
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="radio" name="namiSchedule" checked={namiScheduleMode === "schedule"}
-                  onChange={() => setNamiScheduleMode("schedule")} className="accent-primary" />
-                Schedule
-              </label>
-              {(surveyType === "pulse" || surveyType === "enps") && (
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="radio" name="namiSchedule" checked={namiScheduleMode === "recurring"}
-                    onChange={() => setNamiScheduleMode("recurring")} className="accent-primary" />
-                  Recurring
-                </label>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4 border-b border-border/60">
+              <h3 className="text-lg font-semibold text-foreground">Nami will message participants</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                <span className="font-semibold text-foreground">{namiParticipantCount}</span> participant{namiParticipantCount !== 1 ? "s" : ""} will receive a Slack DM to complete the survey.
+              </p>
+            </div>
+
+            {/* Schedule mode picker — segmented control */}
+            <div className="px-6 py-5 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">When to send</Label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
+                  {[
+                    { value: "now" as const, label: "Now", available: true },
+                    { value: "schedule" as const, label: "Schedule", available: true },
+                    { value: "recurring" as const, label: "Recurring", available: surveyType === "pulse" || surveyType === "enps" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={!opt.available}
+                      onClick={() => setNamiScheduleMode(opt.value)}
+                      className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                        namiScheduleMode === opt.value
+                          ? "bg-card text-foreground shadow-sm"
+                          : opt.available
+                            ? "text-muted-foreground hover:text-foreground"
+                            : "text-muted-foreground/30 cursor-not-allowed"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {namiScheduleMode === "schedule" && (
+                <div className="space-y-2">
+                  <Label htmlFor="sched-datetime" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Send at</Label>
+                  <Input
+                    id="sched-datetime"
+                    type="datetime-local"
+                    value={namiScheduleDate}
+                    onChange={(e) => setNamiScheduleDate(e.target.value)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              )}
+
+              {namiScheduleMode === "recurring" && (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Frequency</Label>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
+                      {([
+                        ["weekly", "Weekly"],
+                        ["biweekly", "Every 2 weeks"],
+                        ["monthly", "Monthly"],
+                      ] as const).map(([val, label]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setRecurrence(val)}
+                          className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                            recurrence === val
+                              ? "bg-card text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Day of the week</Label>
+                    <div className="grid grid-cols-5 gap-1.5 p-1 rounded-lg bg-muted/60">
+                      {(["monday", "tuesday", "wednesday", "thursday", "friday"] as const).map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => setRecurrenceDay(d)}
+                          className={`h-8 rounded-md text-xs font-medium transition-colors capitalize ${
+                            recurrenceDay === d
+                              ? "bg-card text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {d.slice(0, 3)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Nami will automatically send this survey every {recurrence === "weekly" ? "week" : recurrence === "biweekly" ? "2 weeks" : "month"} on{" "}
+                    <span className="font-semibold text-foreground capitalize">{recurrenceDay}</span>s. First send goes out now.
+                  </p>
+                </div>
               )}
             </div>
-            {namiScheduleMode === "schedule" && (
-              <input type="datetime-local" value={namiScheduleDate}
-                onChange={(e) => setNamiScheduleDate(e.target.value)}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm" />
-            )}
-            {namiScheduleMode === "recurring" && (
-              <div className="space-y-3 rounded-lg border border-border p-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Frequency</Label>
-                  <div className="flex gap-2">
-                    {([["weekly", "Weekly"], ["biweekly", "Every 2 weeks"], ["monthly", "Monthly"]] as const).map(([val, label]) => (
-                      <label key={val} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs cursor-pointer border ${recurrence === val ? "border-primary bg-primary/5 font-medium" : "border-border"}`}>
-                        <input type="radio" name="recurrence" checked={recurrence === val} onChange={() => setRecurrence(val)} className="sr-only" />
-                        {label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Day of the week</Label>
-                  <select value={recurrenceDay} onChange={e => setRecurrenceDay(e.target.value)} className="w-full border border-border rounded-md px-3 py-1.5 text-sm bg-background">
-                    {["monday", "tuesday", "wednesday", "thursday", "friday"].map(d => (
-                      <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-xs text-muted-foreground">Nami will automatically send this survey on the selected day. First send happens immediately.</p>
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <Button onClick={confirmNamiSend} disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}
-                className="flex-1">
-                {loading ? "Sending..." : "Confirm & Send"}
-              </Button>
-              <Button variant="outline" onClick={async () => {
+
+            {/* Footer — CTAs */}
+            <div className="px-6 pb-5 pt-1 flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={async () => {
                   setShowNamiConfirm(false);
                   const identity = await getClientIdentity(supabase);
                   if (identity?.workspaceId) {
@@ -893,8 +968,15 @@ export default function NewSurveyPage() {
                   }
                   router.push(`/dashboard/surveys/${pendingSurveyId}`);
                 }}
-                className="flex-1">
+              >
                 Skip Nami
+              </Button>
+              <Button
+                onClick={confirmNamiSend}
+                disabled={loading || (namiScheduleMode === "schedule" && !namiScheduleDate)}
+                className="flex-1"
+              >
+                {loading ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Sending…</> : "Confirm & send"}
               </Button>
             </div>
           </div>

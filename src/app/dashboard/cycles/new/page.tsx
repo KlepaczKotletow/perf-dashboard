@@ -718,7 +718,11 @@ export default function NewCyclePage() {
       <PageHeader
         hat="manage"
         title="New cycle"
-        subtitle={`Step ${step} of 5${autoSaving ? " · Saving..." : pendingCycleId ? " · Draft saved" : ""}`}
+        subtitle={
+          autoSaving ? "Saving draft…"
+          : pendingCycleId ? "Draft saved"
+          : "Configure a performance review cycle"
+        }
         actions={
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard/cycles"><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Link>
