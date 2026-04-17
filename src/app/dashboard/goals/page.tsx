@@ -1,68 +1,99 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import GoalsClient from "./goals-client";
-import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
+import GoalsClient, { type TabId } from "./goals-client";
+import { isHROrAbove } from "@/lib/roles";
+import type { GoalRow } from "@/lib/goals-utils";
 
-async function getGoals(
-  workspaceId: string | undefined,
-  role: string | undefined,
-  currentUserId: string | null,
-  hasDirectReports?: boolean,
-) {
-  if (!workspaceId) return [];
+const GOAL_SELECT = `
+  id, title, description, scope, status, progress, weight,
+  metric_start, metric_current, metric_target, metric_unit,
+  tracking_status, due_date, created_at, parent_id, goal_direction,
+  employee_id, suggested_by_user_id,
+  employee:users!goals_employee_id_fkey(id, slack_name, department),
+  suggested_by:users!goals_suggested_by_user_id_fkey(id, slack_name),
+  cycle:performance_cycles!goals_cycle_id_fkey(id, name)
+`;
 
+const VALID_TABS = ["me", "team", "company"] as const;
+
+async function getMeGoals(workspaceId: string, appUserId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("goals")
+    .select(GOAL_SELECT)
+    .eq("workspace_id", workspaceId)
+    .eq("employee_id", appUserId)
+    .eq("scope", "individual")
+    .order("created_at", { ascending: false });
+  if (error) console.error("Failed to fetch 'me' goals:", error.message);
+  return (data || []) as unknown as GoalRow[];
+}
+
+async function getTeamGoals(workspaceId: string, appUserId: string) {
   const supabase = await createServerSupabaseClient();
 
-  let query = supabase
+  // PostgREST .or() with subqueries is fragile — run two queries and merge.
+  // Query 1: any team-scope goal in this workspace.
+  // Query 2: individual goals owned by a direct report of the caller.
+  const { data: reports, error: reportsErr } = await supabase
+    .from("users")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("manager_id", appUserId);
+  if (reportsErr) console.error("Failed to fetch reports for team goals:", reportsErr.message);
+
+  const reportIds = (reports || []).map((r: { id: string }) => r.id);
+
+  const teamScopePromise = supabase
     .from("goals")
-    .select(`
-      id, parent_id, title, description, status, progress,
-      weight, metric_start, metric_current, metric_target, metric_unit,
-      tracking_status, scope, goal_direction, due_date,
-      employee:users!goals_employee_id_fkey(id, slack_name, department),
-      cycle:performance_cycles!goals_cycle_id_fkey(id, name)
-    `)
-    .order("created_at", { ascending: false })
-    .eq("workspace_id", workspaceId);
+    .select(GOAL_SELECT)
+    .eq("workspace_id", workspaceId)
+    .eq("scope", "team")
+    .order("created_at", { ascending: false });
 
-  // HR / Admin — unrestricted
-  if (isHROrAbove(role)) {
-    const { data, error } = await query;
-    if (error) console.error("Failed to fetch goals (HR):", error.message);
-    return data || [];
-  }
+  const reportIndividualsPromise =
+    reportIds.length > 0
+      ? supabase
+          .from("goals")
+          .select(GOAL_SELECT)
+          .eq("workspace_id", workspaceId)
+          .eq("scope", "individual")
+          .in("employee_id", reportIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as unknown as GoalRow[], error: null as { message: string } | null });
 
-  if (!currentUserId) {
-    // Unauthenticated — only public company-level goals
-    const { data, error } = await query.eq("scope", "company");
-    if (error) console.error("Failed to fetch goals (public):", error.message);
-    return data || [];
-  }
+  const [teamScopeRes, reportIndividualsRes] = await Promise.all([
+    teamScopePromise,
+    reportIndividualsPromise,
+  ]);
 
-  if (isManagerOrAbove(role) || hasDirectReports) {
-    // Manager — company goals + team goals + individual goals for self and direct reports
-    const { data: reports, error: reportsErr } = await supabase
-      .from("users")
-      .select("id")
-      .eq("manager_id", currentUserId)
-      .eq("workspace_id", workspaceId);
-    if (reportsErr) console.error("Failed to fetch manager reports for goals:", reportsErr.message);
+  if (teamScopeRes.error) console.error("Failed to fetch team-scope goals:", teamScopeRes.error.message);
+  if (reportIndividualsRes.error)
+    console.error("Failed to fetch reports' individual goals:", reportIndividualsRes.error.message);
 
-    const allIds = [currentUserId, ...((reports || []).map((r: any) => r.id))];
-    const idsStr = allIds.join(",");
+  // Merge — IDs are unique across both queries (a row has exactly one scope).
+  const merged = [
+    ...((teamScopeRes.data as unknown as GoalRow[]) || []),
+    ...((reportIndividualsRes.data as unknown as GoalRow[]) || []),
+  ];
+  // Re-sort the merged list by created_at DESC
+  merged.sort((a, b) => {
+    const aT = (a as GoalRow & { created_at?: string }).created_at || "";
+    const bT = (b as GoalRow & { created_at?: string }).created_at || "";
+    return bT.localeCompare(aT);
+  });
+  return merged;
+}
 
-    const { data, error } = await query.or(
-      `scope.eq.company,scope.eq.team,employee_id.in.(${idsStr})`
-    );
-    if (error) console.error("Failed to fetch goals (manager):", error.message);
-    return data || [];
-  }
-
-  // Employee — company goals + their own individual goals
-  const { data, error } = await query.or(
-    `scope.eq.company,employee_id.eq.${currentUserId}`
-  );
-  if (error) console.error("Failed to fetch goals (employee):", error.message);
-  return data || [];
+async function getCompanyGoals(workspaceId: string) {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("goals")
+    .select(GOAL_SELECT)
+    .eq("workspace_id", workspaceId)
+    .eq("scope", "company")
+    .order("created_at", { ascending: false });
+  if (error) console.error("Failed to fetch company goals:", error.message);
+  return (data || []) as unknown as GoalRow[];
 }
 
 async function getCycles(workspaceId: string | undefined) {
@@ -91,16 +122,76 @@ async function getEmployees(workspaceId: string | undefined) {
   return data || [];
 }
 
-export default async function GoalsPage() {
+async function getDirectReports(workspaceId: string | undefined, appUserId: string | null) {
+  if (!workspaceId || !appUserId) return [];
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, slack_name")
+    .eq("workspace_id", workspaceId)
+    .eq("manager_id", appUserId)
+    .order("slack_name");
+  if (error) console.error("Failed to fetch direct reports for goals:", error.message);
+  return data || [];
+}
+
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string }>;
+}) {
+  const params = (await searchParams) ?? {};
+  const rawTab = params.tab;
+  const tab: TabId = (VALID_TABS as readonly string[]).includes(rawTab ?? "")
+    ? (rawTab as TabId)
+    : "me";
+
   const workspace = await getUserWorkspace();
   const role = workspace?.role;
-  const currentUserId = workspace?.appUserId ?? null;
+  const appUserId = workspace?.appUserId ?? null;
+  const workspaceId = workspace?.workspaceId;
 
-  const [goals, cycles, employees] = await Promise.all([
-    getGoals(workspace?.workspaceId, role, currentUserId, workspace?.hasDirectReports),
-    getCycles(workspace?.workspaceId),
-    getEmployees(workspace?.workspaceId),
+  // Determine which tabs this caller sees
+  const visibleTabs: TabId[] = ["me"];
+  if (workspace?.hasDirectReports) visibleTabs.push("team");
+  visibleTabs.push("company");
+
+  // Fetch goals for all visible tabs in parallel — switching is instant.
+  const fetches: Partial<Record<TabId, Promise<GoalRow[]>>> = {};
+  if (workspaceId && appUserId) {
+    if (visibleTabs.includes("me")) fetches.me = getMeGoals(workspaceId, appUserId);
+    if (visibleTabs.includes("team")) fetches.team = getTeamGoals(workspaceId, appUserId);
+    if (visibleTabs.includes("company")) fetches.company = getCompanyGoals(workspaceId);
+  }
+
+  const [meGoals, teamGoals, companyGoals, cycles, employees, directReports] = await Promise.all([
+    fetches.me ?? Promise.resolve([] as GoalRow[]),
+    fetches.team ?? Promise.resolve([] as GoalRow[]),
+    fetches.company ?? Promise.resolve([] as GoalRow[]),
+    getCycles(workspaceId),
+    getEmployees(workspaceId),
+    getDirectReports(workspaceId, appUserId),
   ]);
 
-  return <GoalsClient goals={goals} cycles={cycles} employees={employees} role={role} workspaceId={workspace?.workspaceId ?? ""} />;
+  const goalsByTab: Record<TabId, GoalRow[]> = {
+    me: meGoals,
+    team: teamGoals,
+    company: companyGoals,
+  };
+
+  return (
+    <GoalsClient
+      initialTab={tab}
+      visibleTabs={visibleTabs}
+      goalsByTab={goalsByTab}
+      cycles={cycles}
+      employees={employees}
+      directReports={directReports ?? []}
+      currentUserId={appUserId ?? ""}
+      currentUserName={workspace?.name ?? ""}
+      canCreateCompany={isHROrAbove(role)}
+      role={role}
+      workspaceId={workspaceId ?? ""}
+    />
+  );
 }

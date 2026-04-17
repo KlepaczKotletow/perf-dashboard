@@ -43,7 +43,13 @@ export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTa
 
   // Normalize FK joins
   const normalized = useMemo<NormalizedGoalRow[]>(
-    () => goals.map((g) => ({ ...g, employee: unwrap(g.employee), cycle: unwrap(g.cycle) })),
+    () =>
+      goals.map((g) => ({
+        ...g,
+        employee: unwrap(g.employee),
+        cycle: unwrap(g.cycle),
+        suggested_by: unwrap(g.suggested_by),
+      })),
     [goals]
   );
 

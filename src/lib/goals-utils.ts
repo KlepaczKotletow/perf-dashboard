@@ -3,6 +3,7 @@
 
 export interface EmployeeRef { id: string; slack_name: string; department: string | null }
 export interface CycleRef { id: string; name: string }
+export interface SuggestedByRef { id: string; slack_name: string }
 
 export interface GoalRow {
   id: string;
@@ -20,13 +21,16 @@ export interface GoalRow {
   scope: string;
   goal_direction?: string;
   due_date: string | null;
+  suggested_by_user_id?: string | null;
   employee?: EmployeeRef | EmployeeRef[] | null;
   cycle?: CycleRef | CycleRef[] | null;
+  suggested_by?: SuggestedByRef | SuggestedByRef[] | null;
 }
 
-export interface NormalizedGoalRow extends Omit<GoalRow, "employee" | "cycle"> {
+export interface NormalizedGoalRow extends Omit<GoalRow, "employee" | "cycle" | "suggested_by"> {
   employee: EmployeeRef | null;
   cycle: CycleRef | null;
+  suggested_by: SuggestedByRef | null;
 }
 
 export interface GoalNode extends NormalizedGoalRow {
