@@ -7,6 +7,7 @@ import { format, addDays, nextDay, Day } from "date-fns";
 import { isHROrAbove } from "@/lib/roles";
 import { SurveyActions } from "./survey-actions";
 import { SurveyResults } from "./survey-results";
+import { ScheduleEditor } from "./schedule-editor";
 import { PageHeader } from "@/components/page-header";
 
 async function getSurvey(id: string, workspaceId: string) {
@@ -16,7 +17,7 @@ async function getSurvey(id: string, workspaceId: string) {
   const [{ data: survey }, { data: participants }] = await Promise.all([
     supabase
       .from("surveys")
-      .select("id, type, name, status, config, closes_at, created_at")
+      .select("id, type, name, status, config, closes_at, created_at, nami_send_at")
       .eq("id", id)
       .eq("workspace_id", workspaceId)
       .single(),
@@ -114,6 +115,15 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
                   <Download className="h-4 w-4 mr-1.5" /> Export CSV
                 </a>
               </Button>
+            )}
+            {canManage && survey.status !== "closed" && (
+              <ScheduleEditor
+                surveyId={id}
+                workspaceId={workspace!.workspaceId}
+                surveyType={survey.type}
+                initialConfig={(survey as { config?: Record<string, unknown> }).config || {}}
+                initialSendAt={(survey as { nami_send_at?: string | null }).nami_send_at ?? null}
+              />
             )}
             {canManage && survey.status === "active" && (
               <SurveyActions surveyId={id} workspaceId={workspace!.workspaceId} />
