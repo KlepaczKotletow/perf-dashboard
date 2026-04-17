@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import {
   Slack, Shield, BarChart3, MessageSquare, Users, Star,
   Check, Target, TrendingUp, Flag, ChevronRight,
-  Grid3X3, Bot, Bell, Zap, Send, Clock, BookOpen, MousePointerClick,
-  Activity, Heart, ClipboardList, AlertTriangle, Smile,
+  Grid3X3, Bot, Bell, Zap, Send, Clock,
+  Activity, Heart, ClipboardList, AlertTriangle, Lock, Globe,
 } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
@@ -32,7 +32,8 @@ export default function Home() {
               <span className="text-[40px] font-black tracking-tight text-foreground">Nami</span>
             </Link>
             <div className="hidden lg:flex items-center gap-6">
-              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
+              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
+              <a href="#goals" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
               <a href="#surveys" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
               <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
               <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
@@ -336,55 +337,121 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Goals & Analytics — compact cards ── */}
-      <section className="bg-white py-16 lg:py-20">
+      {/* ── Goals & Analytics — product showcase ── */}
+      <section id="goals" className="bg-white py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-10">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              Goals, analytics, and everything in between
+          <ScrollReveal className="text-center mb-12">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              Goals &amp; Analytics
+            </span>
+            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+              Track goals. See patterns. Act on both.
             </h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[17px]">
-              Nami doesn&apos;t just handle reviews. It tracks goals, surfaces analytics, and keeps your whole performance stack connected.
+            <p className="mt-3 text-muted-foreground max-w-xl mx-auto text-[17px]">
+              OKRs, competency heatmaps, and trend reporting — all in the same place reviews happen. No CSV exports. No second tool.
             </p>
           </ScrollReveal>
 
-          <div className="grid sm:grid-cols-3 gap-5">
-            <ScrollReveal>
-              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
-                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
-                  <Flag className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">Goals &amp; OKRs</h3>
-                <p className="text-[15px] text-muted-foreground leading-relaxed">
-                  Create goals in 30 seconds from templates. Track status (On Track, At Risk, Achieved) in real time. Goals feed directly into reviews and analytics — no manual data entry.
-                </p>
-              </div>
-            </ScrollReveal>
+          <ScrollReveal>
+            <div className="grid lg:grid-cols-5 gap-4">
 
-            <ScrollReveal delay={80}>
-              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
-                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
-                  <BarChart3 className="h-5 w-5 text-primary" />
+              {/* Goals card — 2 cols */}
+              <div className="lg:col-span-2 rounded-2xl border border-border/60 bg-white shadow-sm overflow-hidden flex flex-col">
+                <div className="px-5 py-3.5 border-b border-border/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Flag className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-[14px] text-foreground">My Goals · Q2 2026</h3>
+                  </div>
+                  <span className="text-[10px] font-medium text-muted-foreground">4 of 5 on track</span>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">Analytics &amp; Heatmaps</h3>
-                <p className="text-[15px] text-muted-foreground leading-relaxed">
-                  Competency heatmaps, performance rankings, completion breakdowns — sliced by role, department, level, and tenure. See exactly where to invest, not just a pie chart.
-                </p>
+                <div className="p-4 space-y-3 flex-1">
+                  {[
+                    { title: "Ship the new onboarding flow", status: "On Track", progress: 72, statusColor: "bg-emerald-100 text-emerald-700 border-emerald-200", barColor: "bg-emerald-500" },
+                    { title: "Reduce p95 API latency to <200ms", status: "On Track", progress: 58, statusColor: "bg-emerald-100 text-emerald-700 border-emerald-200", barColor: "bg-emerald-500" },
+                    { title: "Hire 2 senior engineers", status: "At Risk", progress: 25, statusColor: "bg-amber-100 text-amber-700 border-amber-200", barColor: "bg-amber-500" },
+                    { title: "Launch design-system v2", status: "Achieved", progress: 100, statusColor: "bg-primary/10 text-primary border-primary/20", barColor: "bg-primary" },
+                    { title: "Publish quarterly engineering blog", status: "On Track", progress: 40, statusColor: "bg-emerald-100 text-emerald-700 border-emerald-200", barColor: "bg-emerald-500" },
+                  ].map((g) => (
+                    <div key={g.title} className="space-y-1.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="text-[12px] font-medium text-foreground leading-snug">{g.title}</p>
+                        <span className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ${g.statusColor}`}>
+                          {g.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full ${g.barColor} rounded-full`} style={{ width: `${g.progress}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium w-7 text-right">{g.progress}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-5 py-3 bg-[#faf9f6] border-t border-border/30 text-[11px] text-muted-foreground">
+                  Goals feed reviews automatically — no manual data entry.
+                </div>
               </div>
-            </ScrollReveal>
 
-            <ScrollReveal delay={160}>
-              <div className="rounded-2xl border border-border/60 bg-white p-6 shadow-sm h-full card-hover">
-                <div className="h-10 w-10 rounded-xl bg-primary/[0.08] flex items-center justify-center mb-4">
-                  <TrendingUp className="h-5 w-5 text-primary" />
+              {/* Heatmap card — 3 cols */}
+              <div className="lg:col-span-3 rounded-2xl border border-border/60 bg-white shadow-sm overflow-hidden flex flex-col">
+                <div className="px-5 py-3.5 border-b border-border/40 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Grid3X3 className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-[14px] text-foreground">Competency heatmap · Engineering</h3>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span className="inline-block h-2 w-2 rounded-sm bg-red-200" /> Gap
+                    <span className="inline-block h-2 w-2 rounded-sm bg-amber-200 ml-1" /> Mid
+                    <span className="inline-block h-2 w-2 rounded-sm bg-emerald-200 ml-1" /> Strong
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">Trends &amp; Reporting</h3>
-                <p className="text-[15px] text-muted-foreground leading-relaxed">
-                  Cross-cycle trends show if your org is improving. Completion rates, average ratings, and goal attainment — all tracked over time so you know your investment in people is working.
-                </p>
+                <div className="p-4 flex-1 overflow-x-auto">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr>
+                        <th className="text-left font-semibold text-muted-foreground pb-2 pr-3 w-[140px]">Competency</th>
+                        {["Frontend", "Backend", "Platform", "Data", "Mobile"].map((dept) => (
+                          <th key={dept} className="font-semibold text-muted-foreground pb-2 px-1 text-center">{dept}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        { name: "Coding & Quality",            scores: [4.3, 4.1, 4.5, 3.8, 4.0] },
+                        { name: "System Design",               scores: [3.4, 4.2, 4.6, 4.1, 3.6] },
+                        { name: "Debugging & Problem Solving", scores: [4.0, 4.1, 4.4, 3.9, 4.0] },
+                        { name: "Delivery & Execution",        scores: [4.1, 3.8, 4.0, 3.6, 3.9] },
+                        { name: "Communication",               scores: [3.9, 3.7, 3.6, 3.4, 3.8] },
+                        { name: "Mentorship & Leadership",     scores: [3.2, 3.4, 3.9, 2.9, 3.1] },
+                      ].map((row) => (
+                        <tr key={row.name}>
+                          <td className="py-1 pr-3 text-foreground text-[11px] font-medium">{row.name}</td>
+                          {row.scores.map((s, i) => {
+                            const tone =
+                              s >= 4.2 ? "bg-emerald-200/90 text-emerald-900" :
+                              s >= 3.8 ? "bg-emerald-100 text-emerald-800" :
+                              s >= 3.4 ? "bg-amber-100 text-amber-800" :
+                                          "bg-red-100 text-red-800";
+                            return (
+                              <td key={i} className="px-1 py-1">
+                                <div className={`h-7 rounded-md flex items-center justify-center text-[11px] font-semibold ${tone}`}>
+                                  {s.toFixed(1)}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-5 py-3 bg-[#faf9f6] border-t border-border/30 text-[11px] text-muted-foreground">
+                  Averages across 42 engineers · last cycle. Click any cell in-app for the people behind the score.
+                </div>
               </div>
-            </ScrollReveal>
-          </div>
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
@@ -403,23 +470,34 @@ export default function Home() {
             </p>
           </ScrollReveal>
 
-          {/* Value pills */}
-          <ScrollReveal className="flex flex-wrap justify-center gap-3 mb-12">
+          {/* All 8 frameworks — visible proof the library is real */}
+          <ScrollReveal className="flex flex-wrap justify-center gap-2 mb-10">
             {[
-              { icon: Clock, text: "Saves weeks of setup" },
-              { icon: BookOpen, text: "Research-backed frameworks" },
-              { icon: MousePointerClick, text: "One-click import" },
-            ].map((pill) => (
-              <span key={pill.text} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white border border-border/60 text-xs font-medium text-foreground shadow-sm">
-                <pill.icon className="h-3.5 w-3.5 text-primary" />
-                {pill.text}
+              "Software Engineering",
+              "Product Management",
+              "Design",
+              "Data & Analytics",
+              "Sales",
+              "Customer Success",
+              "Marketing",
+              "People & HR",
+            ].map((name, i) => (
+              <span
+                key={name}
+                className={`inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-medium border ${
+                  i === 0
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-white text-foreground border-border/60"
+                }`}
+              >
+                {name}
               </span>
             ))}
           </ScrollReveal>
 
           <ScrollReveal>
-            <p className="text-center text-sm text-muted-foreground mb-4">
-              8 frameworks included — Software Engineering, Data &amp; Analytics, Product Management, Design, and more
+            <p className="text-center text-[13px] text-muted-foreground mb-6">
+              8 career frameworks, 30+ review &amp; goal templates — import one-click, customise anything.
             </p>
           </ScrollReveal>
 
@@ -482,22 +560,17 @@ export default function Home() {
                 </table>
               </div>
 
-              {/* Score descriptor example */}
-              <div className="px-5 py-4 bg-[#faf9f6] border-t border-border/30">
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2">Score Descriptors</p>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2.5">
-                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold border bg-green-100 text-green-700 border-green-200 mt-0.5 shrink-0">4</span>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      <span className="font-medium text-foreground">Coding &amp; Quality:</span> Champions code quality across the team by establishing review standards, introducing static analysis tooling, and refactoring legacy code. Writes code that others use as a reference.
-                    </p>
-                  </div>
-                  <div className="flex items-start gap-2.5">
-                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full text-[10px] font-bold border bg-emerald-100 text-emerald-700 border-emerald-200 mt-0.5 shrink-0">5</span>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      <span className="font-medium text-foreground">Coding &amp; Quality:</span> Sets org-wide coding standards and quality benchmarks adopted across multiple teams. Designs testing strategies and CI/CD quality gates that measurably reduce production incidents.
-                    </p>
-                  </div>
+              {/* Cell-level descriptor — what makes Nami's frameworks different */}
+              <div className="px-5 py-4 bg-[#faf9f6] border-t border-border/30 flex items-start gap-3">
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold border bg-green-100 text-green-700 border-green-200 shrink-0">4</span>
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Coding &amp; Quality · Staff</p>
+                  <p className="text-[13px] text-foreground leading-relaxed">
+                    &ldquo;Champions code quality across the team — establishes review standards, introduces static-analysis tooling, and refactors legacy code. Writes code others use as a reference.&rdquo;
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Every cell in every framework has a descriptor like this — so reviews aren&apos;t guesswork.
+                  </p>
                 </div>
               </div>
             </div>
@@ -714,12 +787,135 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Feature Spotlight 3: Surveys & Pulse Checks ── */}
+      {/* ── Feature Spotlight 3: Surveys & Pulse Checks (mockup LEFT, copy RIGHT — alternates rhythm) ── */}
       <section id="surveys" className="bg-gradient-to-br from-[#f5f5f0] via-[#faf8f2] to-[#f3f2ed] py-20 lg:py-24">
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-start">
 
-            {/* Left: copy */}
+            {/* Left: mockups — Slack pulse DM + results dashboard */}
+            <ScrollReveal scale>
+              <div className="relative">
+                <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
+
+                {/* Pulse survey DM */}
+                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                      <span className="text-white text-[8px] font-bold">N</span>
+                    </div>
+                    <span className="text-[13px] font-bold text-foreground">Nami</span>
+                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
+                  </div>
+                  <div className="p-5 space-y-5 bg-white">
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+                        <span className="text-white text-xs font-bold">N</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 mb-1">
+                          <span className="text-sm font-bold text-foreground">Nami</span>
+                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
+                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
+                        </div>
+                        <p className="text-[13px] text-foreground leading-relaxed mb-3">
+                          Hey! You&apos;ve been invited to take the <span className="font-semibold">March Pulse Survey</span>. It&apos;s quick — 5 questions, ~1 min.
+                        </p>
+                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-3">
+                          <Shield className="h-3 w-3" /> Your responses are anonymous and aggregated.
+                        </p>
+                        <div className="border-l-[3px] border-l-primary pl-3 py-1 mb-3">
+                          <p className="text-[12px] font-semibold text-foreground mb-1">1/5: I feel supported by my manager</p>
+                          <p className="text-[10px] text-muted-foreground italic">Rate from 1 (Strongly disagree) to 7 (Strongly agree)</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                            <div key={n} className={`px-3 py-1.5 rounded text-[11px] font-medium ${n === 6 ? 'border-2 border-primary bg-primary/10 text-primary' : 'border border-border bg-white text-foreground'}`}>
+                              {n}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-center mt-3 text-xs text-muted-foreground/70">
+                  Questions arrive as Slack DMs — answered in under 60 seconds.
+                </p>
+
+                {/* Results dashboard — eNPS + sentiment trend + top insights */}
+                <div className="mt-6 rounded-2xl border border-border/60 bg-white overflow-hidden shadow-xl shadow-primary/10">
+                  <div className="px-5 py-3.5 border-b border-border/40 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-[14px] text-foreground">Pulse results · March</h3>
+                    </div>
+                    <span className="text-[10px] font-medium text-muted-foreground">87% response rate · 128 replies</span>
+                  </div>
+                  <div className="p-4 space-y-4">
+
+                    {/* eNPS score — big number + promoter/passive/detractor breakdown */}
+                    <div className="grid grid-cols-[auto,1fr] gap-4 items-center">
+                      <div className="text-center px-4 py-2">
+                        <p className="text-[9px] font-semibold text-muted-foreground uppercase tracking-widest">eNPS</p>
+                        <p className="text-3xl font-black text-emerald-600 leading-none mt-1">+42</p>
+                        <p className="text-[10px] text-emerald-700 font-medium mt-0.5">+8 vs. Feb</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {[
+                          { label: "Promoters",  pct: 58, color: "bg-emerald-500" },
+                          { label: "Passives",   pct: 26, color: "bg-amber-400" },
+                          { label: "Detractors", pct: 16, color: "bg-red-400" },
+                        ].map((row) => (
+                          <div key={row.label} className="flex items-center gap-2 text-[11px]">
+                            <span className="w-20 text-muted-foreground">{row.label}</span>
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div className={`h-full ${row.color} rounded-full`} style={{ width: `${row.pct}%` }} />
+                            </div>
+                            <span className="w-8 text-right font-medium text-foreground">{row.pct}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sentiment trend — tiny sparkline bars */}
+                    <div className="pt-3 border-t border-border/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-semibold text-foreground">Sentiment · last 6 pulses</p>
+                        <span className="text-[10px] text-emerald-700 font-medium">↑ trending up</span>
+                      </div>
+                      <div className="flex items-end gap-1.5 h-10">
+                        {[52, 48, 55, 38, 40, 42].map((v, i) => (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <div
+                              className={`w-full rounded-sm ${i === 5 ? "bg-primary" : "bg-primary/30"}`}
+                              style={{ height: `${(v / 60) * 100}%` }}
+                            />
+                            <span className="text-[8px] text-muted-foreground">{["Oct","Nov","Dec","Jan","Feb","Mar"][i]}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Top gap — something actionable */}
+                    <div className="pt-3 border-t border-border/30 flex items-start gap-2.5">
+                      <div className="h-6 w-6 rounded-md bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold text-foreground">Biggest drop: Career growth clarity</p>
+                        <p className="text-[11px] text-muted-foreground leading-snug">Engineering scored 3.1/5 (↓ 0.6). Worth addressing at the next all-hands.</p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+                <p className="text-center mt-4 text-sm text-muted-foreground/70">
+                  Results arrive as a dashboard — eNPS, trends, and the one insight worth acting on this week.
+                </p>
+              </div>
+            </ScrollReveal>
+
+            {/* Right: copy */}
             <ScrollReveal>
               <div className="lg:sticky lg:top-24">
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
@@ -769,126 +965,6 @@ export default function Home() {
               </div>
             </ScrollReveal>
 
-            {/* Right: Slack DM mockup — pulse survey + eNPS */}
-            <ScrollReveal scale>
-              <div className="relative">
-                <div className="absolute -inset-6 bg-primary/[0.07] blur-3xl rounded-full -z-10 pointer-events-none" />
-
-                {/* Pulse survey DM */}
-                <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
-                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
-                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <span className="text-white text-[8px] font-bold">N</span>
-                    </div>
-                    <span className="text-[13px] font-bold text-foreground">Nami</span>
-                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
-                  </div>
-                  <div className="p-5 space-y-5 bg-white">
-                    {/* Nami → pulse survey intro */}
-                    <div className="flex gap-3">
-                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <span className="text-white text-xs font-bold">N</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground">Nami</span>
-                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
-                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
-                        </div>
-                        <p className="text-[13px] text-foreground leading-relaxed mb-3">
-                          Hey! You&apos;ve been invited to take the <span className="font-semibold">March Pulse Survey</span>. It&apos;s quick — 5 questions, ~1 min.
-                        </p>
-                        <p className="text-[11px] text-muted-foreground flex items-center gap-1 mb-3">
-                          <Shield className="h-3 w-3" /> Your responses are anonymous and aggregated.
-                        </p>
-                        {/* Question with left border */}
-                        <div className="border-l-[3px] border-l-primary pl-3 py-1 mb-3">
-                          <p className="text-[12px] font-semibold text-foreground mb-1">1/5: I feel supported by my manager</p>
-                          <p className="text-[10px] text-muted-foreground italic">Rate from 1 (Strongly disagree) to 7 (Strongly agree)</p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
-                            <div key={n} className={`px-3 py-1.5 rounded text-[11px] font-medium ${n === 6 ? 'border-2 border-primary bg-primary/10 text-primary' : 'border border-border bg-white text-foreground'}`}>
-                              {n}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Nami confirmation */}
-                    <div className="flex gap-3">
-                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <span className="text-white text-xs font-bold">N</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground">Nami</span>
-                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
-                          <span className="text-[11px] text-muted-foreground">9:00 AM</span>
-                        </div>
-                        <p className="text-[13px] text-foreground leading-relaxed">
-                          Got it — <span className="font-semibold text-primary">6/7</span>. Next: <span className="font-semibold">I have the tools I need to do my job well</span>
-                        </p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div className="h-full bg-primary rounded-full" style={{ width: '20%' }} />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground font-medium">1/5</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* eNPS mockup */}
-                <div className="mt-6 rounded-2xl border border-border/60 bg-white overflow-hidden shadow-xl shadow-primary/10">
-                  <div className="bg-white border-b border-border/60 px-5 py-2.5 flex items-center gap-2">
-                    <div className="h-5 w-5 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <span className="text-white text-[8px] font-bold">N</span>
-                    </div>
-                    <span className="text-[13px] font-bold text-foreground">Nami</span>
-                    <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">APP</span>
-                  </div>
-                  <div className="p-5 bg-white">
-                    <div className="flex gap-3">
-                      <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
-                        <span className="text-white text-xs font-bold">N</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2 mb-1">
-                          <span className="text-sm font-bold text-foreground">Nami</span>
-                          <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1 py-0.5 rounded">APP</span>
-                          <span className="text-[11px] text-muted-foreground">9:05 AM</span>
-                        </div>
-                        <div className="border-l-[3px] border-l-emerald-500 pl-3 py-1 mb-3">
-                          <p className="text-[12px] font-semibold text-foreground mb-1">eNPS Survey</p>
-                          <p className="text-[11px] text-muted-foreground">On a scale of 0–10, how likely are you to recommend this company as a great place to work?</p>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
-                            <div key={n} className={`w-7 h-7 rounded flex items-center justify-center text-[10px] font-medium ${
-                              n === 9 ? 'border-2 border-emerald-500 bg-emerald-50 text-emerald-700' : 'border border-border bg-white text-foreground'
-                            }`}>
-                              {n}
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex justify-between mt-1.5 text-[9px] text-muted-foreground">
-                          <span>Not at all likely</span>
-                          <span>Extremely likely</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-center mt-5 text-sm text-muted-foreground/70">
-                  Pulse surveys and eNPS — answered in Slack in under 60 seconds.
-                </p>
-              </div>
-            </ScrollReveal>
-
           </div>
         </div>
       </section>
@@ -898,8 +974,8 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-16 items-start">
 
-            {/* Left: Slack check-in mockup + manager alert */}
-            <ScrollReveal scale>
+            {/* Visually on the RIGHT on desktop (alternates rhythm with Reviews / Surveys) — Slack check-in + manager alert */}
+            <ScrollReveal scale className="lg:order-2">
               <div className="relative lg:sticky lg:top-24">
                 <div className="absolute -inset-6 bg-primary/[0.06] blur-3xl rounded-full -z-10 pointer-events-none" />
 
@@ -999,8 +1075,8 @@ export default function Home() {
               </div>
             </ScrollReveal>
 
-            {/* Right: copy */}
-            <ScrollReveal>
+            {/* Visually on the LEFT on desktop — copy */}
+            <ScrollReveal className="lg:order-1">
               <div>
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-6">
                   Frictionless Check-ins
@@ -1124,6 +1200,23 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Roadmap callout — as trust signal BEFORE pricing, not between pricing and CTA ── */}
+      <ScrollReveal>
+        <div className="max-w-5xl mx-auto px-6 pb-8">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-border/60 bg-gradient-to-r from-primary/[0.04] to-background p-6 sm:p-8">
+            <div className="text-center sm:text-left">
+              <h3 className="text-xl font-bold text-foreground">Missing a feature that would make you switch?</h3>
+              <p className="mt-1.5 text-[15px] text-muted-foreground">Check our public roadmap — or suggest it and we&apos;ll build it.</p>
+            </div>
+            <Button variant="outline" className="shrink-0 rounded-full px-6" asChild>
+              <Link href="/roadmap">
+                View Roadmap <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </ScrollReveal>
+
       {/* ── Pricing ── */}
       <section id="pricing" className="bg-background border-t border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-24">
@@ -1179,31 +1272,43 @@ export default function Home() {
               </div>
             </ScrollReveal>
 
-            {/* Partner programme */}
+            {/* Partner programme — visually distinct from a priced plan */}
             <ScrollReveal delay={80}>
               <div className="relative p-8 rounded-2xl border border-border/60 bg-gradient-to-br from-[#faf8f2] to-white h-full flex flex-col card-hover">
-                <div className="text-center mb-6">
-                  <h3 className="text-lg font-bold text-foreground mb-1">Partners Programme</h3>
-                  <p className="text-4xl font-black text-foreground">Let&apos;s talk</p>
-                  <p className="text-[13px] text-muted-foreground mt-2">For early adopters who want to shape the product</p>
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider border border-amber-200">
+                      <Star className="h-3 w-3" />
+                      Invite-only
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">Limited spots</span>
+                  </div>
+                  <h3 className="text-2xl font-black text-foreground leading-tight">Partners Programme</h3>
+                  <p className="text-[14px] text-muted-foreground mt-2 leading-relaxed">
+                    For early adopters who want to shape the product &mdash; not just use it.
+                  </p>
                 </div>
 
                 <div className="text-left mb-8 flex-1 space-y-4">
-                  <p className="text-[15px] text-muted-foreground leading-relaxed">
-                    Join a small group of launch partners shaping Nami from the ground up. Get early access, direct input on the roadmap, and a product built around your workflow.
-                  </p>
-                  <p className="text-[15px] text-muted-foreground leading-relaxed">
-                    We&apos;re looking for teams who care about performance management and want to be part of building something great.
-                  </p>
-                  <p className="text-[13px] text-muted-foreground/70 italic">
-                    Limited spots available.
-                  </p>
+                  <ul className="space-y-3">
+                    {[
+                      "Direct line to the founders",
+                      "Custom onboarding & data migration",
+                      "Roadmap influence — build features with us",
+                      "Founding partner pricing, locked in",
+                    ].map((line) => (
+                      <li key={line} className="flex items-start gap-2.5 text-[14px] text-foreground">
+                        <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
                 <Button variant="outline" className="w-full" size="lg" asChild>
                   <a href="mailto:hello@namihr.com">
                     <Send className="h-4 w-4 mr-2" />
-                    Inquire about the programme
+                    Apply to the programme
                   </a>
                 </Button>
                 <p className="text-center text-xs text-muted-foreground mt-3">hello@namihr.com</p>
@@ -1213,22 +1318,121 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ── Roadmap callout ── */}
-      <ScrollReveal>
-        <div className="max-w-5xl mx-auto px-6 pb-16 -mt-4">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-border/60 bg-gradient-to-r from-primary/[0.04] to-background p-6 sm:p-8">
-            <div className="text-center sm:text-left">
-              <h3 className="text-xl font-bold text-foreground">Missing a feature that would make you switch?</h3>
-              <p className="mt-1.5 text-[15px] text-muted-foreground">Check our public roadmap — or suggest it and we&apos;ll build it.</p>
+      {/* ── Security & Compliance strip ── */}
+      <section className="bg-white border-t border-border/30 py-14">
+        <div className="max-w-5xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-8">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+              Built for HR, reviewed by IT
+            </p>
+            <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              Security and privacy, not an afterthought
+            </h2>
+          </ScrollReveal>
+          <ScrollReveal>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                {
+                  icon: Lock,
+                  title: "Encrypted in transit & at rest",
+                  body: "TLS 1.2+ in transit, AES-256 at rest. Data isolated per workspace.",
+                },
+                {
+                  icon: Users,
+                  title: "Role-based access control",
+                  body: "Employee / manager / HR / admin — enforced at the database layer, not just the UI.",
+                },
+                {
+                  icon: ClipboardList,
+                  title: "Audit logs",
+                  body: "Every sensitive action logged: who did it, when, and from where. Exportable anytime.",
+                },
+                {
+                  icon: Globe,
+                  title: "GDPR-ready",
+                  body: "Data export, delete-on-request, and EU-region data residency available.",
+                },
+              ].map((item) => (
+                <div key={item.title} className="rounded-xl border border-border/60 bg-white p-5">
+                  <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center mb-3">
+                    <item.icon className="h-4 w-4 text-primary" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                  <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">{item.body}</p>
+                </div>
+              ))}
             </div>
-            <Button variant="outline" className="shrink-0 rounded-full px-6" asChild>
-              <Link href="/roadmap">
-                View Roadmap <ChevronRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </div>
+            <p className="text-center mt-6 text-xs text-muted-foreground/80">
+              SOC 2 Type II audit in progress · Anonymous survey responses · Strict upward-feedback visibility rules
+            </p>
+          </ScrollReveal>
         </div>
-      </ScrollReveal>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section id="faq" className="bg-[#faf9f6] border-t border-border/30 py-20">
+        <div className="max-w-3xl mx-auto px-6">
+          <ScrollReveal className="text-center mb-10">
+            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
+              FAQ
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Questions we get a lot</h2>
+            <p className="mt-3 text-muted-foreground text-[15px]">Don&apos;t see yours? Email <a href="mailto:hello@namihr.com" className="text-primary underline-offset-2 hover:underline">hello@namihr.com</a>.</p>
+          </ScrollReveal>
+
+          <ScrollReveal>
+            <div className="space-y-3">
+              {[
+                {
+                  q: "Where is my data stored and who can see it?",
+                  a: "Nami runs on Supabase (Postgres + authenticated APIs). Your workspace data is isolated per tenant and enforced at the database layer via row-level security. Only people inside your workspace see your data — we don't share or sell it. EU-region data residency is available on request.",
+                },
+                {
+                  q: "What if some of my team doesn't check Slack often?",
+                  a: "Everything Nami does in Slack also works on the web dashboard (app.nami.team). Reviews, goals, and surveys can be completed either way — you can even mix modes within a single cycle. For people who genuinely don't use Slack, managers can run reviews entirely in the dashboard.",
+                },
+                {
+                  q: "Can we migrate from Lattice, Leapsome, or 15Five?",
+                  a: "Yes. We import teams via CSV (or directly from Slack), and competency frameworks can be imported from our library or pasted in from your existing ladder. For Partner Programme customers we'll help with the migration hands-on.",
+                },
+                {
+                  q: "How do you handle 360° and upward feedback privately?",
+                  a: "Strict visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see results after HR releases grades. Survey responses are anonymous and aggregated — names are never attached to answers.",
+                },
+                {
+                  q: "Can I customise the review templates and competency frameworks?",
+                  a: "Yes. All 8 career frameworks ship fully editable — rename competencies, tweak level descriptors, adjust rating scales (2–5, 1–5, 1–7, anything you want). Review templates work the same way. You can also build your own from scratch.",
+                },
+                {
+                  q: "What if we cancel — what happens to our data?",
+                  a: "You can export everything at any time — reviews, goals, ratings, survey responses — as CSV. On cancellation your data is retained for 30 days in case you come back, then permanently deleted. Audit logs stay available during that window.",
+                },
+                {
+                  q: "Do you support multiple Slack workspaces?",
+                  a: "One Nami workspace corresponds to one Slack workspace. If your company has multiple Slack workspaces (e.g. one per region or business unit), contact us — we support org-level structures for Partner Programme customers.",
+                },
+                {
+                  q: "Is there a free trial?",
+                  a: "Yes — 14 days, no credit card. For teams of 10 or fewer, Nami is free indefinitely.",
+                },
+              ].map((item) => (
+                <details
+                  key={item.q}
+                  className="group rounded-xl border border-border/60 bg-white overflow-hidden"
+                >
+                  <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-4 hover:bg-muted/30 transition-colors">
+                    <span className="text-[15px] font-semibold text-foreground">{item.q}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform group-open:rotate-90" />
+                  </summary>
+                  <div className="px-5 pb-5 pt-1 text-[14px] text-muted-foreground leading-relaxed">
+                    {item.a}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
 
       {/* ── CTA ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#faf8f2] via-background to-[#f5f5f0] py-20">
