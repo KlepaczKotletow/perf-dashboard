@@ -1482,20 +1482,14 @@ async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: str
     : fb.feedback_type === "improvement" ? ":chart_with_upwards_trend: improvement suggestion"
     : ":speech_balloon: feedback";
 
-  const open = await fetch("https://slack.com/api/conversations.open", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ users: recipient.slack_user_id }),
-  }).then((r) => r.json());
+  // Route through callSlackApi so 429s bubble up as SlackRateLimitError and
+  // the drain loop can requeue without burning an attempt.
+  const open = await callSlackApi(botToken, "conversations.open", { users: recipient.slack_user_id });
   const channel = open?.channel?.id;
   if (!channel) return { ok: false, error: `conversations.open: ${open?.error ?? "unknown"}` };
 
   const text = `${typeLabel} from ${sender}:\n> ${String(fb.message).replace(/\n/g, "\n> ")}`;
-  const post = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ channel, text }),
-  }).then((r) => r.json());
+  const post = await callSlackApi(botToken, "chat.postMessage", { channel, text });
   if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
   return { ok: true };
 }
@@ -1532,11 +1526,7 @@ async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: 
   const botToken = (ws as { bot_token?: string } | null)?.bot_token;
   if (!botToken) return { ok: false, error: "no bot token" };
 
-  const open = await fetch("https://slack.com/api/conversations.open", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ users: reviewer.slack_user_id }),
-  }).then((r) => r.json());
+  const open = await callSlackApi(botToken, "conversations.open", { users: reviewer.slack_user_id });
   const channel = open?.channel?.id;
   if (!channel) return { ok: false, error: `conversations.open: ${open?.error ?? "unknown"}` };
 
@@ -1547,11 +1537,7 @@ async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: 
     `Open the dashboard when you're ready to fill it in.`,
   ].join("\n");
 
-  const post = await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ channel, text }),
-  }).then((r) => r.json());
+  const post = await callSlackApi(botToken, "chat.postMessage", { channel, text });
   if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
   return { ok: true };
 }
@@ -1581,17 +1567,13 @@ async function refreshHomeTab(job: QueueJob): Promise<{ ok: boolean; error?: str
   // publish a minimal holding view; slack-events's own handler provides
   // the rich one. If the user hasn't opened the home tab yet, Slack will
   // reject with channel_not_found — treat that as success (idempotent).
-  const resp = await fetch("https://slack.com/api/views.publish", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${botToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      user_id: slackUserId,
-      view: {
-        type: "home",
-        blocks: [{ type: "section", text: { type: "mrkdwn", text: ":arrows_counterclockwise: Refreshing..." } }],
-      },
-    }),
-  }).then((r) => r.json());
+  const resp = await callSlackApi(botToken, "views.publish", {
+    user_id: slackUserId,
+    view: {
+      type: "home",
+      blocks: [{ type: "section", text: { type: "mrkdwn", text: ":arrows_counterclockwise: Refreshing..." } }],
+    },
+  });
   if (!resp?.ok) {
     if (resp?.error === "channel_not_found" || resp?.error === "not_allowed_token_type") {
       return { ok: true };
@@ -1609,6 +1591,7 @@ async function handleDrainSendQueue() {
   const jobs = (jobsRaw ?? []) as QueueJob[];
   let succeeded = 0;
   let failed = 0;
+  let requeued = 0;
   for (const job of jobs) {
     try {
       let result: { ok: boolean; error?: string };
@@ -1629,6 +1612,23 @@ async function handleDrainSendQueue() {
       if (result.ok) succeeded++;
       else failed++;
     } catch (e) {
+      // Slack rate limits: honour Retry-After at the queue layer instead of
+      // burning attempts. Reset locked_at + next_attempt_at and leave the
+      // attempt counter untouched so the job has its full retry budget for
+      // actual failures.
+      if (e instanceof SlackRateLimitError) {
+        const nextAttemptAt = new Date(Date.now() + e.retryAfterSeconds * 1000).toISOString();
+        await supabase
+          .from("slack_send_queue")
+          .update({
+            locked_at: null,
+            next_attempt_at: nextAttemptAt,
+            last_error: `rate-limited; retry after ${e.retryAfterSeconds}s`,
+          })
+          .eq("id", job.id);
+        requeued++;
+        continue;
+      }
       const msg = e instanceof Error ? e.message : String(e);
       await supabase.rpc("complete_slack_send_job", {
         p_id: job.id,
@@ -1638,7 +1638,7 @@ async function handleDrainSendQueue() {
       failed++;
     }
   }
-  return { processed: jobs.length, succeeded, failed };
+  return { processed: jobs.length, succeeded, failed, requeued };
 }
 
 // =============================================================================

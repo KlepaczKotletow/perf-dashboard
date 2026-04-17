@@ -1,19 +1,31 @@
 // =============================================================================
 //  Shared Slack API helper with rate limit handling
-//  Detects 429 responses and retries after the Retry-After delay.
+//
+//  Two-tier retry strategy:
+//  1. In-process: one quick retry for transient bursts (Retry-After <= 10s).
+//  2. Persistent: throw SlackRateLimitError so the queue worker can requeue
+//     with next_attempt_at = now() + retryAfter, WITHOUT burning an attempt.
+//
+//  The old behaviour capped delay at 120s and burned all 3 attempt slots on a
+//  single rate-limit incident, which stranded jobs in last_error state for
+//  hours. Now long Retry-After values bubble up to the queue layer where
+//  they belong.
 // =============================================================================
 
-const MAX_RETRIES = 3;
+const QUICK_RETRY_THRESHOLD_SECONDS = 10;
 
 /**
- * Call a Slack Web API method with automatic rate-limit retry.
- * Returns the parsed JSON response from Slack.
+ * Call a Slack Web API method.
+ *
+ * On 429: if Retry-After <= 10s, sleep and retry once in-process.
+ * Otherwise throw SlackRateLimitError — the queue worker can catch it and
+ * requeue the job for the requested delay without consuming an attempt.
  */
 export async function callSlackApi(
   token: string,
   method: string,
   body: Record<string, unknown>,
-  retries = MAX_RETRIES,
+  _alreadyRetried: boolean = false,
 ): Promise<any> {
   const res = await fetch(`https://slack.com/api/${method}`, {
     method: "POST",
@@ -24,29 +36,28 @@ export async function callSlackApi(
     body: JSON.stringify(body),
   });
 
-  // Handle rate limiting (429 Too Many Requests)
-  if (res.status === 429 && retries > 0) {
+  // Handle rate limiting (429 Too Many Requests at HTTP layer)
+  if (res.status === 429) {
     const retryAfter = parseInt(res.headers.get("Retry-After") || "1", 10);
-    // Honor Slack's Retry-After up to 120s. The previous 30s cap meant that
-    // when Slack returned Retry-After: 60 we'd retry early and immediately
-    // re-fail the same method — adding up to MAX_RETRIES wasted round-trips
-    // and a user-visible error. 120s is the documented upper bound for
-    // typical chat.postMessage bursts; longer waits indicate an incident.
-    const delayMs = Math.min(retryAfter * 1000, 120_000);
-    console.warn(`[slack-api] Rate limited on ${method}, retrying after ${retryAfter}s (${retries} retries left)`);
-    await sleep(delayMs);
-    return callSlackApi(token, method, body, retries - 1);
+    if (!_alreadyRetried && retryAfter <= QUICK_RETRY_THRESHOLD_SECONDS) {
+      console.warn(`[slack-api] Rate limited on ${method}, quick-retrying after ${retryAfter}s`);
+      await sleep(retryAfter * 1000);
+      return callSlackApi(token, method, body, true);
+    }
+    throw new SlackRateLimitError(retryAfter);
   }
 
   const data = await res.json();
 
-  // Slack sometimes returns ok:false with a rate limit error in the body
-  if (!data.ok && data.error === "ratelimited" && retries > 0) {
+  // Slack can also return ok:false with a ratelimited error in the body
+  if (!data.ok && data.error === "ratelimited") {
     const retryAfter = parseInt(res.headers.get("Retry-After") || "1", 10);
-    const delayMs = Math.min(retryAfter * 1000, 120_000); // honor Slack up to 2 min
-    console.warn(`[slack-api] Rate limited (body) on ${method}, retrying after ${retryAfter}s`);
-    await sleep(delayMs);
-    return callSlackApi(token, method, body, retries - 1);
+    if (!_alreadyRetried && retryAfter <= QUICK_RETRY_THRESHOLD_SECONDS) {
+      console.warn(`[slack-api] Rate limited (body) on ${method}, quick-retrying after ${retryAfter}s`);
+      await sleep(retryAfter * 1000);
+      return callSlackApi(token, method, body, true);
+    }
+    throw new SlackRateLimitError(retryAfter);
   }
 
   return data;
