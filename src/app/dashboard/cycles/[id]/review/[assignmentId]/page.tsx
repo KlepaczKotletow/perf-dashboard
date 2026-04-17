@@ -395,6 +395,27 @@ export default function ReviewFormPage({
     };
   }, [competencies, textResponses, overallComment]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Warn before unload if the user has unsubmitted content. The draft is in
+  // localStorage but not persisted to the DB until they click Submit — users
+  // historically assumed "Saved 2s ago" meant submitted and lost work.
+  useEffect(() => {
+    if (alreadySubmitted || submitting) return;
+    const hasContent =
+      competencies.some((c) => c.rating !== null || (c.comment && c.comment.trim())) ||
+      textResponses.some((t) => t.response.trim()) ||
+      overallComment.trim().length > 0;
+    if (!hasContent) return;
+
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers ignore the returned string and show their own copy,
+      // but returnValue must be set for the dialog to appear at all.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [competencies, textResponses, overallComment, alreadySubmitted, submitting]);
+
   function setRating(compIdx: number, rating: number) {
     setCompetencies((prev) => {
       const updated = [...prev];
@@ -778,13 +799,13 @@ export default function ReviewFormPage({
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {autosaveStatus === "saving" && (
-            <><Loader2 className="h-3 w-3 animate-spin" /><span>Saving…</span></>
+            <><Loader2 className="h-3 w-3 animate-spin" /><span>Saving draft…</span></>
           )}
           {autosaveStatus === "saved" && lastSaved && (
-            <><CheckCircle2 className="h-3 w-3 text-emerald-500" /><span>Saved {formatDistanceToNow(lastSaved, { addSuffix: true })}</span></>
+            <><CheckCircle2 className="h-3 w-3 text-emerald-500" /><span>Draft saved {formatDistanceToNow(lastSaved, { addSuffix: true })} · click Submit to finalise</span></>
           )}
           {autosaveStatus === "idle" && !lastSaved && (
-            <><Clock className="h-3 w-3" /><span>Auto-saves as you go</span></>
+            <><Clock className="h-3 w-3" /><span>Draft autosaves as you type — Submit when done</span></>
           )}
         </div>
         <div className="flex gap-2">
