@@ -14,6 +14,7 @@ import {
   UsersRound,
   ListChecks,
   Flag,
+  ScrollText,
   SlidersHorizontal,
   Settings2,
   HelpCircle,
@@ -58,27 +59,28 @@ export default async function DashboardLayout({
   const canAccessHRFeatures = isHROrAbove(workspace?.role);
 
   const sections: NavSection[] = [
-    // ── Everyone sees this (no label for employees, acts as flat list) ──
+    // ── MY WORK: personal-scope items, always visible ──
     {
-      label: "",
+      label: "My Work",
       items: [
         { href: "/dashboard", label: "Home", icon: LayoutDashboard, requiresManager: false, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/performance", label: "Performance", icon: ClipboardCheck, requiresManager: false, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/goals", label: "Goals", icon: Flag, requiresManager: false, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/feedback", label: "Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/performance", label: "My Performance", icon: ClipboardCheck, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/goals", label: "My Goals", icon: Flag, requiresManager: false, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/feedback", label: "My Kudos", icon: MessageSquare, requiresManager: false, requiresHR: false, requiresAdmin: false },
       ],
     },
-    // ── Managers: team management ──
+    // ── MY TEAM: manager-scope items, visible when hasDirectReports ──
     {
-      label: "Team",
+      label: "My Team",
       items: [
-        { href: "/dashboard/my-team", label: "My Team", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/reviews", label: "Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/my-team", label: "Team Overview", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/reviews", label: "Team Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        { href: "/dashboard/goals?tab=team", label: "Team Goals", icon: Flag, requiresManager: true, requiresHR: false, requiresAdmin: false },
       ],
     },
-    // ── HR/Admin: org-wide tools ──
+    // ── MANAGE: HR/Admin org-wide tools ──
     {
-      label: "Admin",
+      label: "Manage",
       items: [
         { href: "/dashboard/cycles", label: "Cycles", icon: CalendarClock, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/team", label: "Directory", icon: Users, requiresManager: false, requiresHR: true, requiresAdmin: false },
@@ -88,6 +90,7 @@ export default async function DashboardLayout({
         { href: "/dashboard/admin/functions", label: "Functions", icon: Briefcase, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings", label: "Settings", icon: Settings2, requiresManager: false, requiresHR: true, requiresAdmin: false },
         { href: "/dashboard/settings/billing", label: "Billing", icon: CreditCard, requiresManager: false, requiresHR: false, requiresAdmin: true },
+        { href: "/dashboard/admin/audit", label: "Audit log", icon: ScrollText, requiresManager: false, requiresHR: true, requiresAdmin: false },
       ],
     },
   ];
