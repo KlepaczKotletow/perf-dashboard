@@ -36,26 +36,24 @@ export function ReviewsFilter() {
   const hasFilters = searchParams.get("search") || searchParams.get("status");
 
   return (
-    <div className="flex flex-wrap gap-4 mb-6">
-      <div className="flex gap-2 flex-1 min-w-[200px]">
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px] max-w-[320px]">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           placeholder="Search by employee name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="max-w-sm"
+          className="pl-8 h-8 text-sm"
         />
-        <Button variant="outline" size="icon" onClick={handleSearch}>
-          <Search className="h-4 w-4" />
-        </Button>
       </div>
-      
+
       <Select value={status} onValueChange={(value) => updateFilters("status", value)}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Filter by status" />
+        <SelectTrigger className="w-[160px] h-8 text-xs">
+          <SelectValue placeholder="All statuses" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Statuses</SelectItem>
+          <SelectItem value="all">All statuses</SelectItem>
           <SelectItem value="pending">Pending</SelectItem>
           <SelectItem value="in_progress">In Progress</SelectItem>
           <SelectItem value="completed">Completed</SelectItem>
@@ -63,8 +61,8 @@ export function ReviewsFilter() {
       </Select>
 
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={clearFilters}>
-          <X className="h-4 w-4 mr-1" />
+        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters}>
+          <X className="h-3 w-3 mr-1" />
           Clear
         </Button>
       )}

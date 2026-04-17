@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import Link from "next/link";
 import {
   ArrowRight, Users, ArrowUpCircle, ChevronDown, ChevronRight,
   FileText, ArrowUpDown, AlertCircle, Plus,
 } from "lucide-react";
 import { getAssignmentStatus } from "@/lib/status";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup,
   DropdownMenuRadioItem, DropdownMenuTrigger,
@@ -33,20 +33,30 @@ const SORT_OPTIONS = [
 const STATUS_ORDER: Record<string, number> = { pending: 0, in_progress: 1, completed: 2 };
 const CYCLE_STATUS_ORDER: Record<string, number> = { active: 0, draft: 1, completed: 2, closed: 3 };
 
-function UserCell({ name, subtitle, avatarUrl }: { name: string; subtitle?: string; avatarUrl?: string }) {
+function UserCell({
+  name,
+  subtitle,
+  avatarUrl,
+  compact = false,
+}: {
+  name: string;
+  subtitle?: string;
+  avatarUrl?: string;
+  compact?: boolean;
+}) {
   if (!name || name === "Unassigned") {
     return <span className="text-xs text-muted-foreground italic">Not assigned</span>;
   }
-  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+  const initials = name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   return (
-    <div className="flex items-center gap-3">
-      <Avatar className="h-7 w-7">
+    <div className="flex items-center gap-2 min-w-0">
+      <Avatar className={compact ? "h-6 w-6 shrink-0" : "h-7 w-7 shrink-0"}>
         {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
         <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
       </Avatar>
       <div className="min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{name}</p>
-        {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+        {subtitle && <p className="text-[11px] text-muted-foreground truncate">{subtitle}</p>}
       </div>
     </div>
   );
@@ -198,129 +208,98 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
               </div>
             )}
 
-            {/* Expanded: single table for all assignments */}
+            {/* Expanded: flat row list (no Table chrome) */}
             {!isCollapsed && (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-5 w-[30%]">Employee</TableHead>
-                    <TableHead className="w-[25%]">Reviewer</TableHead>
-                    <TableHead className="w-[12%]">Type</TableHead>
-                    <TableHead className="w-[13%] text-center">Status</TableHead>
-                    <TableHead className="w-[10%] text-center">Rating</TableHead>
-                    <TableHead className="pr-5 w-[5%]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {/* Standard reviews (self + manager) */}
-                  {standard.length > 0 && (
-                    <TableRow className="hover:bg-transparent bg-muted/10">
-                      <TableCell colSpan={6} className="pl-5 py-1.5">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Standard Reviews · {standard.length}
-                          </span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {standard.map((a) => {
-                    const config = getAssignmentStatus(a.status);
-                    return (
-                      <TableRow
-                        key={a.id}
-                        className="group cursor-pointer"
-                        onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}
-                      >
-                        <TableCell className="pl-5">
-                          <UserCell
-                            name={a.employee?.slack_name || "Unknown"}
-                            subtitle={a.employee?.department || a.employee?.job_title || undefined}
-                            avatarUrl={a.employee?.avatar_url}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <UserCell
-                            name={a.manager?.slack_name}
-                            avatarUrl={a.manager?.avatar_url}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px] font-medium">Standard</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={`text-[10px] font-medium ${config.badge}`}>
-                            {config.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center text-sm font-medium text-muted-foreground">
-                          {a.overall_rating ? `${a.overall_rating}/5` : "—"}
-                        </TableCell>
-                        <TableCell className="pr-5">
-                          <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-
-                  {/* Upward reviews */}
-                  {upward.length > 0 && (
-                    <TableRow className="hover:bg-transparent bg-muted/10">
-                      <TableCell colSpan={6} className="pl-5 py-1.5">
-                        <div className="flex items-center gap-2">
-                          <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Upward Reviews · {upward.length}
-                          </span>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {upward.map((a) => {
-                    const config = getAssignmentStatus(a.status);
-                    return (
-                      <TableRow
-                        key={a.id}
-                        className="group cursor-pointer"
-                        onClick={() => window.location.href = `/dashboard/reviews/${a.id}`}
-                      >
-                        <TableCell className="pl-5">
-                          <UserCell
-                            name={a.employee?.slack_name || "Unknown"}
-                            subtitle={a.employee?.department || a.employee?.job_title || undefined}
-                            avatarUrl={a.employee?.avatar_url}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <UserCell
-                            name={a.reviewer?.slack_name}
-                            avatarUrl={a.reviewer?.avatar_url}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[10px] font-medium">Upward</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge className={`text-[10px] font-medium ${config.badge}`}>
-                            {config.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center text-sm font-medium text-muted-foreground">
-                          {a.overall_rating ? `${a.overall_rating}/5` : "—"}
-                        </TableCell>
-                        <TableCell className="pr-5">
-                          <ArrowRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <div>
+                {standard.length > 0 && (
+                  <ReviewGroup
+                    icon={Users}
+                    label="Standard Reviews"
+                    count={standard.length}
+                    rows={standard}
+                    kind="standard"
+                  />
+                )}
+                {upward.length > 0 && (
+                  <ReviewGroup
+                    icon={ArrowUpCircle}
+                    label="Upward Reviews"
+                    count={upward.length}
+                    rows={upward}
+                    kind="upward"
+                  />
+                )}
+              </div>
             )}
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- */
+/*  Flat row group — replaces the per-cycle <Table> with a stack of     */
+/*  link rows separated by hairline dividers.                            */
+/* -------------------------------------------------------------------- */
+
+function ReviewGroup({
+  icon: Icon,
+  label,
+  count,
+  rows,
+  kind,
+}: {
+  icon: typeof Users;
+  label: string;
+  count: number;
+  rows: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  kind: "standard" | "upward";
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 px-5 py-2 bg-muted/20">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {label} · {count}
+        </span>
+      </div>
+      <div className="divide-y divide-border/60">
+        {rows.map((a) => {
+          const config = getAssignmentStatus(a.status);
+          const reviewer = kind === "upward" ? a.reviewer : a.manager;
+          return (
+            <Link
+              key={a.id}
+              href={`/dashboard/reviews/${a.id}`}
+              className="flex items-center gap-3 px-5 py-2.5 hover:bg-muted/20 transition-colors group"
+            >
+              <div className="flex-1 min-w-0 max-w-[44%]">
+                <UserCell
+                  name={a.employee?.slack_name || "Unknown"}
+                  subtitle={a.employee?.department || a.employee?.job_title || undefined}
+                  avatarUrl={a.employee?.avatar_url}
+                />
+              </div>
+              <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+                <span className="text-muted-foreground/50">→</span>
+                <UserCell
+                  name={reviewer?.slack_name}
+                  avatarUrl={reviewer?.avatar_url}
+                  compact
+                />
+              </div>
+              <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums">
+                {a.overall_rating ? `${a.overall_rating}/5` : ""}
+              </span>
+              <Badge className={`text-[10px] font-medium shrink-0 ${config.badge}`}>
+                {config.label}
+              </Badge>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" />
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }
