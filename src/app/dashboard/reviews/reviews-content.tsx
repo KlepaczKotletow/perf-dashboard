@@ -8,7 +8,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import {
   ArrowRight, Users, ArrowUpCircle, ChevronDown, ChevronRight,
-  FileText, ArrowUpDown, AlertCircle, Plus,
+  FileText, ArrowUpDown, Plus,
 } from "lucide-react";
 import { getAssignmentStatus } from "@/lib/status";
 import {
@@ -64,7 +64,21 @@ function UserCell({
 
 export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any; standard: any[]; upward: any[] }[] }) {
   const [sort, setSort] = useState("newest");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Collapse by default — only the first cycle (by current sort) stays expanded.
+  // Users can still expand/collapse individual cycles, or use expand-all.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    if (initialCycles.length <= 1) return new Set();
+    const sortedByStart = [...initialCycles].sort(
+      (a, b) =>
+        new Date(b.cycle?.start_date ?? 0).getTime() -
+        new Date(a.cycle?.start_date ?? 0).getTime(),
+    );
+    // Everything except the first (newest) starts collapsed.
+    return new Set(
+      sortedByStart.slice(1).map((c) => c.cycle?.id ?? "__none__"),
+    );
+  });
 
   const sorted = useMemo(() => {
     const copy = [...initialCycles];
@@ -127,9 +141,9 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
   const currentSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "Sort";
 
   return (
-    <div className="space-y-4">
+    <div>
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <button onClick={expandAll} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
             Expand all
@@ -158,82 +172,77 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
         </DropdownMenu>
       </div>
 
-      {/* Cycle cards */}
-      {sorted.map(({ cycle, standard, upward }) => {
-        const cid = cycle?.id ?? "__none__";
-        const isCollapsed = collapsed.has(cid);
-        const incompleteCount = [...standard, ...upward].filter(a => a.status !== "completed").length;
-        const totalCount = standard.length + upward.length;
+      {/* Cycles — no per-cycle border. Hairline divides each one. */}
+      <div className="rounded-lg border border-border/60 bg-card overflow-hidden divide-y divide-border/60">
+        {sorted.map(({ cycle, standard, upward }) => {
+          const cid = cycle?.id ?? "__none__";
+          const isCollapsed = collapsed.has(cid);
+          const incompleteCount = [...standard, ...upward].filter(a => a.status !== "completed").length;
+          const totalCount = standard.length + upward.length;
+          const hasBothTypes = standard.length > 0 && upward.length > 0;
 
-        return (
-          <div key={cid} className="rounded-xl border border-border/60 bg-card overflow-hidden">
-            {/* Cycle header */}
-            <button
-              onClick={() => toggleCollapse(cid)}
-              className="w-full flex items-center justify-between px-5 py-3.5 border-b border-border/60 bg-muted/20 hover:bg-muted/30 transition-colors text-left"
-            >
-              <div className="flex items-center gap-3 min-w-0">
+          return (
+            <div key={cid}>
+              {/* Cycle header row */}
+              <button
+                onClick={() => toggleCollapse(cid)}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/20 transition-colors text-left"
+              >
                 {isCollapsed
                   ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
-                <span className="text-sm font-semibold truncate">
+                <span className="text-sm font-semibold text-foreground truncate">
                   {cycle?.name ?? "Unknown Cycle"}
                 </span>
                 {cycle?.status && (
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ${CYCLE_STATUS_STYLE[cycle.status] ?? CYCLE_STATUS_STYLE.draft}`}>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded shrink-0 ${CYCLE_STATUS_STYLE[cycle.status] ?? CYCLE_STATUS_STYLE.draft}`}>
                     {cycle.status.charAt(0).toUpperCase() + cycle.status.slice(1)}
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0 ml-4">
-                {incompleteCount > 0 && (
-                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                    {incompleteCount} not completed
-                  </span>
-                )}
-                <span className="text-xs text-muted-foreground">{totalCount} review{totalCount !== 1 ? "s" : ""}</span>
-                {cycle?.start_date && cycle?.end_date && (
-                  <span className="text-xs text-muted-foreground hidden md:block">
-                    {format(new Date(cycle.start_date), "MMM d")} — {format(new Date(cycle.end_date), "MMM d, yyyy")}
-                  </span>
-                )}
-              </div>
-            </button>
+                <span className="ml-auto flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
+                  {incompleteCount > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400 font-medium">
+                      {incompleteCount} pending
+                    </span>
+                  )}
+                  <span>{totalCount} review{totalCount !== 1 ? "s" : ""}</span>
+                  {cycle?.start_date && cycle?.end_date && (
+                    <span className="hidden md:inline">
+                      {format(new Date(cycle.start_date), "MMM d")} — {format(new Date(cycle.end_date), "MMM d, yyyy")}
+                    </span>
+                  )}
+                </span>
+              </button>
 
-            {/* Collapsed summary */}
-            {isCollapsed && incompleteCount > 0 && (
-              <div className="px-5 py-2 flex items-center gap-2 text-xs text-muted-foreground bg-muted/5">
-                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
-                {incompleteCount} assignment{incompleteCount !== 1 ? "s" : ""} not completed
-              </div>
-            )}
-
-            {/* Expanded: flat row list (no Table chrome) */}
-            {!isCollapsed && (
-              <div>
-                {standard.length > 0 && (
-                  <ReviewGroup
-                    icon={Users}
-                    label="Standard Reviews"
-                    count={standard.length}
-                    rows={standard}
-                    kind="standard"
-                  />
-                )}
-                {upward.length > 0 && (
-                  <ReviewGroup
-                    icon={ArrowUpCircle}
-                    label="Upward Reviews"
-                    count={upward.length}
-                    rows={upward}
-                    kind="upward"
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+              {/* Expanded rows */}
+              {!isCollapsed && (
+                <div className="bg-muted/[0.04]">
+                  {standard.length > 0 && (
+                    <ReviewGroup
+                      icon={Users}
+                      label="Standard Reviews"
+                      count={standard.length}
+                      rows={standard}
+                      kind="standard"
+                      showLabel={hasBothTypes}
+                    />
+                  )}
+                  {upward.length > 0 && (
+                    <ReviewGroup
+                      icon={ArrowUpCircle}
+                      label="Upward Reviews"
+                      count={upward.length}
+                      rows={upward}
+                      kind="upward"
+                      showLabel={hasBothTypes}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -249,21 +258,25 @@ function ReviewGroup({
   count,
   rows,
   kind,
+  showLabel = true,
 }: {
   icon: typeof Users;
   label: string;
   count: number;
   rows: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   kind: "standard" | "upward";
+  showLabel?: boolean;
 }) {
   return (
     <div>
-      <div className="flex items-center gap-2 px-5 py-2 bg-muted/20">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {label} · {count}
-        </span>
-      </div>
+      {showLabel && (
+        <div className="flex items-center gap-2 px-5 pt-3 pb-1.5">
+          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {label} · {count}
+          </span>
+        </div>
+      )}
       <div className="divide-y divide-border/60">
         {rows.map((a) => {
           const config = getAssignmentStatus(a.status);
@@ -272,7 +285,7 @@ function ReviewGroup({
             <Link
               key={a.id}
               href={`/dashboard/reviews/${a.id}`}
-              className="flex items-center gap-3 px-5 py-2.5 hover:bg-muted/20 transition-colors group"
+              className="flex items-center gap-3 px-5 py-2 hover:bg-muted/30 transition-colors group"
             >
               <div className="flex-1 min-w-0 max-w-[44%]">
                 <UserCell
@@ -289,9 +302,6 @@ function ReviewGroup({
                   compact
                 />
               </div>
-              <span className="text-xs text-muted-foreground shrink-0 hidden sm:inline tabular-nums">
-                {a.overall_rating ? `${a.overall_rating}/5` : ""}
-              </span>
               <Badge className={`text-[10px] font-medium shrink-0 ${config.badge}`}>
                 {config.label}
               </Badge>
