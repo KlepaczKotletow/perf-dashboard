@@ -1,8 +1,6 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } from "lucide-react";
@@ -131,123 +129,98 @@ export default async function MyTeamPage() {
         subtitle={`${directReports?.length || 0} direct report${(directReports?.length || 0) !== 1 ? "s" : ""}`}
       />
 
-      {/* Compact stat strip — was 4 oversized cards; now one quiet row */}
-      <div className="flex flex-wrap items-center gap-5 sm:gap-7 px-4 py-3 rounded-xl border border-border/60 bg-card">
+      {/* Inline stat strip — no container. Quieter than any card treatment. */}
+      <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-sm">
         {[
-          { label: "Direct reports", value: directReports?.length || 0, icon: Users, iconClass: "text-primary", bgClass: "bg-primary/[0.08]" },
-          { label: "Need action", value: needsActionCount, icon: AlertCircle, iconClass: "text-amber-600 dark:text-amber-400", bgClass: "bg-amber-50 dark:bg-amber-400/10" },
-          { label: "Pending reviews", value: totalPendingReviews, icon: ClipboardCheck, iconClass: "text-sky-600 dark:text-sky-400", bgClass: "bg-sky-50 dark:bg-sky-400/10" },
-          { label: "Active goals", value: totalActiveGoals, icon: Target, iconClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50 dark:bg-emerald-400/10" },
+          { label: "direct reports", value: directReports?.length || 0, tone: "text-primary" },
+          { label: "need action", value: needsActionCount, tone: needsActionCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground" },
+          { label: "pending reviews", value: totalPendingReviews, tone: totalPendingReviews > 0 ? "text-sky-700 dark:text-sky-400" : "text-muted-foreground" },
+          { label: "active goals", value: totalActiveGoals, tone: "text-emerald-700 dark:text-emerald-400" },
         ].map((m, i) => (
-          <div key={m.label} className="flex items-center gap-5 sm:gap-7">
-            {i > 0 && <span className="h-8 w-px bg-border/60 hidden sm:block" aria-hidden="true" />}
-            <div className="flex items-center gap-2.5">
-              <div className={`h-8 w-8 rounded-lg ${m.bgClass} flex items-center justify-center shrink-0`}>
-                <m.icon className={`h-4 w-4 ${m.iconClass}`} />
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-foreground leading-none tabular-nums">{m.value}</p>
-                <p className="text-[11px] text-muted-foreground mt-1">{m.label}</p>
-              </div>
-            </div>
-          </div>
+          <span key={m.label} className="inline-flex items-baseline gap-1.5">
+            {i > 0 && <span className="text-muted-foreground/30 mr-5" aria-hidden="true">·</span>}
+            <span className={`text-xl font-semibold tabular-nums ${m.tone}`}>{m.value}</span>
+            <span className="text-xs text-muted-foreground">{m.label}</span>
+          </span>
         ))}
       </div>
 
-      {/* Team Members */}
-      <Card className="border-border/60">
-        <CardContent className="p-0">
-          {employeeSummaries.length === 0 ? (
-            <p className="text-center py-12 text-muted-foreground">
-              No direct reports found. Assign reporting lines via the Team page.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-5">Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead className="text-center">Rating</TableHead>
-                  <TableHead className="text-center">Reviews</TableHead>
-                  <TableHead className="text-center">Goals</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                  <TableHead className="pr-5 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {employeeSummaries.map((emp) => (
-                  <TableRow key={emp.id}>
-                    <TableCell className="pl-5">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">{getInitials(emp.slack_name)}</AvatarFallback>
-                        </Avatar>
-                        <Link href={`/dashboard/team/${emp.id}`} className="font-medium hover:underline text-sm">
-                          {emp.slack_name}
-                        </Link>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {emp.job_title || "—"}
-                      {emp.department && <span className="text-muted-foreground/60"> · {emp.department}</span>}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {emp.level?.name || "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {emp.latestRating ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                          <span className="font-semibold text-sm">{emp.latestRating}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center text-sm">
-                      <span className="font-semibold text-emerald-600">{emp.completedReviews}</span>
-                      {emp.pendingReviews > 0 && (
-                        <span className="text-amber-600 text-xs ml-1">({emp.pendingReviews} pending)</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center text-sm">
-                      {emp.activeGoals > 0 ? (
-                        <span>{emp.activeGoals} <span className="text-muted-foreground text-xs">({emp.avgProgress}%)</span></span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {emp.needsAction ? (
-                        <Badge className="text-[10px] font-medium text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10">
-                          Needs Review
-                        </Badge>
-                      ) : (
-                        <Badge className="text-[10px] font-medium text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10">
-                          On Track
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="pr-5 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
-                          <Link href={`/dashboard/team/${emp.id}`}>View</Link>
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                          <Link href={`/dashboard/team/${emp.id}/edit`}>
-                            <Pencil className="h-3 w-3" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Team Members — flat row list, no Card / no Table chrome */}
+      {employeeSummaries.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-8 text-center">
+          No direct reports found. Assign reporting lines via the Team page.
+        </p>
+      ) : (
+        <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
+          {employeeSummaries.map((emp) => (
+            <div key={emp.id} className="flex items-center gap-4 px-4 py-3">
+              <Avatar className="h-8 w-8 shrink-0">
+                <AvatarFallback className="text-xs">{getInitials(emp.slack_name)}</AvatarFallback>
+              </Avatar>
+
+              {/* Name + meta (role · department · level) */}
+              <div className="flex-1 min-w-0">
+                <Link href={`/dashboard/team/${emp.id}`} className="text-sm font-medium text-foreground hover:underline truncate block">
+                  {emp.slack_name}
+                </Link>
+                <p className="text-xs text-muted-foreground truncate">
+                  {[emp.job_title, emp.department, emp.level?.name].filter(Boolean).join(" · ") || "—"}
+                </p>
+              </div>
+
+              {/* Inline metrics */}
+              <div className="hidden md:flex items-center gap-5 text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                {emp.latestRating ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span className="font-semibold text-foreground tabular-nums">{emp.latestRating}</span>
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground/50 tabular-nums">—</span>
+                )}
+                <span className="tabular-nums">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{emp.completedReviews}</span>
+                  {emp.pendingReviews > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400 ml-1">({emp.pendingReviews} pending)</span>
+                  )}
+                  <span className="ml-1">reviews</span>
+                </span>
+                <span className="tabular-nums">
+                  {emp.activeGoals > 0 ? (
+                    <>
+                      <span className="font-semibold text-foreground">{emp.activeGoals}</span>
+                      <span className="ml-1">goals · {emp.avgProgress}%</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground/50">no goals</span>
+                  )}
+                </span>
+              </div>
+
+              <Badge
+                className={`text-[10px] font-medium shrink-0 ${
+                  emp.needsAction
+                    ? "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10"
+                    : "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10"
+                }`}
+              >
+                {emp.needsAction ? "Needs Review" : "On Track"}
+              </Badge>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <Button variant="outline" size="sm" className="h-7 text-xs" asChild>
+                  <Link href={`/dashboard/team/${emp.id}`}>View</Link>
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                  <Link href={`/dashboard/team/${emp.id}/edit`}>
+                    <Pencil className="h-3 w-3" />
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Pending Review Assignments for your team — active cycles only */}
       {(() => {
@@ -255,7 +228,7 @@ export default async function MyTeamPage() {
         if (pending.length === 0) return null;
         return (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Pending Team Reviews
               <span className="ml-1.5 text-xs font-medium text-muted-foreground">· {pending.length}</span>
             </h2>
@@ -286,7 +259,7 @@ export default async function MyTeamPage() {
       {/* Team Goals */}
       {teamGoals.length > 0 && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Team Goals</h2>
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Team Goals</h2>
           <TeamGoalsTable
             goals={teamGoals}
             cycles={cycles || []}
