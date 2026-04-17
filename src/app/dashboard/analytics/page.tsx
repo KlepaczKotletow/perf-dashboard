@@ -789,12 +789,36 @@ export default async function AnalyticsPage({
     : null;
   const ratingScale = workspace?.ratingScale ?? DEFAULT_RATING_SCALE;
 
+  // Subtitle carries real metadata instead of marketing copy
+  const subtitleParts: string[] = [];
+  if (analytics.totalRatings > 0) {
+    subtitleParts.push(
+      `${analytics.totalRatings.toLocaleString()} rating${analytics.totalRatings !== 1 ? "s" : ""}`,
+    );
+  }
+  if (analytics.participants > 0) {
+    subtitleParts.push(
+      `${analytics.participants} participant${analytics.participants !== 1 ? "s" : ""}`,
+    );
+  }
+  if (filters.cycleId) {
+    const cycleName = filterOptions.cycles.find((c) => c.id === filters.cycleId)?.name;
+    if (cycleName) subtitleParts.push(`Cycle: ${cycleName}`);
+  } else if (analytics.cycleStats.total > 0) {
+    subtitleParts.push(
+      `${analytics.cycleStats.total} cycle${analytics.cycleStats.total !== 1 ? "s" : ""}`,
+    );
+  }
+  const analyticsSubtitle = subtitleParts.length > 0
+    ? subtitleParts.join(" · ")
+    : "Performance insights across your workspace";
+
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Analytics"
-        subtitle={`Performance insights for ${workspace?.workspaceName || "your workspace"}`}
+        subtitle={analyticsSubtitle}
         actions={
           <AnalyticsExportButton
             cycleId={filters.cycleId || undefined}
@@ -821,62 +845,26 @@ export default async function AnalyticsPage({
 
       {activeTab === "overview" && (
         <>
-          {/* KPI tiles */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
-            <Card>
-              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-                <p className="text-sm font-medium">Overall Rating</p>
-                <Star className="h-4 w-4 text-amber-500" />
+          {/* Compact KPI strip — one row, unified primary-toned icons */}
+          <div className="flex flex-wrap items-center gap-x-7 gap-y-3 px-4 py-3 rounded-xl border border-border/60 bg-card">
+            {[
+              { label: "Overall", value: `${analytics.overallAvg}/${ratingScale.max}`, icon: Star, tone: "text-amber-500", help: "Average rating across all competencies for the selected cycle" },
+              { label: "Completion", value: `${analytics.completionRate}%`, icon: TrendingUp, tone: "text-primary", help: "Percentage of assigned reviews that have been submitted" },
+              { label: "Ratings", value: analytics.totalRatings.toLocaleString(), icon: BarChart3, tone: "text-primary", help: "Number of individual competency ratings submitted" },
+              { label: "Participants", value: String(analytics.participants), icon: Users, tone: "text-primary", help: "Number of employees with at least one review assignment" },
+              { label: "Active cycles", value: String(analytics.cycleStats.active), icon: Grid3X3, tone: "text-primary", help: "Cycles currently in active or in-review status" },
+            ].map((m, i) => (
+              <div key={m.label} className="flex items-center gap-5 sm:gap-7">
+                {i > 0 && <span className="h-8 w-px bg-border/60 hidden sm:block" aria-hidden="true" />}
+                <div className="flex items-center gap-2.5" title={m.help}>
+                  <m.icon className={`h-4 w-4 shrink-0 ${m.tone}`} />
+                  <div>
+                    <p className="text-lg font-semibold text-foreground leading-none tabular-nums">{m.value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-1">{m.label}</p>
+                  </div>
+                </div>
               </div>
-              <div className="px-6 pb-6">
-                <div className="text-2xl font-bold">{analytics.overallAvg}/5</div>
-                <p className="text-xs text-muted-foreground">Average rating across all competencies for the selected cycle</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-                <p className="text-sm font-medium">Completion Rate</p>
-                <TrendingUp className="h-4 w-4 text-green-500" />
-              </div>
-              <div className="px-6 pb-6">
-                <div className="text-2xl font-bold">{analytics.completionRate}%</div>
-                <p className="text-xs text-muted-foreground">Percentage of assigned reviews that have been submitted</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-                <p className="text-sm font-medium">Total Ratings</p>
-                <BarChart3 className="h-4 w-4 text-blue-500" />
-              </div>
-              <div className="px-6 pb-6">
-                <div className="text-2xl font-bold">{analytics.totalRatings}</div>
-                <p className="text-xs text-muted-foreground">Number of individual competency ratings submitted</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-                <p className="text-sm font-medium">Participants</p>
-                <Users className="h-4 w-4 text-purple-500" />
-              </div>
-              <div className="px-6 pb-6">
-                <div className="text-2xl font-bold">{analytics.participants}</div>
-                <p className="text-xs text-muted-foreground">Number of employees with at least one review assignment</p>
-              </div>
-            </Card>
-
-            <Card>
-              <div className="flex flex-row items-center justify-between space-y-0 px-6 pt-6 pb-2">
-                <p className="text-sm font-medium">Active Cycles</p>
-                <Grid3X3 className="h-4 w-4 text-orange-500" />
-              </div>
-              <div className="px-6 pb-6">
-                <div className="text-2xl font-bold">{analytics.cycleStats.active}</div>
-                <p className="text-xs text-muted-foreground">Number of cycles currently in active or in-review status</p>
-              </div>
-            </Card>
+            ))}
           </div>
 
           {/* Empty state */}
@@ -897,32 +885,36 @@ export default async function AnalyticsPage({
             </Card>
           )}
 
+          {/* Trends — promoted above Charts because "are we improving?" is the
+               most important question on this page. */}
+          <AnalyticsTrends data={trends} />
+
           {/* Charts */}
           <AnalyticsCharts data={analytics.chartsData} />
 
-          {/* Breakdown charts */}
+          {/* Breakdowns — shorter subtitles (titles were already self-describing) */}
           <AnalyticsBreakdowns charts={[
             {
-              title: "Completion Rate by Department",
-              subtitle: "Percentage of reviews submitted by employees in each department",
+              title: "Completion by Department",
+              subtitle: "% of reviews submitted",
               data: analytics.completionByDepartment,
               unit: "%",
             },
             {
-              title: "Completion Rate by Function",
-              subtitle: "Percentage of reviews submitted per job function",
+              title: "Completion by Function",
+              subtitle: "% of reviews submitted",
               data: analytics.completionByFunction,
               unit: "%",
             },
             {
               title: "Avg Rating by Department",
-              subtitle: "Average competency rating per department for the selected cycle",
+              subtitle: "Competency average",
               data: analytics.avgRatingByDepartment,
               unit: "avg",
             },
             {
               title: "Avg Rating by Function",
-              subtitle: "Average competency rating per job function",
+              subtitle: "Competency average",
               data: analytics.avgRatingByFunction,
               unit: "avg",
             },
@@ -992,9 +984,6 @@ export default async function AnalyticsPage({
               </CardContent>
             </Card>
           )}
-
-          {/* Trends (cross-cycle) */}
-          <AnalyticsTrends data={trends} />
         </>
       )}
 
