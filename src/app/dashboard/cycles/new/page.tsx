@@ -123,37 +123,39 @@ function DatePickerField({
 }
 
 // ── Step indicator bar ────────────────────────────────────────────────────────
+// Slim version: inline status line + thin segmented bar.
+// Saves ~60px vertical vs the old 5 × 40px circle stepper.
 function StepIndicator({ currentStep }: { currentStep: number }) {
+  const total = STEP_LABELS.length;
   return (
-    <div className="flex items-center justify-between mb-10">
-      {STEP_LABELS.map((label, idx) => {
-        const stepNum = idx + 1;
-        const isCompleted = stepNum < currentStep;
-        const isCurrent = stepNum === currentStep;
-        return (
-          <div key={label} className="flex items-center flex-1 last:flex-initial">
-            <div className="flex flex-col items-center">
-              <div
-                className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-semibold border-2 transition-colors ${
-                  isCompleted
-                    ? "bg-primary border-primary text-primary-foreground"
-                    : isCurrent
-                    ? "border-primary text-primary bg-primary/10"
-                    : "border-border text-muted-foreground bg-background"
-                }`}
-              >
-                {isCompleted ? <Check className="h-4 w-4" /> : stepNum}
-              </div>
-              <span className={`text-xs mt-2 whitespace-nowrap ${isCurrent ? "text-primary font-semibold" : "text-muted-foreground"}`}>
-                {label}
-              </span>
-            </div>
-            {idx < STEP_LABELS.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-3 mt-[-14px] ${isCompleted ? "bg-primary" : "bg-border"}`} />
-            )}
-          </div>
-        );
-      })}
+    <div className="space-y-2 mb-6">
+      <div className="flex items-baseline gap-2 text-xs flex-wrap">
+        <span className="text-muted-foreground">
+          Step {currentStep} of {total}
+        </span>
+        <span className="text-muted-foreground/40">·</span>
+        <span className="font-semibold text-foreground">
+          {STEP_LABELS[currentStep - 1]}
+        </span>
+      </div>
+      <div className="flex gap-1" aria-hidden="true">
+        {STEP_LABELS.map((_, idx) => {
+          const stepNum = idx + 1;
+          const color =
+            stepNum < currentStep
+              ? "bg-emerald-500"
+              : stepNum === currentStep
+                ? "bg-primary"
+                : "bg-muted";
+          return (
+            <div
+              key={idx}
+              className={`h-1.5 flex-1 rounded-full ${color}`}
+              title={STEP_LABELS[idx]}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

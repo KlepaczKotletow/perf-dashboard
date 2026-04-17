@@ -54,7 +54,7 @@ export default async function CyclesPage() {
   const cycles = await getPerformanceCycles(workspace!.workspaceId);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Cycles"
