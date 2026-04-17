@@ -781,6 +781,7 @@ export function FunctionsClient({
             {/* Function header */}
             <div className="flex items-start justify-between">
               <div className="flex-1 min-w-0">
+                {/* Title — bumped to text-2xl with a subtle pencil affordance on hover */}
                 {editingFunctionName ? (
                   <Input
                     autoFocus
@@ -791,21 +792,25 @@ export function FunctionsClient({
                       if (e.key === "Escape") setEditingFunctionName(false);
                     }}
                     onBlur={() => handleRenameFunction(selectedId!, editFunctionNameValue, () => setEditingFunctionName(false))}
-                    className="text-xl font-semibold h-9 max-w-sm"
+                    className="text-2xl font-semibold h-10 max-w-md"
                   />
                 ) : (
                   <h2
-                    className={`text-xl font-semibold text-foreground ${canEdit ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
+                    className={`group/title text-2xl font-semibold tracking-tight text-foreground inline-flex items-center gap-2 ${canEdit ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
                     onClick={() => {
                       if (!canEdit) return;
                       setEditingFunctionName(true);
                       setEditFunctionNameValue(selectedFunction.name);
                     }}
                   >
-                    {selectedFunction.name}
+                    <span>{selectedFunction.name}</span>
+                    {canEdit && (
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover/title:opacity-100 transition-opacity" />
+                    )}
                   </h2>
                 )}
 
+                {/* Description — same pattern */}
                 {editingFunctionDesc ? (
                   <Input
                     autoFocus
@@ -817,24 +822,27 @@ export function FunctionsClient({
                     }}
                     onBlur={() => handleUpdateFunctionDescription(selectedId!, editFunctionDescValue)}
                     placeholder="Add a description…"
-                    className="text-sm mt-1 max-w-sm"
+                    className="text-sm mt-1.5 max-w-md"
                   />
                 ) : (
                   <p
-                    className={`text-sm mt-1 ${selectedFunction.description ? "text-muted-foreground" : "text-muted-foreground/40 italic"} ${canEdit ? "cursor-pointer hover:text-foreground transition-colors" : ""}`}
+                    className={`group/desc text-sm mt-1.5 inline-flex items-center gap-1.5 ${selectedFunction.description ? "text-muted-foreground" : "text-muted-foreground/40 italic"} ${canEdit ? "cursor-pointer hover:text-foreground transition-colors" : ""}`}
                     onClick={() => {
                       if (!canEdit) return;
                       setEditingFunctionDesc(true);
                       setEditFunctionDescValue(selectedFunction.description ?? "");
                     }}
                   >
-                    {selectedFunction.description ?? (canEdit ? "Add a description…" : "")}
+                    <span>{selectedFunction.description ?? (canEdit ? "Add a description…" : "")}</span>
+                    {canEdit && selectedFunction.description && (
+                      <Pencil className="h-3 w-3 opacity-0 group-hover/desc:opacity-100 transition-opacity" />
+                    )}
                   </p>
                 )}
 
                 {(memberCountByFunction[selectedId!] ?? 0) > 0 && (
-                  <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
-                    <Users className="h-3.5 w-3.5" />
+                  <div className="inline-flex items-center gap-1.5 mt-3 text-[11px] font-medium text-muted-foreground bg-muted/60 rounded-full px-2.5 py-1">
+                    <Users className="h-3 w-3" />
                     {memberCountByFunction[selectedId!]} member{memberCountByFunction[selectedId!] !== 1 ? "s" : ""}
                   </div>
                 )}
