@@ -30,6 +30,7 @@ import { isManagerOrAbove, canManageUsers, isHROrAbove } from "@/lib/roles";
 import { DashboardCharts, type DashboardChartData } from "./dashboard-charts";
 import { STATUS_COLORS } from "@/components/charts/chart-utils";
 import { EmployeeHome } from "./employee-home";
+import { PageHeader } from "@/components/page-header";
 
 // ─── Data fetchers ─────────────────────────────────────────────────────────────
 
@@ -430,19 +431,17 @@ export default async function DashboardPage() {
 
     return (
       <div className="space-y-8">
-        {/* Heading */}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Your Team
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {pendingMgrReviews.length > 0
+        <PageHeader
+          hat="my-team"
+          title="Home"
+          subtitle={
+            pendingMgrReviews.length > 0
               ? `${pendingMgrReviews.length} team member${pendingMgrReviews.length !== 1 ? "s" : ""} ready for your review.`
               : teamSize === 0
               ? "No direct reports assigned yet."
-              : `${teamSize} direct report${teamSize !== 1 ? "s" : ""} — all caught up.`}
-          </p>
-        </div>
+              : `${teamSize} direct report${teamSize !== 1 ? "s" : ""} — all caught up.`
+          }
+        />
 
         {/* Own pending self-review */}
         {pendingSelf.length > 0 && (
@@ -659,26 +658,25 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            {showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {showOnboarding
-              ? "Let's get your workspace set up. Follow the steps below to start running reviews."
-              : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`}
-          </p>
-        </div>
-        {!showOnboarding && activeCycles.length > 0 && (
-          <Link
-            href="/dashboard/cycles"
-            className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
-          >
-            Manage cycles <ChevronRight className="h-3 w-3" />
-          </Link>
-        )}
-      </div>
+      <PageHeader
+        hat="manage"
+        title={showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
+        subtitle={
+          showOnboarding
+            ? "Let's get your workspace set up. Follow the steps below to start running reviews."
+            : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`
+        }
+        actions={
+          !showOnboarding && activeCycles.length > 0 ? (
+            <Link
+              href="/dashboard/cycles"
+              className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
+            >
+              Manage cycles <ChevronRight className="h-3 w-3" />
+            </Link>
+          ) : undefined
+        }
+      />
 
       {/* Onboarding checklist */}
       {showOnboarding && (

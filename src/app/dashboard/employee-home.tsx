@@ -18,6 +18,7 @@ import {
   Medal,
   BarChart3,
 } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 
 interface Assignment {
   id: string;
@@ -55,13 +56,12 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
 
   return (
     <div className="space-y-8">
-      {/* Greeting */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Hey {firstName}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">{statusMessage}</p>
-      </div>
+      <PageHeader
+        hat="my-work"
+        title={`Hey ${firstName}`}
+        subtitle={statusMessage}
+      />
+
 
       {/* Action required — pending self-reviews */}
       {pendingSelf.length > 0 && (

@@ -11,6 +11,7 @@ import { ProgressStepper } from "./progress-stepper";
 import { ActionRequiredSection } from "./action-required-section";
 import { CompletedSection } from "./completed-section";
 import { ResultsSection } from "./results-section";
+import { PageHeader } from "@/components/page-header";
 
 /* ------------------------------------------------------------------ */
 /*  Types for the per-cycle grouped data                              */
@@ -719,15 +720,11 @@ export default async function PerformancePage({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Performance
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Your performance journey across review cycles
-        </p>
-      </div>
+      <PageHeader
+        hat="my-work"
+        title="My Performance"
+        subtitle="Your performance journey across review cycles"
+      />
 
       {/* Summary Hero */}
       <PerformanceSummaryHero

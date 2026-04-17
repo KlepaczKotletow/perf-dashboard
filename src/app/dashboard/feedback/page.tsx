@@ -8,6 +8,7 @@ import { Suspense } from "react";
 import { MessageSquare } from "lucide-react";
 import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
 import { Pagination } from "@/components/ui/pagination";
+import { PageHeader } from "@/components/page-header";
 
 interface FeedbackFilters {
   type?: string;
@@ -198,10 +199,7 @@ export default async function FeedbackPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Kudos</h1>
-        <p className="text-sm text-muted-foreground mt-1">{pageDescription}</p>
-      </div>
+      <PageHeader hat="my-work" title="Kudos" subtitle={pageDescription} />
 
       <Suspense fallback={<div className="h-10" />}>
         <FeedbackFilter showAdvanced={isAdmin} users={userList} />

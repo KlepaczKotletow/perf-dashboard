@@ -4,6 +4,7 @@ import { ReviewsContent } from "./reviews-content";
 import { ReviewsExportButton } from "./reviews-export-button";
 import { Suspense } from "react";
 import { isHROrAbove } from "@/lib/roles";
+import { PageHeader } from "@/components/page-header";
 
 async function getReviewAssignments(workspaceId: string, status?: string, search?: string) {
   const supabase = await createServerSupabaseClient();
@@ -75,15 +76,12 @@ export default async function ReviewsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Review Assignments</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            All performance review assignments grouped by cycle
-          </p>
-        </div>
-        {isHROrAbove(workspace?.role) && <ReviewsExportButton />}
-      </div>
+      <PageHeader
+        hat="my-team"
+        title="Team Reviews"
+        subtitle="All performance review assignments grouped by cycle"
+        actions={isHROrAbove(workspace?.role) ? <ReviewsExportButton /> : undefined}
+      />
 
       <Suspense fallback={<div>Loading filters...</div>}>
         <ReviewsFilter />

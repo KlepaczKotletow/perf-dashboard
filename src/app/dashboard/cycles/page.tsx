@@ -7,6 +7,7 @@ import { format, differenceInDays } from "date-fns";
 import { isManagerOrAbove } from "@/lib/roles";
 import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
 import { MissingReviewsPopover } from "./missing-reviews-popover";
+import { PageHeader } from "@/components/page-header";
 
 async function getPerformanceCycles(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -54,19 +55,19 @@ export default async function CyclesPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Performance Cycles</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage organisation-wide review periods</p>
-        </div>
-        <Button size="sm" asChild>
-          <Link href="/dashboard/cycles/new">
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New Cycle
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Cycles"
+        subtitle="Manage organisation-wide review periods"
+        actions={
+          <Button size="sm" asChild>
+            <Link href="/dashboard/cycles/new">
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Cycle
+            </Link>
+          </Button>
+        }
+      />
 
       {/* ── List ── */}
       {cycles.length === 0 ? (

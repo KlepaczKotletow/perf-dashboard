@@ -87,6 +87,7 @@ import {
   flattenTree,
 } from "@/lib/goals-utils";
 import { Lightbulb } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 
 interface Cycle {
   id: string;
@@ -764,157 +765,157 @@ export default function GoalsClient({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Goals</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {role === "admin" || role === "hr"
-              ? "All objectives and key results across the organisation"
-              : role === "manager"
-              ? "Company, team, and individual goals for you and your direct reports"
-              : "Company-wide goals and your personal objectives"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isHROrAbove(role) && (
-            <Button variant="outline" size="sm" onClick={() => {
-              const a = document.createElement("a");
-              a.href = "/api/goals/export";
-              a.download = `goals-export-${new Date().toISOString().split("T")[0]}.csv`;
-              a.click();
-            }}>
-              <Download className="h-3.5 w-3.5 mr-1.5" />
-              Export
+      <PageHeader
+        hat="my-work"
+        title="Goals"
+        subtitle={
+          role === "admin" || role === "hr"
+            ? "All objectives and key results across the organisation"
+            : role === "manager"
+            ? "Company, team, and individual goals for you and your direct reports"
+            : "Company-wide goals and your personal objectives"
+        }
+        actions={
+          <>
+            {isHROrAbove(role) && (
+              <Button variant="outline" size="sm" onClick={() => {
+                const a = document.createElement("a");
+                a.href = "/api/goals/export";
+                a.download = `goals-export-${new Date().toISOString().split("T")[0]}.csv`;
+                a.click();
+              }}>
+                <Download className="h-3.5 w-3.5 mr-1.5" />
+                Export
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
+              <Zap className="h-3.5 w-3.5 mr-1.5" />
+              Quick Add
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(true)}>
-            <Zap className="h-3.5 w-3.5 mr-1.5" />
-            Quick Add
-          </Button>
 
-          {/* Context-aware create action — depends on active tab */}
-          {tab === "me" && (
-            <Button
-              size="sm"
-              onClick={() =>
-                openCreateWithContext({
-                  scope: "individual",
-                  employeeId: currentUserId,
-                  suggestedByUserId: null,
-                })
-              }
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              New goal
-            </Button>
-          )}
+            {/* Context-aware create action — depends on active tab */}
+            {tab === "me" && (
+              <Button
+                size="sm"
+                onClick={() =>
+                  openCreateWithContext({
+                    scope: "individual",
+                    employeeId: currentUserId,
+                    suggestedByUserId: null,
+                  })
+                }
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                New goal
+              </Button>
+            )}
 
-          {tab === "team" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm">
-                  <Plus className="h-3.5 w-3.5 mr-1.5" />
-                  New goal
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuItem
-                  onClick={() =>
-                    openCreateWithContext({
-                      scope: "individual",
-                      employeeId: currentUserId,
-                      suggestedByUserId: null,
-                    })
-                  }
-                >
-                  For myself
-                </DropdownMenuItem>
-                {directReports.map((r) => (
+            {tab === "team" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm">
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    New goal
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuItem
-                    key={r.id}
                     onClick={() =>
                       openCreateWithContext({
                         scope: "individual",
-                        employeeId: r.id,
-                        suggestedByUserId: currentUserId,
+                        employeeId: currentUserId,
+                        suggestedByUserId: null,
                       })
                     }
                   >
-                    For {r.slack_name}
+                    For myself
                   </DropdownMenuItem>
-                ))}
-                <DropdownMenuItem
-                  onClick={() =>
-                    openCreateWithContext({
-                      scope: "team",
-                      employeeId: currentUserId,
-                      suggestedByUserId: null,
-                    })
-                  }
-                >
-                  Team goal
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  {directReports.map((r) => (
+                    <DropdownMenuItem
+                      key={r.id}
+                      onClick={() =>
+                        openCreateWithContext({
+                          scope: "individual",
+                          employeeId: r.id,
+                          suggestedByUserId: currentUserId,
+                        })
+                      }
+                    >
+                      For {r.slack_name}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuItem
+                    onClick={() =>
+                      openCreateWithContext({
+                        scope: "team",
+                        employeeId: currentUserId,
+                        suggestedByUserId: null,
+                      })
+                    }
+                  >
+                    Team goal
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
-          {tab === "company" && canCreateCompany && (
-            <Button
-              size="sm"
-              onClick={() =>
-                openCreateWithContext({
-                  scope: "company",
-                  employeeId: currentUserId,
-                  suggestedByUserId: null,
-                })
-              }
-            >
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              New company OKR
-            </Button>
-          )}
-        </div>
-
-        <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Quick Add Goal</DialogTitle>
-              <DialogDescription>Create a goal with just a title and owner. You can add details later.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label>Goal Title *</Label>
-                <Input
-                  placeholder="e.g., Improve API response times by 50%"
-                  value={quickTitle}
-                  onChange={(e) => setQuickTitle(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleQuickAdd()}
-                  autoFocus
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Employee *</Label>
-                <Select value={quickEmployeeId} onValueChange={setQuickEmployeeId}>
-                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
-                  <SelectContent>
-                    {employees.map((emp) => (
-                      <SelectItem key={emp.id} value={emp.id}>{emp.slack_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
-              <Button onClick={handleQuickAdd} disabled={quickAdding || !quickTitle.trim() || !quickEmployeeId}>
-                {quickAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Create Goal
+            {tab === "company" && canCreateCompany && (
+              <Button
+                size="sm"
+                onClick={() =>
+                  openCreateWithContext({
+                    scope: "company",
+                    employeeId: currentUserId,
+                    suggestedByUserId: null,
+                  })
+                }
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                New company OKR
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
+            )}
+          </>
+        }
+      />
+
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick Add Goal</DialogTitle>
+            <DialogDescription>Create a goal with just a title and owner. You can add details later.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Goal Title *</Label>
+              <Input
+                placeholder="e.g., Improve API response times by 50%"
+                value={quickTitle}
+                onChange={(e) => setQuickTitle(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleQuickAdd()}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Employee *</Label>
+              <Select value={quickEmployeeId} onValueChange={setQuickEmployeeId}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.slack_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleQuickAdd} disabled={quickAdding || !quickTitle.trim() || !quickEmployeeId}>
+              {quickAdding && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Goal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Tab nav: Me / Team / Company */}
       <nav className="flex gap-1 border-b border-border/60">

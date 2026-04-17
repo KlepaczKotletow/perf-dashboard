@@ -9,6 +9,7 @@ import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } 
 import { isManagerOrAbove } from "@/lib/roles";
 import { getAssignmentStatus } from "@/lib/status";
 import TeamGoalsTable from "./team-goals-table";
+import { PageHeader } from "@/components/page-header";
 
 export default async function MyTeamPage() {
   const workspace = await getUserWorkspace();
@@ -124,12 +125,11 @@ export default async function MyTeamPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">My Team</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {directReports?.length || 0} direct report{(directReports?.length || 0) !== 1 ? "s" : ""}
-        </p>
-      </div>
+      <PageHeader
+        hat="my-team"
+        title="Team Overview"
+        subtitle={`${directReports?.length || 0} direct report${(directReports?.length || 0) !== 1 ? "s" : ""}`}
+      />
 
       {/* Stats */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
