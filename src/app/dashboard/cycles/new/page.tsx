@@ -20,6 +20,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
 import { format } from "date-fns";
+import { PageHeader } from "@/components/page-header";
 
 const CYCLE_TYPES = [
   { value: "annual", label: "Annual Review" },
@@ -712,20 +713,16 @@ export default function NewCyclePage() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-4xl mx-auto pb-16">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/cycles"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">New Performance Cycle</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Step {step} of 5
-            {autoSaving && <span className="ml-2 text-muted-foreground/60">Saving...</span>}
-            {pendingCycleId && !autoSaving && <span className="ml-2 text-muted-foreground/60">Draft saved</span>}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="New cycle"
+        subtitle={`Step ${step} of 5${autoSaving ? " · Saving..." : pendingCycleId ? " · Draft saved" : ""}`}
+        actions={
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/cycles"><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Link>
+          </Button>
+        }
+      />
 
       {/* Step indicator */}
       <StepIndicator currentStep={step} />

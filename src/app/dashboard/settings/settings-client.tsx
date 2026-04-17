@@ -13,6 +13,7 @@ import {
   Shield, Link2, Upload, X, Clock, Plus, Trash2,
 } from "lucide-react";
 import type { TenureBucket } from "@/lib/types";
+import { PageHeader } from "@/components/page-header";
 
 interface Props {
   workspace: {
@@ -136,19 +137,17 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
 
   return (
     <div className="w-full space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Configure how reviews, ratings, and notifications work across your organisation
-          </p>
-        </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2">
-          {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
-        </Button>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Settings"
+        subtitle="Configure how reviews, ratings, and notifications work across your organisation"
+        actions={
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+            {saving ? "Saving…" : saved ? "Saved" : "Save changes"}
+          </Button>
+        }
+      />
 
       {/* General */}
       <Card>

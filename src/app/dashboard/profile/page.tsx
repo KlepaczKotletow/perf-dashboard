@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS, UserRole } from "@/lib/roles";
 import { User, Mail, Briefcase, Building2, Users, GraduationCap, Flag, ClipboardCheck, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { PageHeader } from "@/components/page-header";
 
 export default async function ProfilePage() {
   const workspace = await getUserWorkspace();
@@ -67,10 +68,11 @@ export default async function ProfilePage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Profile</h1>
-        <p className="text-sm text-muted-foreground mt-1">Your personal account details.</p>
-      </div>
+      <PageHeader
+        hat="my-work"
+        title="Profile"
+        subtitle="Your personal account details."
+      />
 
       {/* Avatar */}
       <div className="flex items-center gap-4">

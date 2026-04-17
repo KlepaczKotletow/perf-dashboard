@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAllArticles } from "@/lib/help-articles";
 import { EmptyState } from "@/components/ui/empty-state";
 import { HelpCircle } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
 
 export default function HelpPage() {
   const articles = getAllArticles();
@@ -11,7 +12,8 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="py-8">
+    <div className="space-y-6">
+      <PageHeader hat="my-work" title="Help" />
       <EmptyState
         icon={HelpCircle}
         title="Help Center"

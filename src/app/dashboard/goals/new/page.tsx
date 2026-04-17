@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
+import { PageHeader } from "@/components/page-header";
 
 const GOAL_TEMPLATES = [
   { label: "Improve a Metric", icon: "📈", title: "Improve [metric] by [X]%", metric_start: "0", metric_target: "100", metric_unit: "%", scope: "individual" },
@@ -159,15 +160,16 @@ export default function NewGoalPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/goals"><ArrowLeft className="h-4 w-4" /></Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">New Goal</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Set an objective for tracking</p>
-        </div>
-      </div>
+      <PageHeader
+        hat="my-work"
+        title="New goal"
+        subtitle="Set an objective for tracking"
+        actions={
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/goals"><ArrowLeft className="h-4 w-4 mr-1.5" /> Back</Link>
+          </Button>
+        }
+      />
 
       {workspaceGoalTemplates.length > 0 && (
         <div className="space-y-2">

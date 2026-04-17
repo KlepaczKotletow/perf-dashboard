@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, ChevronRight, Lock, ClipboardList, Download } from "lucide-react";
 import { format } from "date-fns";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
+import { PageHeader } from "@/components/page-header";
 
 async function getSurveys(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -72,19 +73,20 @@ export default async function SurveysPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Surveys</h1>
-          <p className="text-sm text-muted-foreground mt-1">360 reviews, pulse checks, and eNPS — all via Slack</p>
-        </div>
-        {isAdminOrHR && (
-          <Button size="sm" asChild>
-            <Link href="/dashboard/surveys/new">
-              <Plus className="h-3.5 w-3.5 mr-1.5" />New Survey
-            </Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Surveys"
+        subtitle="360 reviews, pulse checks, and eNPS — all via Slack"
+        actions={
+          isAdminOrHR ? (
+            <Button size="sm" asChild>
+              <Link href="/dashboard/surveys/new">
+                <Plus className="h-3.5 w-3.5 mr-1.5" />New Survey
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       {surveys.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">

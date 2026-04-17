@@ -7,6 +7,7 @@ import { Lock, CreditCard, Users, Calendar, CheckCircle, AlertCircle } from "luc
 import { format } from "date-fns";
 import { isAdmin } from "@/lib/roles";
 import { UpgradeButton } from "./upgrade-button";
+import { PageHeader } from "@/components/page-header";
 
 async function getSubscription(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -87,10 +88,11 @@ export default async function BillingPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Billing & Subscription</h1>
-        <p className="text-muted-foreground mt-2">Manage your workspace subscription and billing</p>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Billing"
+        subtitle="Manage your workspace subscription and billing"
+      />
 
       {/* Current Plan */}
       <Card>

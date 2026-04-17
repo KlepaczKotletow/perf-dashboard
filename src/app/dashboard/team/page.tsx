@@ -7,6 +7,7 @@ import { TeamList } from "./team-list";
 import { canManageUsers } from "@/lib/roles";
 import { Users, Upload, List, Network } from "lucide-react";
 import { OrgChart } from "./org-chart";
+import { PageHeader } from "@/components/page-header";
 
 async function getUsers(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -89,69 +90,68 @@ export default async function TeamPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Team Directory</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {users.length} member{users.length !== 1 ? "s" : ""}{departments.length > 0 ? ` across ${departments.length} department${departments.length !== 1 ? "s" : ""}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Seat usage indicator */}
-          <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border/60 bg-card/50">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-foreground">
-                {seatUsed} / {seatLimit}
-              </span>
-              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    seatPercent >= 90
-                      ? "bg-red-500"
-                      : seatPercent >= 70
-                      ? "bg-yellow-500"
-                      : "bg-primary"
-                  }`}
-                  style={{ width: `${seatPercent}%` }}
-                />
+      <PageHeader
+        hat="manage"
+        title="Directory"
+        subtitle={`${users.length} member${users.length !== 1 ? "s" : ""}${departments.length > 0 ? ` across ${departments.length} department${departments.length !== 1 ? "s" : ""}` : ""}`}
+        actions={
+          <div className="flex items-center gap-4">
+            {/* Seat usage indicator */}
+            <div className="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-border/60 bg-card/50">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-foreground">
+                  {seatUsed} / {seatLimit}
+                </span>
+                <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      seatPercent >= 90
+                        ? "bg-red-500"
+                        : seatPercent >= 70
+                        ? "bg-yellow-500"
+                        : "bg-primary"
+                    }`}
+                    style={{ width: `${seatPercent}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground">seats</span>
               </div>
-              <span className="text-[10px] text-muted-foreground">seats</span>
             </div>
-          </div>
-          {/* View toggle */}
-          <div className="flex items-center border rounded-lg overflow-hidden">
-            <Link
-              href="/dashboard/team"
-              className={`p-1.5 transition-colors ${!viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              title="List view"
-            >
-              <List className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/dashboard/team?view=chart"
-              className={`p-1.5 transition-colors ${viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-              title="Org chart"
-            >
-              <Network className="h-4 w-4" />
-            </Link>
-          </div>
-          {isAdmin && (
-            <>
-              <Button variant="outline" size="sm" className="text-xs gap-1.5" asChild>
-                <Link href="/dashboard/team/import">
-                  <Upload className="h-3.5 w-3.5" />
-                  Import CSV
-                </Link>
-              </Button>
-              <SyncButton workspaceId={workspace?.workspaceId} />
-              <Link href="/dashboard/admin/functions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                Manage Functions
+            {/* View toggle */}
+            <div className="flex items-center border rounded-lg overflow-hidden">
+              <Link
+                href="/dashboard/team"
+                className={`p-1.5 transition-colors ${!viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                title="List view"
+              >
+                <List className="h-4 w-4" />
               </Link>
-            </>
-          )}
-        </div>
-      </div>
+              <Link
+                href="/dashboard/team?view=chart"
+                className={`p-1.5 transition-colors ${viewChart ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                title="Org chart"
+              >
+                <Network className="h-4 w-4" />
+              </Link>
+            </div>
+            {isAdmin && (
+              <>
+                <Button variant="outline" size="sm" className="text-xs gap-1.5" asChild>
+                  <Link href="/dashboard/team/import">
+                    <Upload className="h-3.5 w-3.5" />
+                    Import CSV
+                  </Link>
+                </Button>
+                <SyncButton workspaceId={workspace?.workspaceId} />
+                <Link href="/dashboard/admin/functions" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Manage Functions
+                </Link>
+              </>
+            )}
+          </div>
+        }
+      />
 
       {/* Unassigned warning banner */}
       {isAdmin && unassignedCount > 0 && (

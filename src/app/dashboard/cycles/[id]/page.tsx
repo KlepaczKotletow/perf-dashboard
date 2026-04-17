@@ -24,6 +24,7 @@ import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
 import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
+import { PageHeader } from "@/components/page-header";
 
 async function getCycle(id: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -210,39 +211,37 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" className="mt-0.5" asChild>
-            <Link href="/dashboard/cycles">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground">{cycle.name}</h1>
-              <Badge className={`text-[11px] font-medium ${getCycleDisplayStatus(cycle).badge}`}>
-                {getCycleDisplayStatus(cycle).label}
-              </Badge>
-              {cycle.grades_released && (
-                <Badge className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
-                  Grades Released
-                </Badge>
-              )}
-            </div>
-            {cycle.description && (
-              <p className="text-sm text-muted-foreground mt-1">{cycle.description}</p>
+      <PageHeader
+        hat="manage"
+        title={cycle.name}
+        subtitle={cycle.description || undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {isHROrAbove(workspace?.role) && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
+              </Button>
             )}
+            <CycleActions cycle={cycle} employeeCount={employees.length} submittedCount={submittedCount} pendingManagerCount={pendingManagerCount} userRole={workspace?.role || undefined} />
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {isHROrAbove(workspace?.role) && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/dashboard/cycles/${id}/calibration`}>Calibration View</Link>
-            </Button>
-          )}
-          <CycleActions cycle={cycle} employeeCount={employees.length} submittedCount={submittedCount} pendingManagerCount={pendingManagerCount} userRole={workspace?.role || undefined} />
-        </div>
+        }
+      />
+
+      {/* ── Sub-header (back + status badges) ─────────────────────────────── */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/dashboard/cycles">
+            <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+          </Link>
+        </Button>
+        <Badge className={`text-[11px] font-medium ${getCycleDisplayStatus(cycle).badge}`}>
+          {getCycleDisplayStatus(cycle).label}
+        </Badge>
+        {cycle.grades_released && (
+          <Badge className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20">
+            Grades Released
+          </Badge>
+        )}
       </div>
 
       {/* ── Urgency Banner (active cycles only) ───────────────────────────── */}

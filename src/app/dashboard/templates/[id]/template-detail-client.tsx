@@ -19,6 +19,7 @@ import { FileText, Star, MessageSquare, Pencil, Plus, Trash2, Info } from "lucid
 import { format } from "date-fns";
 import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
+import { PageHeader } from "@/components/page-header";
 
 interface Question {
   id: string;
@@ -115,17 +116,21 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
   if (editing) {
     return (
       <div className="space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Edit Template</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving || !name.trim()}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          hat="manage"
+          title={template.name || "Edit Template"}
+          subtitle="Edit template"
+          actions={
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCancel} disabled={saving}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !name.trim()}>
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          }
+        />
 
         <Card>
           <CardHeader>
@@ -236,12 +241,14 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
 
   return (
     <div className="space-y-8">
+      <PageHeader
+        hat="manage"
+        title={template.name}
+        subtitle={template.description || undefined}
+      />
       <div className="flex items-center gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">
-              {template.name}
-            </h1>
             {template.is_default && <Badge variant="secondary">Default</Badge>}
             {template.is_system && (
               <Badge variant="outline" className="border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400">
@@ -249,9 +256,6 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
               </Badge>
             )}
           </div>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            {template.description || "No description"}
-          </p>
         </div>
         {!template.is_system && (
           <Button variant="outline" size="icon" onClick={() => setEditing(true)}>

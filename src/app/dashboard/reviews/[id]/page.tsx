@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { ArrowLeft, User2, Calendar, Layers, TriangleAlert, Lock } from "lucide-react";
 import { ReviewDetailClient, type CompetencyRating } from "./review-detail-client";
 import { getAssignmentStatus } from "@/lib/status";
+import { PageHeader } from "@/components/page-header";
 
 export default async function ReviewDetailPage({
   params,
@@ -160,6 +161,11 @@ export default async function ReviewDetailPage({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        hat="my-team"
+        title={employee?.slack_name || "Unknown employee"}
+        subtitle={cycle?.name}
+      />
       {/* Back + header */}
       <div>
         <Link
@@ -182,9 +188,9 @@ export default async function ReviewDetailPage({
 
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h2 className="text-xl font-semibold tracking-tight">
               {employee?.slack_name || "Unknown employee"}
-            </h1>
+            </h2>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               {level && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">

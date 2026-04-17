@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getClientIdentity } from "@/lib/client-auth";
+import { PageHeader } from "@/components/page-header";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -278,6 +279,7 @@ export default function GoalDetailClient({
 
   return (
     <div className="space-y-6 max-w-3xl">
+      <PageHeader hat="my-work" title={goal.title} />
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">

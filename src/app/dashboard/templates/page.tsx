@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Plus, Lock } from "lucide-react";
 import { isManagerOrAbove } from "@/lib/roles";
 import TemplatesClient from "./templates-client";
+import { PageHeader } from "@/components/page-header";
 
 // ── System Review Templates ─────────────────────────────────────────────────
 
@@ -1728,21 +1729,19 @@ export default async function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Template Library</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Review templates, function templates, competency frameworks, cycle profiles, and goal templates
-          </p>
-        </div>
-        <Button size="sm" asChild>
-          <Link href="/dashboard/templates/new">
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New Template
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Templates"
+        subtitle="Review templates, function templates, competency frameworks, cycle profiles, and goal templates"
+        actions={
+          <Button size="sm" asChild>
+            <Link href="/dashboard/templates/new">
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New Template
+            </Link>
+          </Button>
+        }
+      />
 
       {/* Tabbed content */}
       <TemplatesClient templates={templates} workspaceId={workspaceId} />

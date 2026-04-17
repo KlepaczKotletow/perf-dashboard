@@ -7,6 +7,7 @@ import { createBrowserClient } from "@supabase/ssr";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { PageHeader } from "@/components/page-header";
 
 interface Props {
   competency: {
@@ -108,17 +109,24 @@ export default function DescriptorsClient({
 
   return (
     <div className="space-y-6 max-w-4xl">
+      <PageHeader
+        hat="manage"
+        title="Score descriptors"
+        subtitle={competency.name}
+        actions={
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard/competencies">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Link>
+          </Button>
+        }
+      />
       <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" asChild>
-          <Link href="/dashboard/competencies">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
               {competency.name}
-            </h1>
+            </h2>
             {competency.category && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                 {competency.category}

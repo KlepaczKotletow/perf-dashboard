@@ -12,6 +12,7 @@ import Link from "next/link";
 import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
+import { PageHeader } from "@/components/page-header";
 
 interface Question {
   id: string;
@@ -138,17 +139,18 @@ export default function NewTemplatePage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild>
-          <Link href="/dashboard/templates">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">New Template</h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">Create a custom template</p>
-        </div>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="New template"
+        subtitle="Create a custom template"
+        actions={
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/templates">
+              <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
+            </Link>
+          </Button>
+        }
+      />
 
       <div className="space-y-2">
         <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Template Type</h2>

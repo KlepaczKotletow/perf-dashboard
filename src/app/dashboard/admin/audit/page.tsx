@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { isHROrAbove } from "@/lib/roles";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
 
 const PAGE_SIZE = 100;
 
@@ -66,15 +67,11 @@ export default async function AuditLogPage({
 
   return (
     <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-          Audit log
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Sensitive actions in this workspace: cycle status changes, grade releases,
-          calibration grade edits, and user role changes. Read-only.
-        </p>
-      </div>
+      <PageHeader
+        hat="manage"
+        title="Audit log"
+        subtitle="Sensitive actions in this workspace: cycle status changes, grade releases, calibration grade edits, and user role changes. Read-only."
+      />
 
       <nav className="flex flex-wrap gap-1.5">
         {actions.map((a) => {
