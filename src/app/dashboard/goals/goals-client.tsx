@@ -71,6 +71,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { isHROrAbove } from "@/lib/roles";
+import { cn } from "@/lib/utils";
 import { getClientIdentity } from "@/lib/client-auth";
 import {
   type EmployeeRef,
@@ -85,14 +86,38 @@ import {
   buildTree,
   flattenTree,
 } from "@/lib/goals-utils";
+import { Lightbulb } from "lucide-react";
 
 interface Cycle {
   id: string;
   name: string;
 }
 
+// ─── Tabs ──────────────────────────────────────────────
+export type TabId = "me" | "team" | "company";
+
+const TAB_LABEL: Record<TabId, string> = {
+  me: "Me",
+  team: "Team",
+  company: "Company",
+};
+
+interface DirectReport {
+  id: string;
+  slack_name: string;
+}
+
 interface GoalsClientProps {
-  goals: GoalRow[];
+  // New per-tab props (Phase 7)
+  initialTab: TabId;
+  visibleTabs: TabId[];
+  goalsByTab: Record<TabId, GoalRow[]>;
+  directReports: DirectReport[];
+  currentUserId: string;
+  currentUserName: string;
+  canCreateCompany: boolean;
+
+  // Existing props preserved
   cycles: Cycle[];
   employees?: { id: string; slack_name: string }[];
   role?: string;
@@ -117,7 +142,19 @@ const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
 
 // ─── Component ──────────────────────────────────────────
 
-export default function GoalsClient({ goals: rawGoals, cycles, employees = [], role, workspaceId }: GoalsClientProps) {
+export default function GoalsClient({
+  initialTab,
+  visibleTabs,
+  goalsByTab,
+  directReports,
+  currentUserId,
+  currentUserName: _currentUserName,
+  canCreateCompany,
+  cycles,
+  employees = [],
+  role,
+  workspaceId,
+}: GoalsClientProps) {
   const router = useRouter();
   const supabase = useMemo(
     () => createBrowserClient(
@@ -127,6 +164,10 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     []
   );
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
+
+  // Active tab drives which goals we render.
+  const tab: TabId = initialTab;
+  const rawGoals: GoalRow[] = goalsByTab[tab] ?? [];
 
   // Side panel create
   const [showCreatePanel, setShowCreatePanel] = useState(false);
@@ -161,6 +202,14 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
   const [quickTitle, setQuickTitle] = useState("");
   const [quickEmployeeId, setQuickEmployeeId] = useState("");
   const [quickAdding, setQuickAdding] = useState(false);
+
+  // Create-flow context (captured when the user clicks a context-aware create action).
+  // Seeds the side-panel form with the right scope / owner / suggested-by.
+  const [createContext, setCreateContext] = useState<{
+    scope: "individual" | "team" | "company";
+    employeeId: string;
+    suggestedByUserId: string | null;
+  }>({ scope: "individual", employeeId: currentUserId, suggestedByUserId: null });
 
   // Edit panel
   const [showEditPanel, setShowEditPanel] = useState(false);
@@ -220,6 +269,7 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
         ...g,
         employee: unwrap(g.employee),
         cycle: unwrap(g.cycle),
+        suggested_by: unwrap(g.suggested_by),
       })),
     [rawGoals]
   );
@@ -390,16 +440,24 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
       case "goal":
         return (
           <TableCell key={col}>
-            <div className="flex items-center gap-1.5" style={{ paddingLeft: goal.depth * 24 }}>
-              {goal.children.length > 0 ? (
-                <button onClick={() => toggleExpand(goal.id)} className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
-                  {expanded.has(goal.id) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
-                </button>
-              ) : (
-                <span className="w-[18px] shrink-0" />
+            <div className="flex flex-col gap-1" style={{ paddingLeft: goal.depth * 24 }}>
+              <div className="flex items-center gap-1.5">
+                {goal.children.length > 0 ? (
+                  <button onClick={() => toggleExpand(goal.id)} className="p-0.5 rounded hover:bg-muted transition-colors shrink-0">
+                    {expanded.has(goal.id) ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </button>
+                ) : (
+                  <span className="w-[18px] shrink-0" />
+                )}
+                <button onClick={() => openEditPanel(goal)} className="text-sm font-medium text-foreground truncate hover:underline text-left">{goal.title}</button>
+                {goal.status === "draft" && <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">Draft</Badge>}
+              </div>
+              {goal.suggested_by && (
+                <span className="inline-flex items-center gap-1 self-start text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 ml-[calc(18px+0.375rem)]">
+                  <Lightbulb className="h-3 w-3" />
+                  Suggested by {goal.suggested_by.slack_name}
+                </span>
               )}
-              <button onClick={() => openEditPanel(goal)} className="text-sm font-medium text-foreground truncate hover:underline text-left">{goal.title}</button>
-              {goal.status === "draft" && <Badge variant="outline" className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-normal">Draft</Badge>}
             </div>
           </TableCell>
         );
@@ -498,11 +556,34 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
     router.refresh();
   }
 
+  function openCreateWithContext(ctx: {
+    scope: "individual" | "team" | "company";
+    employeeId: string;
+    suggestedByUserId: string | null;
+  }) {
+    setCreateContext(ctx);
+    setNewGoal({
+      title: "",
+      employee_id: ctx.employeeId,
+      goal_direction: "increase",
+      metric_target: "",
+      metric_unit: "",
+      metric_start: "",
+      cycle_id: "",
+      due_date: "",
+      scope: ctx.scope,
+      parent_id: "",
+      description: "",
+      weight: "1",
+    });
+    setShowCreatePanel(true);
+  }
+
   async function handleCreate() {
     if (!newGoal.title || !newGoal.employee_id) return;
     setCreateLoading(true);
     try {
-      const { error } = await supabase.from("goals").insert({
+      const payload: Record<string, unknown> = {
         title: newGoal.title,
         employee_id: newGoal.employee_id,
         workspace_id: workspaceId,
@@ -518,13 +599,27 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
         weight: Math.min(1, Math.max(0, Number(newGoal.weight) || 1)),
         status: "active",
         progress: 0,
-      });
-      if (error) throw error;
+      };
+      if (createContext.suggestedByUserId) {
+        payload.suggested_by_user_id = createContext.suggestedByUserId;
+      }
+      const { error } = await supabase.from("goals").insert(payload);
+      if (error) {
+        // Postgres permission-denied → friendly message
+        if ((error as { code?: string }).code === "42501") {
+          setUpdateError("You don't have permission to create this goal — ask an admin.");
+          return;
+        }
+        throw error;
+      }
+      setUpdateError(null);
       setShowCreatePanel(false);
       setNewGoal({ title: "", employee_id: "", goal_direction: "increase", metric_target: "", metric_unit: "", metric_start: "", cycle_id: "", due_date: "", scope: "individual", parent_id: "", description: "", weight: "1" });
+      setCreateContext({ scope: "individual", employeeId: currentUserId, suggestedByUserId: null });
       router.refresh();
     } catch (err) {
       console.error("Failed to create goal:", err);
+      setUpdateError("Failed to create goal. Please try again.");
     } finally {
       setCreateLoading(false);
     }
@@ -697,10 +792,88 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Quick Add
           </Button>
-          <Button size="sm" onClick={() => setShowCreatePanel(true)}>
-            <Plus className="h-3.5 w-3.5 mr-1.5" />
-            New Goal
-          </Button>
+
+          {/* Context-aware create action — depends on active tab */}
+          {tab === "me" && (
+            <Button
+              size="sm"
+              onClick={() =>
+                openCreateWithContext({
+                  scope: "individual",
+                  employeeId: currentUserId,
+                  suggestedByUserId: null,
+                })
+              }
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New goal
+            </Button>
+          )}
+
+          {tab === "team" && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  New goal
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem
+                  onClick={() =>
+                    openCreateWithContext({
+                      scope: "individual",
+                      employeeId: currentUserId,
+                      suggestedByUserId: null,
+                    })
+                  }
+                >
+                  For myself
+                </DropdownMenuItem>
+                {directReports.map((r) => (
+                  <DropdownMenuItem
+                    key={r.id}
+                    onClick={() =>
+                      openCreateWithContext({
+                        scope: "individual",
+                        employeeId: r.id,
+                        suggestedByUserId: currentUserId,
+                      })
+                    }
+                  >
+                    For {r.slack_name}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem
+                  onClick={() =>
+                    openCreateWithContext({
+                      scope: "team",
+                      employeeId: currentUserId,
+                      suggestedByUserId: null,
+                    })
+                  }
+                >
+                  Team goal
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
+          {tab === "company" && canCreateCompany && (
+            <Button
+              size="sm"
+              onClick={() =>
+                openCreateWithContext({
+                  scope: "company",
+                  employeeId: currentUserId,
+                  suggestedByUserId: null,
+                })
+              }
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              New company OKR
+            </Button>
+          )}
         </div>
 
         <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
@@ -742,6 +915,27 @@ export default function GoalsClient({ goals: rawGoals, cycles, employees = [], r
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Tab nav: Me / Team / Company */}
+      <nav className="flex gap-1 border-b border-border/60">
+        {visibleTabs.map((t) => {
+          const active = t === tab;
+          return (
+            <Link
+              key={t}
+              href={`/dashboard/goals?tab=${t}`}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors",
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {TAB_LABEL[t]}
+            </Link>
+          );
+        })}
+      </nav>
 
       {/* Summary Stats */}
       <div className="flex items-center gap-6 p-4 rounded-xl border border-border/60 bg-card">
