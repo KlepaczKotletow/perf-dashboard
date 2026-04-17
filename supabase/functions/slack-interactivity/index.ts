@@ -1140,26 +1140,40 @@ Deno.serve(async (req) => {
         const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
         const participant = participants?.[0];
 
-        await dbInsert("survey_responses", {
+        // INSERT is now guarded by uniq_survey_response_* indexes. A 23505
+        // means "already submitted" — from Slack retry, dual tab, or two
+        // submits racing past the soft status check above. Treat identically
+        // to the status-completed branch: ack, show the thank-you, move on.
+        const insertRes = await dbInsert("survey_responses", {
           survey_id: surveyId,
           participant_id: participantId,
           subject_user_id: participant?.subject_user_id || null,
           answers,
           workspace_id: ws.id,
         });
-        await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
-          status: "completed",
-          completed_at: new Date().toISOString(),
-        });
+        const insertWasDuplicate =
+          insertRes && typeof insertRes === "object" &&
+          !Array.isArray(insertRes) &&
+          (insertRes as any).code === "23505";
+
+        if (!insertWasDuplicate) {
+          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          });
+        }
 
         // Send thank-you confirmation to the user
         const surveyForConfirm = await dbQuery("surveys", `id=eq.${surveyId}&select=name`);
         const surveyName = surveyForConfirm?.[0]?.name || "the survey";
+        const confirmText = insertWasDuplicate
+          ? `:white_check_mark: *Already recorded.* Your response to *${surveyName}* is saved — no duplicate created.`
+          : `:white_check_mark: *Thank you!* Your response to *${surveyName}* has been recorded.`;
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `Survey submitted — ${surveyName}`,
           blocks: [
-            { type: "section", text: { type: "mrkdwn", text: `:white_check_mark: *Thank you!* Your response to *${surveyName}* has been recorded.` } },
+            { type: "section", text: { type: "mrkdwn", text: confirmText } },
             { type: "context", elements: [{ type: "mrkdwn", text: ":lock: Your answers are confidential and will be aggregated with other responses." }] },
           ],
         });
