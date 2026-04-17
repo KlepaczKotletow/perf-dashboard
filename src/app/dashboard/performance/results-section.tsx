@@ -68,14 +68,11 @@ export function ResultsSection({
   feedbackPreviews,
   gradesReleased,
 }: ResultsSectionProps) {
+  // When grades aren't released yet, render nothing.
+  // (The cycle card shows pending/completed activity above; a full empty
+  // "grades not released" card was pure dead space — so we drop it.)
   if (!gradesReleased) {
-    return (
-      <div className="rounded-lg border border-border/60 bg-muted/30 px-5 py-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          Grades not yet released for this cycle.
-        </p>
-      </div>
-    );
+    return null;
   }
 
   return (

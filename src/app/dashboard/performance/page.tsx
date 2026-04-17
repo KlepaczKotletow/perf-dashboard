@@ -719,7 +719,7 @@ export default async function PerformancePage({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="my-work"
         title="My Performance"
@@ -746,25 +746,25 @@ export default async function PerformancePage({
                 <CycleCardHeader cycle={cycle} ratingMax={ratingMax} />
               }
             >
-              {cycle.isCurrent && cycle.progressSteps.length > 0 && (
-                <div className="mb-4">
+              <div className="space-y-5">
+                {cycle.isCurrent && cycle.progressSteps.length > 0 && (
                   <ProgressStepper steps={cycle.progressSteps} />
-                </div>
-              )}
-              <ActionRequiredSection tasks={cycle.pendingTasks} />
-              <CompletedSection
-                items={cycle.completedItems}
-                responsesByAssignment={submittedResponsesByAssignment}
-                ratingMax={ratingMax}
-              />
-              <ResultsSection
-                overallRating={cycle.rating}
-                grade={cycle.grade}
-                ratingMax={ratingMax}
-                competencyRatings={cycle.competencyRatings}
-                feedbackPreviews={cycle.feedbackPreviews}
-                gradesReleased={cycle.gradesReleased}
-              />
+                )}
+                <ActionRequiredSection tasks={cycle.pendingTasks} />
+                <CompletedSection
+                  items={cycle.completedItems}
+                  responsesByAssignment={submittedResponsesByAssignment}
+                  ratingMax={ratingMax}
+                />
+                <ResultsSection
+                  overallRating={cycle.rating}
+                  grade={cycle.grade}
+                  ratingMax={ratingMax}
+                  competencyRatings={cycle.competencyRatings}
+                  feedbackPreviews={cycle.feedbackPreviews}
+                  gradesReleased={cycle.gradesReleased}
+                />
+              </div>
             </CycleCard>
           ))}
         </div>

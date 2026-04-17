@@ -1,9 +1,8 @@
 import Link from "next/link";
-import { Clock, ArrowRight, ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronRight } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface ActionTask {
   id: string;
@@ -30,8 +29,7 @@ const typeBadgeConfig: Record<
   },
   "manager-review": {
     label: "Manager Review",
-    className:
-      "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
+    className: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
   },
   "upward-feedback": {
     label: "Upward",
@@ -61,78 +59,64 @@ function getTaskCta(type: ActionTask["type"]): {
   }
 }
 
+/**
+ * Flat row list — no Table chrome.
+ * Small uppercase label above, one padded row per task with divider between.
+ */
 export function ActionRequiredSection({ tasks }: ActionRequiredSectionProps) {
   if (tasks.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <span className="h-5 w-5 rounded bg-amber-100 dark:bg-amber-400/10 flex items-center justify-center">
-          <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
-        </span>
-        Action Required
-        <Badge className="text-[10px] h-4 px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400 font-medium">
-          {tasks.length}
-        </Badge>
-      </h3>
+    <section className="space-y-2">
+      <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+        Pending · {tasks.length}
+      </p>
 
-      <div className="rounded-lg border border-border/60 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="pl-5">Type</TableHead>
-              <TableHead>Task</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead className="pr-5 text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tasks.map((task) => {
-              const badge = typeBadgeConfig[task.type];
-              const cta = getTaskCta(task.type);
-              const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-              const isOverdue = dueDate && isPast(dueDate);
+      <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
+        {tasks.map((task) => {
+          const badge = typeBadgeConfig[task.type];
+          const cta = getTaskCta(task.type);
+          const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+          const isOverdue = !!dueDate && isPast(dueDate);
 
-              return (
-                <TableRow key={task.id}>
-                  <TableCell className="pl-5">
-                    <Badge className={`text-[10px] font-medium ${badge.className}`}>
-                      {badge.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium text-sm">
-                    {task.label}
-                  </TableCell>
-                  <TableCell>
-                    {dueDate ? (
-                      <span
-                        className={`text-xs ${
-                          isOverdue
-                            ? "text-red-500 font-semibold"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {isOverdue
-                          ? `Overdue \u00b7 ${format(dueDate, "MMM d, yyyy")}`
-                          : format(dueDate, "MMM d, yyyy")}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="pr-5 text-right">
-                    <Button size="sm" className="text-xs h-7" asChild>
-                      <Link href={getTaskHref(task)}>
-                        {cta.text} <cta.icon className="h-3 w-3 ml-1" />
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+          return (
+            <div
+              key={task.id}
+              className="flex items-center gap-3 px-4 py-3"
+            >
+              <Badge
+                className={`text-[10px] font-medium shrink-0 ${badge.className}`}
+              >
+                {badge.label}
+              </Badge>
+
+              <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
+                {task.label}
+              </span>
+
+              {dueDate && (
+                <span
+                  className={`text-xs shrink-0 ${
+                    isOverdue
+                      ? "text-red-600 font-semibold"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {isOverdue
+                    ? `Overdue ${format(dueDate, "MMM d")}`
+                    : `Due ${format(dueDate, "MMM d")}`}
+                </span>
+              )}
+
+              <Button size="sm" className="text-xs h-7 shrink-0" asChild>
+                <Link href={getTaskHref(task)}>
+                  {cta.text} <cta.icon className="h-3 w-3 ml-1" />
+                </Link>
+              </Button>
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </section>
   );
 }
