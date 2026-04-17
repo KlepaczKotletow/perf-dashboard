@@ -1116,7 +1116,9 @@ export function FunctionsClient({
                             <td className="pr-2">
                               <button
                                 onClick={() => handleRemoveSkill(skill.id)}
-                                className="opacity-0 group-hover/row:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                                className="p-1 rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                                aria-label={`Remove ${skill.name} from this function`}
+                                title="Remove from function"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </button>
@@ -1319,8 +1321,11 @@ export function FunctionsClient({
                                 <td className="py-2 pr-3 text-right">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                      <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted">
-                                        <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <button
+                                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                        aria-label={`Actions for ${skill.name}`}
+                                      >
+                                        <MoreHorizontal className="h-3.5 w-3.5" />
                                       </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end" className="w-44">
