@@ -1,5 +1,5 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -124,34 +124,33 @@ export default async function MyTeamPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="my-team"
         title="Team Overview"
         subtitle={`${directReports?.length || 0} direct report${(directReports?.length || 0) !== 1 ? "s" : ""}`}
       />
 
-      {/* Stats */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Compact stat strip — was 4 oversized cards; now one quiet row */}
+      <div className="flex flex-wrap items-center gap-5 sm:gap-7 px-4 py-3 rounded-xl border border-border/60 bg-card">
         {[
-          { label: "Direct Reports", value: directReports?.length || 0, icon: Users, color: "text-primary bg-primary/[0.08]" },
-          { label: "Need Action", value: needsActionCount, icon: AlertCircle, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-          { label: "Pending Reviews", value: totalPendingReviews, icon: ClipboardCheck, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-          { label: "Active Goals", value: totalActiveGoals, icon: Target, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-        ].map((m) => (
-          <Card key={m.label} className="border-border/60">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
-                  <p className="text-2xl font-semibold mt-1 text-foreground">{m.value}</p>
-                </div>
-                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${m.color}`}>
-                  <m.icon className="h-5 w-5" />
-                </div>
+          { label: "Direct reports", value: directReports?.length || 0, icon: Users, iconClass: "text-primary", bgClass: "bg-primary/[0.08]" },
+          { label: "Need action", value: needsActionCount, icon: AlertCircle, iconClass: "text-amber-600 dark:text-amber-400", bgClass: "bg-amber-50 dark:bg-amber-400/10" },
+          { label: "Pending reviews", value: totalPendingReviews, icon: ClipboardCheck, iconClass: "text-sky-600 dark:text-sky-400", bgClass: "bg-sky-50 dark:bg-sky-400/10" },
+          { label: "Active goals", value: totalActiveGoals, icon: Target, iconClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50 dark:bg-emerald-400/10" },
+        ].map((m, i) => (
+          <div key={m.label} className="flex items-center gap-5 sm:gap-7">
+            {i > 0 && <span className="h-8 w-px bg-border/60 hidden sm:block" aria-hidden="true" />}
+            <div className="flex items-center gap-2.5">
+              <div className={`h-8 w-8 rounded-lg ${m.bgClass} flex items-center justify-center shrink-0`}>
+                <m.icon className={`h-4 w-4 ${m.iconClass}`} />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-lg font-semibold text-foreground leading-none tabular-nums">{m.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{m.label}</p>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
@@ -251,47 +250,38 @@ export default async function MyTeamPage() {
       </Card>
 
       {/* Pending Review Assignments for your team — active cycles only */}
-      {reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active").length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">Pending Team Reviews</h2>
-          <Card className="border-border/60">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-5">Employee</TableHead>
-                    <TableHead>Cycle</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="pr-5 text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reviewAssignments
-                    .filter((a: any) => a.status !== "completed" && a.cycle?.status === "active")
-                    .map((assignment: any) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell className="pl-5 font-medium">{assignment.employee?.slack_name || "Unknown"}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{assignment.cycle?.name || "Unknown Cycle"}</TableCell>
-                        <TableCell>
-                          <Badge className={`text-[10px] font-medium ${getAssignmentStatus(assignment.status).badge}`}>
-                            {getAssignmentStatus(assignment.status).label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="pr-5 text-right">
-                          <Button size="sm" className="h-7 text-xs" asChild>
-                            <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
-                              Review <ArrowRight className="h-3 w-3 ml-1" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {(() => {
+        const pending = reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active");
+        if (pending.length === 0) return null;
+        return (
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+              Pending Team Reviews
+              <span className="ml-1.5 text-xs font-medium text-muted-foreground">· {pending.length}</span>
+            </h2>
+            <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
+              {pending.map((assignment: any) => (
+                <div key={assignment.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
+                    {assignment.employee?.slack_name || "Unknown"}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[160px]">
+                    {assignment.cycle?.name || "Unknown Cycle"}
+                  </span>
+                  <Badge className={`text-[10px] font-medium shrink-0 ${getAssignmentStatus(assignment.status).badge}`}>
+                    {getAssignmentStatus(assignment.status).label}
+                  </Badge>
+                  <Button size="sm" className="h-7 text-xs shrink-0" asChild>
+                    <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
+                      Review <ArrowRight className="h-3 w-3 ml-1" />
+                    </Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Team Goals */}
       {teamGoals.length > 0 && (

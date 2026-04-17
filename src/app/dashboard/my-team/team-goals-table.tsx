@@ -131,27 +131,26 @@ export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTa
 
   return (
     <div className="space-y-3">
-      {/* Summary stats */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Compact stat strip — was 4 oversized cards, now a quiet row */}
+      <div className="flex flex-wrap items-center gap-5 sm:gap-7 px-4 py-3 rounded-xl border border-border/60 bg-card">
         {[
-          { label: "Active Goals", value: activeGoals.length, icon: Target, color: "text-primary bg-primary/[0.08]" },
-          { label: "Avg Progress", value: `${weightedProgress}%`, icon: TrendingUp, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10" },
-          { label: "At Risk", value: atRisk, icon: AlertTriangle, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-          { label: "On Track", value: `${onTrack}/${activeGoals.length}`, icon: CheckCircle2, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-        ].map((m) => (
-          <Card key={m.label} className="border-border/60">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{m.label}</p>
-                  <p className="text-xl font-semibold mt-0.5 text-foreground">{m.value}</p>
-                </div>
-                <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${m.color}`}>
-                  <m.icon className="h-4 w-4" />
-                </div>
+          { label: "Active goals", value: activeGoals.length, icon: Target, iconClass: "text-primary", bgClass: "bg-primary/[0.08]" },
+          { label: "Avg progress", value: `${weightedProgress}%`, icon: TrendingUp, iconClass: "text-sky-600 dark:text-sky-400", bgClass: "bg-sky-50 dark:bg-sky-400/10" },
+          { label: "At risk", value: atRisk, icon: AlertTriangle, iconClass: "text-amber-600 dark:text-amber-400", bgClass: "bg-amber-50 dark:bg-amber-400/10" },
+          { label: "On track", value: `${onTrack}/${activeGoals.length}`, icon: CheckCircle2, iconClass: "text-emerald-600 dark:text-emerald-400", bgClass: "bg-emerald-50 dark:bg-emerald-400/10" },
+        ].map((m, i) => (
+          <div key={m.label} className="flex items-center gap-5 sm:gap-7">
+            {i > 0 && <span className="h-8 w-px bg-border/60 hidden sm:block" aria-hidden="true" />}
+            <div className="flex items-center gap-2.5">
+              <div className={`h-8 w-8 rounded-lg ${m.bgClass} flex items-center justify-center shrink-0`}>
+                <m.icon className={`h-4 w-4 ${m.iconClass}`} />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <p className="text-lg font-semibold text-foreground leading-none tabular-nums">{m.value}</p>
+                <p className="text-[11px] text-muted-foreground mt-1">{m.label}</p>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
 
