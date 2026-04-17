@@ -2,7 +2,7 @@ import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-ser
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import { Plus, ChevronRight, Lock, ClipboardList, Download } from "lucide-react";
+import { Plus, ChevronRight, Lock, ClipboardList, Download, Repeat } from "lucide-react";
 import { format } from "date-fns";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 import { PageHeader } from "@/components/page-header";
@@ -10,11 +10,12 @@ import { PageHeader } from "@/components/page-header";
 async function getSurveys(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
-  // Query surveys and participant counts separately to avoid nested-embed RLS issues
+  // Query surveys and participant counts separately to avoid nested-embed RLS issues.
+  // Pull config too so we can surface recurrence (weekly / biweekly / monthly).
   const [{ data: surveys, error: surveyErr }, { data: counts, error: countErr }] = await Promise.all([
     supabase
       .from("surveys")
-      .select("id, type, name, status, closes_at, created_at")
+      .select("id, type, name, status, config, closes_at, created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
     supabase
@@ -71,8 +72,12 @@ export default async function SurveysPage() {
   const surveys = await getSurveys(workspace!.workspaceId);
   const isAdminOrHR = isHROrAbove(workspace?.role);
 
+  // Split out recurring from one-off for clearer mental model
+  const recurringSurveys = surveys.filter((s: any) => s.config?.recurrence);
+  const oneOffSurveys = surveys.filter((s: any) => !s.config?.recurrence);
+
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Surveys"
@@ -107,66 +112,108 @@ export default async function SurveysPage() {
           )}
         </div>
       ) : (
-        <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
-          <div className="grid grid-cols-[1fr_70px_70px_1fr_100px_70px_32px] gap-3 px-4 py-2.5 bg-muted/40">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Type</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Response rate</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Closes</span>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Export</span>
-            <span />
-          </div>
-          {surveys.map((survey) => {
-            const total = survey.totalParticipants;
-            const completed = survey.completedParticipants;
-            const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-            return (
-              <div
-                key={survey.id}
-                className="grid grid-cols-[1fr_70px_70px_1fr_100px_70px_32px] gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors items-center"
-              >
-                <Link href={`/dashboard/surveys/${survey.id}`} className="text-sm font-medium text-foreground truncate hover:underline">
-                  {survey.name}
-                </Link>
-                <Badge variant="outline" className={`text-xs w-fit ${TYPE_COLORS[survey.type] || ""}`}>
+        <>
+          {/* Recurring schedules — shown first when present */}
+          {recurringSurveys.length > 0 && (
+            <section className="space-y-2">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Repeat className="h-3 w-3" />
+                Recurring schedules · {recurringSurveys.length}
+              </p>
+              <SurveyList surveys={recurringSurveys} />
+            </section>
+          )}
+
+          {/* One-off surveys */}
+          {oneOffSurveys.length > 0 && (
+            <section className="space-y-2">
+              {recurringSurveys.length > 0 && (
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  One-off surveys · {oneOffSurveys.length}
+                </p>
+              )}
+              <SurveyList surveys={oneOffSurveys} />
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------- */
+/*  Flat row list — no column header chrome.                             */
+/* -------------------------------------------------------------------- */
+
+function SurveyList({ surveys }: { surveys: any[] }) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return (
+    <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
+      {surveys.map((survey) => {
+        const total = survey.totalParticipants;
+        const completed = survey.completedParticipants;
+        const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+        const recurrence: string | undefined = survey.config?.recurrence;
+        return (
+          <Link
+            key={survey.id}
+            href={`/dashboard/surveys/${survey.id}`}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group"
+          >
+            {/* Name + type + optional recurring tag stacked */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-medium text-foreground truncate">{survey.name}</span>
+                <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[survey.type] || ""}`}>
                   {TYPE_LABELS[survey.type] || survey.type}
                 </Badge>
-                <Badge variant="outline" className={`text-xs w-fit capitalize ${STATUS_COLORS[survey.status] || ""}`}>
-                  {survey.status}
-                </Badge>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${rate === 100 ? "bg-emerald-500" : "bg-primary"}`}
-                      style={{ width: `${rate}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap">{completed}/{total} ({rate}%)</span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {survey.closes_at ? format(new Date(survey.closes_at), "MMM d, yyyy") : "—"}
-                </span>
-                <div>
-                  {completed > 0 && (
-                    <a
-                      href={`/api/surveys/${survey.id}/export`}
-                      download
-                      className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted transition-colors"
-                      title="Export CSV"
-                    >
-                      <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                    </a>
-                  )}
-                </div>
-                <Link href={`/dashboard/surveys/${survey.id}`}>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                </Link>
+                {recurrence && (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-400/10 rounded px-1.5 py-0.5">
+                    <Repeat className="h-2.5 w-2.5" />
+                    {recurrence}
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
-      )}
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                {completed}/{total} responded · {rate}%
+                {survey.closes_at && !recurrence && (
+                  <> · closes {format(new Date(survey.closes_at), "MMM d, yyyy")}</>
+                )}
+              </p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="hidden sm:flex items-center gap-2 shrink-0 w-[140px]">
+              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${rate === 100 ? "bg-emerald-500" : "bg-primary"}`}
+                  style={{ width: `${rate}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">{rate}%</span>
+            </div>
+
+            {/* Status chip */}
+            <Badge variant="outline" className={`text-[10px] shrink-0 capitalize ${STATUS_COLORS[survey.status] || ""}`}>
+              {survey.status}
+            </Badge>
+
+            {/* Export (only when there are responses) */}
+            {completed > 0 && (
+              <a
+                href={`/api/surveys/${survey.id}/export`}
+                download
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted transition-colors shrink-0"
+                title="Export CSV"
+              >
+                <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              </a>
+            )}
+
+            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" aria-hidden="true" />
+          </Link>
+        );
+      })}
     </div>
   );
 }
