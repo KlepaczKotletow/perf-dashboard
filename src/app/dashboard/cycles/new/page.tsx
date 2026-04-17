@@ -588,6 +588,22 @@ export default function NewCyclePage() {
       setError("Please complete all required fields before launching");
       return;
     }
+
+    // Pre-launch: every enrolled employee needs a manager assigned (otherwise
+    // the manager_review phase opens but has no reviewer, and the cycle can't
+    // complete). Match the server-side 23514 guard in launch_cycle RPC.
+    const missingMgr = users
+      .filter((u) => selectedPeopleIds.includes(u.id) && !u.manager_id);
+    if (missingMgr.length > 0) {
+      const names = missingMgr.slice(0, 5).map((u) => u.slack_name || u.slack_email || "someone").join(", ");
+      const tail = missingMgr.length > 5 ? ` and ${missingMgr.length - 5} more` : "";
+      setError(
+        `Can't launch: ${missingMgr.length} employee(s) have no manager — ${names}${tail}. ` +
+        `Set their managers in Team Settings first, or remove them from the cycle.`
+      );
+      return;
+    }
+
     setLoading("launch");
     setError(null);
     try {

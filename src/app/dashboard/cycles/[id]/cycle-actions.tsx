@@ -139,11 +139,11 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
 
       if (empError) throw empError;
 
-      // 2. Fetch manager_id for each employee
+      // 2. Fetch manager_id + name for each employee
       const employeeIds = (cycleEmployees || []).map((e: any) => e.employee_id);
       const { data: users, error: usersError } = await supabase
         .from("users")
-        .select("id, manager_id")
+        .select("id, slack_name, manager_id")
         .in("id", employeeIds)
         .eq("workspace_id", cycle.workspace_id);
 
@@ -161,6 +161,20 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         if (foundIds.size === 0) {
           throw new Error("No valid employees found. All enrolled employees may have been removed.");
         }
+      }
+
+      // 2c. Pre-check: manager_review phase needs every enrolled employee to
+      //    have a manager_id. The launch_cycle RPC will enforce this at the DB
+      //    level (23514) but catching it here lets us show a better message
+      //    with specific names and avoids a round-trip.
+      const missingMgr = (users || []).filter((u: any) => !u.manager_id);
+      if (missingMgr.length > 0) {
+        const names = missingMgr.slice(0, 5).map((u: any) => u.slack_name || "someone").join(", ");
+        const tail = missingMgr.length > 5 ? ` and ${missingMgr.length - 5} more` : "";
+        throw new Error(
+          `Can't launch: ${missingMgr.length} employee(s) have no manager — ${names}${tail}. ` +
+          `Set their managers in Team Settings first, or remove them from the cycle.`
+        );
       }
 
       // 3. Build all assignments in memory first — so if anything is wrong with the
@@ -201,7 +215,15 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         p_assignments: allAssignments,
       });
 
-      if (launchError) throw launchError;
+      if (launchError) {
+        const code = (launchError as { code?: string }).code;
+        if (code === "23514") {
+          // Server-side "missing manager" guard. Extract the DB message so
+          // the admin sees the same list of names we show in the pre-check.
+          throw new Error(launchError.message);
+        }
+        throw launchError;
+      }
 
       // 7. Send Slack notifications — check the returned error (functions.invoke never throws)
       await sendNotifications();
@@ -210,7 +232,15 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
     } catch (err: any) {
       failed = true;
       console.error("Error launching cycle:", err);
-      setActionError("Failed to launch cycle. Please try again.");
+      // Surface the validation message when the server or pre-check
+      // produced a specific one — avoid swallowing it into "try again".
+      setActionError(
+        typeof err?.message === "string" && err.message.startsWith("Can't launch:")
+          ? err.message
+          : typeof err?.message === "string" && err.message.startsWith("Cannot launch:")
+          ? err.message
+          : "Failed to launch cycle. Please try again."
+      );
     } finally {
       setLoading(false);
       if (!failed) setShowLaunchDialog(false);  // only close dialog on success
