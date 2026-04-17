@@ -87,7 +87,7 @@ export default async function BillingPage() {
   const planInfo = planDetails[plan] || planDetails.free;
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Billing"

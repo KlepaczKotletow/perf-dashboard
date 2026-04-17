@@ -626,7 +626,7 @@ export default function FormsPage() {
   }
 
   return (
-    <div className="space-y-6 relative">
+    <div className="max-w-5xl mx-auto space-y-6 relative">
       {/* Toast container */}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
         {toasts.map((t) => (
