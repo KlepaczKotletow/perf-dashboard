@@ -292,6 +292,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               placeholder="e.g. Senior Software Engineer"
+              maxLength={120}
             />
           </div>
 
@@ -409,6 +410,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
               placeholder="e.g. Squad Falcon or Platform Team"
+              maxLength={120}
             />
             <p className="text-xs text-muted-foreground">Informal name — not linked to functions</p>
           </div>

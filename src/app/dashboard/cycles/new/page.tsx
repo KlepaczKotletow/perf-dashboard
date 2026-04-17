@@ -804,6 +804,7 @@ export default function NewCyclePage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Q2 2026 Performance Review"
+                maxLength={120}
               />
             </div>
             <div className="w-52 space-y-1.5">

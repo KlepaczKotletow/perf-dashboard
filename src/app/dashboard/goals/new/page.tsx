@@ -251,7 +251,7 @@ export default function NewGoalPage() {
 
             <div className="space-y-2">
               <Label htmlFor="title">Goal Title *</Label>
-              <Input id="title" ref={titleInputRef} placeholder="e.g., Improve API response times by 50%" required value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Input id="title" ref={titleInputRef} placeholder="e.g., Improve API response times by 50%" required maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} />
             </div>
 
             <div className="space-y-2">

@@ -742,6 +742,7 @@ export default function ReviewFormPage({
                       value={comp.comment}
                       onChange={(e) => setComment(compIdx, e.target.value)}
                       className="min-h-[72px] text-sm resize-none"
+                      maxLength={5000}
                     />
                   </div>
                 );
@@ -765,6 +766,7 @@ export default function ReviewFormPage({
                   value={tq.response}
                   onChange={(e) => setTextResponse(idx, e.target.value)}
                   className="min-h-[100px] text-sm resize-none"
+                  maxLength={5000}
                 />
               </div>
             ))}
@@ -783,6 +785,7 @@ export default function ReviewFormPage({
               value={overallComment}
               onChange={(e) => setOverallComment(e.target.value)}
               className="min-h-[120px] text-sm resize-none"
+              maxLength={5000}
             />
           </CardContent>
         </Card>
