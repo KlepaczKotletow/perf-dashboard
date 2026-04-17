@@ -167,6 +167,7 @@ export default function GoalDetailClient({
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [form, setForm] = useState<EditForm>({
@@ -234,15 +235,38 @@ export default function GoalDetailClient({
   }
 
   async function handleDuplicate() {
+    if (duplicating) return; // guard against double-click
+    setDuplicating(true);
     setSaveError(null);
     const identity = await getClientIdentity(supabase);
     if (!identity) {
       setSaveError("Failed to duplicate goal");
+      setDuplicating(false);
       return;
     }
 
+    // If a "(Copy)" already exists for this cycle, append a counter so the
+    // uniq_goal_per_cycle_employee_title index doesn't bounce us. First copy
+    // is "Foo (Copy)", second is "Foo (Copy 2)", etc.
+    const baseTitle = `${goal.title} (Copy)`;
+    let candidate = baseTitle;
+    if (goal.cycle?.id && goal.employee?.id) {
+      const { data: existing } = await supabase
+        .from("goals")
+        .select("title")
+        .eq("cycle_id", goal.cycle.id)
+        .eq("employee_id", goal.employee.id)
+        .ilike("title", `${goal.title} (Copy%`);
+      const existingTitles = new Set((existing ?? []).map((r: { title: string }) => r.title));
+      if (existingTitles.has(baseTitle)) {
+        let n = 2;
+        while (existingTitles.has(`${goal.title} (Copy ${n})`)) n++;
+        candidate = `${goal.title} (Copy ${n})`;
+      }
+    }
+
     const { error } = await supabase.from("goals").insert({
-      title: `${goal.title} (Copy)`,
+      title: candidate,
       description: goal.description,
       employee_id: goal.employee?.id ?? null,
       cycle_id: goal.cycle?.id ?? null,
@@ -262,7 +286,13 @@ export default function GoalDetailClient({
     });
 
     if (error) {
-      setSaveError("Failed to duplicate goal");
+      const code = (error as { code?: string }).code;
+      setSaveError(
+        code === "23505"
+          ? "A goal with this title already exists for this cycle."
+          : "Failed to duplicate goal"
+      );
+      setDuplicating(false);
       return;
     }
 
@@ -356,8 +386,8 @@ export default function GoalDetailClient({
               </>
             ) : (
               <>
-                <Button size="sm" variant="outline" onClick={handleDuplicate} className="gap-1.5">
-                  <Copy className="h-3.5 w-3.5" /> Duplicate
+                <Button size="sm" variant="outline" onClick={handleDuplicate} disabled={duplicating} className="gap-1.5">
+                  <Copy className="h-3.5 w-3.5" /> {duplicating ? "Duplicating…" : "Duplicate"}
                 </Button>
                 <Button
                   size="sm"

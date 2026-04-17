@@ -149,7 +149,19 @@ export default function NewGoalPage() {
         workspace_id: workspaceId,
       });
 
-      if (insertError) { setError(insertError.message); setLoading(false); return; }
+      if (insertError) {
+        const code = (insertError as { code?: string }).code;
+        if (code === "23505") {
+          setError(
+            "A goal with this title already exists for this person in this cycle. " +
+            "Rename it or edit the existing goal instead."
+          );
+        } else {
+          setError(insertError.message);
+        }
+        setLoading(false);
+        return;
+      }
       router.push("/dashboard/goals");
       router.refresh();
     } catch {

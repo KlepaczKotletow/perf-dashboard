@@ -680,8 +680,28 @@ export default function GoalsClient({
     const identity = await getClientIdentity(supabase);
     if (!identity) return;
 
+    // Same uniqueness guard as the goal-detail page: if the "(Copy)" title is
+    // already taken for this (cycle, employee), walk up "(Copy 2)", "(Copy 3)"
+    // until we find a free slot so uniq_goal_per_cycle_employee_title passes.
+    const baseTitle = `${goal.title} (Copy)`;
+    let candidate = baseTitle;
+    if (goal.cycle?.id && goal.employee?.id) {
+      const { data: existing } = await supabase
+        .from("goals")
+        .select("title")
+        .eq("cycle_id", goal.cycle.id)
+        .eq("employee_id", goal.employee.id)
+        .ilike("title", `${goal.title} (Copy%`);
+      const existingTitles = new Set((existing ?? []).map((r: { title: string }) => r.title));
+      if (existingTitles.has(baseTitle)) {
+        let n = 2;
+        while (existingTitles.has(`${goal.title} (Copy ${n})`)) n++;
+        candidate = `${goal.title} (Copy ${n})`;
+      }
+    }
+
     const { error } = await supabase.from("goals").insert({
-      title: `${goal.title} (Copy)`,
+      title: candidate,
       description: goal.description,
       employee_id: goal.employee?.id ?? null,
       cycle_id: goal.cycle?.id ?? null,
