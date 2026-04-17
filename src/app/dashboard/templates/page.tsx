@@ -1728,11 +1728,11 @@ export default async function TemplatesPage() {
   const templates = await getTemplates(workspaceId);
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Templates"
-        subtitle="Review templates, function templates, competency frameworks, cycle profiles, and goal templates"
+        subtitle="Pre-built starting points for reviews, functions, competencies, cycles, and goals"
         actions={
           <Button size="sm" asChild>
             <Link href="/dashboard/templates/new">
@@ -1743,7 +1743,6 @@ export default async function TemplatesPage() {
         }
       />
 
-      {/* Tabbed content */}
       <TemplatesClient templates={templates} workspaceId={workspaceId} />
     </div>
   );

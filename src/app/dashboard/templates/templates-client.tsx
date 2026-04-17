@@ -13,10 +13,12 @@ import {
   X,
   Target,
   Briefcase,
+  ArrowRight,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { FunctionImportDialog } from "./function-import-dialog";
-import { CycleImportDialog } from "./cycle-import-dialog";
+import { FrameworkImportDialog } from "./framework-import-dialog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,16 @@ const proficiencyColors: Record<number, string> = {
   3: "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800/40",
   4: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/40",
   5: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/40",
+};
+
+// ── Section icon tint per template type ──────────────────────────────────────
+
+const SECTION_TINT: Record<string, { bg: string; fg: string }> = {
+  function_template:     { bg: "bg-sky-50 dark:bg-sky-400/10",       fg: "text-sky-600 dark:text-sky-400" },
+  review:                { bg: "bg-violet-50 dark:bg-violet-400/10", fg: "text-violet-600 dark:text-violet-400" },
+  competency_framework:  { bg: "bg-emerald-50 dark:bg-emerald-400/10", fg: "text-emerald-600 dark:text-emerald-400" },
+  cycle_profile:         { bg: "bg-amber-50 dark:bg-amber-400/10",   fg: "text-amber-600 dark:text-amber-400" },
+  goal_template:         { bg: "bg-rose-50 dark:bg-rose-400/10",     fg: "text-rose-600 dark:text-rose-400" },
 };
 
 // ── Template Row ──────────────────────────────────────────────────────────────
@@ -84,19 +96,20 @@ function TemplateRow({
     return "";
   }
 
-  // ── Action button ──
+  // ── Action button — every template now has a working "Use template" flow ──
 
   function renderAction() {
+    const btnClasses = "h-8 text-xs font-medium gap-1.5";
+
     if (templateType === "function_template") {
       return (
         <>
           <Button
             size="sm"
-            variant="default"
-            className="h-7 text-xs"
+            className={btnClasses}
             onClick={(e) => { e.stopPropagation(); setDialogOpen(true); }}
           >
-            Use Template
+            Use template <ArrowRight className="h-3 w-3" />
           </Button>
           <FunctionImportDialog
             template={template}
@@ -107,81 +120,95 @@ function TemplateRow({
         </>
       );
     }
-    if (templateType === "cycle_profile") {
+
+    if (templateType === "competency_framework") {
+      // Was: broken <Link href="/dashboard/competencies?import=..."> — destination
+      // never handled the param. Now uses the proper FrameworkImportDialog that
+      // inserts competencies + level_competencies and respects duplicates.
       return (
         <>
           <Button
             size="sm"
-            variant="default"
-            className="h-7 text-xs"
+            className={btnClasses}
             onClick={(e) => { e.stopPropagation(); setDialogOpen(true); }}
           >
-            Use Template
+            Use template <ArrowRight className="h-3 w-3" />
           </Button>
-          <CycleImportDialog
-            template={template}
+          <FrameworkImportDialog
+            template={{
+              ...template,
+              description: template.description ?? "",
+            }}
+            workspaceId={workspaceId}
             open={dialogOpen}
             onOpenChange={setDialogOpen}
           />
         </>
       );
     }
+
+    if (templateType === "cycle_profile") {
+      // Was: underpowered CycleImportDialog that created a draft cycle with only
+      // name + dates + description. Now redirects to the new-cycle wizard which
+      // already handles ?profile=<id> and applies the full profile content
+      // (cycle type, description, phase weights, review-template hint).
+      return (
+        <Button
+          size="sm"
+          className={btnClasses}
+          asChild
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+        >
+          <Link href={`/dashboard/cycles/new?profile=${template.id}`}>
+            Use template <ArrowRight className="h-3 w-3" />
+          </Link>
+        </Button>
+      );
+    }
+
     if (templateType === "review") {
       return (
         <Button
           size="sm"
-          variant="default"
-          className="h-7 text-xs"
+          className={btnClasses}
           asChild
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
           <Link href={`/dashboard/cycles/new?reviewTemplate=${template.id}`}>
-            Use Template
+            Use template <ArrowRight className="h-3 w-3" />
           </Link>
         </Button>
       );
     }
+
     if (templateType === "goal_template") {
       return (
         <Button
           size="sm"
-          variant="default"
-          className="h-7 text-xs"
+          className={btnClasses}
           asChild
           onClick={(e: React.MouseEvent) => e.stopPropagation()}
         >
           <Link href={`/dashboard/goals/new?templateId=${template.id}`}>
-            Use Template
+            Use template <ArrowRight className="h-3 w-3" />
           </Link>
         </Button>
       );
     }
-    if (templateType === "competency_framework") {
-      return (
-        <Button
-          size="sm"
-          variant="default"
-          className="h-7 text-xs"
-          asChild
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
-        >
-          <Link href={`/dashboard/competencies?import=${template.id}`}>
-            Import
-          </Link>
-        </Button>
-      );
-    }
+
     return null;
   }
 
-  // ── Expanded content ──
+  // ── Expanded content (preview) ─────────────────────────────────────────────
 
   function renderExpanded() {
     if (templateType === "function_template") {
       const c = template.content as any;
       const levels = c?.levels || [];
       const competencies = c?.competencies || [];
-      const hasDescriptors = competencies.some((comp: any) => comp.score_descriptors && Object.keys(comp.score_descriptors).length > 0);
+      const hasDescriptors = competencies.some(
+        (comp: any) => comp.score_descriptors && Object.keys(comp.score_descriptors).length > 0
+      );
       return (
         <div className="space-y-4">
           <div className="overflow-x-auto">
@@ -354,48 +381,49 @@ function TemplateRow({
   return (
     <>
       <div
-        className="grid grid-cols-[20px_1fr_auto_auto] items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20 transition-colors group/row"
         onClick={onToggle}
       >
         <ChevronRight
-          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`h-3.5 w-3.5 text-muted-foreground/50 group-hover/row:text-muted-foreground transition-all shrink-0 ${expanded ? "rotate-90" : ""}`}
         />
-        <div className="min-w-0 flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-foreground truncate">
-                {template.name}
-              </span>
-              {template.is_system && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] shrink-0 border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400"
-                >
-                  System
-                </Badge>
-              )}
-              {template.is_default && (
-                <Badge variant="secondary" className="text-[10px] shrink-0">
-                  Default
-                </Badge>
-              )}
-            </div>
-            {template.description && (
-              <p className="text-xs text-muted-foreground truncate mt-0.5">
-                {template.description}
-              </p>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-foreground">
+              {template.name}
+            </span>
+            {template.is_system && (
+              <Badge
+                variant="outline"
+                className="text-[10px] h-4 px-1.5 shrink-0 border-sky-200 text-sky-700 dark:border-sky-800 dark:text-sky-400"
+              >
+                System
+              </Badge>
+            )}
+            {template.is_default && (
+              <Badge className="text-[10px] h-4 px-1.5 shrink-0 bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400 border border-amber-200/60 dark:border-amber-400/20">
+                Default
+              </Badge>
             )}
           </div>
-          <span className="text-xs text-muted-foreground shrink-0 hidden sm:block capitalize">
-            {getStats()}
-          </span>
+          {template.description && (
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
+              {template.description}
+            </p>
+          )}
         </div>
+
+        <span className="text-[11px] text-muted-foreground shrink-0 hidden md:block capitalize tabular-nums">
+          {getStats()}
+        </span>
+
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
           {renderAction()}
         </div>
       </div>
       {expanded && (
-        <div className="px-4 pb-4 pt-1 ml-[32px] border-t border-border/20 bg-muted/10">
+        <div className="px-5 pb-5 pt-2 border-t border-border/30 bg-muted/10">
           {renderExpanded()}
         </div>
       )}
@@ -407,32 +435,44 @@ function TemplateRow({
 
 function TemplateSection({
   title,
+  subtitle,
   icon: Icon,
+  type,
   templates,
   workspaceId,
   expandedId,
   onToggle,
 }: {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  subtitle: string;
+  icon: LucideIcon;
+  type: string;
   templates: Template[];
   workspaceId: string;
   expandedId: string | null;
   onToggle: (id: string) => void;
 }) {
   if (templates.length === 0) return null;
+  const tint = SECTION_TINT[type] ?? { bg: "bg-muted", fg: "text-muted-foreground" };
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-          {title}
-        </h2>
-        <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-          {templates.length}
-        </Badge>
+    <section>
+      {/* Section header — icon badge + title + subtitle + count */}
+      <div className="flex items-start gap-3 mb-3">
+        <div className={`h-8 w-8 rounded-lg ${tint.bg} flex items-center justify-center shrink-0`}>
+          <Icon className={`h-4 w-4 ${tint.fg}`} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+            <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
+              {templates.length}
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">{subtitle}</p>
+        </div>
       </div>
-      <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/40 overflow-hidden">
+
+      <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/40 overflow-hidden">
         {templates.map((t) => (
           <TemplateRow
             key={t.id}
@@ -443,7 +483,7 @@ function TemplateSection({
           />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -480,20 +520,21 @@ export default function TemplatesClient({
     cycleProfileTemplates.length + goalTemplates.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Search */}
+    <div className="space-y-8">
+      {/* Search bar */}
       <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           placeholder="Search templates..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
+          className="pl-9 h-9 text-sm"
         />
         {search && (
           <button
             onClick={() => setSearch("")}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -501,7 +542,7 @@ export default function TemplatesClient({
       </div>
 
       {!hasAny && (
-        <div className="rounded-lg border border-dashed border-border/60 py-16 text-center">
+        <div className="rounded-xl border border-dashed border-border/60 py-16 text-center">
           <p className="text-sm font-medium text-foreground mb-1">No templates found</p>
           <p className="text-xs text-muted-foreground">
             {search ? "Try a different search term" : "Templates will appear here once seeded"}
@@ -509,11 +550,56 @@ export default function TemplatesClient({
         </div>
       )}
 
-      <TemplateSection title="Function Templates" icon={Briefcase} templates={functionTemplates} workspaceId={workspaceId} expandedId={expandedId} onToggle={handleToggle} />
-      <TemplateSection title="Review Templates" icon={FileText} templates={reviewTemplates} workspaceId={workspaceId} expandedId={expandedId} onToggle={handleToggle} />
-      <TemplateSection title="Competency Frameworks" icon={Layers} templates={frameworkTemplates} workspaceId={workspaceId} expandedId={expandedId} onToggle={handleToggle} />
-      <TemplateSection title="Cycle Profiles" icon={Calendar} templates={cycleProfileTemplates} workspaceId={workspaceId} expandedId={expandedId} onToggle={handleToggle} />
-      <TemplateSection title="Goal Templates" icon={Target} templates={goalTemplates} workspaceId={workspaceId} expandedId={expandedId} onToggle={handleToggle} />
+      <TemplateSection
+        title="Function templates"
+        subtitle="Career frameworks with levels + expected competency scores"
+        icon={Briefcase}
+        type="function_template"
+        templates={functionTemplates}
+        workspaceId={workspaceId}
+        expandedId={expandedId}
+        onToggle={handleToggle}
+      />
+      <TemplateSection
+        title="Review templates"
+        subtitle="Question sets used when launching a review cycle"
+        icon={FileText}
+        type="review"
+        templates={reviewTemplates}
+        workspaceId={workspaceId}
+        expandedId={expandedId}
+        onToggle={handleToggle}
+      />
+      <TemplateSection
+        title="Competency frameworks"
+        subtitle="Pre-built competency libraries you can import wholesale"
+        icon={Layers}
+        type="competency_framework"
+        templates={frameworkTemplates}
+        workspaceId={workspaceId}
+        expandedId={expandedId}
+        onToggle={handleToggle}
+      />
+      <TemplateSection
+        title="Cycle profiles"
+        subtitle="Starting points for common review cadences (annual, quarterly, probation)"
+        icon={Calendar}
+        type="cycle_profile"
+        templates={cycleProfileTemplates}
+        workspaceId={workspaceId}
+        expandedId={expandedId}
+        onToggle={handleToggle}
+      />
+      <TemplateSection
+        title="Goal templates"
+        subtitle="Seed a new goal with a pre-filled title and metric"
+        icon={Target}
+        type="goal_template"
+        templates={goalTemplates}
+        workspaceId={workspaceId}
+        expandedId={expandedId}
+        onToggle={handleToggle}
+      />
     </div>
   );
 }
