@@ -432,10 +432,12 @@ export default async function DashboardPage() {
     return (
       <div className="space-y-8">
         <PageHeader
-          hat="my-team"
+          hat="my-work"
           title="Home"
           subtitle={
-            pendingMgrReviews.length > 0
+            pendingSelf.length > 0
+              ? `You have ${pendingSelf.length} pending action${pendingSelf.length !== 1 ? "s" : ""}.`
+              : pendingMgrReviews.length > 0
               ? `${pendingMgrReviews.length} team member${pendingMgrReviews.length !== 1 ? "s" : ""} ready for your review.`
               : teamSize === 0
               ? "No direct reports assigned yet."
@@ -443,11 +445,11 @@ export default async function DashboardPage() {
           }
         />
 
-        {/* Own pending self-review */}
+        {/* Section 1 — MY WORK: your next actions */}
         {pendingSelf.length > 0 && (
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
-              Your action required
+          <section aria-labelledby="next-actions" className="space-y-2">
+            <h2 id="next-actions" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+              Your next actions
             </h2>
             {pendingSelf.map((a: any) => (
               <div
@@ -468,15 +470,24 @@ export default async function DashboardPage() {
                 </Button>
               </div>
             ))}
-          </div>
+          </section>
         )}
+
+        {/* Section 2 — MY TEAM: your team needs attention */}
+        <section aria-labelledby="team-attention" className="space-y-3">
+          <h2 id="team-attention" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3 flex items-center gap-2">
+            Your team
+            <span className="inline-flex items-center text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+              My Team
+            </span>
+          </h2>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Team stats */}
           <div className="lg:col-span-1 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Team overview
-            </h2>
+            </h3>
             <div className="grid gap-2">
               {[
                 { label: "Direct reports", value: teamSize, color: "text-sky-600 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10", icon: Users },
@@ -524,9 +535,9 @@ export default async function DashboardPage() {
           {/* Team to review list */}
           <div className="lg:col-span-2 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 {pendingMgrReviews.length > 0 ? "Ready for your review" : "Team review status"}
-              </h2>
+              </h3>
               <Link
                 href="/dashboard/performance"
                 className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
@@ -626,6 +637,7 @@ export default async function DashboardPage() {
             </div>
           </div>
         )}
+        </section>
       </div>
     );
   }
@@ -656,15 +668,21 @@ export default async function DashboardPage() {
   ];
 
 
+  // Personal pending self-reviews — HR/admin are employees too
+  const adminPersonalAssignments = personal?.assignments || [];
+  const adminPendingSelf = adminPersonalAssignments.filter((a: any) => !a.selfSubmitted && a.status !== "completed");
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <PageHeader
-        hat="manage"
-        title={showOnboarding ? `Welcome, ${firstName}` : "Organization Overview"}
+        hat="my-work"
+        title={showOnboarding ? `Welcome, ${firstName}` : `Hey ${firstName}`}
         subtitle={
           showOnboarding
             ? "Let's get your workspace set up. Follow the steps below to start running reviews."
-            : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""}`
+            : adminPendingSelf.length > 0
+              ? `You have ${adminPendingSelf.length} pending action${adminPendingSelf.length !== 1 ? "s" : ""}.`
+              : `${stats.totalUsers} team member${stats.totalUsers !== 1 ? "s" : ""} · ${stats.activeCycles} active cycle${stats.activeCycles !== 1 ? "s" : ""} in your workspace.`
         }
         actions={
           !showOnboarding && activeCycles.length > 0 ? (
@@ -677,6 +695,34 @@ export default async function DashboardPage() {
           ) : undefined
         }
       />
+
+      {/* Section 1 — MY WORK: your next actions (personal pending, always first) */}
+      {!showOnboarding && adminPendingSelf.length > 0 && (
+        <section aria-labelledby="admin-next-actions" className="space-y-2">
+          <h2 id="admin-next-actions" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
+            Your next actions
+          </h2>
+          {adminPendingSelf.map((a: any) => (
+            <div
+              key={a.id}
+              className="flex items-center justify-between p-4 rounded-xl border border-amber-200/70 bg-amber-50/40 dark:border-amber-400/20 dark:bg-amber-400/[0.04]"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Your self-review is due — {a.cycle?.name}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">You&apos;re also being reviewed this cycle</p>
+                </div>
+              </div>
+              <Button size="sm" className="shrink-0" asChild>
+                <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
+                  Start <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+                </Link>
+              </Button>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Onboarding checklist */}
       {showOnboarding && (
@@ -717,7 +763,15 @@ export default async function DashboardPage() {
         </Card>
       )}
 
-      {/* Org-wide metrics */}
+      {/* Section 3 — MANAGE: workspace health (admins only, shown below personal + team sections) */}
+      {!showOnboarding && (
+        <section aria-labelledby="workspace-health" className="space-y-3">
+          <h2 id="workspace-health" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3 flex items-center gap-2">
+            Workspace health
+            <span className="inline-flex items-center text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
+              Manage
+            </span>
+          </h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((m) => (
           <Card key={m.label} className={`border-border/60 border-b-2 ${m.accent} hover:shadow-md transition-shadow`}>
@@ -738,11 +792,16 @@ export default async function DashboardPage() {
 
       {!showOnboarding && chartData && <DashboardCharts data={chartData} />}
 
-      {/* Manager team section for HR/Admins who also manage people */}
+      {/* Section 2 — MY TEAM: for HR/Admins who also manage direct reports */}
       {managerData && managerData.teamSize > 0 && (
-        <div className="space-y-3">
+        <section aria-labelledby="admin-team" className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">My Direct Reports</h2>
+            <h2 id="admin-team" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3 flex items-center gap-2">
+              Your team
+              <span className="inline-flex items-center text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                My Team
+              </span>
+            </h2>
             <Link
               href="/dashboard/my-team"
               className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
@@ -770,7 +829,7 @@ export default async function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
+        </section>
       )}
 
       {/* Active cycles quick view */}
@@ -820,6 +879,8 @@ export default async function DashboardPage() {
             })}
           </div>
         </div>
+      )}
+        </section>
       )}
     </div>
   );
