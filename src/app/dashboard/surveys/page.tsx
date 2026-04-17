@@ -154,55 +154,60 @@ function SurveyList({ surveys }: { surveys: any[] }) { // eslint-disable-line @t
         const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
         const recurrence: string | undefined = survey.config?.recurrence;
         return (
-          <Link
+          // Row is a flex container, NOT a link — so the Export anchor can be a
+          // sibling rather than a nested <a> (which was crashing hydration).
+          <div
             key={survey.id}
-            href={`/dashboard/surveys/${survey.id}`}
             className="flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors group"
           >
-            {/* Name + type + optional recurring tag stacked */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-medium text-foreground truncate">{survey.name}</span>
-                <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[survey.type] || ""}`}>
-                  {TYPE_LABELS[survey.type] || survey.type}
-                </Badge>
-                {recurrence && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-400/10 rounded px-1.5 py-0.5">
-                    <Repeat className="h-2.5 w-2.5" />
-                    {recurrence}
-                  </span>
-                )}
+            <Link
+              href={`/dashboard/surveys/${survey.id}`}
+              className="flex items-center gap-3 flex-1 min-w-0"
+            >
+              {/* Name + type + optional recurring tag stacked */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-foreground truncate">{survey.name}</span>
+                  <Badge variant="outline" className={`text-[10px] ${TYPE_COLORS[survey.type] || ""}`}>
+                    {TYPE_LABELS[survey.type] || survey.type}
+                  </Badge>
+                  {recurrence && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-400/10 rounded px-1.5 py-0.5">
+                      <Repeat className="h-2.5 w-2.5" />
+                      {recurrence}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {completed}/{total} responded · {rate}%
+                  {survey.closes_at && !recurrence && (
+                    <> · closes {format(new Date(survey.closes_at), "MMM d, yyyy")}</>
+                  )}
+                </p>
               </div>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                {completed}/{total} responded · {rate}%
-                {survey.closes_at && !recurrence && (
-                  <> · closes {format(new Date(survey.closes_at), "MMM d, yyyy")}</>
-                )}
-              </p>
-            </div>
 
-            {/* Progress bar */}
-            <div className="hidden sm:flex items-center gap-2 shrink-0 w-[140px]">
-              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${rate === 100 ? "bg-emerald-500" : "bg-primary"}`}
-                  style={{ width: `${rate}%` }}
-                />
+              {/* Progress bar */}
+              <div className="hidden sm:flex items-center gap-2 shrink-0 w-[140px]">
+                <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${rate === 100 ? "bg-emerald-500" : "bg-primary"}`}
+                    style={{ width: `${rate}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">{rate}%</span>
               </div>
-              <span className="text-[10px] text-muted-foreground tabular-nums w-8 text-right">{rate}%</span>
-            </div>
 
-            {/* Status chip */}
-            <Badge variant="outline" className={`text-[10px] shrink-0 capitalize ${STATUS_COLORS[survey.status] || ""}`}>
-              {survey.status}
-            </Badge>
+              {/* Status chip */}
+              <Badge variant="outline" className={`text-[10px] shrink-0 capitalize ${STATUS_COLORS[survey.status] || ""}`}>
+                {survey.status}
+              </Badge>
+            </Link>
 
-            {/* Export (only when there are responses) */}
+            {/* Export sits OUTSIDE the Link so we don't nest <a> inside <a> */}
             {completed > 0 && (
               <a
                 href={`/api/surveys/${survey.id}/export`}
                 download
-                onClick={(e) => e.stopPropagation()}
                 className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted transition-colors shrink-0"
                 title="Export CSV"
               >
@@ -210,8 +215,14 @@ function SurveyList({ surveys }: { surveys: any[] }) { // eslint-disable-line @t
               </a>
             )}
 
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" aria-hidden="true" />
-          </Link>
+            <Link
+              href={`/dashboard/surveys/${survey.id}`}
+              className="shrink-0"
+              aria-label="Open survey"
+            >
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" aria-hidden="true" />
+            </Link>
+          </div>
         );
       })}
     </div>
