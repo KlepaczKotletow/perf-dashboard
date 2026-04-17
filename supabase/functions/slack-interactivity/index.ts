@@ -249,6 +249,30 @@ Deno.serve(async (req) => {
 
         // Notify only when ALL reviews for this employee are completed (not pending or in_progress)
         if (nonCompletedForEmp.length === 0 && completedForEmp.length > 0) {
+          // Atomically claim the per-employee alert slot. Only the first concurrent
+          // caller sees a non-empty array back; later callers skip silently.
+          // We flip one row per cycle+employee: whichever review_assignment fires
+          // the PATCH first wins. The filter matches all assignments for this
+          // (cycle, employee) pair so repeat calls find them all already stamped.
+          const claimRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/review_assignments?cycle_id=eq.${cycleId}&employee_id=eq.${empId}&employee_completion_notified_at=is.null`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({ employee_completion_notified_at: new Date().toISOString() }),
+            },
+          );
+          const claimed = claimRes.ok ? await claimRes.json() : [];
+          if (!Array.isArray(claimed) || claimed.length === 0) {
+            // Another caller already notified — skip both per-employee and cycle-wide
+            // so we don't double-send. The cycle-wide branch below has its own
+            // independent guard too.
+          } else {
           const avgOverall = completedForEmp.reduce((s: number, a: any) => s + a.overall_rating, 0) / completedForEmp.length;
           const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=in.(admin,hr)&select=id,slack_user_id`);
 
@@ -271,12 +295,32 @@ Deno.serve(async (req) => {
               ],
             });
           }
+          } // close "else" of atomic-claim branch
         }
 
         // Check: all reviews in the ENTIRE cycle (must all be "completed", not just "not pending")
         const allNonCompleted = await dbQuery("review_assignments",
           `cycle_id=eq.${cycleId}&status=neq.completed&select=id`);
         if (Array.isArray(allNonCompleted) && allNonCompleted.length === 0) {
+          // Atomic claim on the cycle-wide alert slot.
+          const cycleClaimRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/performance_cycles?id=eq.${cycleId}&completion_notified_at=is.null`,
+            {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_SERVICE_ROLE_KEY,
+                Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({ completion_notified_at: new Date().toISOString() }),
+            },
+          );
+          const cycleClaimed = cycleClaimRes.ok ? await cycleClaimRes.json() : [];
+          if (!Array.isArray(cycleClaimed) || cycleClaimed.length === 0) {
+            return; // already sent by a concurrent caller
+          }
+
           const allCompleted = await dbQuery("review_assignments",
             `cycle_id=eq.${cycleId}&status=eq.completed&select=id,overall_rating`);
           const cycleAvg = allCompleted.length > 0
