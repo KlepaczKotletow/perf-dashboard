@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, ArrowRight, Loader2, Plus, X, Users, BarChart2, TrendingUp, Info, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 
 type SurveyType = "360" | "pulse" | "enps";
@@ -726,6 +727,106 @@ export default function NewSurveyPage() {
                 </div>
               )}
 
+              {/* ============================================================
+                   When to send — inline, visible while configuring.
+                   Used to be hidden in a modal after Launch.
+                  ============================================================ */}
+              <div className="space-y-3">
+                <Label>When to send</Label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
+                  {[
+                    { value: "now" as const, label: "Now", available: true },
+                    { value: "schedule" as const, label: "Schedule", available: true },
+                    { value: "recurring" as const, label: "Recurring", available: surveyType === "pulse" || surveyType === "enps" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={!opt.available}
+                      onClick={() => setNamiScheduleMode(opt.value)}
+                      className={`h-9 rounded-md text-sm font-medium transition-colors ${
+                        namiScheduleMode === opt.value
+                          ? "bg-card text-foreground shadow-sm"
+                          : opt.available
+                            ? "text-muted-foreground hover:text-foreground"
+                            : "text-muted-foreground/30 cursor-not-allowed"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {surveyType === "360" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Recurring is only available for Pulse and eNPS surveys.
+                  </p>
+                )}
+
+                {namiScheduleMode === "schedule" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sched-datetime" className="text-xs text-muted-foreground">Send at</Label>
+                    <Input
+                      id="sched-datetime"
+                      type="datetime-local"
+                      value={namiScheduleDate}
+                      onChange={(e) => setNamiScheduleDate(e.target.value)}
+                      className="h-9 text-sm max-w-sm"
+                    />
+                  </div>
+                )}
+
+                {namiScheduleMode === "recurring" && (
+                  <div className="space-y-3 rounded-lg border border-border/60 p-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Frequency</Label>
+                      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
+                        {([
+                          ["weekly", "Weekly"],
+                          ["biweekly", "Every 2 weeks"],
+                          ["monthly", "Monthly"],
+                        ] as const).map(([val, label]) => (
+                          <button
+                            key={val}
+                            type="button"
+                            onClick={() => setRecurrence(val)}
+                            className={`h-8 rounded-md text-xs font-medium transition-colors ${
+                              recurrence === val
+                                ? "bg-card text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Day of the week</Label>
+                      <div className="grid grid-cols-5 gap-1.5 p-1 rounded-lg bg-muted/60">
+                        {(["monday", "tuesday", "wednesday", "thursday", "friday"] as const).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => setRecurrenceDay(d)}
+                            className={`h-8 rounded-md text-xs font-medium transition-colors capitalize ${
+                              recurrenceDay === d
+                                ? "bg-card text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {d.slice(0, 3)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Nami sends this survey every {recurrence === "weekly" ? "week" : recurrence === "biweekly" ? "2 weeks" : "month"} on{" "}
+                      <span className="font-semibold text-foreground capitalize">{recurrenceDay}</span>s. First send goes out now.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-between">
                 <Button variant="outline" onClick={() => { setStep(1); setActiveGuide(surveyType ? `type-${surveyType}` : "type-360"); }}>
                   <ArrowLeft className="h-4 w-4 mr-1.5" />Back
@@ -810,6 +911,16 @@ export default function NewSurveyPage() {
                       <span>{closesAt}</span>
                     </div>
                   )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">When</span>
+                    <span className="font-medium">
+                      {namiScheduleMode === "now" && "Send immediately"}
+                      {namiScheduleMode === "schedule" && (namiScheduleDate
+                        ? `Scheduled for ${format(new Date(namiScheduleDate), "MMM d, yyyy 'at' h:mm a")}`
+                        : "Scheduled")}
+                      {namiScheduleMode === "recurring" && `${recurrence.charAt(0).toUpperCase() + recurrence.slice(1)} on ${recurrenceDay.charAt(0).toUpperCase() + recurrenceDay.slice(1)}s`}
+                    </span>
+                  </div>
                   {surveyType === "360" && peerMode !== "admin_assigns" && (
                     <div className="rounded-md bg-blue-50 border border-blue-100 px-3 py-2 text-blue-700 text-xs mt-2">
                       After launch, {peerMode === "subject_nominates" ? "each subject" : "managers"} will receive a Slack DM to nominate peer reviewers.
@@ -849,113 +960,29 @@ export default function NewSurveyPage() {
         </div>
       </div>
 
-      {/* Nami confirm modal — modernised picker */}
+      {/* Final confirm — picker lives on Step 2 now; this is a pure confirmation. */}
       {showNamiConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-2xl max-w-md w-full shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-border/60">
-              <h3 className="text-lg font-semibold text-foreground">Nami will message participants</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                <span className="font-semibold text-foreground">{namiParticipantCount}</span> participant{namiParticipantCount !== 1 ? "s" : ""} will receive a Slack DM to complete the survey.
+            <div className="px-6 pt-6 pb-5 space-y-3">
+              <h3 className="text-lg font-semibold text-foreground">Ready to send</h3>
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{namiParticipantCount}</span> participant{namiParticipantCount !== 1 ? "s" : ""} will receive a Slack DM from Nami.
               </p>
-            </div>
-
-            {/* Schedule mode picker — segmented control */}
-            <div className="px-6 py-5 space-y-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">When to send</Label>
-                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
-                  {[
-                    { value: "now" as const, label: "Now", available: true },
-                    { value: "schedule" as const, label: "Schedule", available: true },
-                    { value: "recurring" as const, label: "Recurring", available: surveyType === "pulse" || surveyType === "enps" },
-                  ].map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      disabled={!opt.available}
-                      onClick={() => setNamiScheduleMode(opt.value)}
-                      className={`h-8 rounded-md text-xs font-medium transition-colors ${
-                        namiScheduleMode === opt.value
-                          ? "bg-card text-foreground shadow-sm"
-                          : opt.available
-                            ? "text-muted-foreground hover:text-foreground"
-                            : "text-muted-foreground/30 cursor-not-allowed"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">Schedule</p>
+                <p className="text-foreground">
+                  {namiScheduleMode === "now" && "Sending immediately"}
+                  {namiScheduleMode === "schedule" && namiScheduleDate && (
+                    <>Scheduled for {format(new Date(namiScheduleDate), "MMM d, yyyy 'at' h:mm a")}</>
+                  )}
+                  {namiScheduleMode === "recurring" && (
+                    <>Every {recurrence === "weekly" ? "week" : recurrence === "biweekly" ? "2 weeks" : "month"} on <span className="font-semibold capitalize">{recurrenceDay}</span>s — first send goes out now</>
+                  )}
+                </p>
               </div>
-
-              {namiScheduleMode === "schedule" && (
-                <div className="space-y-2">
-                  <Label htmlFor="sched-datetime" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Send at</Label>
-                  <Input
-                    id="sched-datetime"
-                    type="datetime-local"
-                    value={namiScheduleDate}
-                    onChange={(e) => setNamiScheduleDate(e.target.value)}
-                    className="h-9 text-sm"
-                  />
-                </div>
-              )}
-
-              {namiScheduleMode === "recurring" && (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Frequency</Label>
-                    <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-muted/60">
-                      {([
-                        ["weekly", "Weekly"],
-                        ["biweekly", "Every 2 weeks"],
-                        ["monthly", "Monthly"],
-                      ] as const).map(([val, label]) => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setRecurrence(val)}
-                          className={`h-8 rounded-md text-xs font-medium transition-colors ${
-                            recurrence === val
-                              ? "bg-card text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Day of the week</Label>
-                    <div className="grid grid-cols-5 gap-1.5 p-1 rounded-lg bg-muted/60">
-                      {(["monday", "tuesday", "wednesday", "thursday", "friday"] as const).map((d) => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setRecurrenceDay(d)}
-                          className={`h-8 rounded-md text-xs font-medium transition-colors capitalize ${
-                            recurrenceDay === d
-                              ? "bg-card text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {d.slice(0, 3)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Nami will automatically send this survey every {recurrence === "weekly" ? "week" : recurrence === "biweekly" ? "2 weeks" : "month"} on{" "}
-                    <span className="font-semibold text-foreground capitalize">{recurrenceDay}</span>s. First send goes out now.
-                  </p>
-                </div>
-              )}
             </div>
 
-            {/* Footer — CTAs */}
             <div className="px-6 pb-5 pt-1 flex gap-2">
               <Button
                 variant="outline"
