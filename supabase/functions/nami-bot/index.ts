@@ -16,7 +16,7 @@ import {
   buildOverdueNotice,
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
-import { callSlackApi } from "../_shared/slack-api.ts";
+import { callSlackApi, buildAuthedDashboardUrl, SlackRateLimitError } from "../_shared/slack-api.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -1333,6 +1333,11 @@ async function handleReleaseGrades(cycleId: string) {
         ? resultParts.join("  ·  ")
         : "_No rating available_";
 
+      const resultsUrl = await buildAuthedDashboardUrl(
+        SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+        emp.id, "/dashboard/performance",
+      );
+
       const blocks: any[] = [
         {
           type: "section",
@@ -1358,7 +1363,7 @@ async function handleReleaseGrades(cycleId: string) {
               type: "button",
               text: { type: "plain_text", text: "View my results :chart_with_upwards_trend:", emoji: true },
               style: "primary",
-              url: `${DASHBOARD_URL}/dashboard/performance`,
+              url: resultsUrl,
               action_id: "open_results",
             },
           ],

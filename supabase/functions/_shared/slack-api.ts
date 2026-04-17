@@ -88,3 +88,78 @@ export async function sendSlackMessagesBulk(
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+// =============================================================================
+//  Slack rate-limit sentinel — thrown when Slack returns 429 and the caller
+//  should requeue the job instead of burning in-process retries.
+// =============================================================================
+export class SlackRateLimitError extends Error {
+  retryAfterSeconds: number;
+  constructor(retryAfterSeconds: number) {
+    super(`Slack rate-limited, retry after ${retryAfterSeconds}s`);
+    this.name = "SlackRateLimitError";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+// =============================================================================
+//  Authed dashboard deep-links — mint a short-lived dashboard_link_token and
+//  build `${DASHBOARD_URL}/api/auth/slack-link?t=<token>`. The slack-link
+//  route redeems the token and forwards the user through a magic-link sign-in
+//  to the stored target_path. Falls back to the raw URL on any error so a
+//  Slack send never fails solely because the token service is unavailable.
+// =============================================================================
+
+export async function mintDashboardLinkToken(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  userId: string,
+  targetPath: string,
+  ttlSeconds: number = 60 * 60 * 24 * 7, // 7 days; Slack messages sit in inboxes
+): Promise<string | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/rest/v1/rpc/mint_dashboard_link_token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        p_user_id: userId,
+        p_target_path: targetPath,
+        p_ttl_seconds: ttlSeconds,
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[mintDashboardLinkToken] RPC failed: ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    return (data && typeof data.token === "string") ? data.token : null;
+  } catch (err) {
+    console.warn("[mintDashboardLinkToken] fetch error:", err);
+    return null;
+  }
+}
+
+/**
+ * Build a Slack-embedded URL that authenticates the recipient on click.
+ * Falls back to the raw public URL if token minting fails — never blocks a send.
+ */
+export async function buildAuthedDashboardUrl(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  dashboardUrl: string,
+  userId: string | null | undefined,
+  targetPath: string,
+  ttlSeconds?: number,
+): Promise<string> {
+  const rawUrl = `${dashboardUrl}${targetPath}`;
+  if (!userId) return rawUrl;
+  const token = await mintDashboardLinkToken(
+    supabaseUrl, serviceRoleKey, userId, targetPath, ttlSeconds,
+  );
+  if (!token) return rawUrl;
+  return `${dashboardUrl}/api/auth/slack-link?t=${encodeURIComponent(token)}`;
+}

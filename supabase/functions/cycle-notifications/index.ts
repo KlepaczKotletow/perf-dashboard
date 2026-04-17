@@ -1,9 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { callSlackApi } from "../_shared/slack-api.ts";
+import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL") || "https://namihr.com";
+
+/** Helper: bind the shared authed-URL builder to this file's env vars. */
+function authedUrl(userId: string, path: string): Promise<string> {
+  return buildAuthedDashboardUrl(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL, userId, path);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -97,7 +102,8 @@ async function handleCycleLaunch(cycleId: string) {
     if (mgr?.slack_user_id && a.assignment_type !== "upward") {
       const canSend = await logNotification(workspaceId, mgr.id, "review_assigned", a.id);
       if (canSend) {
-        const text = `📋 *Review cycle started: ${cycle.name}*\nYou have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/cycles/${cycleId}`;
+        const url = await authedUrl(mgr.id, `/dashboard/cycles/${cycleId}`);
+        const text = `📋 *Review cycle started: ${cycle.name}*\nYou have a review to complete for *${emp?.slack_name || "a team member"}*.\nDeadline: ${deadline}\n→ ${url}`;
         const ok = await sendSlackDM(botToken, mgr.slack_user_id, text);
         if (ok) {
           sent++;
@@ -117,7 +123,8 @@ async function handleCycleLaunch(cycleId: string) {
       if (reviewer?.slack_user_id) {
         const canSend = await logNotification(workspaceId, reviewer.id, "review_assigned", `upward_${a.id}`);
         if (canSend) {
-          const text = `📋 *Review cycle started: ${cycle.name}*\nYou've been asked to give upward feedback on *${emp?.slack_name || "your manager"}*.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/performance`;
+          const url = await authedUrl(reviewer.id, "/dashboard/performance");
+          const text = `📋 *Review cycle started: ${cycle.name}*\nYou've been asked to give upward feedback on *${emp?.slack_name || "your manager"}*.\nDeadline: ${deadline}\n→ ${url}`;
           const ok = await sendSlackDM(botToken, reviewer.slack_user_id, text);
           if (ok) {
             sent++;
@@ -135,7 +142,8 @@ async function handleCycleLaunch(cycleId: string) {
     if (emp?.slack_user_id && a.assignment_type === "standard") {
       const canSend = await logNotification(workspaceId, emp.id, "review_assigned", `self_${a.id}`);
       if (canSend) {
-        const text = `📋 *Review cycle started: ${cycle.name}*\nYour performance review has begun. Please complete your self-assessment.\nDeadline: ${deadline}\n→ ${DASHBOARD_URL}/dashboard/performance`;
+        const url = await authedUrl(emp.id, "/dashboard/performance");
+        const text = `📋 *Review cycle started: ${cycle.name}*\nYour performance review has begun. Please complete your self-assessment.\nDeadline: ${deadline}\n→ ${url}`;
         const ok = await sendSlackDM(botToken, emp.slack_user_id, text);
         if (ok) {
           sent++;
@@ -200,7 +208,8 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
   const canSend = await logNotification(goal.workspace_id, manager.id, "goal_status_update", referenceId);
   if (!canSend) return { sent: 0, skipped: 1 };
 
-  const text = `${label} — *${goal.title}*\n${employee.slack_name}'s goal status has changed.\n→ ${DASHBOARD_URL}/dashboard/goals`;
+  const url = await authedUrl(manager.id, "/dashboard/goals");
+  const text = `${label} — *${goal.title}*\n${employee.slack_name}'s goal status has changed.\n→ ${url}`;
   const ok = await sendSlackDM(workspace.bot_token, manager.slack_user_id, text);
   if (!ok) {
     await rollbackNotification(goal.workspace_id, manager.id, "goal_status_update", referenceId);
@@ -234,7 +243,8 @@ async function handleSelfSubmitted(assignmentId: string) {
   const canSend = await logNotification(workspaceId, mgr.id, "self_review_submitted", assignmentId);
   if (!canSend) return { sent: 0, skipped: 1 };
 
-  const text = `✅ *${emp?.slack_name || "An employee"}* has completed their self-review for *${cycle?.name}*.\nYou can now complete your manager review.\n→ ${DASHBOARD_URL}/dashboard/reviews/${assignmentId}`;
+  const url = await authedUrl(mgr.id, `/dashboard/reviews/${assignmentId}`);
+  const text = `✅ *${emp?.slack_name || "An employee"}* has completed their self-review for *${cycle?.name}*.\nYou can now complete your manager review.\n→ ${url}`;
   const ok = await sendSlackDM(botToken, mgr.slack_user_id, text);
   if (!ok) {
     await rollbackNotification(workspaceId, mgr.id, "self_review_submitted", assignmentId);

@@ -1,5 +1,5 @@
 import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, buildReviewSummary, buildSurveyQuestionPrompt } from "../_shared/nami-blocks.ts";
-import { callSlackApi } from "../_shared/slack-api.ts";
+import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -250,10 +250,14 @@ Deno.serve(async (req) => {
         // Notify only when ALL reviews for this employee are completed (not pending or in_progress)
         if (nonCompletedForEmp.length === 0 && completedForEmp.length > 0) {
           const avgOverall = completedForEmp.reduce((s: number, a: any) => s + a.overall_rating, 0) / completedForEmp.length;
-          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=in.(admin,hr)&select=slack_user_id`);
+          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=in.(admin,hr)&select=id,slack_user_id`);
 
           for (const admin of (admins || [])) {
             if (!admin?.slack_user_id) continue;
+            const viewUrl = await buildAuthedDashboardUrl(
+              SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+              admin.id, `/dashboard/cycles/${cycleId}`,
+            );
             await slackApi(botToken, "chat.postMessage", {
               channel: admin.slack_user_id,
               text: `All reviews for ${empName} are complete`,
@@ -262,7 +266,7 @@ Deno.serve(async (req) => {
                 { type: "context", elements: [{ type: "mrkdwn", text: `Overall: ⭐ *${(Math.round(avgOverall * 10) / 10).toString()}/${ws.rating_scale?.max || 5}* · ${completedForEmp.length} reviews` }] },
                 { type: "actions", elements: [
                   { type: "button", text: { type: "plain_text", text: "View Results 🔗", emoji: true },
-                    url: `${DASHBOARD_URL}/dashboard/cycles/${cycleId}`, action_id: "view_dashboard" },
+                    url: viewUrl, action_id: "view_dashboard" },
                 ]},
               ],
             });
@@ -281,9 +285,19 @@ Deno.serve(async (req) => {
           const cycles = await dbQuery("performance_cycles", `id=eq.${cycleId}&select=name`);
           const cycleName = cycles?.[0]?.name || "Review Cycle";
 
-          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=eq.admin&select=slack_user_id&limit=1`);
+          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=eq.admin&select=id,slack_user_id&limit=1`);
           const firstAdmin = admins?.[0];
           if (firstAdmin?.slack_user_id) {
+            const [viewUrl, calUrl] = await Promise.all([
+              buildAuthedDashboardUrl(
+                SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+                firstAdmin.id, `/dashboard/cycles/${cycleId}`,
+              ),
+              buildAuthedDashboardUrl(
+                SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+                firstAdmin.id, `/dashboard/cycles/${cycleId}/calibration`,
+              ),
+            ]);
             await slackApi(botToken, "chat.postMessage", {
               channel: firstAdmin.slack_user_id,
               text: `All reviews for "${cycleName}" are complete!`,
@@ -292,9 +306,9 @@ Deno.serve(async (req) => {
                 { type: "context", elements: [{ type: "mrkdwn", text: `${allCompleted.length} reviews · Average: ⭐ *${(Math.round(cycleAvg * 10) / 10).toString()}/${ws.rating_scale?.max || 5}*` }] },
                 { type: "actions", elements: [
                   { type: "button", text: { type: "plain_text", text: "View Results", emoji: true }, style: "primary",
-                    url: `${DASHBOARD_URL}/dashboard/cycles/${cycleId}`, action_id: "view_dashboard" },
+                    url: viewUrl, action_id: "view_dashboard" },
                   { type: "button", text: { type: "plain_text", text: "Start Calibration", emoji: true },
-                    url: `${DASHBOARD_URL}/dashboard/cycles/${cycleId}/calibration`, action_id: "view_calibration" },
+                    url: calUrl, action_id: "view_calibration" },
                 ]},
               ],
             });
@@ -1477,6 +1491,10 @@ Deno.serve(async (req) => {
           return `• ${compNames[i]} — skipped`;
         }).join("\n");
 
+        const dashUrl = await buildAuthedDashboardUrl(
+          SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+          conv.user_id, "/dashboard",
+        );
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `Review submitted — ${conv.employee_name}`,
@@ -1487,7 +1505,7 @@ Deno.serve(async (req) => {
             { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${convScaleMax}* · ${ratedCount} of ${compIds.length} rated` }] },
             { type: "actions", elements: [
               { type: "button", text: { type: "plain_text", text: "View on Dashboard 🔗", emoji: true },
-                url: `${DASHBOARD_URL}/dashboard`, action_id: "open_dashboard" },
+                url: dashUrl, action_id: "open_dashboard" },
             ]},
           ],
         });
@@ -2135,6 +2153,10 @@ Deno.serve(async (req) => {
           return `\u2022 ${compNames[i]} \u2014 skipped`;
         }).join("\n");
 
+        const dashUrl2 = await buildAuthedDashboardUrl(
+          SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
+          conv.user_id, "/dashboard",
+        );
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `Review submitted \u2014 ${conv.employee_name}`,
@@ -2145,7 +2167,7 @@ Deno.serve(async (req) => {
             { type: "context", elements: [{ type: "mrkdwn", text: `Average: *${avgStr}/${namiScaleMax}* \u00b7 ${ratedCount} of ${compIds.length} rated` }] },
             { type: "actions", elements: [
               { type: "button", text: { type: "plain_text", text: "View on Dashboard \ud83d\udd17", emoji: true },
-                url: `${DASHBOARD_URL}/dashboard`, action_id: "open_dashboard" },
+                url: dashUrl2, action_id: "open_dashboard" },
             ]},
           ],
         });
