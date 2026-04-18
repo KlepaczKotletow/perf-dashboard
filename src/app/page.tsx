@@ -32,8 +32,8 @@ export default function Home() {
             </Link>
             <div className="hidden lg:flex items-center gap-6">
               <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
-              <a href="#goals" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
-              <a href="#surveys" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
+              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
+              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
               <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
               <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>

@@ -34,7 +34,7 @@ export function FeatureTabs() {
   };
 
   return (
-    <section className="bg-[#faf9f6] border-y border-border/40 py-20 lg:py-28">
+    <section id="features" className="bg-[#faf9f6] border-y border-border/40 py-20 lg:py-28">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         {/* Header */}
         <ScrollReveal className="max-w-3xl">
