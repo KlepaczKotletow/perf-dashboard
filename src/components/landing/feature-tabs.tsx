@@ -34,7 +34,7 @@ export function FeatureTabs() {
   };
 
   return (
-    <section className="bg-[#faf9f4] border-y border-border/40 py-20 lg:py-28">
+    <section className="bg-[#faf9f6] border-y border-border/40 py-20 lg:py-28">
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         {/* Header */}
         <ScrollReveal className="max-w-3xl">
@@ -107,17 +107,40 @@ export function FeatureTabs() {
           })}
         </div>
 
-        {/* Active panel */}
-        <div
-          role="tabpanel"
-          id={`panel-${active}`}
-          aria-labelledby={`tab-${active}`}
-          className="pt-14"
-        >
-          {active === "reviews" && <ReviewsPanel />}
-          {active === "goals" && <GoalsPanel />}
-          {active === "pulse" && <PulsePanel />}
-          {active === "checkins" && <CheckinsPanel />}
+        {/* Panels — all four rendered, inactive ones hidden for stable aria-controls targets */}
+        <div className="pt-14">
+          <div
+            role="tabpanel"
+            id="panel-reviews"
+            aria-labelledby="tab-reviews"
+            hidden={active !== "reviews"}
+          >
+            <ReviewsPanel />
+          </div>
+          <div
+            role="tabpanel"
+            id="panel-goals"
+            aria-labelledby="tab-goals"
+            hidden={active !== "goals"}
+          >
+            <GoalsPanel />
+          </div>
+          <div
+            role="tabpanel"
+            id="panel-pulse"
+            aria-labelledby="tab-pulse"
+            hidden={active !== "pulse"}
+          >
+            <PulsePanel />
+          </div>
+          <div
+            role="tabpanel"
+            id="panel-checkins"
+            aria-labelledby="tab-checkins"
+            hidden={active !== "checkins"}
+          >
+            <CheckinsPanel />
+          </div>
         </div>
       </div>
     </section>
