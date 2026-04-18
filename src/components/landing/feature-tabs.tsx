@@ -643,13 +643,153 @@ function PulseMockup() {
   );
 }
 function CheckinsPanel() {
-  return <PanelStub title="Check-ins — coming in Task 5" />;
+  return (
+    <TwoColPanel
+      eyebrow="Recurring Check-ins"
+      heading={
+        <>
+          Set it once.
+          <br />
+          <span className="font-serif italic font-normal text-foreground/80">
+            Nami checks in forever.
+          </span>
+        </>
+      }
+      lede="Pick a group, pick a frequency. Every week (or two, or four), Nami runs a 30-second temperature check — and pings managers privately when sentiment drops."
+      features={[
+        {
+          num: "01",
+          title: "One emoji tap, optional comment",
+          body: "That's the whole interaction. Response rates stay above 90% because it's effortless.",
+        },
+        {
+          num: "02",
+          title: "Runs on autopilot",
+          body: "Weekly, bi-weekly, or monthly. Nami sends it, collects it, closes it. You never touch it again.",
+        },
+        {
+          num: "03",
+          title: "Early-warning alerts",
+          body: "When a teammate's score drops across consecutive check-ins, their manager gets a private Slack DM — weeks before it becomes a resignation.",
+        },
+      ]}
+      mockup={<CheckinsMockup />}
+    />
+  );
 }
 
-function PanelStub({ title }: { title: string }) {
+function CheckinsMockup() {
+  const emojis = [
+    { e: "😊", active: false },
+    { e: "🙂", active: true },
+    { e: "😐", active: false },
+    { e: "😕", active: false },
+    { e: "😞", active: false },
+  ];
+
   return (
-    <div className="rounded-xl border border-dashed border-border/60 p-10 text-center text-muted-foreground">
-      {title}
+    <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+      {/* Window chrome */}
+      <div className="bg-muted/70 border-b border-border/60 px-4 py-2.5 flex items-center gap-3">
+        <div className="flex gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+          <div className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+        </div>
+        <p className="flex-1 text-center text-[11px] text-muted-foreground font-medium">
+          DM · Sarah Chen
+        </p>
+      </div>
+
+      <div className="p-5 space-y-5 bg-white">
+        {/* Nami prompt */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">N</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">Nami</span>
+              <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                APP
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Mon 9:00 AM
+              </span>
+            </div>
+            <p className="text-[13px] text-foreground leading-relaxed">
+              Quick bi-weekly check-in — how are you feeling about work right
+              now?
+            </p>
+            <div className="mt-3 flex gap-2">
+              {emojis.map((opt, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "h-10 w-10 rounded-lg flex items-center justify-center text-lg border",
+                    opt.active
+                      ? "border-primary bg-primary/10"
+                      : "border-border bg-white"
+                  )}
+                >
+                  {opt.e}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Sarah reply */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-md bg-purple-400 flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">S</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">
+                Sarah Chen
+              </span>
+              <span className="text-[11px] text-muted-foreground">9:01 AM</span>
+            </div>
+            <p className="text-[13px] text-foreground italic leading-relaxed">
+              Swamped with the migration, but team&apos;s been great about
+              pairing.
+            </p>
+          </div>
+        </div>
+
+        {/* Nami confirmation */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">N</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">Nami</span>
+              <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                APP
+              </span>
+              <span className="text-[11px] text-muted-foreground">9:01 AM</span>
+            </div>
+            <p className="text-[13px] text-foreground leading-relaxed">
+              Thanks Sarah — logged &amp; anonymised. See you in two weeks ✦
+            </p>
+          </div>
+        </div>
+
+        {/* Private manager alert */}
+        <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3">
+          <p className="text-[10px] font-semibold text-amber-900 uppercase tracking-[0.15em]">
+            Private DM to Mike (Manager)
+          </p>
+          <p className="mt-1 text-[12px] text-amber-900 leading-relaxed">
+            Sarah&apos;s check-in score dropped{" "}
+            <span className="font-semibold">4.2 → 2.8</span> over 3 check-ins.
+            Consider a gentle 1:1 check-in this week.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
+
