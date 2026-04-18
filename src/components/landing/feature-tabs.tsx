@@ -477,7 +477,170 @@ function GoalsMockup() {
   );
 }
 function PulsePanel() {
-  return <PanelStub title="Pulse & eNPS — coming in Task 4" />;
+  return (
+    <TwoColPanel
+      eyebrow="Pulse & eNPS"
+      heading={
+        <>
+          Sentiment without
+          <br />
+          <span className="font-serif italic font-normal text-foreground/80">
+            the annual survey ritual.
+          </span>
+        </>
+      }
+      lede="Stop guessing how your team feels. Pulses, eNPS, and custom questionnaires collect answers in under a minute — and arrive as a dashboard with the one insight worth acting on this week."
+      features={[
+        {
+          num: "01",
+          title: "Pulse in 60 seconds",
+          body: "5–15 question pulse surveys delivered as Slack DMs. One-tap responses, anonymised and aggregated by default.",
+        },
+        {
+          num: "02",
+          title: "eNPS, always on",
+          body: "Promoters, passives, detractors, tracked over time. One number that flags the week something shifted.",
+        },
+        {
+          num: "03",
+          title: "The insight, not the data dump",
+          body: "Every pulse report surfaces the biggest drop and the team it came from. No dashboards you have to go find.",
+        },
+      ]}
+      mockup={<PulseMockup />}
+    />
+  );
+}
+
+function PulseMockup() {
+  // Simple polyline sparkline — 6 months, normalized to a 0-100 Y axis
+  const trend = [28, 30, 26, 34, 36, 42];
+  const w = 340;
+  const h = 90;
+  const max = Math.max(...trend);
+  const min = Math.min(...trend);
+  const points = trend.map((v, i) => {
+    const x = (i / (trend.length - 1)) * w;
+    const y = h - ((v - min) / (max - min || 1)) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const path = `M${points.join(" L")}`;
+  const area = `${path} L${w},${h} L0,${h} Z`;
+  const months = ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+      <div className="px-6 py-4 border-b border-border/60 flex items-center justify-between">
+        <p className="font-mono text-[13px] text-muted-foreground">
+          <span className="text-foreground font-semibold">Pulse</span> · March
+          2026
+        </p>
+        <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 rounded-full px-3 py-1">
+          87% response · 128 replies
+        </span>
+      </div>
+
+      <div className="p-5 grid grid-cols-[auto_1fr] gap-5">
+        {/* eNPS block */}
+        <div className="rounded-xl bg-[#faf9f6] border border-border/50 p-4 min-w-[140px]">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
+            ENPS
+          </p>
+          <p className="mt-2 font-serif text-[56px] leading-none font-normal text-foreground">
+            +42
+          </p>
+          <p className="mt-2 text-[11px] font-medium text-emerald-700">
+            ↗ +8 vs. Feb
+          </p>
+          <div className="mt-4 space-y-2 text-[11px]">
+            {[
+              { label: "Promoters",  pct: 58, color: "bg-emerald-500" },
+              { label: "Passives",   pct: 26, color: "bg-amber-400" },
+              { label: "Detractors", pct: 16, color: "bg-red-400" },
+            ].map((row) => (
+              <div key={row.label}>
+                <div className="flex justify-between text-foreground">
+                  <span>{row.label}</span>
+                  <span className="tabular-nums font-medium">{row.pct}%</span>
+                </div>
+                <div className="mt-1 h-1 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn("h-full", row.color)}
+                    style={{ width: `${row.pct}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sentiment trend + insight */}
+        <div className="flex flex-col">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
+            Sentiment · last 6 pulses
+          </p>
+          <div className="mt-2">
+            <svg
+              viewBox={`0 0 ${w} ${h}`}
+              className="w-full h-[90px]"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="pulseArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgb(59 130 246)" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="rgb(59 130 246)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={area} fill="url(#pulseArea)" />
+              <path
+                d={path}
+                fill="none"
+                stroke="rgb(59 130 246)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {points.map((p, i) => {
+                const [x, y] = p.split(",").map(Number);
+                return (
+                  <circle
+                    key={i}
+                    cx={x}
+                    cy={y}
+                    r="3"
+                    fill="white"
+                    stroke="rgb(59 130 246)"
+                    strokeWidth="2"
+                  />
+                );
+              })}
+            </svg>
+            <div className="mt-1 grid grid-cols-6 text-[10px] text-muted-foreground">
+              {months.map((m) => (
+                <span key={m} className="text-center">
+                  {m}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Insight */}
+          <div className="mt-auto pt-4">
+            <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-3">
+              <p className="text-[10px] font-semibold text-amber-900 uppercase tracking-[0.15em]">
+                Insight · This week
+              </p>
+              <p className="mt-1 text-[12px] text-amber-900 leading-relaxed">
+                <span className="font-semibold">Career growth clarity</span>{" "}
+                dropped 0.6 points in Engineering (3.1/5). Worth addressing at
+                the next all-hands.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 function CheckinsPanel() {
   return <PanelStub title="Check-ins — coming in Task 5" />;
