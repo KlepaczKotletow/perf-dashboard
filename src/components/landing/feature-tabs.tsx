@@ -149,9 +149,224 @@ export function FeatureTabs() {
 
 // ───── Panel stubs (filled in later tasks) ─────
 
-function ReviewsPanel() {
-  return <PanelStub title="360° Reviews — coming in Task 2" />;
+function TwoColPanel({
+  eyebrow,
+  heading,
+  lede,
+  features,
+  mockup,
+}: {
+  eyebrow: string;
+  heading: React.ReactNode;
+  lede: string;
+  features: Array<{ num: string; title: string; body: string }>;
+  mockup: React.ReactNode;
+}) {
+  return (
+    <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-start">
+      {/* Left: copy */}
+      <div>
+        <div className="flex items-center gap-2 mb-6">
+          <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
+            {eyebrow}
+          </span>
+        </div>
+        <h3 className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight text-foreground leading-[1.1]">
+          {heading}
+        </h3>
+        <p className="mt-5 text-[16px] leading-relaxed text-muted-foreground max-w-xl">
+          {lede}
+        </p>
+
+        <dl className="mt-10 space-y-7">
+          {features.map((f) => (
+            <div key={f.num} className="grid grid-cols-[36px_1fr] gap-x-5">
+              <dt className="font-mono text-xs text-muted-foreground/60 pt-0.5">
+                {f.num}
+              </dt>
+              <div>
+                <p className="text-[15px] font-semibold text-foreground">
+                  {f.title}
+                </p>
+                <p className="mt-1.5 text-[14.5px] leading-relaxed text-muted-foreground">
+                  {f.body}
+                </p>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      {/* Right: mockup */}
+      <div className="relative">{mockup}</div>
+    </div>
+  );
 }
+
+function ReviewsPanel() {
+  return (
+    <TwoColPanel
+      eyebrow="Reviews & 360°"
+      heading={
+        <>
+          Reviews that
+          <br />
+          <span className="font-serif italic font-normal text-foreground/80">
+            actually get completed.
+          </span>
+        </>
+      }
+      lede="Most teams hover around 40–60% review completion. Nami clears 95%+ because the review lives where the work already does — and HR keeps control of visibility."
+      features={[
+        {
+          num: "01",
+          title: "Slack modals, not forms",
+          body: "Competencies, level descriptors, open-ended comments — all inside a single Slack modal. Reviewers never see a browser.",
+        },
+        {
+          num: "02",
+          title: "Airtight visibility rules",
+          body: "Managers can't see upward feedback until they've submitted their own. Employees see results only after HR releases grades.",
+        },
+        {
+          num: "03",
+          title: "9-box calibration built in",
+          body: "HR aligns grades across managers on a drag-and-drop calibration grid before release. No spreadsheet exports.",
+        },
+        {
+          num: "04",
+          title: "Ratings tied to the framework",
+          body: "Each rating shows the level descriptor for that exact competency at that exact level. Guesswork replaced with rubric.",
+        },
+      ]}
+      mockup={<ReviewsMockup />}
+    />
+  );
+}
+
+function ReviewsMockup() {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+      {/* Window chrome */}
+      <div className="bg-muted/70 border-b border-border/60 px-4 py-2.5 flex items-center gap-3">
+        <div className="flex gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+          <div className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+          <div className="h-2.5 w-2.5 rounded-full bg-emerald-400/70" />
+        </div>
+        <p className="flex-1 text-center text-[11px] text-muted-foreground font-medium">
+          Manager Review · Alex Kim · L4
+        </p>
+      </div>
+
+      {/* Slack-style conversation */}
+      <div className="p-5 space-y-5 bg-white">
+        {/* Nami → competency prompt */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">N</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">Nami</span>
+              <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                APP
+              </span>
+              <span className="text-[11px] text-muted-foreground">10:32 AM</span>
+            </div>
+            <p className="text-[13px] font-semibold text-foreground">
+              2 of 6 · Product Strategy
+            </p>
+            <p className="text-[12px] text-muted-foreground mt-0.5">
+              Defining product vision, roadmap, and competitive positioning.
+            </p>
+            <div className="mt-3 rounded-lg border border-border/60 bg-background/40 p-3">
+              <p className="text-[11px] font-semibold text-foreground mb-2.5">
+                Rate at L4 (Senior) — expected: 4/5
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { n: 2, label: "Below" },
+                  { n: 3, label: "Meets" },
+                  { n: 4, label: "Exceeds", selected: true },
+                  { n: 5, label: "Exceptional" },
+                ].map((opt) => (
+                  <div
+                    key={opt.n}
+                    className={cn(
+                      "rounded-lg px-2 py-2 text-center border",
+                      opt.selected
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-white text-foreground"
+                    )}
+                  >
+                    <p
+                      className={cn(
+                        "text-lg font-bold",
+                        opt.selected ? "text-primary" : "text-foreground"
+                      )}
+                    >
+                      {opt.n}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {opt.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                <span className="font-semibold text-foreground">4</span> —
+                Defines multi-quarter strategy backed by market analysis.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Manager context reply */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-full bg-amber-200 flex items-center justify-center shrink-0">
+            <span className="text-amber-900 text-xs font-bold">M</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">
+                Mike Torres
+              </span>
+              <span className="text-[11px] text-muted-foreground">10:33 AM</span>
+            </div>
+            <p className="text-[13px] text-foreground italic leading-relaxed">
+              &ldquo;Alex drove the Q4 roadmap independently and identified the
+              upsell opportunity that became our top initiative.&rdquo;
+            </p>
+          </div>
+        </div>
+
+        {/* Nami confirmation */}
+        <div className="flex gap-3">
+          <div className="h-9 w-9 rounded-md bg-gradient-to-br from-primary to-secondary flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">N</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-sm font-bold text-foreground">Nami</span>
+              <span className="text-[9px] font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">
+                APP
+              </span>
+              <span className="text-[11px] text-muted-foreground">10:33 AM</span>
+            </div>
+            <p className="text-[13px] text-foreground">
+              Product Strategy{" "}
+              <span className="font-semibold text-primary">4/5</span> ✓ · Next:
+              Stakeholder Management
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GoalsPanel() {
   return <PanelStub title="Goals & OKRs — coming in Task 3" />;
 }
