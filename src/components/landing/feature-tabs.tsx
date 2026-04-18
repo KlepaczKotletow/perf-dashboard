@@ -47,7 +47,7 @@ export function FeatureTabs() {
           <h2 className="text-4xl sm:text-5xl lg:text-[56px] font-bold tracking-tight text-foreground leading-[1.05]">
             Everything performance,
             <br />
-            <span className="font-serif italic font-normal text-foreground/80">
+            <span className="italic font-normal text-foreground/80">
               run from one DM thread.
             </span>
           </h2>
@@ -212,7 +212,7 @@ function ReviewsPanel() {
         <>
           Reviews that
           <br />
-          <span className="font-serif italic font-normal text-foreground/80">
+          <span className="italic font-normal text-foreground/80">
             actually get completed.
           </span>
         </>
@@ -375,7 +375,7 @@ function GoalsPanel() {
         <>
           Goals that <span className="text-foreground/80">feed the review</span>
           <br />
-          <span className="font-serif italic font-normal text-foreground/80">
+          <span className="italic font-normal text-foreground/80">
             — not a second tool.
           </span>
         </>
@@ -484,7 +484,7 @@ function PulsePanel() {
         <>
           Sentiment without
           <br />
-          <span className="font-serif italic font-normal text-foreground/80">
+          <span className="italic font-normal text-foreground/80">
             the annual survey ritual.
           </span>
         </>
@@ -546,7 +546,7 @@ function PulseMockup() {
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em]">
             ENPS
           </p>
-          <p className="mt-2 font-serif text-[56px] leading-none font-normal text-foreground">
+          <p className="mt-2 text-[56px] leading-none font-bold tracking-tight text-foreground">
             +42
           </p>
           <p className="mt-2 text-[11px] font-medium text-emerald-700">
@@ -650,7 +650,7 @@ function CheckinsPanel() {
         <>
           Set it once.
           <br />
-          <span className="font-serif italic font-normal text-foreground/80">
+          <span className="italic font-normal text-foreground/80">
             Nami checks in forever.
           </span>
         </>
