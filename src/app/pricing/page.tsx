@@ -320,6 +320,12 @@ export default function PricingPage() {
                 Terms
               </Link>
               <Link
+                href="/security"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Security
+              </Link>
+              <Link
                 href="/support"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >

@@ -410,6 +410,7 @@ export default function RoadmapPage() {
               <Link href="/pricing" className="text-muted-foreground/60 hover:text-foreground transition-colors">Pricing</Link>
               <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>
               <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
             </div>
           </div>

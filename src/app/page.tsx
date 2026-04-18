@@ -788,6 +788,7 @@ export default function Home() {
             <div className="flex gap-6 text-sm">
               <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>
               <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
               <Link href="/roadmap" className="text-muted-foreground/60 hover:text-foreground transition-colors">Roadmap</Link>
             </div>
