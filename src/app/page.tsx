@@ -9,6 +9,7 @@ import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { MobileNav } from "@/components/landing/mobile-nav";
 import { AnimatedCounter } from "@/components/landing/animated-counter";
+import { FeatureTabs } from "@/components/landing/feature-tabs";
 
 export default function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
@@ -336,6 +337,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <FeatureTabs />
 
       {/* ── Goals & Analytics — product showcase ── */}
       <section id="goals" className="bg-white py-20 lg:py-24">
