@@ -179,12 +179,12 @@ function TwoColPanel({
           {lede}
         </p>
 
-        <dl className="mt-10 space-y-7">
+        <ul className="mt-10 space-y-7 list-none">
           {features.map((f) => (
-            <div key={f.num} className="grid grid-cols-[36px_1fr] gap-x-5">
-              <dt className="font-mono text-xs text-muted-foreground/60 pt-0.5">
+            <li key={f.num} className="grid grid-cols-[36px_1fr] gap-x-5">
+              <span className="font-mono text-xs text-muted-foreground/60 pt-0.5">
                 {f.num}
-              </dt>
+              </span>
               <div>
                 <p className="text-[15px] font-semibold text-foreground">
                   {f.title}
@@ -193,13 +193,13 @@ function TwoColPanel({
                   {f.body}
                 </p>
               </div>
-            </div>
+            </li>
           ))}
-        </dl>
+        </ul>
       </div>
 
-      {/* Right: mockup */}
-      <div className="relative">{mockup}</div>
+      {/* Right: mockup — decorative reproduction of product UI */}
+      <div className="relative" aria-hidden="true">{mockup}</div>
     </div>
   );
 }
