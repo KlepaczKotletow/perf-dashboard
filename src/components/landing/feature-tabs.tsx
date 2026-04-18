@@ -368,7 +368,113 @@ function ReviewsMockup() {
 }
 
 function GoalsPanel() {
-  return <PanelStub title="Goals & OKRs — coming in Task 3" />;
+  return (
+    <TwoColPanel
+      eyebrow="Goals & OKRs"
+      heading={
+        <>
+          Goals that <span className="text-foreground/80">feed the review</span>
+          <br />
+          <span className="font-serif italic font-normal text-foreground/80">
+            — not a second tool.
+          </span>
+        </>
+      }
+      lede="OKRs, progress, and competency signals live next to the review they inform. No CSV exports, no end-of-quarter scramble, no parallel spreadsheet."
+      features={[
+        {
+          num: "01",
+          title: "Quarterly OKR tracking",
+          body: "Set objectives, key results, and owners. Nami nudges owners in Slack for weekly progress updates — 30 seconds each.",
+        },
+        {
+          num: "02",
+          title: "On-track status, automatically",
+          body: "On-track · At-risk · Achieved — rolled up across the org without anyone maintaining a status page.",
+        },
+        {
+          num: "03",
+          title: "Goals feed review cycles",
+          body: "When the next review opens, goal progress is pre-loaded. Managers see what shipped, what slipped, and what changed.",
+        },
+        {
+          num: "04",
+          title: "Trend analytics for HR",
+          body: "See which teams set stretch goals, which hit consistently, and where execution breaks down — by function and level.",
+        },
+      ]}
+      mockup={<GoalsMockup />}
+    />
+  );
+}
+
+function GoalsMockup() {
+  const goals: Array<{
+    title: string;
+    status: "ON TRACK" | "AT RISK" | "ACHIEVED";
+    progress: number;
+  }> = [
+    { title: "Ship the new onboarding flow",    status: "ON TRACK", progress: 72 },
+    { title: "Reduce p95 API latency <200ms",   status: "ON TRACK", progress: 58 },
+    { title: "Hire 2 senior engineers",         status: "AT RISK",  progress: 25 },
+    { title: "Launch design-system v2",         status: "ACHIEVED", progress: 100 },
+    { title: "Publish quarterly eng blog",      status: "ON TRACK", progress: 40 },
+  ];
+
+  const chip = (s: (typeof goals)[number]["status"]) => {
+    if (s === "ACHIEVED") return "bg-primary/15 text-primary";
+    if (s === "AT RISK") return "bg-amber-100 text-amber-800";
+    return "bg-emerald-100 text-emerald-800";
+  };
+
+  const bar = (s: (typeof goals)[number]["status"]) => {
+    if (s === "ACHIEVED") return "bg-primary";
+    if (s === "AT RISK") return "bg-amber-400";
+    return "bg-emerald-500";
+  };
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-white overflow-hidden shadow-2xl shadow-primary/10">
+      <div className="px-6 py-4 border-b border-border/60 flex items-center justify-between">
+        <p className="font-mono text-[13px] text-muted-foreground">
+          <span className="text-foreground font-semibold">My Goals</span> · Q2
+          2026
+        </p>
+        <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 rounded-full px-3 py-1">
+          4 of 5 on track
+        </span>
+      </div>
+      <div className="divide-y divide-border/40">
+        {goals.map((g) => (
+          <div
+            key={g.title}
+            className="px-6 py-4 grid grid-cols-[1fr_auto_120px_40px] gap-4 items-center"
+          >
+            <p className="text-[14px] font-medium text-foreground truncate">
+              {g.title}
+            </p>
+            <span
+              className={cn(
+                "text-[10px] font-semibold tracking-wide px-2 py-1 rounded",
+                chip(g.status)
+              )}
+            >
+              {g.status}
+            </span>
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn("h-full rounded-full", bar(g.status))}
+                style={{ width: `${g.progress}%` }}
+              />
+            </div>
+            <span className="text-[12px] font-semibold text-foreground tabular-nums text-right">
+              {g.progress}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 function PulsePanel() {
   return <PanelStub title="Pulse & eNPS — coming in Task 4" />;
