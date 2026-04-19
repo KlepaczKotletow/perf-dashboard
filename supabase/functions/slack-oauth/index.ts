@@ -117,6 +117,18 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_request`, 302);
     }
 
+    // Reject obviously-malformed state values. Real states are either:
+    //   - nonce_<uuid>  (landing page / dashboard-auth install flows)
+    //   - <uuid>        (setup_token from checkout flow)
+    // Anything else is suspicious. This is a weak first line of defence;
+    // the stronger HMAC-signed state upgrade is tracked for a follow-up PR.
+    const NONCE_PATTERN = /^nonce_[0-9a-f-]{32,40}$/i;
+    const UUID_PATTERN = /^[0-9a-f-]{32,40}$/i;
+    if (!NONCE_PATTERN.test(state) && !UUID_PATTERN.test(state)) {
+      console.error("[slack-oauth] Malformed state parameter rejected:", state.slice(0, 20));
+      return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
+    }
+
     if (!supabase) {
       console.error("[slack-oauth] Supabase client not initialized");
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=supabase_init_failed`, 302);
