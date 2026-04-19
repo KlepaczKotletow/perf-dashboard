@@ -26,8 +26,10 @@ function throttle(): Promise<void> {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DASHBOARD_URL =
-  Deno.env.get("DASHBOARD_URL") || "https://namihr.com";
+const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL");
+if (!DASHBOARD_URL) {
+  throw new Error("DASHBOARD_URL secret is not configured for this Supabase project");
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

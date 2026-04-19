@@ -5,7 +5,11 @@ const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const DASHBOARD_URL = (Deno.env.get("DASHBOARD_URL") || "https://namihr.com").replace(/\/+$/, "");
+const DASHBOARD_URL_RAW = Deno.env.get("DASHBOARD_URL");
+if (!DASHBOARD_URL_RAW) {
+  throw new Error("DASHBOARD_URL secret is not configured for this Supabase project");
+}
+const DASHBOARD_URL = DASHBOARD_URL_RAW.replace(/\/+$/, "");
 
 let supabase: any;
 try {
