@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isManagerOrAbove } from "@/lib/roles";
 import { csvStreamResponse } from "@/lib/csv";
+import { sanitizeExportError } from "./error-sanitization";
 
 export const runtime = "nodejs";
 
@@ -119,8 +120,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("Analytics export error:", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to export analytics";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: sanitizeExportError(err) },
+      { status: 500 },
+    );
   }
 }
