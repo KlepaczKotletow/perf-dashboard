@@ -16,25 +16,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env";
+import { isValidTargetPath } from "./validate-target-path";
 
 export const runtime = "nodejs";
 
-const DASHBOARD_URL = env.DASHBOARD_URL ?? "https://namihr.com";
-
-function errorRedirect(code: string): NextResponse {
+function errorRedirect(dashboardUrl: string, code: string): NextResponse {
   // Land on the login with a specific error query so we can tune copy later.
-  return NextResponse.redirect(`${DASHBOARD_URL}/?signin=required&reason=${code}`);
+  return NextResponse.redirect(`${dashboardUrl}/?signin=required&reason=${code}`);
 }
 
 export async function GET(request: NextRequest) {
+  // Resolve dashboard URL from env only — no hardcoded fallback so that
+  // preview/staging deploys can't silently redirect users to production.
+  const DASHBOARD_URL = env.DASHBOARD_URL;
+  if (!DASHBOARD_URL) {
+    console.error("[slack-link] DASHBOARD_URL env var missing");
+    // Fall back to the request's own origin so the user at least lands back
+    // on the site they came from instead of getting a broken redirect.
+    return NextResponse.redirect(`${request.nextUrl.origin}/?signin=required&reason=server_misconfigured`);
+  }
+
   const token = request.nextUrl.searchParams.get("t");
   if (!token || token.length < 32) {
-    return errorRedirect("missing_token");
+    return errorRedirect(DASHBOARD_URL, "missing_token");
   }
 
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
     console.error("[slack-link] SUPABASE_SERVICE_ROLE_KEY missing");
-    return errorRedirect("server_misconfigured");
+    return errorRedirect(DASHBOARD_URL, "server_misconfigured");
   }
 
   const admin = createClient(
@@ -50,15 +59,23 @@ export async function GET(request: NextRequest) {
   );
   if (redeemErr) {
     console.error("[slack-link] redeem failed:", redeemErr.message);
-    return errorRedirect("redeem_failed");
+    return errorRedirect(DASHBOARD_URL, "redeem_failed");
   }
   if (!redeemed || typeof redeemed !== "object") {
-    return errorRedirect("token_invalid_or_expired");
+    return errorRedirect(DASHBOARD_URL, "token_invalid_or_expired");
   }
   const { user_id: appUserId, target_path: targetPath } = redeemed as {
     user_id: string;
     target_path: string;
   };
+
+  // Defense-in-depth: tokens are minted server-side today, but treat the
+  // stored path as untrusted in case a future bug or compromise allows
+  // attacker-controlled values. Reject anything outside /dashboard.
+  if (!isValidTargetPath(targetPath)) {
+    console.error("[slack-link] invalid target path rejected:", targetPath);
+    return errorRedirect(DASHBOARD_URL, "invalid_target");
+  }
 
   // 2. Resolve the app user → their email via the slack_user_id link.
   //    (auth.users.raw_user_meta_data->>'slack_user_id' is the canonical link
@@ -70,7 +87,7 @@ export async function GET(request: NextRequest) {
     .single();
   if (appUserErr || !appUser?.slack_email) {
     console.error("[slack-link] app user lookup failed:", appUserErr?.message);
-    return errorRedirect("user_not_found");
+    return errorRedirect(DASHBOARD_URL, "user_not_found");
   }
 
   // 3. Generate a magic link and redirect the browser to its callback URL.
@@ -83,7 +100,7 @@ export async function GET(request: NextRequest) {
   });
   if (linkErr || !linkData?.properties?.action_link) {
     console.error("[slack-link] generateLink failed:", linkErr?.message);
-    return errorRedirect("link_failed");
+    return errorRedirect(DASHBOARD_URL, "link_failed");
   }
 
   return NextResponse.redirect(linkData.properties.action_link);
