@@ -35,6 +35,13 @@ export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
         }
       }
     } catch { /* ignore — signout is best-effort */ }
+
+    // Server-side logout first: revokes the refresh token globally so a
+    // stolen/offline device can't keep using the old session. Then
+    // client-side signOut to clear the in-memory session immediately.
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch { /* ignore — fall through to client signout */ }
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
