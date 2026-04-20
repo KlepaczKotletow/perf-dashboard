@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { LogOut, User, Settings, ChevronUp, HelpCircle } from "lucide-react";
@@ -19,8 +20,51 @@ interface Props {
   isAdmin: boolean;
 }
 
+// Static visual of the trigger — used both for SSR (so the layout doesn't
+// jump) and as the asChild slot once the real DropdownMenu mounts.
+function TriggerVisual({ initials, name, roleLabel }: { initials: string; name: string; roleLabel: string }) {
+  return (
+    <>
+      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+        <span className="text-xs font-medium text-primary">{initials}</span>
+      </div>
+      <div className="min-w-0 flex-1 text-left">
+        <p className="text-[13px] font-medium text-sidebar-foreground truncate">{name}</p>
+        <Badge
+          variant="outline"
+          className="text-[10px] h-4 px-1.5 capitalize border-sidebar-border text-sidebar-foreground/50 font-normal"
+        >
+          {roleLabel}
+        </Badge>
+      </div>
+      <ChevronUp className="h-3.5 w-3.5 text-sidebar-foreground/40 shrink-0 group-data-[state=open]:rotate-180 transition-transform" />
+    </>
+  );
+}
+
 export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
   const router = useRouter();
+  // Defer the Radix DropdownMenu until after mount. Radix uses React.useId()
+  // for the trigger button; that id is stable per-mount but Next.js dev
+  // overlays / Speed Insights can shift the tree position between SSR and
+  // hydration, producing a console-noisy "won't be patched up" warning.
+  // Rendering a plain visual on the server and swapping to the interactive
+  // menu after mount sidesteps the mismatch without changing what the user
+  // sees.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return (
+      <button
+        type="button"
+        className="flex items-center gap-2.5 w-full px-1 py-1.5 rounded-md hover:bg-sidebar-accent transition-colors group"
+        aria-label="Open user menu"
+      >
+        <TriggerVisual initials={initials} name={name} roleLabel={roleLabel} />
+      </button>
+    );
+  }
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -54,19 +98,7 @@ export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
           type="button"
           className="flex items-center gap-2.5 w-full px-1 py-1.5 rounded-md hover:bg-sidebar-accent transition-colors group"
         >
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-xs font-medium text-primary">{initials}</span>
-          </div>
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-[13px] font-medium text-sidebar-foreground truncate">{name}</p>
-            <Badge
-              variant="outline"
-              className="text-[10px] h-4 px-1.5 capitalize border-sidebar-border text-sidebar-foreground/50 font-normal"
-            >
-              {roleLabel}
-            </Badge>
-          </div>
-          <ChevronUp className="h-3.5 w-3.5 text-sidebar-foreground/40 shrink-0 group-data-[state=open]:rotate-180 transition-transform" />
+          <TriggerVisual initials={initials} name={name} roleLabel={roleLabel} />
         </button>
       </DropdownMenuTrigger>
 
