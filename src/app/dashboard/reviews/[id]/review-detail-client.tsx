@@ -229,6 +229,20 @@ export function ReviewDetailClient({
 
   return (
     <div className="space-y-6">
+      {/* Self-reviews are completed via Slack — explain why the form is read-only
+          for the employee viewing their own assignment. */}
+      {!canEdit && reviewerRole === "self" && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/30 p-3 flex items-start gap-3">
+          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-medium text-foreground">Complete your self-review in Slack</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Self-reviews happen as a guided chat with <span className="font-medium">Nami</span> in your Slack DMs. This page is read-only — open Slack and reply to Nami&apos;s message to fill it out.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Progress bar */}
       <div className="flex items-center gap-3">
         <div className="flex-1 bg-muted rounded-full h-1.5">
