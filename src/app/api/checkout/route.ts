@@ -4,7 +4,15 @@ import { getUserWorkspace } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/roles";
 
 function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  // Throw a recognisable, generic error if STRIPE_SECRET_KEY is missing so the
+  // caller sees "Payments not configured" instead of leaking SDK internals like
+  // "Neither apiKey nor config.authenticator provided".
+  if (!process.env.STRIPE_SECRET_KEY) {
+    const e = new Error("Payments not configured");
+    (e as Error & { code?: string }).code = "stripe_not_configured";
+    throw e;
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: "2026-01-28.clover",
   });
 }
@@ -101,8 +109,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     console.error("Checkout error:", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to create checkout session";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const code = (err as Error & { code?: string })?.code;
+    if (code === "stripe_not_configured") {
+      return NextResponse.json(
+        { error: "Payments are not configured. Contact support." },
+        { status: 503 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Failed to create checkout session" },
+      { status: 500 },
+    );
   }
 }
