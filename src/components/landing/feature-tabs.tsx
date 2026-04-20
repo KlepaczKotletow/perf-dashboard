@@ -587,15 +587,15 @@ function PulseMockup() {
             >
               <defs>
                 <linearGradient id="pulseArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgb(59 130 246)" stopOpacity="0.18" />
-                  <stop offset="100%" stopColor="rgb(59 130 246)" stopOpacity="0" />
+                  <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d={area} fill="url(#pulseArea)" />
               <path
                 d={path}
                 fill="none"
-                stroke="rgb(59 130 246)"
+                stroke="var(--primary)"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -609,7 +609,7 @@ function PulseMockup() {
                     cy={y}
                     r="3"
                     fill="white"
-                    stroke="rgb(59 130 246)"
+                    stroke="var(--primary)"
                     strokeWidth="2"
                   />
                 );
