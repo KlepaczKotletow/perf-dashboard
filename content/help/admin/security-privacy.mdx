@@ -1,6 +1,6 @@
 ---
 title: "Security & Privacy"
-description: "How Perf protects your data — tenant isolation, encryption, compliance, and data handling"
+description: "How Nami protects your data — tenant isolation, encryption, compliance, and data handling"
 category: "Admin & Billing"
 audience: ["all"]
 order: 3
@@ -11,11 +11,11 @@ icon: "Shield"
 
 <RoleTag role="all" />
 
-Perf takes the security and privacy of your performance data seriously. This article explains how your data is protected, who can see what, and what commitments we make regarding your information.
+Nami takes the security and privacy of your performance data seriously. This article explains how your data is protected, who can see what, and what commitments we make regarding your information.
 
 ## Who Can See What
 
-Perf enforces strict role-based visibility at the API level — not just the UI. Even if someone manipulates a URL or API call, they cannot access data outside their permissions.
+Nami enforces strict role-based visibility at the API level — not just the UI. Even if someone manipulates a URL or API call, they cannot access data outside their permissions.
 
 | Data | Employee | Manager | HR / Admin |
 |---|---|---|---|
@@ -37,7 +37,7 @@ Visibility rules are enforced at the database level using Row-Level Security (RL
 
 ## Workspace Isolation (Multi-Tenancy)
 
-Each Slack workspace maps to a single Perf tenant. Your data is strictly isolated from all other organizations using multiple layers of protection:
+Each Slack workspace maps to a single Nami tenant. Your data is strictly isolated from all other organizations using multiple layers of protection:
 
 - **Row-Level Security (RLS):** Every table in the database has RLS policies that filter data by workspace. Queries automatically return only data belonging to your workspace — this is enforced at the PostgreSQL level, not just in application code.
 - **Cross-tenant validation triggers:** Database triggers on key tables (reviews, feedback, goals, participants) prevent inserting records that reference entities from another workspace. Other tables are protected by RLS policies and foreign key constraints.
@@ -59,7 +59,7 @@ All 28 database tables have RLS enabled. There are zero tables that allow cross-
 
 ## Slack Integration Scope
 
-When you sign in via Slack OAuth, Perf receives an access token scoped to only the permissions it needs:
+When you sign in via Slack OAuth, Nami receives an access token scoped to only the permissions it needs:
 
 | Slack Scope | What It Does |
 |---|---|
@@ -67,15 +67,15 @@ When you sign in via Slack OAuth, Perf receives an access token scoped to only t
 | `chat:write` | Send review prompts and reminders via the Nami bot |
 | `im:read` / `im:write` / `im:history` | Handle direct message conversations with the Nami bot |
 | `commands` | Support slash commands (e.g., `/kudos`) |
-| `app_mentions:read` | Detect when the Perf bot is mentioned |
+| `app_mentions:read` | Detect when the Nami bot is mentioned |
 
 <Callout type="warning">
-Perf never reads your Slack channels, group messages, files, or general message history. The integration is limited to authentication, directory sync, and Nami bot direct messages.
+Nami never reads your Slack channels, group messages, files, or general message history. The integration is limited to authentication, directory sync, and Nami bot direct messages.
 </Callout>
 
 ## What Data We Store
 
-Perf stores **workplace performance data** — review ratings, feedback, goals, competencies, and survey responses. We do **not** store or require:
+Nami stores **workplace performance data** — review ratings, feedback, goals, competencies, and survey responses. We do **not** store or require:
 
 - Financial data (credit card info is handled entirely by Stripe)
 - Government IDs or social security numbers
