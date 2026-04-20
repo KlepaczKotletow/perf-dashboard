@@ -75,7 +75,12 @@ export default async function DashboardLayout({
       items: [
         { href: "/dashboard/my-team", label: "Team Overview", icon: UsersRound, requiresManager: true, requiresHR: false, requiresAdmin: false },
         { href: "/dashboard/reviews", label: "Team Reviews", icon: FileText, requiresManager: true, requiresHR: false, requiresAdmin: false },
-        { href: "/dashboard/goals?tab=team", label: "Team Goals", icon: Flag, requiresManager: true, requiresHR: false, requiresAdmin: false },
+        // Team Goals tab on /dashboard/goals only renders for users with direct
+        // reports — keep this link in lockstep so role-only managers (admins
+        // with no reports) don't land on a tab that silently falls back to "Me".
+        ...(canAccessManagerFeatures && workspace?.hasDirectReports
+          ? [{ href: "/dashboard/goals?tab=team", label: "Team Goals", icon: Flag, requiresManager: true, requiresHR: false, requiresAdmin: false }]
+          : []),
       ],
     },
     // ── MANAGE: HR/Admin org-wide tools ──
