@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 import { SetupClient } from "./setup-client";
+import { signOAuthState } from "@/lib/oauth-state";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -93,16 +94,19 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     });
   }
 
-  // Build the Add to Slack URL with state parameter
+  // Build the Add to Slack URL with HMAC-signed state. We embed the
+  // setup_token inside the signed payload so the slack-oauth callback can
+  // still link the new install to the pre-paid Stripe subscription.
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL!).trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   const scopes =
     "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
 
+  const oauthState = await signOAuthState({ purpose: "setup", setup_token: setupToken });
   const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scopes}&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(
     slackRedirectUri
-  )}&state=${setupToken}`;
+  )}&state=${encodeURIComponent(oauthState)}`;
 
   return (
     <SetupClient
