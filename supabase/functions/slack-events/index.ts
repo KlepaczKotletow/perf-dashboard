@@ -230,8 +230,8 @@ Deno.serve(async (req) => {
     const tokens = await getWorkspaceSlackTokens(workspace.id);
     const botToken = tokens?.botToken;
     if (!botToken) {
-      console.error("Workspace not found for team_id:", teamId);
-      return new Response("Workspace not found", { status: 404 });
+      console.error("[slack-events] Workspace token unreadable for team_id:", teamId);
+      return new Response("Workspace token unavailable", { status: 503 });
     }
 
     // Look up the app user by slack_user_id + workspace_id

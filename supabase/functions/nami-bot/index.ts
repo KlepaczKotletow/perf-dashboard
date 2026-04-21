@@ -17,7 +17,7 @@ import {
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
 import { callSlackApi, buildAuthedDashboardUrl, SlackRateLimitError } from "../_shared/slack-api.ts";
-import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { getWorkspaceSlackTokens, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -1450,7 +1450,10 @@ interface QueueJob {
   attempts: number;
 }
 
-async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+async function sendFeedbackDm(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<{ ok: boolean; error?: string }> {
   const feedbackId = job.payload.feedback_id as string | undefined;
   if (!feedbackId) return { ok: false, error: "missing feedback_id" };
 
@@ -1473,7 +1476,7 @@ async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: str
   const recipient = (fb as { to_user?: { slack_user_id?: string; slack_name?: string } | null }).to_user;
   if (!recipient?.slack_user_id) return { ok: true };
 
-  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const tokens = await tokenFor(job.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
@@ -1498,7 +1501,10 @@ async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: str
   return { ok: true };
 }
 
-async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+async function sendNewReviewerDm(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<{ ok: boolean; error?: string }> {
   const assignmentId = job.payload.assignment_id as string | undefined;
   if (!assignmentId) return { ok: false, error: "missing assignment_id" };
 
@@ -1522,7 +1528,7 @@ async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: 
   if (!reviewer?.slack_user_id) return { ok: true };
   const employee = (a as { employee?: { slack_name?: string } | null }).employee;
 
-  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const tokens = await tokenFor(job.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
@@ -1542,7 +1548,10 @@ async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: 
   return { ok: true };
 }
 
-async function refreshHomeTab(job: QueueJob): Promise<{ ok: boolean; error?: string }> {
+async function refreshHomeTab(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<{ ok: boolean; error?: string }> {
   const appUserId = job.payload.app_user_id as string | undefined;
   if (!appUserId) return { ok: false, error: "missing app_user_id" };
   const { data: u } = await supabase
@@ -1553,7 +1562,7 @@ async function refreshHomeTab(job: QueueJob): Promise<{ ok: boolean; error?: str
   const slackUserId = (u as { slack_user_id?: string } | null)?.slack_user_id;
   if (!slackUserId) return { ok: true }; // nothing to refresh — user has no Slack link
 
-  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const tokens = await tokenFor(job.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
@@ -1585,6 +1594,17 @@ async function handleDrainSendQueue() {
     return { processed: 0, error: claimErr.message };
   }
   const jobs = (jobsRaw ?? []) as QueueJob[];
+
+  // Per-drain token cache: collapses N jobs from one workspace into one
+  // Vault decrypt round-trip. Cache lifetime = single drain invocation.
+  const tokenCache = new Map<string, WorkspaceTokens | null>();
+  async function tokenFor(workspaceId: string): Promise<WorkspaceTokens | null> {
+    if (tokenCache.has(workspaceId)) return tokenCache.get(workspaceId) ?? null;
+    const t = await getWorkspaceSlackTokens(workspaceId);
+    tokenCache.set(workspaceId, t);
+    return t;
+  }
+
   let succeeded = 0;
   let failed = 0;
   let requeued = 0;
@@ -1592,11 +1612,11 @@ async function handleDrainSendQueue() {
     try {
       let result: { ok: boolean; error?: string };
       if (job.action === "notify_feedback") {
-        result = await sendFeedbackDm(job);
+        result = await sendFeedbackDm(job, tokenFor);
       } else if (job.action === "notify_new_reviewer") {
-        result = await sendNewReviewerDm(job);
+        result = await sendNewReviewerDm(job, tokenFor);
       } else if (job.action === "refresh_home_tab") {
-        result = await refreshHomeTab(job);
+        result = await refreshHomeTab(job, tokenFor);
       } else {
         result = { ok: false, error: `unknown action ${job.action}` };
       }

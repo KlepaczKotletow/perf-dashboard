@@ -54,19 +54,6 @@ async function dbQuery(table: string, query: string) {
   ).json();
 }
 
-async function dbUpdate(table: string, query: string, data: Record<string, unknown>) {
-  return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    method: "PATCH",
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(data),
-  });
-}
-
 async function getFreshBotToken(workspaceId: string): Promise<string | null> {
   const tokens = await getWorkspaceSlackTokens(workspaceId);
   if (!tokens) return null;
@@ -74,10 +61,9 @@ async function getFreshBotToken(workspaceId: string): Promise<string | null> {
   const expiresAt = tokens.tokenExpiresAt
     ? new Date(tokens.tokenExpiresAt).getTime()
     : null;
-  const needsRefresh = expiresAt !== null
-    && expiresAt - Date.now() < 5 * 60 * 1000;
+  const needsRefresh = expiresAt === null || expiresAt - Date.now() < 5 * 60 * 1000;
 
-  if (!needsRefresh || !tokens.refreshToken) return tokens.botToken;
+  if (!tokens.refreshToken || !needsRefresh) return tokens.botToken;
 
   const res = await fetch("https://slack.com/api/oauth.v2.access", {
     method: "POST",
