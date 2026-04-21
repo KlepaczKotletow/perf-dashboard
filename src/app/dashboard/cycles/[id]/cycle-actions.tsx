@@ -94,23 +94,24 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         return;
       }
 
-      const result = data as { sent?: number; skipped?: number; failed?: number; failedUsers?: string[] } | null;
-      const sent = result?.sent ?? 0;
-      const skipped = result?.skipped ?? 0;
-      const failed = result?.failed ?? 0;
+      // After Tasks 5/6 the launch endpoints fan out into slack_send_queue
+      // and return { queued, error? } instead of synchronous send results.
+      // The drainer cron actually delivers the DMs over the next minute;
+      // we surface that here instead of the old "sent N, failed N" line.
+      const result = data as { queued?: number; error?: string } | null;
+      const queued = result?.queued ?? 0;
 
-      if (sent > 0) {
-        const parts = [`Sent ${sent} notification${sent !== 1 ? "s" : ""}`];
-        if (skipped > 0) parts.push(`${skipped} skipped`);
-        if (failed > 0) parts.push(`${failed} failed`);
-        setNotificationMessage(parts.join(", ") + ".");
-        setNotificationSent(true);
-        setTimeout(() => { setNotificationSent(false); setNotificationMessage(null); }, 5000);
-      } else if (failed > 0) {
-        setNotificationMessage(`All sends failed (${failed} error${failed !== 1 ? "s" : ""}). Check Slack bot configuration.`);
+      if (result?.error) {
+        setNotificationMessage(`Couldn't enqueue notifications: ${result.error}`);
         setNotificationError(true);
-      } else if (skipped > 0) {
-        setNotificationMessage(`${skipped} notification${skipped !== 1 ? "s" : ""} skipped (already sent or no Slack account).`);
+        return;
+      }
+
+      if (queued > 0) {
+        const word = queued !== 1 ? "s" : "";
+        setNotificationMessage(
+          `Queued ${queued} notification${word} — Nami will deliver them in the background.`,
+        );
         setNotificationSent(true);
         setTimeout(() => { setNotificationSent(false); setNotificationMessage(null); }, 5000);
       } else {

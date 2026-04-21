@@ -16,7 +16,12 @@ import {
   buildOverdueNotice,
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
-import { callSlackApi, buildAuthedDashboardUrl, SlackRateLimitError } from "../_shared/slack-api.ts";
+import {
+  callSlackApi,
+  buildAuthedDashboardUrl,
+  SlackRateLimitError,
+  sendSlackBlocksWithTs,
+} from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
@@ -27,10 +32,11 @@ function throttle(): Promise<void> {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const DASHBOARD_URL = Deno.env.get("DASHBOARD_URL");
-if (!DASHBOARD_URL) {
+const DASHBOARD_URL_RAW = Deno.env.get("DASHBOARD_URL");
+if (!DASHBOARD_URL_RAW) {
   throw new Error("DASHBOARD_URL secret is not configured for this Supabase project");
 }
+const DASHBOARD_URL: string = DASHBOARD_URL_RAW;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -249,33 +255,115 @@ async function getManagerContext(
 }
 
 // =============================================================================
-//  Handle cycle launch
+//  Handle cycle launch — fan-out only
+//
+//  Replaces the old in-process for-loop (one chat.postMessage per assignment,
+//  3 branches each) with a single bulk insert into slack_send_queue. The
+//  drainer picks them up at its own cadence, so a 200-person cycle launch
+//  returns in <1s instead of timing out at the function's wall-clock cap.
+//
+//  Idempotency layers:
+//   - dedupe_key on the queue collapses repeat enqueues from a double-clicked
+//     Launch button into one job (partial unique index, see migration
+//     20260421_04_send_queue_dedupe.sql).
+//   - notification_log dedup inside sendCycleLaunchDm catches per-recipient
+//     duplicates if the same logical job ever reaches the drainer twice.
 // =============================================================================
 
+interface CycleDmJobPayload {
+  cycle_id: string;
+  cycle_name: string;
+  deadline_iso: string | null;
+  workspace_id: string;
+  assignment_id: string;
+  role: "self" | "manager" | "upward";
+  recipient_app_user_id: string;
+  recipient_slack_user_id: string;
+  recipient_name: string;
+  subject_name?: string;
+  // employee_id is needed by manager DMs to fetch the rich manager context
+  // (self-avg, prev rating, goals, competency expectations). We lazy-fetch
+  // inside the handler rather than serialising the full context into the
+  // queue payload.
+  subject_employee_id?: string;
+}
+
+function makeCycleDmJob(
+  cycle: { id: string; name: string; review_deadline: string | null; workspace_id: string },
+  assignment: { id: string; employee_id?: string },
+  role: "self" | "manager" | "upward",
+  recipient: { id: string; slack_user_id: string; slack_name?: string | null },
+  subjectName?: string | null,
+) {
+  const refRole = role === "manager" ? "mgr" : role;
+  const payload: CycleDmJobPayload = {
+    cycle_id: cycle.id,
+    cycle_name: cycle.name,
+    deadline_iso: cycle.review_deadline,
+    workspace_id: cycle.workspace_id,
+    assignment_id: assignment.id,
+    role,
+    recipient_app_user_id: recipient.id,
+    recipient_slack_user_id: recipient.slack_user_id,
+    recipient_name: recipient.slack_name || "there",
+    subject_name: subjectName ?? undefined,
+    subject_employee_id: assignment.employee_id,
+  };
+  return {
+    workspace_id: cycle.workspace_id,
+    action: "send_cycle_dm",
+    dedupe_key: `cycle_dm:${assignment.id}:${refRole}`,
+    payload,
+  };
+}
+
+// Extracted from the old in-process handler. Same query, same logic — only
+// the surrounding control flow changed (now feeds the fan-out instead of
+// the for-loop).
+async function filterMissedAssignments(assignments: any[], workspaceId: string) {
+  const refIdMap = new Map<string, any>();
+  for (const a of assignments) {
+    if (a.assignment_type === "standard") {
+      refIdMap.set(`self_${a.id}`, a);
+      refIdMap.set(`mgr_${a.id}`, a);
+    } else if (a.assignment_type === "upward") {
+      refIdMap.set(`upward_${a.id}`, a);
+    }
+  }
+  const allRefIds = Array.from(refIdMap.keys());
+  if (allRefIds.length === 0) return [] as any[];
+
+  const { data: existingLogs } = await supabase
+    .from("notification_log")
+    .select("reference_id")
+    .eq("workspace_id", workspaceId)
+    .eq("event_type", "nami_initial")
+    .in("reference_id", allRefIds);
+
+  const sentRefIds = new Set((existingLogs || []).map((l: any) => l.reference_id));
+  const missedAssignmentIds = new Set<string>();
+  for (const a of assignments) {
+    if (a.assignment_type === "standard") {
+      if (!sentRefIds.has(`self_${a.id}`) || !sentRefIds.has(`mgr_${a.id}`)) {
+        missedAssignmentIds.add(a.id);
+      }
+    } else if (a.assignment_type === "upward") {
+      if (!sentRefIds.has(`upward_${a.id}`)) {
+        missedAssignmentIds.add(a.id);
+      }
+    }
+  }
+  return assignments.filter((a: any) => missedAssignmentIds.has(a.id));
+}
+
 async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all") {
-  // Fetch cycle + workspace bot token (via vault helper)
   const { data: cycle } = await supabase
     .from("performance_cycles")
     .select("id, name, review_deadline, workspace_id")
     .eq("id", cycleId)
     .single();
+  if (!cycle) return { queued: 0, error: "Cycle not found" };
 
-  if (!cycle) return { sent: 0, skipped: 0, error: "Cycle not found" };
-
-  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
-  const botToken = tokens?.botToken;
-  if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
-
-  const workspaceId = cycle.workspace_id;
-  const deadline = cycle.review_deadline
-    ? new Date(cycle.review_deadline).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "no deadline set";
-
-  // Fetch all review assignments for this cycle
   const { data: assignments } = await supabase
     .from("review_assignments")
     .select(
@@ -291,208 +379,126 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
     `,
     )
     .eq("cycle_id", cycleId);
+  if (!assignments) return { queued: 0 };
 
-  if (!assignments) return { sent: 0, skipped: 0, failed: 0, failedUsers: [] as string[] };
-
-  // --- "missed" mode: filter to only assignments without existing notification_log entries ---
-  let filteredAssignments = assignments;
+  let filtered = assignments;
   if (mode === "missed") {
-    // Build all possible ref IDs for each assignment
-    const refIdMap = new Map<string, any>(); // refId -> assignment
-    for (const a of assignments) {
-      if (a.assignment_type === "standard") {
-        refIdMap.set(`self_${a.id}`, a);
-        refIdMap.set(`mgr_${a.id}`, a);
-      } else if (a.assignment_type === "upward") {
-        refIdMap.set(`upward_${a.id}`, a);
-      }
-    }
-
-    const allRefIds = Array.from(refIdMap.keys());
-    // Query notification_log for existing entries for this cycle's assignments
-    const { data: existingLogs } = await supabase
-      .from("notification_log")
-      .select("reference_id")
-      .eq("workspace_id", workspaceId)
-      .eq("event_type", "nami_initial")
-      .in("reference_id", allRefIds);
-
-    const sentRefIds = new Set((existingLogs || []).map((l: any) => l.reference_id));
-
-    // Keep only assignments that have at least one unsent notification
-    const missedAssignmentIds = new Set<string>();
-    for (const a of assignments) {
-      if (a.assignment_type === "standard") {
-        if (!sentRefIds.has(`self_${a.id}`) || !sentRefIds.has(`mgr_${a.id}`)) {
-          missedAssignmentIds.add(a.id);
-        }
-      } else if (a.assignment_type === "upward") {
-        if (!sentRefIds.has(`upward_${a.id}`)) {
-          missedAssignmentIds.add(a.id);
-        }
-      }
-    }
-    filteredAssignments = assignments.filter((a: any) => missedAssignmentIds.has(a.id));
+    filtered = await filterMissedAssignments(assignments, cycle.workspace_id);
   }
 
-  let sent = 0;
-  let skipped = 0;
-  let failed = 0;
-  const failedUsers: string[] = [];
-
-  for (let _i = 0; _i < filteredAssignments.length; _i++) {
-    const a = filteredAssignments[_i];
-    const emp = (a as any).employee;
-    const mgr = (a as any).manager;
-
-    // Throttle between iterations to respect Slack rate limits
-    if (_i > 0) await throttle();
-
-    // --- Employee self-review ---
-    if (emp?.slack_user_id && a.assignment_type === "standard") {
-      try {
-        const refId = `self_${a.id}`;
-        const canSend = await logNotification(
-          workspaceId,
-          emp.id,
-          "nami_initial",
-          refId,
-        );
-        if (canSend) {
-          const blocks = buildSelfReviewOpening(
-            emp.slack_name || "there",
-            cycle.name,
-            deadline,
-            a.id,
-          );
-          const ok = await sendSlackBlocks(
-            botToken,
-            emp.slack_user_id,
-            `Your self-review for ${cycle.name} is ready`,
-            blocks,
-          );
-          if (ok) {
-            sent++;
-          } else {
-            await rollbackNotification(workspaceId, emp.id, "nami_initial", refId);
-            failed++;
-            failedUsers.push(emp.slack_name || emp.id);
-          }
-        } else {
-          skipped++;
-        }
-      } catch (err) {
-        console.error(`Error sending self-review notification to ${emp.slack_name || emp.id}:`, err);
-        failed++;
-        failedUsers.push(emp.slack_name || emp.id);
-      }
+  const jobs: ReturnType<typeof makeCycleDmJob>[] = [];
+  for (const a of filtered as any[]) {
+    if (a.employee?.slack_user_id && a.assignment_type === "standard") {
+      jobs.push(makeCycleDmJob(cycle, a, "self", a.employee));
     }
-
-    // --- Manager review ---
-    if (mgr?.slack_user_id && a.assignment_type === "standard") {
-      try {
-        const refId = `mgr_${a.id}`;
-        const canSend = await logNotification(
-          workspaceId,
-          mgr.id,
-          "nami_initial",
-          refId,
-        );
-        if (canSend) {
-          const context = await getManagerContext(a.employee_id, cycleId, workspaceId);
-          const blocks = buildManagerReviewOpening(
-            mgr.slack_name || "there",
-            emp?.slack_name || "a team member",
-            cycle.name,
-            deadline,
-            a.id,
-            context,
-          );
-          const ok = await sendSlackBlocks(
-            botToken,
-            mgr.slack_user_id,
-            `Time to review ${emp?.slack_name || "a team member"} for ${cycle.name}`,
-            blocks,
-          );
-          if (ok) {
-            sent++;
-          } else {
-            await rollbackNotification(workspaceId, mgr.id, "nami_initial", refId);
-            failed++;
-            failedUsers.push(mgr.slack_name || mgr.id);
-          }
-        } else {
-          skipped++;
-        }
-      } catch (err) {
-        console.error(`Error sending manager-review notification to ${mgr.slack_name || mgr.id}:`, err);
-        failed++;
-        failedUsers.push(mgr.slack_name || mgr.id);
-      }
+    if (a.manager?.slack_user_id && a.assignment_type === "standard") {
+      jobs.push(makeCycleDmJob(cycle, a, "manager", a.manager, a.employee?.slack_name));
     }
-
-    // --- Upward feedback ---
-    if (a.assignment_type === "upward") {
-      const reviewer = (a as any).reviewer;
-      if (reviewer?.slack_user_id) {
-        try {
-          const refId = `upward_${a.id}`;
-          const canSend = await logNotification(
-            workspaceId,
-            reviewer.id,
-            "nami_initial",
-            refId,
-          );
-          if (canSend) {
-            const blocks = buildUpwardFeedbackOpening(
-              reviewer.slack_name || "there",
-              emp?.slack_name || "your manager",
-              cycle.name,
-              deadline,
-              a.id,
-            );
-            const ok = await sendSlackBlocks(
-              botToken,
-              reviewer.slack_user_id,
-              `Upward feedback requested for ${emp?.slack_name || "your manager"}`,
-              blocks,
-            );
-            if (ok) {
-              sent++;
-            } else {
-              await rollbackNotification(
-                workspaceId,
-                reviewer.id,
-                "nami_initial",
-                refId,
-              );
-              failed++;
-              failedUsers.push(reviewer.slack_name || reviewer.id);
-            }
-          } else {
-            skipped++;
-          }
-        } catch (err) {
-          console.error(`Error sending upward-feedback notification to ${reviewer.slack_name || reviewer.id}:`, err);
-          failed++;
-          failedUsers.push(reviewer.slack_name || reviewer.id);
-        }
-      }
+    if (a.reviewer?.slack_user_id && a.assignment_type === "upward") {
+      jobs.push(makeCycleDmJob(cycle, a, "upward", a.reviewer, a.employee?.slack_name));
     }
   }
 
-  // Mark cycle as nami_confirmed
+  if (jobs.length === 0) {
+    await supabase
+      .from("performance_cycles")
+      .update({ nami_confirmed: true })
+      .eq("id", cycleId);
+    return { queued: 0 };
+  }
+
+  const { error: insErr } = await supabase
+    .from("slack_send_queue")
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
+  if (insErr) {
+    console.error("[handleCycleLaunch] queue insert failed:", insErr);
+    return { queued: 0, error: insErr.message };
+  }
+
+  // Recount from DB instead of trusting the insert response. ignoreDuplicates
+  // only RETURNS rows it actually inserted, so a re-launch that collides with
+  // every existing pending job would report 0 queued — even though the
+  // drainer is still chewing through the originals. Counting actual pending
+  // rows for THIS launch (matched on the dedupe_keys we just tried to insert)
+  // reports the truth in all cases: first launch, partial collision, full
+  // collision.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", cycle.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+
   await supabase
     .from("performance_cycles")
     .update({ nami_confirmed: true })
     .eq("id", cycleId);
-
-  return { sent, skipped, failed, failedUsers };
+  return { queued: pending ?? jobs.length };
 }
 
 // =============================================================================
-//  Handle survey launch
+//  Handle survey launch — fan-out only
+//
+//  Same shape as handleCycleLaunch: collapse the in-process for-loop into a
+//  bulk queue insert. Distinct dedupe_key prefix (`survey_dm:`) and distinct
+//  notification_log event_type (`nami_survey_invite`) so survey + cycle DMs
+//  for the same physical user can't collide.
 // =============================================================================
+
+interface SurveyDmJobPayload {
+  survey_id: string;
+  survey_name: string;
+  workspace_id: string;
+  // The Slack DM lands once per user, but a 360-style survey can give one user
+  // multiple participant rows (e.g. respondent + reviewer slots). Carry every
+  // participant_id the user holds in this survey so the deeplink targets the
+  // first row and (optionally, downstream) the handler can mark them all
+  // notified in one go.
+  participant_id: string;
+  participant_ids: string[];
+  question_count: number;
+  role: string;
+  subject_name?: string;
+  recipient_app_user_id: string;
+  recipient_slack_user_id: string;
+  recipient_name: string;
+}
+
+function makeSurveyDmJob(
+  survey: { id: string; name: string; workspace_id: string },
+  userParts: any[],
+  recipient: { id: string; slack_user_id: string; slack_name?: string | null },
+  questionCount: number,
+  subjectName?: string | null,
+) {
+  const primary = userParts[0];
+  const payload: SurveyDmJobPayload = {
+    survey_id: survey.id,
+    survey_name: survey.name,
+    workspace_id: survey.workspace_id,
+    participant_id: primary.id,
+    participant_ids: userParts.map((p) => p.id),
+    question_count: questionCount,
+    role: primary.role,
+    subject_name: subjectName ?? undefined,
+    recipient_app_user_id: recipient.id,
+    recipient_slack_user_id: recipient.slack_user_id,
+    recipient_name: recipient.slack_name || "there",
+  };
+  return {
+    workspace_id: survey.workspace_id,
+    action: "send_survey_invite",
+    // Key on (survey_id, user_id) — NOT participant_id. The launch picks one
+    // participant per user but the choice is non-deterministic across
+    // retries (different sort orders return userParts[0] differently). A
+    // participant-keyed dedupe would let a re-launch enqueue a SECOND DM for
+    // the same user under a different participant. Per-user keying is
+    // stable.
+    dedupe_key: `survey_dm:${survey.id}:${recipient.id}`,
+    payload,
+  };
+}
 
 async function handleSurveyLaunch(surveyId: string) {
   const { data: survey } = await supabase
@@ -500,21 +506,12 @@ async function handleSurveyLaunch(surveyId: string) {
     .select("id, name, type, workspace_id, config")
     .eq("id", surveyId)
     .single();
+  if (!survey) return { queued: 0, error: "Survey not found" };
 
-  if (!survey) return { sent: 0, skipped: 0, error: "Survey not found" };
-
-  const tokens = await getWorkspaceSlackTokens(survey.workspace_id);
-  const botToken = tokens?.botToken;
-  if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
-
-  const workspaceId = survey.workspace_id;
-
-  // Count questions from config
   const config = (survey.config || {}) as Record<string, any>;
-  const questions = config.questions || [];
+  const questions = (config.questions || []) as unknown[];
   const questionCount = questions.length;
 
-  // Fetch pending participants with role and subject info
   const { data: participants } = await supabase
     .from("survey_participants")
     .select(
@@ -530,75 +527,59 @@ async function handleSurveyLaunch(surveyId: string) {
     )
     .eq("survey_id", surveyId)
     .eq("status", "pending");
+  if (!participants) return { queued: 0 };
 
-  if (!participants) return { sent: 0, skipped: 0 };
-
-  // Filter out "subject" tracking entries — they don't need notifications
+  // Drop subject tracking rows — they're not real recipients.
   const filteredParticipants = participants.filter((p: any) => p.role !== "subject");
 
-  let sent = 0;
-  let skipped = 0;
-
-  // Group participants by user for 360 surveys so we can send a single consolidated DM
-  const userParticipants = new Map<string, typeof filteredParticipants>();
-  for (const p of filteredParticipants) {
-    const userId = (p as any).user?.id;
+  // Preserve the old "one consolidated DM per user for 360 surveys" semantics:
+  // group by user_id and only enqueue the first participant row per user. The
+  // per-participant notification_log dedup (downstream) treats these as
+  // distinct logical sends, but a single Slack DM is sent for the user.
+  const userParticipants = new Map<string, any[]>();
+  for (const p of filteredParticipants as any[]) {
+    const userId = p.user?.id;
     if (!userId) continue;
     const existing = userParticipants.get(userId) || [];
     existing.push(p);
     userParticipants.set(userId, existing);
   }
 
+  const jobs: ReturnType<typeof makeSurveyDmJob>[] = [];
   for (const [, userParts] of userParticipants) {
-    const p = userParts[0]; // Use first participant for notification tracking
-    const user = (p as any).user;
-    if (!user?.slack_user_id) {
-      skipped++;
-      continue;
-    }
-
-    const refId = `survey_${p.id}`;
-    const canSend = await logNotification(
-      workspaceId,
-      user.id,
-      "nami_initial",
-      refId,
-    );
-    if (canSend) {
-      const subjectName = (p as any).subject?.slack_name || undefined;
-      const blocks = buildSurveyOpening(
-        user.slack_name || "there",
-        survey.name,
-        questionCount,
-        p.id,
-        surveyId,
-        (p as any).role,
-        subjectName,
-      );
-      const ok = await sendSlackBlocks(
-        botToken,
-        user.slack_user_id,
-        `You're invited to take the ${survey.name} survey`,
-        blocks,
-      );
-      if (ok) {
-        sent++;
-      } else {
-        await rollbackNotification(workspaceId, user.id, "nami_initial", refId);
-        skipped++;
-      }
-    } else {
-      skipped++;
-    }
+    const primary = userParts[0];
+    const user = primary.user;
+    if (!user?.slack_user_id) continue;
+    const subjectName = primary.subject?.slack_name || undefined;
+    jobs.push(makeSurveyDmJob(survey, userParts, user, questionCount, subjectName));
   }
 
-  // Mark survey as nami_confirmed
-  await supabase
-    .from("surveys")
-    .update({ nami_confirmed: true })
-    .eq("id", surveyId);
+  if (jobs.length === 0) {
+    await supabase.from("surveys").update({ nami_confirmed: true }).eq("id", surveyId);
+    return { queued: 0 };
+  }
 
-  return { sent, skipped };
+  const { error: insErr } = await supabase
+    .from("slack_send_queue")
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
+  if (insErr) {
+    console.error("[handleSurveyLaunch] queue insert failed:", insErr);
+    return { queued: 0, error: insErr.message };
+  }
+
+  // See handleCycleLaunch above — count actual pending rows so the report is
+  // accurate whether we just inserted, collided with a previous launch, or
+  // some mix.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", survey.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+
+  await supabase.from("surveys").update({ nami_confirmed: true }).eq("id", surveyId);
+  return { queued: pending ?? jobs.length };
 }
 
 // =============================================================================
@@ -714,9 +695,11 @@ async function handleReminders() {
         .limit(1);
 
       if (!alreadySent?.length) {
-        // Not yet sent — launch now
+        // Not yet sent — enqueue now. handleCycleLaunch returns
+        // { queued } after the Phase 5/6 fan-out refactor; the real DM
+        // sends happen on the drain pass.
         const result = await handleCycleLaunch(cycle.id);
-        sent += result.sent;
+        sent += result.queued ?? 0;
       }
     }
   }
@@ -747,7 +730,7 @@ async function handleReminders() {
 
       if (!alreadySent?.length) {
         const result = await handleSurveyLaunch(survey.id);
-        sent += result.sent;
+        sent += result.queued ?? 0;
       }
     }
   }
@@ -771,13 +754,22 @@ async function handleReminders() {
     // Clone the survey and create fresh participants
     const newSurveyId = await cloneAndLaunchRecurringSurvey(survey.id, survey.workspace_id, config, survey.type);
     if (newSurveyId) {
-      // Update last_recurrence_at on the template survey
-      await supabase.from("surveys").update({
-        config: { ...config, last_recurrence_at: now.toISOString() },
-      }).eq("id", survey.id);
-
       const result = await handleSurveyLaunch(newSurveyId);
-      sent += result.sent;
+      // Only stamp last_recurrence_at AFTER the launch succeeds. If the
+      // queue insert errored we leave the timestamp alone so the next cron
+      // tick retries — otherwise a transient failure would silently skip
+      // this recurrence until the next interval (week/2weeks/month).
+      if (!result.error) {
+        await supabase.from("surveys").update({
+          config: { ...config, last_recurrence_at: now.toISOString() },
+        }).eq("id", survey.id);
+        sent += result.queued ?? 0;
+      } else {
+        console.warn(
+          `[handleReminders] recurring survey ${survey.id} launch failed; leaving last_recurrence_at unchanged for retry next tick:`,
+          result.error,
+        );
+      }
     }
   }
 
@@ -1269,13 +1261,55 @@ async function processSurveyReminder(
  * workspace via the user's email (email is provider-set, not user-editable).
  */
 // =============================================================================
-//  Handle release grades — DM each employee their review results
+//  Handle release grades — fan-out only
+//
+//  Same shape as the cycle/survey launches. Distinct dedupe_key prefix
+//  (`grade_dm:`) and distinct notification_log event_type
+//  (`nami_grade_release`) keep these isolated from cycle launch DMs that
+//  share the same assignment_id.
+//
+//  The cycle's stamped rating scale max_value is captured at enqueue time
+//  and stored in the payload so the drainer doesn't need to re-resolve it.
 // =============================================================================
 
+interface GradeReleaseDmJobPayload {
+  cycle_id: string;
+  cycle_name: string;
+  workspace_id: string;
+  assignment_id: string;
+  rating_max: number;
+  overall_rating: number | null;
+  final_grade: string | null;
+  recipient_app_user_id: string;
+  recipient_slack_user_id: string;
+}
+
+function makeGradeReleaseDmJob(
+  cycle: { id: string; name: string; workspace_id: string },
+  ratingMax: number,
+  assignment: { id: string; overall_rating: number | null; final_grade: string | null },
+  recipient: { id: string; slack_user_id: string },
+) {
+  const payload: GradeReleaseDmJobPayload = {
+    cycle_id: cycle.id,
+    cycle_name: cycle.name,
+    workspace_id: cycle.workspace_id,
+    assignment_id: assignment.id,
+    rating_max: ratingMax,
+    overall_rating: assignment.overall_rating,
+    final_grade: assignment.final_grade,
+    recipient_app_user_id: recipient.id,
+    recipient_slack_user_id: recipient.slack_user_id,
+  };
+  return {
+    workspace_id: cycle.workspace_id,
+    action: "send_grade_release",
+    dedupe_key: `grade_dm:${assignment.id}`,
+    payload,
+  };
+}
+
 async function handleReleaseGrades(cycleId: string) {
-  // Fetch cycle + stamped rating scale so the DM reflects the scale that was
-  // active at this cycle's launch (Lattice / Leapsome semantics: cycles freeze
-  // their scale at kickoff). Bot token is loaded separately via vault helper.
   const { data: cycle } = await supabase
     .from("performance_cycles")
     .select(
@@ -1283,18 +1317,11 @@ async function handleReleaseGrades(cycleId: string) {
     )
     .eq("id", cycleId)
     .single();
+  if (!cycle) return { queued: 0, error: "Cycle not found" };
 
-  if (!cycle) return { sent: 0, skipped: 0, failed: 0, error: "Cycle not found" };
-
-  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
-  const botToken = tokens?.botToken;
-  if (!botToken) return { sent: 0, skipped: 0, failed: 0, error: "No bot token" };
-
-  const workspaceId = cycle.workspace_id;
   // Fall back to 5 only if the cycle has no stamped scale (pre-backfill data).
   const ratingMax: number = (cycle as any).rating_scale?.max_value ?? 5;
 
-  // Fetch all standard review assignments with employee info
   const { data: assignments } = await supabase
     .from("review_assignments")
     .select(
@@ -1307,99 +1334,43 @@ async function handleReleaseGrades(cycleId: string) {
     )
     .eq("cycle_id", cycleId)
     .eq("assignment_type", "standard");
+  if (!assignments) return { queued: 0 };
 
-  if (!assignments) return { sent: 0, skipped: 0, failed: 0 };
-
-  let sent = 0;
-  let skipped = 0;
-  let failed = 0;
-
-  for (let _i = 0; _i < assignments.length; _i++) {
-    const a = assignments[_i];
-    const emp = (a as any).employee;
-
-    if (!emp?.slack_user_id) {
-      skipped++;
-      continue;
-    }
-
-    // Throttle between iterations to respect Slack rate limits
-    if (_i > 0) await throttle();
-
-    try {
-      // Build a rich results message — this is the most important notification an employee receives
-      const ratingStr = a.overall_rating
-        ? `${(Math.round(a.overall_rating * 10) / 10)}/${ratingMax}`
-        : null;
-      const gradeStr = a.final_grade || null;
-
-      // Summary line combining rating + grade
-      const resultParts: string[] = [];
-      if (ratingStr) resultParts.push(`:star: *${ratingStr}*`);
-      if (gradeStr) resultParts.push(`:medal: *${gradeStr}*`);
-      const resultLine = resultParts.length > 0
-        ? resultParts.join("  ·  ")
-        : "_No rating available_";
-
-      const resultsUrl = await buildAuthedDashboardUrl(
-        SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL,
-        emp.id, "/dashboard/performance",
-      );
-
-      const blocks: any[] = [
-        {
-          type: "section",
-          text: {
-            type: "mrkdwn",
-            text: `:tada: *Your ${cycle.name} results are in!*\n\n${resultLine}`,
-          },
-        },
-        {
-          type: "context",
-          elements: [
-            {
-              type: "mrkdwn",
-              text: "View your full results including competency breakdown and feedback on the dashboard.",
-            },
-          ],
-        },
-        { type: "divider" },
-        {
-          type: "actions",
-          elements: [
-            {
-              type: "button",
-              text: { type: "plain_text", text: "View my results :chart_with_upwards_trend:", emoji: true },
-              style: "primary",
-              url: resultsUrl,
-              action_id: "open_results",
-            },
-          ],
-        },
-      ];
-
-      const ok = await sendSlackBlocks(
-        botToken,
-        emp.slack_user_id,
-        `Your ${cycle.name} review results are ready`,
-        blocks,
-      );
-
-      if (ok) {
-        sent++;
-      } else {
-        failed++;
-      }
-    } catch (err) {
-      console.error(
-        `Error sending grade release to ${emp.slack_name || emp.id}:`,
-        err,
-      );
-      failed++;
-    }
+  const jobs: ReturnType<typeof makeGradeReleaseDmJob>[] = [];
+  for (const a of assignments as any[]) {
+    const emp = a.employee;
+    if (!emp?.slack_user_id) continue;
+    jobs.push(
+      makeGradeReleaseDmJob(
+        cycle,
+        ratingMax,
+        { id: a.id, overall_rating: a.overall_rating, final_grade: a.final_grade },
+        emp,
+      ),
+    );
   }
 
-  return { sent, skipped, failed };
+  if (jobs.length === 0) return { queued: 0 };
+
+  const { error: insErr } = await supabase
+    .from("slack_send_queue")
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
+  if (insErr) {
+    console.error("[handleReleaseGrades] queue insert failed:", insErr);
+    return { queued: 0, error: insErr.message };
+  }
+
+  // See handleCycleLaunch above — count actual pending rows so the report is
+  // accurate whether we just inserted, collided with a previous launch, or
+  // some mix.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", cycle.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+  return { queued: pending ?? jobs.length };
 }
 
 async function resolveCallerWorkspace(
@@ -1450,10 +1421,261 @@ interface QueueJob {
   attempts: number;
 }
 
+// Drain handlers can optionally return a Slack message_ts on success — the
+// drainer records it via complete_slack_send_job_with_ts so we can audit
+// "Slack accepted but we crashed before ack'ing" failures.
+type DrainResult = { ok: boolean; ts?: string; error?: string };
+
+// =============================================================================
+//  Bulk launch DM handlers — drained from slack_send_queue. Each handler
+//  uses logNotification + sendSlackBlocksWithTs and only rolls back the
+//  notification_log row when Slack explicitly rejects (knownRejected=true).
+//  Indeterminate failures (network reset, 5xx) leave the row in place so
+//  the retry will hit the canSend=false branch and no-op rather than risk
+//  a duplicate DM.
+// =============================================================================
+
+async function sendCycleLaunchDm(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<DrainResult> {
+  const p = job.payload as unknown as CycleDmJobPayload;
+  const refRole = p.role === "manager" ? "mgr" : p.role;
+  const refId = `${refRole}_${p.assignment_id}`;
+  const eventType = "nami_initial";
+
+  const canSend = await logNotification(
+    p.workspace_id,
+    p.recipient_app_user_id,
+    eventType,
+    refId,
+  );
+  if (!canSend) return { ok: true }; // already delivered, no-op
+
+  const tokens = await tokenFor(p.workspace_id);
+  const botToken = tokens?.botToken;
+  if (!botToken) {
+    // Workspace has no Slack token (uninstalled or token revoked). Terminal —
+    // mark complete and don't retry. We deliberately do NOT roll back the
+    // notification_log row: if the workspace re-installs later, the row
+    // prevents an accidental re-delivery of a now-stale launch DM.
+    // TODO (Task 13): set workspaces.requires_reinstall = true here so the
+    // dashboard surfaces the issue.
+    console.warn(
+      `[send_cycle_dm] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
+  }
+
+  const deadline = p.deadline_iso
+    ? new Date(p.deadline_iso).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "no deadline set";
+
+  let blocks: unknown[];
+  let text: string;
+  if (p.role === "self") {
+    blocks = buildSelfReviewOpening(p.recipient_name, p.cycle_name, deadline, p.assignment_id);
+    text = `Your self-review for ${p.cycle_name} is ready`;
+  } else if (p.role === "manager") {
+    // manager_context is the only field heavy enough to lazy-fetch (5+
+    // queries; not worth serialising into payload). Falls back to an empty
+    // context if subject_employee_id is missing — the block builder
+    // handles that gracefully.
+    const ctx = p.subject_employee_id
+      ? await getManagerContext(p.subject_employee_id, p.cycle_id, p.workspace_id)
+      : {};
+    blocks = buildManagerReviewOpening(
+      p.recipient_name,
+      p.subject_name ?? "a team member",
+      p.cycle_name,
+      deadline,
+      p.assignment_id,
+      ctx,
+    );
+    text = `Time to review ${p.subject_name ?? "a team member"} for ${p.cycle_name}`;
+  } else {
+    blocks = buildUpwardFeedbackOpening(
+      p.recipient_name,
+      p.subject_name ?? "your manager",
+      p.cycle_name,
+      deadline,
+      p.assignment_id,
+    );
+    text = `Upward feedback requested for ${p.subject_name ?? "your manager"}`;
+  }
+
+  const sendResult = await sendSlackBlocksWithTs(
+    botToken,
+    p.recipient_slack_user_id,
+    text,
+    blocks,
+  );
+  if (sendResult.ok) {
+    return { ok: true, ts: sendResult.ts };
+  }
+  if (sendResult.knownRejected) {
+    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
+  }
+  return { ok: false, error: sendResult.error };
+}
+
+async function sendSurveyInviteDm(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<DrainResult> {
+  const p = job.payload as unknown as SurveyDmJobPayload;
+  // Key the notification_log row on (survey_id, user_id) — matches the
+  // queue dedupe_key so both layers protect against the same double-DM
+  // scenario described on makeSurveyDmJob. Was: `survey_${participant_id}`,
+  // which let a re-launch with a different participant ordering re-deliver.
+  const refId = `survey_${p.survey_id}_user_${p.recipient_app_user_id}`;
+  const eventType = "nami_survey_invite";
+
+  const canSend = await logNotification(
+    p.workspace_id,
+    p.recipient_app_user_id,
+    eventType,
+    refId,
+  );
+  if (!canSend) return { ok: true };
+
+  const tokens = await tokenFor(p.workspace_id);
+  const botToken = tokens?.botToken;
+  if (!botToken) {
+    // See sendCycleLaunchDm — terminal, no rollback, TODO surfaces in
+    // dashboard via Task 13's requires_reinstall flag.
+    console.warn(
+      `[send_survey_invite] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
+  }
+
+  const blocks = buildSurveyOpening(
+    p.recipient_name,
+    p.survey_name,
+    p.question_count,
+    p.participant_id,
+    p.survey_id,
+    p.role,
+    p.subject_name,
+  );
+  const text = `You're invited to take the ${p.survey_name} survey`;
+
+  const sendResult = await sendSlackBlocksWithTs(
+    botToken,
+    p.recipient_slack_user_id,
+    text,
+    blocks,
+  );
+  if (sendResult.ok) return { ok: true, ts: sendResult.ts };
+  if (sendResult.knownRejected) {
+    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
+  }
+  return { ok: false, error: sendResult.error };
+}
+
+async function sendGradeReleaseDm(
+  job: QueueJob,
+  tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
+): Promise<DrainResult> {
+  const p = job.payload as unknown as GradeReleaseDmJobPayload;
+  const refId = `grade_${p.assignment_id}`;
+  const eventType = "nami_grade_release";
+
+  const canSend = await logNotification(
+    p.workspace_id,
+    p.recipient_app_user_id,
+    eventType,
+    refId,
+  );
+  if (!canSend) return { ok: true };
+
+  const tokens = await tokenFor(p.workspace_id);
+  const botToken = tokens?.botToken;
+  if (!botToken) {
+    // See sendCycleLaunchDm — terminal, no rollback, TODO surfaces in
+    // dashboard via Task 13's requires_reinstall flag.
+    console.warn(
+      `[send_grade_release] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
+  }
+
+  const ratingStr = p.overall_rating
+    ? `${Math.round(p.overall_rating * 10) / 10}/${p.rating_max}`
+    : null;
+  const gradeStr = p.final_grade || null;
+  const resultParts: string[] = [];
+  if (ratingStr) resultParts.push(`:star: *${ratingStr}*`);
+  if (gradeStr) resultParts.push(`:medal: *${gradeStr}*`);
+  const resultLine = resultParts.length > 0 ? resultParts.join("  ·  ") : "_No rating available_";
+
+  const resultsUrl = await buildAuthedDashboardUrl(
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+    DASHBOARD_URL,
+    p.recipient_app_user_id,
+    "/dashboard/performance",
+  );
+
+  const blocks: unknown[] = [
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `:tada: *Your ${p.cycle_name} results are in!*\n\n${resultLine}`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: "View your full results including competency breakdown and feedback on the dashboard.",
+        },
+      ],
+    },
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View my results :chart_with_upwards_trend:", emoji: true },
+          style: "primary",
+          url: resultsUrl,
+          action_id: "open_results",
+        },
+      ],
+    },
+  ];
+
+  const text = `Your ${p.cycle_name} review results are ready`;
+  const sendResult = await sendSlackBlocksWithTs(
+    botToken,
+    p.recipient_slack_user_id,
+    text,
+    blocks,
+  );
+  if (sendResult.ok) return { ok: true, ts: sendResult.ts };
+  if (sendResult.knownRejected) {
+    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
+  }
+  return { ok: false, error: sendResult.error };
+}
+
 async function sendFeedbackDm(
   job: QueueJob,
   tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<DrainResult> {
+  // Audit (Section 6.5): no notification_log involvement here, so there's
+  // nothing to roll back on a knownRejected error. Routing through the
+  // sendSlackBlocksWithTs path is still useful: we capture the Slack ts
+  // for audit when the send succeeds.
   const feedbackId = job.payload.feedback_id as string | undefined;
   if (!feedbackId) return { ok: false, error: "missing feedback_id" };
 
@@ -1496,15 +1718,15 @@ async function sendFeedbackDm(
   if (!channel) return { ok: false, error: `conversations.open: ${open?.error ?? "unknown"}` };
 
   const text = `${typeLabel} from ${sender}:\n> ${String(fb.message).replace(/\n/g, "\n> ")}`;
-  const post = await callSlackApi(botToken, "chat.postMessage", { channel, text });
-  if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
-  return { ok: true };
+  const sendResult = await sendSlackBlocksWithTs(botToken, channel, text);
+  if (sendResult.ok) return { ok: true, ts: sendResult.ts };
+  return { ok: false, error: `postMessage: ${sendResult.error ?? "unknown"}` };
 }
 
 async function sendNewReviewerDm(
   job: QueueJob,
   tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<DrainResult> {
   const assignmentId = job.payload.assignment_id as string | undefined;
   if (!assignmentId) return { ok: false, error: "missing assignment_id" };
 
@@ -1543,15 +1765,15 @@ async function sendNewReviewerDm(
     `Open the dashboard when you're ready to fill it in.`,
   ].join("\n");
 
-  const post = await callSlackApi(botToken, "chat.postMessage", { channel, text });
-  if (!post?.ok) return { ok: false, error: `postMessage: ${post?.error ?? "unknown"}` };
-  return { ok: true };
+  const sendResult = await sendSlackBlocksWithTs(botToken, channel, text);
+  if (sendResult.ok) return { ok: true, ts: sendResult.ts };
+  return { ok: false, error: `postMessage: ${sendResult.error ?? "unknown"}` };
 }
 
 async function refreshHomeTab(
   job: QueueJob,
   tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<DrainResult> {
   const appUserId = job.payload.app_user_id as string | undefined;
   if (!appUserId) return { ok: false, error: "missing app_user_id" };
   const { data: u } = await supabase
@@ -1610,21 +1832,38 @@ async function handleDrainSendQueue() {
   let requeued = 0;
   for (const job of jobs) {
     try {
-      let result: { ok: boolean; error?: string };
+      let result: DrainResult;
       if (job.action === "notify_feedback") {
         result = await sendFeedbackDm(job, tokenFor);
       } else if (job.action === "notify_new_reviewer") {
         result = await sendNewReviewerDm(job, tokenFor);
       } else if (job.action === "refresh_home_tab") {
         result = await refreshHomeTab(job, tokenFor);
+      } else if (job.action === "send_cycle_dm") {
+        result = await sendCycleLaunchDm(job, tokenFor);
+      } else if (job.action === "send_survey_invite") {
+        result = await sendSurveyInviteDm(job, tokenFor);
+      } else if (job.action === "send_grade_release") {
+        result = await sendGradeReleaseDm(job, tokenFor);
       } else {
         result = { ok: false, error: `unknown action ${job.action}` };
       }
-      await supabase.rpc("complete_slack_send_job", {
-        p_id: job.id,
-        p_success: result.ok,
-        p_error: result.ok ? null : result.error ?? null,
-      });
+      // Prefer the with-ts RPC when Slack returned a message_ts. Stores the
+      // ts in slack_send_queue.slack_message_ts for audit/cleanup; the
+      // notification_log dedup is what protects against double-sends, so
+      // the queue ts is informational only.
+      if (result.ok && result.ts) {
+        await supabase.rpc("complete_slack_send_job_with_ts", {
+          p_id: job.id,
+          p_slack_message_ts: result.ts,
+        });
+      } else {
+        await supabase.rpc("complete_slack_send_job", {
+          p_id: job.id,
+          p_success: result.ok,
+          p_error: result.ok ? null : result.error ?? null,
+        });
+      }
       if (result.ok) succeeded++;
       else failed++;
     } catch (e) {

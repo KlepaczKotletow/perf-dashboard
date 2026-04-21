@@ -1,6 +1,7 @@
 import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, buildReviewSummary, buildSurveyQuestionPrompt } from "../_shared/nami-blocks.ts";
 import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { asUuid, asSlackTeamId, asSlackUserId } from "../_shared/postgrest-safe.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -43,6 +44,22 @@ Deno.serve(async (req) => {
       if (computed.byteLength !== received.byteLength || !crypto.subtle.timingSafeEqual(computed, received)) {
         return new Response("Invalid signature", { status: 403 });
       }
+    }
+
+    // Slack retried because we were slow. With Task 2's event_id dedup, the
+    // inbox catches event-callback retries; this is the catch-all for the
+    // other endpoints (commands, interactivity) that don't have an event_id.
+    // Either we already finished and Slack didn't get our 200 — doing it again
+    // risks side-effects firing twice. Or we're still processing the original.
+    // Either way, acknowledge fast so Slack stops retrying.
+    const retryNum = req.headers.get("x-slack-retry-num");
+    if (retryNum) {
+      console.warn(
+        `[slack-interactivity] retry #${retryNum} (reason=${
+          req.headers.get("x-slack-retry-reason") ?? "?"
+        }), short-circuiting to 200`,
+      );
+      return new Response("OK", { status: 200 });
     }
 
     const p = new URLSearchParams(body);
@@ -133,13 +150,22 @@ Deno.serve(async (req) => {
 
     // User lookup
     async function getOrCreateUser(wsId: string, slackId: string, token: string) {
-      let users = await dbQuery("users", `workspace_id=eq.${wsId}&slack_user_id=eq.${slackId}`);
+      // Defense in depth: validate both IDs before they get interpolated into
+      // a PostgREST URL. Callers should already validate, but a missed call
+      // site shouldn't be the difference between safe and unsafe.
+      const safeWsId = asUuid(wsId);
+      const safeSlackId = asSlackUserId(slackId);
+      if (!safeWsId || !safeSlackId) {
+        console.error("[getOrCreateUser] invalid id rejected:", { wsId, slackId });
+        return null;
+      }
+      let users = await dbQuery("users", `workspace_id=eq.${safeWsId}&slack_user_id=eq.${safeSlackId}`);
       if (users[0]) return users[0];
-      const info = await slackApi(token, "users.info", { user: slackId });
+      const info = await slackApi(token, "users.info", { user: safeSlackId });
       if (!info.ok) return null;
       const created = await dbInsert("users", {
-        workspace_id: wsId,
-        slack_user_id: slackId,
+        workspace_id: safeWsId,
+        slack_user_id: safeSlackId,
         slack_name: info.user.real_name || info.user.name,
         slack_email: info.user.profile?.email,
       });
@@ -158,11 +184,25 @@ Deno.serve(async (req) => {
     // ----------------------------------------------------------------
     // Resolve workspace
     // ----------------------------------------------------------------
-    const teamId = payload.team?.id || payload.user?.team_id;
+    const rawTeamId = payload.team?.id || payload.user?.team_id;
+    const teamId = asSlackTeamId(rawTeamId);
+    if (!teamId) {
+      console.warn(`[slack-interactivity] invalid team_id rejected:`, rawTeamId);
+      return json({ response_action: "clear" });
+    }
     const ws = (await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,rating_scale`))[0];
     if (!ws) return json({ response_action: "clear" });
 
-    const botToken = await getFreshBotToken(ws.id);
+    // Defense in depth: ws.id is a server-generated UUID, but we interpolate it
+    // into many PostgREST URLs throughout this handler — validate once here so
+    // a corrupt DB row can't smuggle filter syntax into our queries.
+    const wsId = asUuid(ws.id);
+    if (!wsId) {
+      console.error(`[slack-interactivity] invalid workspace UUID from DB:`, wsId);
+      return json({ response_action: "clear" });
+    }
+
+    const botToken = await getFreshBotToken(wsId);
     if (!botToken) return json({ response_action: "clear" });
     const cbId = payload.view?.callback_id;
     console.log("[interactivity] type:", payload.type, "callback:", cbId);
@@ -173,14 +213,18 @@ Deno.serve(async (req) => {
     // that entities belong to the resolved workspace before operating.
     // ----------------------------------------------------------------
     async function validateAssignmentWorkspace(assignmentId: string): Promise<boolean> {
+      const safeId = asUuid(assignmentId);
+      if (!safeId) return false;
       const res = await dbQuery("review_assignments",
-        `id=eq.${assignmentId}&select=cycle:performance_cycles!inner(workspace_id)`);
-      return res?.[0]?.cycle?.workspace_id === ws.id;
+        `id=eq.${safeId}&select=cycle:performance_cycles!inner(workspace_id)`);
+      return res?.[0]?.cycle?.workspace_id === wsId;
     }
 
     async function validateConversationWorkspace(convId: string): Promise<boolean> {
+      const safeId = asUuid(convId);
+      if (!safeId) return false;
       const res = await dbQuery("conversation_states",
-        `id=eq.${convId}&workspace_id=eq.${ws.id}&select=id`);
+        `id=eq.${safeId}&workspace_id=eq.${wsId}&select=id`);
       return res?.length > 0;
     }
 
@@ -189,14 +233,25 @@ Deno.serve(async (req) => {
     // ================================================================
     async function updateOriginalNotification(assignmentId: string) {
       try {
+        // Defense in depth: assignmentId is validated at the callsite, but verify here too.
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[WS4] updateOriginalNotification: invalid assignmentId rejected:", assignmentId);
+          return;
+        }
         const assignments = await dbQuery("review_assignments",
-          `id=eq.${assignmentId}&select=slack_notification_ts,slack_notification_channel`);
+          `id=eq.${safeAssignmentId}&select=slack_notification_ts,slack_notification_channel`);
         const a = assignments?.[0];
         if (!a?.slack_notification_ts || !a?.slack_notification_channel) return;
 
+        // slack_notification_ts (Slack message timestamp like "1234567890.123") and
+        // slack_notification_channel (Slack channel ID) are server-stored values
+        // sourced from Slack — percent-encode to be safe in the URL filter.
+        const safeNotifTs = encodeURIComponent(String(a.slack_notification_ts));
+        const safeNotifChannel = encodeURIComponent(String(a.slack_notification_channel));
         // Find ALL assignments sharing this notification message
         const siblings = await dbQuery("review_assignments",
-          `slack_notification_ts=eq.${a.slack_notification_ts}&slack_notification_channel=eq.${a.slack_notification_channel}&select=id,status,overall_rating,employee:users!review_assignments_employee_id_fkey(slack_name),cycle:performance_cycles(name)`);
+          `slack_notification_ts=eq.${safeNotifTs}&slack_notification_channel=eq.${safeNotifChannel}&select=id,status,overall_rating,employee:users!review_assignments_employee_id_fkey(slack_name),cycle:performance_cycles(name)`);
         if (!siblings?.length) return;
 
         const cycleName = siblings[0]?.cycle?.name || "Review";
@@ -250,15 +305,30 @@ Deno.serve(async (req) => {
     // ================================================================
     async function checkAndNotifyCompletion(assignmentId: string, cycleId: string, wsId: string) {
       try {
+        // Defense in depth: validate all UUIDs before interpolation
+        const safeAssignmentId = asUuid(assignmentId);
+        const safeCycleId = asUuid(cycleId);
+        const safeWsId = asUuid(wsId);
+        if (!safeAssignmentId || !safeCycleId || !safeWsId) {
+          console.error("[WS5] checkAndNotifyCompletion: invalid id rejected:",
+            { assignmentId, cycleId, wsId });
+          return;
+        }
         const assignments = await dbQuery("review_assignments",
-          `id=eq.${assignmentId}&select=employee_id,employee:users!review_assignments_employee_id_fkey(slack_name)`);
+          `id=eq.${safeAssignmentId}&select=employee_id,employee:users!review_assignments_employee_id_fkey(slack_name)`);
         const empId = assignments?.[0]?.employee_id;
         const empName = assignments?.[0]?.employee?.slack_name || "Employee";
         if (!empId) return;
+        // empId is also a server-generated UUID from the DB — validate before interpolating.
+        const safeEmpId = asUuid(empId);
+        if (!safeEmpId) {
+          console.error("[WS5] checkAndNotifyCompletion: invalid empId from DB:", empId);
+          return;
+        }
 
         // Check: all reviews for this employee in this cycle
         const empAssignments = await dbQuery("review_assignments",
-          `cycle_id=eq.${cycleId}&employee_id=eq.${empId}&select=id,status,overall_rating`);
+          `cycle_id=eq.${safeCycleId}&employee_id=eq.${safeEmpId}&select=id,status,overall_rating`);
         const completedForEmp = empAssignments.filter((a: any) => a.status === "completed" && a.overall_rating);
         const nonCompletedForEmp = empAssignments.filter((a: any) => a.status !== "completed");
 
@@ -270,7 +340,7 @@ Deno.serve(async (req) => {
           // the PATCH first wins. The filter matches all assignments for this
           // (cycle, employee) pair so repeat calls find them all already stamped.
           const claimRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/review_assignments?cycle_id=eq.${cycleId}&employee_id=eq.${empId}&employee_completion_notified_at=is.null`,
+            `${SUPABASE_URL}/rest/v1/review_assignments?cycle_id=eq.${safeCycleId}&employee_id=eq.${safeEmpId}&employee_completion_notified_at=is.null`,
             {
               method: "PATCH",
               headers: {
@@ -289,7 +359,7 @@ Deno.serve(async (req) => {
             // independent guard too.
           } else {
           const avgOverall = completedForEmp.reduce((s: number, a: any) => s + a.overall_rating, 0) / completedForEmp.length;
-          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=in.(admin,hr)&select=id,slack_user_id`);
+          const admins = await dbQuery("users", `workspace_id=eq.${safeWsId}&role=in.(admin,hr)&select=id,slack_user_id`);
 
           for (const admin of (admins || [])) {
             if (!admin?.slack_user_id) continue;
@@ -315,11 +385,11 @@ Deno.serve(async (req) => {
 
         // Check: all reviews in the ENTIRE cycle (must all be "completed", not just "not pending")
         const allNonCompleted = await dbQuery("review_assignments",
-          `cycle_id=eq.${cycleId}&status=neq.completed&select=id`);
+          `cycle_id=eq.${safeCycleId}&status=neq.completed&select=id`);
         if (Array.isArray(allNonCompleted) && allNonCompleted.length === 0) {
           // Atomic claim on the cycle-wide alert slot.
           const cycleClaimRes = await fetch(
-            `${SUPABASE_URL}/rest/v1/performance_cycles?id=eq.${cycleId}&completion_notified_at=is.null`,
+            `${SUPABASE_URL}/rest/v1/performance_cycles?id=eq.${safeCycleId}&completion_notified_at=is.null`,
             {
               method: "PATCH",
               headers: {
@@ -337,14 +407,14 @@ Deno.serve(async (req) => {
           }
 
           const allCompleted = await dbQuery("review_assignments",
-            `cycle_id=eq.${cycleId}&status=eq.completed&select=id,overall_rating`);
+            `cycle_id=eq.${safeCycleId}&status=eq.completed&select=id,overall_rating`);
           const cycleAvg = allCompleted.length > 0
             ? allCompleted.reduce((s: number, a: any) => s + (a.overall_rating || 0), 0) / allCompleted.length
             : 0;
-          const cycles = await dbQuery("performance_cycles", `id=eq.${cycleId}&select=name`);
+          const cycles = await dbQuery("performance_cycles", `id=eq.${safeCycleId}&select=name`);
           const cycleName = cycles?.[0]?.name || "Review Cycle";
 
-          const admins = await dbQuery("users", `workspace_id=eq.${wsId}&role=eq.admin&select=id,slack_user_id&limit=1`);
+          const admins = await dbQuery("users", `workspace_id=eq.${safeWsId}&role=eq.admin&select=id,slack_user_id&limit=1`);
           const firstAdmin = admins?.[0];
           if (firstAdmin?.slack_user_id) {
             const [viewUrl, calUrl] = await Promise.all([
@@ -383,12 +453,24 @@ Deno.serve(async (req) => {
     // ================================================================
     async function sendManagerContext(slackUserId: string, employeeId: string, cycleId: string) {
       try {
+        // Defense in depth: validate UUIDs before they hit PostgREST URLs.
+        const safeEmployeeId = asUuid(employeeId);
+        const safeCycleId = asUuid(cycleId);
+        if (!safeEmployeeId || !safeCycleId) {
+          console.error("[WS3] sendManagerContext: invalid id rejected:",
+            { employeeId, cycleId });
+          return;
+        }
         const contextLines: string[] = [];
 
         // Get all assignments for this employee in this cycle
         const empAssignments = await dbQuery("review_assignments",
-          `cycle_id=eq.${cycleId}&employee_id=eq.${employeeId}&select=id,status`);
-        const empAssignmentIds = (empAssignments || []).map((a: any) => a.id);
+          `cycle_id=eq.${safeCycleId}&employee_id=eq.${safeEmployeeId}&select=id,status`);
+        // empAssignmentIds are server UUIDs from the DB. Validate each one
+        // before they get joined into a PostgREST `in.()` filter.
+        const empAssignmentIds = (empAssignments || [])
+          .map((a: any) => asUuid(a.id))
+          .filter((v: string | null): v is string => v !== null);
 
         if (empAssignmentIds.length > 0) {
           // 1. Self-assessment summary
@@ -416,7 +498,7 @@ Deno.serve(async (req) => {
 
         // 3. Goals with tracking status
         const goals = await dbQuery("goals",
-          `employee_id=eq.${employeeId}&status=eq.active&select=id,progress,tracking_status`);
+          `employee_id=eq.${safeEmployeeId}&status=eq.active&select=id,progress,tracking_status`);
         if (goals?.length > 0 && !goals.error) {
           const avgProgress = Math.round(goals.reduce((s: number, g: any) => s + (g.progress || 0), 0) / goals.length);
           const statusParts: string[] = [];
@@ -435,13 +517,13 @@ Deno.serve(async (req) => {
 
         // 4. Previous cycle rating
         const prevAssignments = await dbQuery("review_assignments",
-          `employee_id=eq.${employeeId}&status=eq.completed&cycle_id=neq.${cycleId}&select=id,overall_rating,updated_at&order=updated_at.desc&limit=1`);
+          `employee_id=eq.${safeEmployeeId}&status=eq.completed&cycle_id=neq.${safeCycleId}&select=id,overall_rating,updated_at&order=updated_at.desc&limit=1`);
         if (prevAssignments?.[0]?.overall_rating) {
           contextLines.push(`Previous Rating: ⭐ *${(Math.round(prevAssignments[0].overall_rating * 10) / 10).toString()}/${ws.rating_scale?.max || 5}*`);
         }
 
         // 5. Competency expectations from level matrix
-        const empLevelData = await dbQuery("users", `id=eq.${employeeId}&workspace_id=eq.${ws.id}&select=level_id,levels(name,job_families(name))`);
+        const empLevelData = await dbQuery("users", `id=eq.${safeEmployeeId}&workspace_id=eq.${wsId}&select=level_id,levels(name,job_families(name))`);
         const empLevel = empLevelData?.[0];
         if (empLevel?.level_id) {
           const level = (empLevel as any).levels;
@@ -449,18 +531,29 @@ Deno.serve(async (req) => {
             ? `${level.job_families.name} — ${level.name}`
             : level?.name;
 
+          // empLevel.level_id is a DB UUID — validate before interpolating.
+          const safeLevelId = asUuid(empLevel.level_id);
+          if (!safeLevelId) {
+            console.warn("[WS3] sendManagerContext: invalid level_id:", empLevel.level_id);
+            return;
+          }
           const levelComps = await dbQuery("level_competencies",
-            `level_id=eq.${empLevel.level_id}&workspace_id=eq.${ws.id}&select=competency_id,expected_level,competencies(name)`);
+            `level_id=eq.${safeLevelId}&workspace_id=eq.${wsId}&select=competency_id,expected_level,competencies(name)`);
 
           if (levelComps?.length > 0 && !levelComps.error && levelName) {
             // Get previous per-competency ratings
             let prevCompMap: Record<string, number> = {};
             if (prevAssignments?.[0]?.id) {
-              const prevResp = await dbQuery("review_responses",
-                `assignment_id=eq.${prevAssignments[0].id}&reviewer_role=eq.manager&select=competency_id,rating`);
-              if (prevResp && !prevResp.error) {
-                for (const r of prevResp) {
-                  if (r.competency_id && r.rating != null) prevCompMap[r.competency_id] = r.rating;
+              const safePrevAssignmentId = asUuid(prevAssignments[0].id);
+              if (!safePrevAssignmentId) {
+                console.warn("[WS3] sendManagerContext: invalid prev assignment id:", prevAssignments[0].id);
+              } else {
+                const prevResp = await dbQuery("review_responses",
+                  `assignment_id=eq.${safePrevAssignmentId}&reviewer_role=eq.manager&select=competency_id,rating`);
+                if (prevResp && !prevResp.error) {
+                  for (const r of prevResp) {
+                    if (r.competency_id && r.rating != null) prevCompMap[r.competency_id] = r.rating;
+                  }
                 }
               }
             }
@@ -489,7 +582,7 @@ Deno.serve(async (req) => {
 
         if (contextLines.length === 0) return; // No context available
 
-        const empData = await dbQuery("users", `id=eq.${employeeId}&select=slack_name`);
+        const empData = await dbQuery("users", `id=eq.${safeEmployeeId}&select=slack_name`);
         const empName = empData?.[0]?.slack_name || "Employee";
 
         await slackApi(botToken, "chat.postMessage", {
@@ -510,47 +603,63 @@ Deno.serve(async (req) => {
     //  Helper: get competencies for an assignment
     // ================================================================
     async function getCompetenciesForAssignment(assignmentId: string, employeeId: string, wsId: string) {
-      const emps = await dbQuery("users", `id=eq.${employeeId}&select=id,slack_name,level_id`);
+      // Defense in depth: validate UUIDs before they get interpolated.
+      const safeAssignmentId = asUuid(assignmentId);
+      const safeEmployeeId = asUuid(employeeId);
+      const safeWsId = asUuid(wsId);
+      if (!safeAssignmentId || !safeEmployeeId || !safeWsId) {
+        console.error("[getCompetenciesForAssignment] invalid id rejected:",
+          { assignmentId, employeeId, wsId });
+        return { competencies: [], empName: "Employee", cycleId: null, scoreDescriptorsByComp: {} };
+      }
+      const emps = await dbQuery("users", `id=eq.${safeEmployeeId}&select=id,slack_name,level_id`);
       const emp = emps?.[0];
       const empName = emp?.slack_name || "Employee";
 
-      const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=cycle_id`);
+      const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=cycle_id`);
       const cycleId = assignments?.[0]?.cycle_id;
 
       let competencies: any[] = [];
 
       if (cycleId) {
-        const cqs = await dbQuery(
-          "cycle_questions",
-          `cycle_id=eq.${cycleId}&question_type=eq.competency&select=id,competency_id,prompt,sort_order,competencies(id,name,category,description)&order=sort_order`
-        );
-        if (cqs && cqs.length > 0 && !cqs.error) {
-          competencies = cqs.map((q: any) => ({
-            id: q.competencies.id,
-            name: q.competencies.name,
-            category: q.competencies.category,
-            description: q.competencies.description || "",
-          }));
+        // cycleId is a server UUID from DB — validate before use.
+        const safeCycleId = asUuid(cycleId);
+        if (safeCycleId) {
+          const cqs = await dbQuery(
+            "cycle_questions",
+            `cycle_id=eq.${safeCycleId}&question_type=eq.competency&select=id,competency_id,prompt,sort_order,competencies(id,name,category,description)&order=sort_order`
+          );
+          if (cqs && cqs.length > 0 && !cqs.error) {
+            competencies = cqs.map((q: any) => ({
+              id: q.competencies.id,
+              name: q.competencies.name,
+              category: q.competencies.category,
+              description: q.competencies.description || "",
+            }));
+          }
         }
       }
 
       if (competencies.length === 0 && emp?.level_id) {
-        const lc = await dbQuery(
-          "level_competencies",
-          `level_id=eq.${emp.level_id}&workspace_id=eq.${wsId}&select=competency_id,competencies(id,name,category,description)&order=competencies(category),competencies(name)`
-        );
-        if (lc && lc.length > 0 && !lc.error) {
-          competencies = lc.map((row: any) => ({
-            id: row.competencies.id,
-            name: row.competencies.name,
-            category: row.competencies.category,
-            description: row.competencies.description || "",
-          }));
+        const safeLevelId = asUuid(emp.level_id);
+        if (safeLevelId) {
+          const lc = await dbQuery(
+            "level_competencies",
+            `level_id=eq.${safeLevelId}&workspace_id=eq.${safeWsId}&select=competency_id,competencies(id,name,category,description)&order=competencies(category),competencies(name)`
+          );
+          if (lc && lc.length > 0 && !lc.error) {
+            competencies = lc.map((row: any) => ({
+              id: row.competencies.id,
+              name: row.competencies.name,
+              category: row.competencies.category,
+              description: row.competencies.description || "",
+            }));
+          }
         }
       }
 
       if (competencies.length === 0) {
-        const all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
+        const all = await dbQuery("competencies", `workspace_id=eq.${safeWsId}&select=id,name,category,is_core&order=category,name`);
         if (all && all.length > 0 && !all.error) {
           const core = all.filter((c: any) => c.is_core);
           competencies = (core.length >= 3 ? core : all).map((c: any) => ({
@@ -563,17 +672,22 @@ Deno.serve(async (req) => {
       // Fetch score descriptors for all competencies in this review
       let scoreDescriptorsByComp: Record<string, Record<string, string>> = {};
       if (competencies.length > 0) {
-        const compIds = competencies.map((c: any) => c.id);
-        const sds = await dbQuery(
-          "competency_score_descriptors",
-          `workspace_id=eq.${wsId}&competency_id=in.(${compIds.join(",")})&select=competency_id,score,description`
-        );
-        if (sds && sds.length > 0 && !sds.error) {
-          for (const sd of sds) {
-            if (!scoreDescriptorsByComp[sd.competency_id]) {
-              scoreDescriptorsByComp[sd.competency_id] = {};
+        // Validate every competency UUID before joining into in.() filter
+        const compIds = competencies
+          .map((c: any) => asUuid(c.id))
+          .filter((v: string | null): v is string => v !== null);
+        if (compIds.length > 0) {
+          const sds = await dbQuery(
+            "competency_score_descriptors",
+            `workspace_id=eq.${safeWsId}&competency_id=in.(${compIds.join(",")})&select=competency_id,score,description`
+          );
+          if (sds && sds.length > 0 && !sds.error) {
+            for (const sd of sds) {
+              if (!scoreDescriptorsByComp[sd.competency_id]) {
+                scoreDescriptorsByComp[sd.competency_id] = {};
+              }
+              scoreDescriptorsByComp[sd.competency_id][String(sd.score)] = sd.description;
             }
-            scoreDescriptorsByComp[sd.competency_id][String(sd.score)] = sd.description;
           }
         }
       }
@@ -638,11 +752,29 @@ Deno.serve(async (req) => {
     //  Shared helper: build review form for a review_assignment (modal)
     // ================================================================
     async function buildReviewForm(assignmentId: string, reviewRole: string, employeeId: string, wsId: string) {
-      const emps = await dbQuery("users", `id=eq.${employeeId}&select=id,slack_name,level_id`);
+      // Defense in depth: validate UUIDs before they get interpolated.
+      const safeAssignmentId = asUuid(assignmentId);
+      const safeEmployeeId = asUuid(employeeId);
+      const safeWsId = asUuid(wsId);
+      if (!safeAssignmentId || !safeEmployeeId || !safeWsId) {
+        console.error("[buildReviewForm] invalid id rejected:",
+          { assignmentId, employeeId, wsId });
+        // Return a valid (but empty) modal so the upstream views.open call
+        // either presents a sensible message or fails noisily — never silently
+        // emits a malformed PostgREST URL.
+        return {
+          type: "modal",
+          callback_id: "cycle_review_submit",
+          title: { type: "plain_text", text: "Review" },
+          close: { type: "plain_text", text: "Close" },
+          blocks: [{ type: "section", text: { type: "mrkdwn", text: "Couldn't load this review." } }],
+        };
+      }
+      const emps = await dbQuery("users", `id=eq.${safeEmployeeId}&select=id,slack_name,level_id`);
       const emp = emps?.[0];
       const empName = emp?.slack_name || "Employee";
 
-      const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=cycle_id`);
+      const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=cycle_id`);
       const cycleId = assignments?.[0]?.cycle_id;
 
       let competencies: any[] = [];
@@ -651,24 +783,30 @@ Deno.serve(async (req) => {
       let usedCycleQuestions = false;
 
       if (cycleId) {
-        const cqs = await dbQuery(
-          "cycle_questions",
-          `cycle_id=eq.${cycleId}&select=id,question_type,competency_id,prompt,sort_order,required,competencies(id,name,category)&order=sort_order`
-        );
-        if (cqs && cqs.length > 0 && !cqs.error) {
-          usedCycleQuestions = true;
-          let expectedMap: Record<string, number> = {};
-          if (emp?.level_id) {
-            const lc = await dbQuery("level_competencies", `level_id=eq.${emp.level_id}&select=competency_id,expected_level`);
-            if (lc && !lc.error) {
-              for (const row of lc) expectedMap[row.competency_id] = row.expected_level;
+        const safeCycleId = asUuid(cycleId);
+        if (safeCycleId) {
+          const cqs = await dbQuery(
+            "cycle_questions",
+            `cycle_id=eq.${safeCycleId}&select=id,question_type,competency_id,prompt,sort_order,required,competencies(id,name,category)&order=sort_order`
+          );
+          if (cqs && cqs.length > 0 && !cqs.error) {
+            usedCycleQuestions = true;
+            let expectedMap: Record<string, number> = {};
+            if (emp?.level_id) {
+              const safeLevelId = asUuid(emp.level_id);
+              if (safeLevelId) {
+                const lc = await dbQuery("level_competencies", `level_id=eq.${safeLevelId}&select=competency_id,expected_level`);
+                if (lc && !lc.error) {
+                  for (const row of lc) expectedMap[row.competency_id] = row.expected_level;
+                }
+              }
             }
-          }
-          for (const q of cqs) {
-            if (q.question_type === "competency" && q.competencies) {
-              competencies.push({ id: q.competencies.id, name: q.competencies.name, category: q.competencies.category, expected: expectedMap[q.competencies.id] || null });
-            } else if (q.question_type === "text") {
-              textQuestions.push({ id: q.id, prompt: q.prompt || "Additional comments", required: q.required });
+            for (const q of cqs) {
+              if (q.question_type === "competency" && q.competencies) {
+                competencies.push({ id: q.competencies.id, name: q.competencies.name, category: q.competencies.category, expected: expectedMap[q.competencies.id] || null });
+              } else if (q.question_type === "text") {
+                textQuestions.push({ id: q.id, prompt: q.prompt || "Additional comments", required: q.required });
+              }
             }
           }
         }
@@ -676,16 +814,19 @@ Deno.serve(async (req) => {
 
       if (!usedCycleQuestions) {
         if (emp?.level_id) {
-          const lc = await dbQuery(
-            "level_competencies",
-            `level_id=eq.${emp.level_id}&workspace_id=eq.${wsId}&select=competency_id,expected_level,weight,competencies(id,name,category)&order=competencies(category),competencies(name)`
-          );
-          if (lc && lc.length > 0 && !lc.error) {
-            competencies = lc.map((row: any) => ({ id: row.competencies.id, name: row.competencies.name, category: row.competencies.category, expected: row.expected_level }));
+          const safeLevelId = asUuid(emp.level_id);
+          if (safeLevelId) {
+            const lc = await dbQuery(
+              "level_competencies",
+              `level_id=eq.${safeLevelId}&workspace_id=eq.${safeWsId}&select=competency_id,expected_level,weight,competencies(id,name,category)&order=competencies(category),competencies(name)`
+            );
+            if (lc && lc.length > 0 && !lc.error) {
+              competencies = lc.map((row: any) => ({ id: row.competencies.id, name: row.competencies.name, category: row.competencies.category, expected: row.expected_level }));
+            }
           }
         }
         if (competencies.length === 0) {
-          const all = await dbQuery("competencies", `workspace_id=eq.${wsId}&select=id,name,category,is_core&order=category,name`);
+          const all = await dbQuery("competencies", `workspace_id=eq.${safeWsId}&select=id,name,category,is_core&order=category,name`);
           if (all && all.length > 0 && !all.error) {
             const core = all.filter((c: any) => c.is_core);
             competencies = (core.length >= 3 ? core : all).map((c: any) => ({ id: c.id, name: c.name, category: c.category, expected: null }));
@@ -695,10 +836,13 @@ Deno.serve(async (req) => {
       }
 
       if (emp?.level_id) {
-        const levels = await dbQuery("levels", `id=eq.${emp.level_id}&select=name,grade,job_families(name)`);
-        if (levels[0]) {
-          const l = levels[0];
-          levelLabel = `${l.job_families?.name || ""} - ${l.name}${l.grade ? " (" + l.grade + ")" : ""}`;
+        const safeLevelId = asUuid(emp.level_id);
+        if (safeLevelId) {
+          const levels = await dbQuery("levels", `id=eq.${safeLevelId}&select=name,grade,job_families(name)`);
+          if (levels[0]) {
+            const l = levels[0];
+            levelLabel = `${l.job_families?.name || ""} - ${l.name}${l.grade ? " (" + l.grade + ")" : ""}`;
+          }
         }
       }
 
@@ -761,7 +905,7 @@ Deno.serve(async (req) => {
         submit: { type: "plain_text", text: "Submit Review" },
         close: { type: "plain_text", text: "Cancel" },
         private_metadata: JSON.stringify({
-          workspaceId: wsId, assignmentId, reviewRole, employeeId,
+          workspaceId: safeWsId, assignmentId: safeAssignmentId, reviewRole, employeeId: safeEmployeeId,
           competencyIds: competencies.slice(0, 60).map((c: any) => c.id),
           textQuestionIds: textQuestions.slice(0, 15).map((tq: any) => tq.id),
         }),
@@ -781,8 +925,14 @@ Deno.serve(async (req) => {
         const { convId, compName } = meta;
         const comment = vals?.comment_block?.comment_input?.value || "";
 
-        if (convId && comment) {
-          const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        // convId is server-generated (we set it in the original DM), but came
+        // back through Slack's modal — validate before any URL interpolation.
+        const safeConvId = asUuid(convId);
+        if (!safeConvId && convId) {
+          console.error("[nami_comment_submit] invalid convId rejected:", convId);
+        }
+        if (safeConvId && comment) {
+          const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
           const conv = convStates?.[0];
           if (conv) {
             const compIds = conv.competency_ids || [];
@@ -792,7 +942,7 @@ Deno.serve(async (req) => {
 
             if (currentCompId && ratings[currentCompId]) {
               ratings[currentCompId].comment = comment;
-              await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+              await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
                 ratings,
                 updated_at: new Date().toISOString(),
               });
@@ -805,14 +955,14 @@ Deno.serve(async (req) => {
             const nextIndex = currentIdx + 1;
 
             if (nextIndex < compIds.length) {
-              await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+              await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
                 current_index: nextIndex,
                 ratings,
                 updated_at: new Date().toISOString(),
               });
               const sdByComp = conv.score_descriptors_by_comp || {};
               const compSd = sdByComp[compIds[nextIndex]] || undefined;
-              const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale, compSd);
+              const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, safeConvId, conv.assignment_id, convRatingScale, compSd);
               await slackApi(botToken, "chat.postMessage", {
                 channel: payload.user.id,
                 text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
@@ -823,14 +973,14 @@ Deno.serve(async (req) => {
               const textQuestionIds = conv.text_question_ids || [];
               const textQuestionPrompts = conv.text_question_prompts || [];
               if (textQuestionIds.length > 0) {
-                await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+                await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
                   phase: "text_questions",
                   current_index: 0,
                   ratings,
                   updated_at: new Date().toISOString(),
                 });
                 const { buildTextQuestionPrompt } = await import("../_shared/nami-blocks.ts");
-                const tqBlocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionIds.length, convId, conv.assignment_id);
+                const tqBlocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionIds.length, safeConvId, conv.assignment_id);
                 await slackApi(botToken, "chat.postMessage", {
                   channel: payload.user.id,
                   text: textQuestionPrompts[0],
@@ -840,7 +990,7 @@ Deno.serve(async (req) => {
                 // Show summary
                 const { buildReviewSummary } = await import("../_shared/nami-blocks.ts");
                 const namiScaleMax = convRatingScale?.max || 5;
-                const summaryBlocks = buildReviewSummary(conv.employee_name, compIds, compNames, ratings, convId, conv.assignment_id, namiScaleMax);
+                const summaryBlocks = buildReviewSummary(conv.employee_name, compIds, compNames, ratings, safeConvId, conv.assignment_id, namiScaleMax);
                 await slackApi(botToken, "chat.postMessage", {
                   channel: payload.user.id,
                   text: `Review summary for ${conv.employee_name}`,
@@ -872,7 +1022,8 @@ Deno.serve(async (req) => {
         if (!selection?.assignmentId) {
           return json({ response_action: "errors", errors: { assignment_block: "Please select a review." } });
         }
-        const view = await buildReviewForm(selection.assignmentId, selection.reviewRole || "manager", selection.employeeId, meta.workspaceId || ws.id);
+        // Always trust the signature-derived workspace; metadata field is ignored.
+        const view = await buildReviewForm(selection.assignmentId, selection.reviewRole || "manager", selection.employeeId, wsId);
         return json({ response_action: "update", view });
       }
 
@@ -881,12 +1032,19 @@ Deno.serve(async (req) => {
         const meta = safeParse(payload.view.private_metadata);
         const { assignmentId, reviewRole, competencyIds, textQuestionIds } = meta;
 
+        // Validate Slack-supplied / metadata IDs before any URL interpolation.
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[cycle_review_submit] invalid assignmentId rejected:", assignmentId);
+          return json({ response_action: "errors", errors: { comment_block: "This review is no longer valid." } });
+        }
+
         // CRITICAL: verify the target assignment belongs to this caller's
         // workspace BEFORE any writes. Service_role bypasses RLS so the
         // application layer is the only boundary; a malicious workspace
         // admin who obtains another workspace's assignment_id could
         // otherwise cross tenants here.
-        if (!(await validateAssignmentWorkspace(assignmentId))) {
+        if (!(await validateAssignmentWorkspace(safeAssignmentId))) {
           return json({
             response_action: "errors",
             errors: { comment_block: "This review belongs to a different workspace." },
@@ -896,11 +1054,23 @@ Deno.serve(async (req) => {
         // Always use the signature-derived ws.id. Ignoring any workspaceId
         // hint in private_metadata removes the spoofing surface where an
         // attacker could craft a view with a foreign workspaceId.
-        const reviewer = await getOrCreateUser(ws.id, payload.user.id, botToken);
+        const safeUserId = asSlackUserId(payload.user.id);
+        if (!safeUserId) {
+          console.warn("[cycle_review_submit] invalid Slack user id:", payload.user.id);
+          return json({ response_action: "clear" });
+        }
+        const reviewer = await getOrCreateUser(wsId, safeUserId, botToken);
         if (!reviewer) return json({ response_action: "clear" });
+        const safeReviewerId = asUuid(reviewer.id);
+        if (!safeReviewerId) {
+          console.error("[cycle_review_submit] invalid reviewer id from DB:", reviewer.id);
+          return json({ response_action: "clear" });
+        }
 
+        // reviewer_role is a constrained enum; encodeURIComponent for safety.
+        const safeRoleFilter = encodeURIComponent(reviewRole || "manager");
         // Check if already submitted (avoid duplicates)
-        const alreadySubmitted = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${reviewer.id}&reviewer_role=eq.${reviewRole || "manager"}&select=id&limit=1`);
+        const alreadySubmitted = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeReviewerId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (alreadySubmitted && alreadySubmitted.length > 0 && !alreadySubmitted.error) {
           return json({ response_action: "errors", errors: { comment_block: "This review has already been submitted." } });
         }
@@ -921,29 +1091,34 @@ Deno.serve(async (req) => {
 
         for (const r of ratings) {
           await dbInsert("review_responses", {
-            assignment_id: assignmentId, reviewer_id: reviewer.id,
+            assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
             reviewer_role: reviewRole || "manager", competency_id: r.competencyId, rating: r.rating,
           });
         }
 
         if (textResponses.length > 0) {
-          const tqIds = textResponses.map(t => t.questionId);
-          const cycleQs = await dbQuery("cycle_questions", `id=in.(${tqIds.join(",")})&select=id,prompt`);
-          const promptMap: Record<string, string> = {};
-          if (cycleQs && !cycleQs.error) {
-            for (const q of cycleQs) promptMap[q.id] = q.prompt || "";
-          }
-          for (const tr of textResponses) {
-            await dbInsert("review_responses", {
-              assignment_id: assignmentId, reviewer_id: reviewer.id,
-              reviewer_role: reviewRole || "manager", comment: `[${promptMap[tr.questionId] || ""}] ${tr.answer}`,
-            });
+          // Validate each cycle_question UUID before joining into in.() filter.
+          const tqIds = textResponses
+            .map(t => asUuid(t.questionId))
+            .filter((v: string | null): v is string => v !== null);
+          if (tqIds.length > 0) {
+            const cycleQs = await dbQuery("cycle_questions", `id=in.(${tqIds.join(",")})&select=id,prompt`);
+            const promptMap: Record<string, string> = {};
+            if (cycleQs && !cycleQs.error) {
+              for (const q of cycleQs) promptMap[q.id] = q.prompt || "";
+            }
+            for (const tr of textResponses) {
+              await dbInsert("review_responses", {
+                assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
+                reviewer_role: reviewRole || "manager", comment: `[${promptMap[tr.questionId] || ""}] ${tr.answer}`,
+              });
+            }
           }
         }
 
         if (overallComment) {
           await dbInsert("review_responses", {
-            assignment_id: assignmentId, reviewer_id: reviewer.id,
+            assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
             reviewer_role: reviewRole || "manager", comment: overallComment,
           });
         }
@@ -952,35 +1127,38 @@ Deno.serve(async (req) => {
         let avgRating = 0;
         if ((reviewRole === "manager" || reviewRole === "upward") && ratings.length > 0) {
           avgRating = ratings.reduce((s, r) => s + r.rating, 0) / ratings.length;
-          await dbUpdate("review_assignments", `id=eq.${assignmentId}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeAssignmentId}`, {
             status: "completed", overall_rating: Math.round(avgRating * 100) / 100,
             updated_at: new Date().toISOString(),
           });
         } else if (reviewRole === "self") {
           if (ratings.length > 0) avgRating = ratings.reduce((s, r) => s + r.rating, 0) / ratings.length;
-          await dbUpdate("review_assignments", `id=eq.${assignmentId}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeAssignmentId}`, {
             status: "in_progress", updated_at: new Date().toISOString(),
           });
         }
 
         // Look up employee name for confirmation
-        const empData = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=employee:users!review_assignments_employee_id_fkey(slack_name),cycle_id`);
+        const empData = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=employee:users!review_assignments_employee_id_fkey(slack_name),cycle_id`);
         const empName = empData?.[0]?.employee?.slack_name || "your team member";
         const cId = empData?.[0]?.cycle_id;
 
         // Count remaining reviews
         let remainingText = "";
         if (cId) {
-          const remaining = await dbQuery("review_assignments", `cycle_id=eq.${cId}&status=in.(pending,in_progress)&or=(manager_id.eq.${reviewer.id},reviewer_id.eq.${reviewer.id})&select=id`);
-          const remCount = Array.isArray(remaining) ? remaining.length : 0;
-          remainingText = remCount > 0 ? `You have *${remCount} more review${remCount > 1 ? "s" : ""}* in this cycle. Check the Nami app Home Tab to continue.` : ":tada: *All caught up!* No more reviews in this cycle.";
+          const safeCId = asUuid(cId);
+          if (safeCId) {
+            const remaining = await dbQuery("review_assignments", `cycle_id=eq.${safeCId}&status=in.(pending,in_progress)&or=(manager_id.eq.${safeReviewerId},reviewer_id.eq.${safeReviewerId})&select=id`);
+            const remCount = Array.isArray(remaining) ? remaining.length : 0;
+            remainingText = remCount > 0 ? `You have *${remCount} more review${remCount > 1 ? "s" : ""}* in this cycle. Check the Nami app Home Tab to continue.` : ":tada: *All caught up!* No more reviews in this cycle.";
+          }
         }
 
         // Compact confirmation message with time-limited Edit button
         const avgStr = avgRating > 0 ? (Math.round(avgRating * 10) / 10).toString() : "N/A";
         const confirmLabel = reviewRole === "upward" ? "Upward feedback" : "Review";
         const editDeadline = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min window
-        const editValue = JSON.stringify({ assignmentId, reviewRole, employeeId: meta.employeeId, deadline: editDeadline });
+        const editValue = JSON.stringify({ assignmentId: safeAssignmentId, reviewRole, employeeId: meta.employeeId, deadline: editDeadline });
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `${confirmLabel} submitted — ${empName}`,
@@ -1016,11 +1194,14 @@ Deno.serve(async (req) => {
         });
 
         // WS4: Update original notification message
-        updateOriginalNotification(assignmentId).catch(console.error);
+        updateOriginalNotification(safeAssignmentId).catch(console.error);
 
         // WS5: Check for completion milestones
         if (cId) {
-          checkAndNotifyCompletion(assignmentId, cId, workspaceId || ws.id).catch(console.error);
+          const safeCId = asUuid(cId);
+          if (safeCId) {
+            checkAndNotifyCompletion(safeAssignmentId, safeCId, wsId).catch(console.error);
+          }
         }
 
         return json({ response_action: "clear" });
@@ -1039,7 +1220,7 @@ Deno.serve(async (req) => {
 
         if (usedConfig) {
           // Dynamic extraction from DB config
-          const configRows = await dbQuery("feedback_form_configs", `workspace_id=eq.${ws.id}&select=fields&limit=1`);
+          const configRows = await dbQuery("feedback_form_configs", `workspace_id=eq.${wsId}&select=fields&limit=1`);
           const fields: any[] = configRows?.[0]?.fields || [];
 
           for (const field of fields) {
@@ -1073,15 +1254,28 @@ Deno.serve(async (req) => {
           var sharedWithEmployee = selectedPrivacyOpts.includes("share_with_recipient");
         }
 
-        const from = await getOrCreateUser(ws.id, payload.user.id, botToken);
-        const to = toId! ? await getOrCreateUser(ws.id, toId!, botToken) : null;
+        // Validate the Slack-supplied user IDs before they get sent through
+        // any DB lookup that could interpolate them into a URL via getOrCreateUser.
+        const safeFromUserId = asSlackUserId(payload.user.id);
+        const rawToId = toId!;
+        const safeToUserId = rawToId ? asSlackUserId(rawToId) : null;
+        if (!safeFromUserId) {
+          console.warn("[feedback_modal] invalid sender Slack id:", payload.user.id);
+          return json({ response_action: "clear" });
+        }
+        if (rawToId && !safeToUserId) {
+          console.warn("[feedback_modal] invalid recipient Slack id:", rawToId);
+          return json({ response_action: "errors", errors: { recipient_block: "Invalid recipient." } });
+        }
+        const from = await getOrCreateUser(wsId, safeFromUserId, botToken);
+        const to = safeToUserId ? await getOrCreateUser(wsId, safeToUserId, botToken) : null;
 
         // Determine shared_with_employee: for dynamic config, default to true unless explicitly set
         const isShared = typeof sharedWithEmployee !== "undefined" ? sharedWithEmployee : true;
 
         if (from && to) {
           await dbInsert("continuous_feedback", {
-            workspace_id: ws.id,
+            workspace_id: wsId,
             from_user_id: anon ? null : from.id,
             to_user_id: to.id,
             message: msg || JSON.stringify(customFields),
@@ -1098,7 +1292,7 @@ Deno.serve(async (req) => {
             const displayMsg = msg || "Feedback received";
 
             await slackApi(botToken, "chat.postMessage", {
-              channel: toId!,
+              channel: safeToUserId!,
               text: `New kudos from ${sender}`,
               blocks: [
                 { type: "section", text: { type: "mrkdwn", text: `${typeEmoji} *New kudos from ${sender}*` } },
@@ -1129,8 +1323,16 @@ Deno.serve(async (req) => {
         const { participantId, surveyId } = meta || {};
         if (!participantId || !surveyId) return json({ response_action: "clear" });
 
+        // Validate UUIDs from view metadata before any URL interpolation.
+        const safeParticipantId = asUuid(participantId);
+        const safeSurveyId = asUuid(surveyId);
+        if (!safeParticipantId || !safeSurveyId) {
+          console.error("[survey_modal_submit] invalid id rejected:", { participantId, surveyId });
+          return json({ response_action: "clear" });
+        }
+
         // Check if already completed (prevent duplicate submissions)
-        const existingParticipant = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        const existingParticipant = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=status`);
         if (existingParticipant?.[0]?.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
@@ -1152,7 +1354,7 @@ Deno.serve(async (req) => {
         }
 
         // Fetch participant to get subject_user_id
-        const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+        const participants = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=subject_user_id`);
         const participant = participants?.[0];
 
         // INSERT is now guarded by uniq_survey_response_* indexes. A 23505
@@ -1160,11 +1362,11 @@ Deno.serve(async (req) => {
         // submits racing past the soft status check above. Treat identically
         // to the status-completed branch: ack, show the thank-you, move on.
         const insertRes = await dbInsert("survey_responses", {
-          survey_id: surveyId,
-          participant_id: participantId,
+          survey_id: safeSurveyId,
+          participant_id: safeParticipantId,
           subject_user_id: participant?.subject_user_id || null,
           answers,
-          workspace_id: ws.id,
+          workspace_id: wsId,
         });
         const insertWasDuplicate =
           insertRes && typeof insertRes === "object" &&
@@ -1172,14 +1374,14 @@ Deno.serve(async (req) => {
           (insertRes as any).code === "23505";
 
         if (!insertWasDuplicate) {
-          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("survey_participants", `id=eq.${safeParticipantId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
         }
 
         // Send thank-you confirmation to the user
-        const surveyForConfirm = await dbQuery("surveys", `id=eq.${surveyId}&select=name`);
+        const surveyForConfirm = await dbQuery("surveys", `id=eq.${safeSurveyId}&select=name`);
         const surveyName = surveyForConfirm?.[0]?.name || "the survey";
         const confirmText = insertWasDuplicate
           ? `:white_check_mark: *Already recorded.* Your response to *${surveyName}* is saved — no duplicate created.`
@@ -1203,9 +1405,16 @@ Deno.serve(async (req) => {
         if (!selected?.participantId) return json({ response_action: "clear" });
 
         const { participantId, surveyId } = selected;
+        // Validate UUIDs from select-option metadata before URL interpolation.
+        const safeParticipantId = asUuid(participantId);
+        const safeSurveyId = asUuid(surveyId);
+        if (!safeParticipantId || !safeSurveyId) {
+          console.error("[survey_select] invalid id rejected:", { participantId, surveyId });
+          return json({ response_action: "clear" });
+        }
 
         // Check if already completed
-        const existingSP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        const existingSP = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=status`);
         if (existingSP?.[0]?.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
@@ -1214,9 +1423,9 @@ Deno.serve(async (req) => {
           return json({ response_action: "clear" });
         }
 
-        const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,type,name,config,workspace_id`);
+        const surveys = await dbQuery("surveys", `id=eq.${safeSurveyId}&select=id,type,name,config,workspace_id`);
         const survey = surveys?.[0];
-        if (!survey || survey.workspace_id !== ws.id) return json({ response_action: "clear" });
+        if (!survey || survey.workspace_id !== wsId) return json({ response_action: "clear" });
 
         // Build and push survey modal (same logic as open_survey_modal block action)
         const questions: any[] = survey.config?.questions || [];
@@ -1257,7 +1466,7 @@ Deno.serve(async (req) => {
           title: { type: "plain_text", text: survey.name.slice(0, 24) },
           submit: { type: "plain_text", text: "Submit" },
           close: { type: "plain_text", text: "Cancel" },
-          private_metadata: JSON.stringify({ participantId, surveyId, workspaceId: ws.id }),
+          private_metadata: JSON.stringify({ participantId: safeParticipantId, surveyId: safeSurveyId, workspaceId: wsId }),
           blocks: blocks.length > 0 ? blocks : [
             { type: "section", text: { type: "mrkdwn", text: "_No questions configured._" } }
           ],
@@ -1276,13 +1485,25 @@ Deno.serve(async (req) => {
       // -- Open cycle review modal --
       if (action?.action_id === "open_cycle_review") {
         const assignmentId = action.value;
-        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
-        const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=id,employee_id,manager_id,status,assignment_type,reviewer_id,cycle_id`);
+        // Defense in depth: action.value is server-generated, but validate before
+        // it gets interpolated into PostgREST URLs.
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[open_cycle_review] invalid assignmentId rejected:", assignmentId);
+          return json({});
+        }
+        if (!await validateAssignmentWorkspace(safeAssignmentId)) return json({});
+        const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=id,employee_id,manager_id,status,assignment_type,reviewer_id,cycle_id`);
         const assignment = assignments?.[0];
         if (!assignment) return json({});
 
-        const user = await getOrCreateUser(ws.id, payload.user.id, botToken);
+        const user = await getOrCreateUser(wsId, payload.user.id, botToken);
         if (!user) return json({});
+        const safeUserId = asUuid(user.id);
+        if (!safeUserId) {
+          console.error("[open_cycle_review] invalid user UUID from DB:", user.id);
+          return json({});
+        }
 
         let reviewRole = "manager";
         if (user.id === assignment.employee_id) reviewRole = "self";
@@ -1300,7 +1521,8 @@ Deno.serve(async (req) => {
         }
 
         // Check if already submitted (via web or Slack)
-        const existing = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        const safeRoleFilter = encodeURIComponent(reviewRole);
+        const existing = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeUserId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (existing && existing.length > 0 && !existing.error) {
           await slackApi(botToken, "chat.postEphemeral", {
             channel: payload.channel?.id || payload.user.id,
@@ -1315,7 +1537,7 @@ Deno.serve(async (req) => {
           await sendManagerContext(payload.user.id, assignment.employee_id, assignment.cycle_id);
         }
 
-        const view = await buildReviewForm(assignmentId, reviewRole, assignment.employee_id, ws.id);
+        const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
         await slackApi(botToken, "views.open", { trigger_id: payload.trigger_id, view });
       }
 
@@ -1373,13 +1595,26 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const assignmentId = meta.assignmentId;
         if (!assignmentId) return json({});
-        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
+        // Validate the server-generated UUID embedded in our own button payload.
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[start_dm_review] invalid assignmentId rejected:", assignmentId);
+          return json({});
+        }
+        if (!await validateAssignmentWorkspace(safeAssignmentId)) return json({});
 
         const slackUserId = payload.user.id;
-        const user = await getOrCreateUser(ws.id, slackUserId, botToken);
+        const safeSlackUserId = asSlackUserId(slackUserId);
+        if (!safeSlackUserId) {
+          console.warn("[start_dm_review] invalid Slack user id:", slackUserId);
+          return json({});
+        }
+        const user = await getOrCreateUser(wsId, safeSlackUserId, botToken);
         if (!user) return json({});
+        const safeUserId = asUuid(user.id);
+        if (!safeUserId) return json({});
 
-        const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
+        const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
         const assignment = assignments?.[0];
         if (!assignment) return json({});
 
@@ -1398,7 +1633,8 @@ Deno.serve(async (req) => {
         }
 
         // Check if already submitted (via web or modal)
-        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        const safeRoleFilter = encodeURIComponent(reviewRole);
+        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeUserId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (existingResp && existingResp.length > 0 && !existingResp.error) {
           await slackApi(botToken, "chat.postMessage", {
             channel: slackUserId,
@@ -1412,7 +1648,7 @@ Deno.serve(async (req) => {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
         }
 
-        const { competencies, empName, scoreDescriptorsByComp } = await getCompetenciesForAssignment(assignmentId, assignment.employee_id, ws.id);
+        const { competencies, empName, scoreDescriptorsByComp } = await getCompetenciesForAssignment(safeAssignmentId, assignment.employee_id, wsId);
         const cycleName = assignment.performance_cycles?.name || "Review";
 
         if (competencies.length === 0) {
@@ -1427,13 +1663,13 @@ Deno.serve(async (req) => {
         const compNames = competencies.map((c: any) => c.name);
         const compDescs = competencies.map((c: any) => c.description || "");
 
-        await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&assignment_id=eq.${assignmentId}&status=eq.active`, { status: "expired" });
+        await dbUpdate("conversation_states", `slack_user_id=eq.${safeSlackUserId}&assignment_id=eq.${safeAssignmentId}&status=eq.active`, { status: "expired" });
 
         const convState = await dbInsert("conversation_states", {
-          workspace_id: ws.id,
-          user_id: user.id,
-          slack_user_id: slackUserId,
-          assignment_id: assignmentId,
+          workspace_id: wsId,
+          user_id: safeUserId,
+          slack_user_id: safeSlackUserId,
+          assignment_id: safeAssignmentId,
           review_role: reviewRole,
           employee_name: empName,
           cycle_name: cycleName,
@@ -1462,11 +1698,14 @@ Deno.serve(async (req) => {
         const msgTs = await sendCompetencyPrompt(
           slackUserId, empName, cycleName,
           compNames[0], 0, compNames.length,
-          assignmentId, true
+          safeAssignmentId, true
         );
 
         if (msgTs) {
-          await dbUpdate("conversation_states", `id=eq.${convState[0].id}`, { last_message_ts: msgTs });
+          const safeConvStateId = asUuid(convState[0].id);
+          if (safeConvStateId) {
+            await dbUpdate("conversation_states", `id=eq.${safeConvStateId}`, { last_message_ts: msgTs });
+          }
         }
       }
 
@@ -1475,25 +1714,39 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const convId = meta.convId;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[dm_review_submit] invalid convId rejected:", convId);
+          return json({});
+        }
 
         // Fetch the conversation state
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
+        // Validate the assignment_id and user_id from the DB row before they
+        // get interpolated into queries.
+        const safeConvAssignmentId = asUuid(conv.assignment_id);
+        const safeConvUserId = asUuid(conv.user_id);
+        if (!safeConvAssignmentId || !safeConvUserId) {
+          console.error("[dm_review_submit] invalid convo state ids:", conv);
+          return json({});
+        }
+        const safeReviewRoleFilter = encodeURIComponent(conv.review_role || "manager");
 
         // Check if already submitted (via web or another Slack flow)
-        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${conv.assignment_id}&reviewer_id=eq.${conv.user_id}&reviewer_role=eq.${conv.review_role || "manager"}&select=id&limit=1`);
+        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${safeConvAssignmentId}&reviewer_id=eq.${safeConvUserId}&reviewer_role=eq.${safeReviewRoleFilter}&select=id&limit=1`);
         if (alreadyDone && alreadyDone.length > 0 && !alreadyDone.error) {
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: ":white_check_mark: This review has already been submitted. You can view or edit it on the dashboard.",
           });
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, { status: "expired" });
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, { status: "expired" });
           return json({});
         }
 
         // Mark as completed
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           status: "completed",
           phase: "completed",
           updated_at: new Date().toISOString(),
@@ -1513,8 +1766,8 @@ Deno.serve(async (req) => {
           totalRating += rating;
           ratedCount++;
           await dbInsert("review_responses", {
-            assignment_id: conv.assignment_id,
-            reviewer_id: conv.user_id,
+            assignment_id: safeConvAssignmentId,
+            reviewer_id: safeConvUserId,
             reviewer_role: reviewRole,
             competency_id: compId,
             rating: rating,
@@ -1530,8 +1783,8 @@ Deno.serve(async (req) => {
           const answer = textResponses[textQuestionIds[i]];
           if (answer) {
             await dbInsert("review_responses", {
-              assignment_id: conv.assignment_id,
-              reviewer_id: conv.user_id,
+              assignment_id: safeConvAssignmentId,
+              reviewer_id: safeConvUserId,
               reviewer_role: reviewRole,
               comment: `[${textQuestionPrompts[i] || ""}] ${answer}`,
             });
@@ -1541,13 +1794,13 @@ Deno.serve(async (req) => {
         // Update assignment status
         const avgRating = ratedCount > 0 ? Math.round((totalRating / ratedCount) * 100) / 100 : 0;
         if ((reviewRole === "manager" || reviewRole === "upward") && ratedCount > 0) {
-          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeConvAssignmentId}`, {
             status: "completed",
             overall_rating: avgRating,
             updated_at: new Date().toISOString(),
           });
         } else if (reviewRole === "self") {
-          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeConvAssignmentId}`, {
             status: "in_progress",
             updated_at: new Date().toISOString(),
           });
@@ -1584,10 +1837,13 @@ Deno.serve(async (req) => {
         });
 
         // WS4 + WS5: Update notification & check completions
-        updateOriginalNotification(conv.assignment_id).catch(console.error);
-        const aData = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=cycle_id`);
+        updateOriginalNotification(safeConvAssignmentId).catch(console.error);
+        const aData = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=cycle_id`);
         if (aData?.[0]?.cycle_id) {
-          checkAndNotifyCompletion(conv.assignment_id, aData[0].cycle_id, conv.workspace_id).catch(console.error);
+          const safeAssignCycleId = asUuid(aData[0].cycle_id);
+          if (safeAssignCycleId) {
+            checkAndNotifyCompletion(safeConvAssignmentId, safeAssignCycleId, wsId).catch(console.error);
+          }
         }
       }
 
@@ -1596,14 +1852,19 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const convId = meta.convId;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[dm_review_edit] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           phase: "competencies",
           current_index: 0,
           updated_at: new Date().toISOString(),
         });
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=competency_names,competency_ids,employee_name,cycle_name,assignment_id`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=competency_names,competency_ids,employee_name,cycle_name,assignment_id`);
         const conv = convStates?.[0];
         if (conv) {
           const compNames = conv.competency_names || [];
@@ -1624,8 +1885,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const convId = meta.convId;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[dm_review_cancel] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           status: "expired",
           updated_at: new Date().toISOString(),
         });
@@ -1640,9 +1906,15 @@ Deno.serve(async (req) => {
       if (action?.action_id === "open_survey_modal") {
         const { participantId, surveyId } = safeParse(action.value) || {};
         if (!participantId || !surveyId) return json({});
+        const safeParticipantId = asUuid(participantId);
+        const safeSurveyId = asUuid(surveyId);
+        if (!safeParticipantId || !safeSurveyId) {
+          console.error("[open_survey_modal] invalid id rejected:", { participantId, surveyId });
+          return json({});
+        }
 
         // Check if already completed
-        const existingP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        const existingP = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=status`);
         if (existingP?.[0]?.status === "completed") {
           await slackApi(botToken, "chat.postEphemeral", {
             channel: payload.channel?.id || payload.user.id,
@@ -1652,9 +1924,9 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,type,name,config,workspace_id`);
+        const surveys = await dbQuery("surveys", `id=eq.${safeSurveyId}&select=id,type,name,config,workspace_id`);
         const survey = surveys?.[0];
-        if (!survey || survey.workspace_id !== ws.id) return json({});
+        if (!survey || survey.workspace_id !== wsId) return json({});
 
         const questions: any[] = survey.config?.questions || [];
         const blocks = questions.map((q: any) => {
@@ -1703,7 +1975,7 @@ Deno.serve(async (req) => {
           title: { type: "plain_text", text: survey.name.slice(0, 24) },
           submit: { type: "plain_text", text: "Submit" },
           close: { type: "plain_text", text: "Cancel" },
-          private_metadata: JSON.stringify({ participantId, surveyId, workspaceId: ws.id }),
+          private_metadata: JSON.stringify({ participantId: safeParticipantId, surveyId: safeSurveyId, workspaceId: wsId }),
           blocks: blocks.length > 0 ? blocks : [
             { type: "section", text: { type: "mrkdwn", text: "_This survey has no questions configured._" } }
           ],
@@ -1717,9 +1989,15 @@ Deno.serve(async (req) => {
       if (action?.action_id === "enps_submit") {
         const { participantId, surveyId } = safeParse(action.value) || {};
         if (!participantId) return json({});
+        const safeParticipantId = asUuid(participantId);
+        const safeSurveyId = asUuid(surveyId);
+        if (!safeParticipantId || !safeSurveyId) {
+          console.error("[enps_submit] invalid id rejected:", { participantId, surveyId });
+          return json({});
+        }
 
         // Check if already completed
-        const existingEnps = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        const existingEnps = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=status`);
         if (existingEnps?.[0]?.status === "completed") {
           await slackApi(botToken, "chat.update", {
             channel: payload.channel?.id || payload.user.id,
@@ -1741,12 +2019,12 @@ Deno.serve(async (req) => {
 
         if (score !== null && score !== undefined) {
           await dbInsert("survey_responses", {
-            survey_id: surveyId,
-            participant_id: participantId,
+            survey_id: safeSurveyId,
+            participant_id: safeParticipantId,
             answers: { score, follow_up: followup || "" },
-            workspace_id: ws.id,
+            workspace_id: wsId,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("survey_participants", `id=eq.${safeParticipantId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -1774,13 +2052,20 @@ Deno.serve(async (req) => {
         const rolePrefix = raw.slice(0, underscoreIdx);
         const assignmentId = raw.slice(underscoreIdx + 1);
         if (!assignmentId) return json({});
-        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[nami_start_review] invalid assignmentId rejected:", assignmentId);
+          return json({});
+        }
+        if (!await validateAssignmentWorkspace(safeAssignmentId)) return json({});
 
         const slackUserId = payload.user.id;
-        const user = await getOrCreateUser(ws.id, slackUserId, botToken);
+        const user = await getOrCreateUser(wsId, slackUserId, botToken);
         if (!user) return json({});
+        const safeUserId = asUuid(user.id);
+        if (!safeUserId) return json({});
 
-        const assignments = await dbQuery("review_assignments", `id=eq.${assignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
+        const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
         const assignment = assignments?.[0];
         if (!assignment) return json({});
 
@@ -1799,7 +2084,8 @@ Deno.serve(async (req) => {
         }
 
         // Check if already submitted (via web or Slack)
-        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole}&select=id&limit=1`);
+        const safeRoleFilter = encodeURIComponent(reviewRole);
+        const existingResp = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeUserId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (existingResp && existingResp.length > 0 && !existingResp.error) {
           await slackApi(botToken, "chat.postMessage", {
             channel: slackUserId,
@@ -1814,7 +2100,7 @@ Deno.serve(async (req) => {
         }
 
         // Open review as a Slack modal (prevents duplicate clicks, cleaner UX)
-        const view = await buildReviewForm(assignmentId, reviewRole, assignment.employee_id, ws.id);
+        const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
         await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view,
@@ -1840,21 +2126,30 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        if (!await validateAssignmentWorkspace(assignmentId)) return json({});
+        const safeAssignmentId = asUuid(assignmentId);
+        if (!safeAssignmentId) {
+          console.error("[nami_edit_submitted_review] invalid assignmentId rejected:", assignmentId);
+          return json({});
+        }
 
-        const user = await getOrCreateUser(ws.id, payload.user.id, botToken);
+        if (!await validateAssignmentWorkspace(safeAssignmentId)) return json({});
+
+        const user = await getOrCreateUser(wsId, payload.user.id, botToken);
         if (!user) return json({});
+        const safeUserId = asUuid(user.id);
+        if (!safeUserId) return json({});
 
         // Delete existing responses so the modal submission can re-insert cleanly
-        await dbDelete("review_responses", `assignment_id=eq.${assignmentId}&reviewer_id=eq.${user.id}&reviewer_role=eq.${reviewRole || "manager"}`);
+        const safeRoleFilter = encodeURIComponent(reviewRole || "manager");
+        await dbDelete("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeUserId}&reviewer_role=eq.${safeRoleFilter}`);
 
         // Reset assignment status back to pending so the submit handler can update it
-        await dbUpdate("review_assignments", `id=eq.${assignmentId}`, {
+        await dbUpdate("review_assignments", `id=eq.${safeAssignmentId}`, {
           status: "pending", overall_rating: null, updated_at: new Date().toISOString(),
         });
 
         // Re-open the review modal
-        const view = await buildReviewForm(assignmentId, reviewRole || "manager", employeeId, ws.id);
+        const view = await buildReviewForm(safeAssignmentId, reviewRole || "manager", employeeId, wsId);
         await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view,
@@ -1927,8 +2222,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId, assignmentId, compName } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_rate_*] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -1941,7 +2241,7 @@ Deno.serve(async (req) => {
           ratings[currentCompId] = { rating: ratingNum };
         }
 
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           ratings,
           updated_at: new Date().toISOString(),
         });
@@ -1949,7 +2249,7 @@ Deno.serve(async (req) => {
         // Send comment prompt
         const compNames = conv.competency_names || [];
         const currentCompName = compNames[currentIdx] || compName || "this competency";
-        const blocks = buildCommentPrompt(currentCompName, convId);
+        const blocks = buildCommentPrompt(currentCompName, safeConvId);
         await slackApi(botToken, "chat.postMessage", {
           channel: payload.user.id,
           text: `Any comments on ${currentCompName}?`,
@@ -1968,13 +2268,18 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId, compName } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_open_comment_modal] invalid convId rejected:", convId);
+          return json({});
+        }
 
         await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view: {
             type: "modal",
             callback_id: "nami_comment_submit",
-            private_metadata: JSON.stringify({ convId, compName }),
+            private_metadata: JSON.stringify({ convId: safeConvId, compName }),
             title: { type: "plain_text", text: "Add Comment" },
             submit: { type: "plain_text", text: "Save" },
             close: { type: "plain_text", text: "Cancel" },
@@ -2004,8 +2309,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_skip_comment] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
@@ -2017,14 +2327,14 @@ Deno.serve(async (req) => {
 
         if (nextIndex < compIds.length) {
           // More competencies to rate
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
           });
 
           const sdByComp2 = conv.score_descriptors_by_comp || {};
           const compSd2 = sdByComp2[compIds[nextIndex]] || undefined;
-          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, convId, conv.assignment_id, convRatingScale, compSd2);
+          const blocks = buildCompetencyPrompt(compNames[nextIndex], compDescs[nextIndex] || "", nextIndex, compNames.length, safeConvId, conv.assignment_id, convRatingScale, compSd2);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Rate ${compNames[nextIndex]} (${nextIndex + 1}/${compNames.length})`,
@@ -2037,20 +2347,24 @@ Deno.serve(async (req) => {
 
           // If text questions not yet loaded, fetch them
           if (textQuestionIds.length === 0 && conv.assignment_id) {
-            const aData = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=cycle_id`);
-            const cycleId = aData?.[0]?.cycle_id;
-            if (cycleId) {
-              const tqs = await dbQuery("cycle_questions", `cycle_id=eq.${cycleId}&question_type=eq.text&select=id,prompt&order=sort_order`);
-              if (tqs && tqs.length > 0 && !tqs.error) {
-                textQuestionIds = tqs.map((q: any) => q.id);
-                textQuestionPrompts = tqs.map((q: any) => q.prompt || "Additional comments");
+            const safeConvAssignmentId = asUuid(conv.assignment_id);
+            if (safeConvAssignmentId) {
+              const aData = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=cycle_id`);
+              const cycleId = aData?.[0]?.cycle_id;
+              const safeCycleId = asUuid(cycleId);
+              if (safeCycleId) {
+                const tqs = await dbQuery("cycle_questions", `cycle_id=eq.${safeCycleId}&question_type=eq.text&select=id,prompt&order=sort_order`);
+                if (tqs && tqs.length > 0 && !tqs.error) {
+                  textQuestionIds = tqs.map((q: any) => q.id);
+                  textQuestionPrompts = tqs.map((q: any) => q.prompt || "Additional comments");
+                }
               }
             }
           }
 
           if (textQuestionIds.length > 0) {
             // Transition to text_questions phase
-            await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+            await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
               phase: "text_questions",
               current_index: 0,
               text_question_ids: textQuestionIds,
@@ -2058,7 +2372,7 @@ Deno.serve(async (req) => {
               updated_at: new Date().toISOString(),
             });
 
-            const blocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionPrompts.length, convId);
+            const blocks = buildTextQuestionPrompt(textQuestionPrompts[0], 0, textQuestionPrompts.length, safeConvId);
             await slackApi(botToken, "chat.postMessage", {
               channel: payload.user.id,
               text: `Question 1/${textQuestionPrompts.length}`,
@@ -2066,7 +2380,7 @@ Deno.serve(async (req) => {
             });
           } else {
             // No text questions — go to summary
-            await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+            await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
               phase: "summary",
               updated_at: new Date().toISOString(),
             });
@@ -2078,7 +2392,7 @@ Deno.serve(async (req) => {
             const tqIds = conv.text_question_ids || [];
             const tqResponses = tqIds.map((id: string) => textResponses[id] || "");
 
-            const blocks = buildReviewSummary(conv.employee_name, compNames, ratingValues, tqPrompts, tqResponses, convId, convRatingScale);
+            const blocks = buildReviewSummary(conv.employee_name, compNames, ratingValues, tqPrompts, tqResponses, safeConvId, convRatingScale);
             await slackApi(botToken, "chat.postMessage", {
               channel: payload.user.id,
               text: `Review summary for ${conv.employee_name}`,
@@ -2095,24 +2409,36 @@ Deno.serve(async (req) => {
       if (action?.action_id === "nami_submit_review") {
         const convId = action.value;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_submit_review] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
+        const safeConvAssignmentId = asUuid(conv.assignment_id);
+        const safeConvUserId = asUuid(conv.user_id);
+        if (!safeConvAssignmentId || !safeConvUserId) {
+          console.error("[nami_submit_review] invalid convo state ids:", conv);
+          return json({});
+        }
+        const safeReviewRoleFilter = encodeURIComponent(conv.review_role || "manager");
 
         // Check if already submitted (e.g. via web while Slack flow was in progress)
-        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${conv.assignment_id}&reviewer_id=eq.${conv.user_id}&reviewer_role=eq.${conv.review_role}&select=id&limit=1`);
+        const alreadyDone = await dbQuery("review_responses", `assignment_id=eq.${safeConvAssignmentId}&reviewer_id=eq.${safeConvUserId}&reviewer_role=eq.${safeReviewRoleFilter}&select=id&limit=1`);
         if (alreadyDone && alreadyDone.length > 0 && !alreadyDone.error) {
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: "⚠️ This review was already submitted (possibly via the dashboard). Your Slack responses were not saved to avoid duplicates.",
           });
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, { status: "expired" });
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, { status: "expired" });
           return json({});
         }
 
         // Mark as completed
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           status: "completed",
           phase: "completed",
           updated_at: new Date().toISOString(),
@@ -2132,8 +2458,8 @@ Deno.serve(async (req) => {
           totalRating += rating;
           ratedCount++;
           await dbInsert("review_responses", {
-            assignment_id: conv.assignment_id,
-            reviewer_id: conv.user_id,
+            assignment_id: safeConvAssignmentId,
+            reviewer_id: safeConvUserId,
             reviewer_role: reviewRole,
             competency_id: compId,
             rating: rating,
@@ -2149,8 +2475,8 @@ Deno.serve(async (req) => {
           const answer = textResponses[textQuestionIds[i]];
           if (answer) {
             await dbInsert("review_responses", {
-              assignment_id: conv.assignment_id,
-              reviewer_id: conv.user_id,
+              assignment_id: safeConvAssignmentId,
+              reviewer_id: safeConvUserId,
               reviewer_role: reviewRole,
               comment: `[${textQuestionPrompts[i] || ""}] ${answer}`,
             });
@@ -2160,13 +2486,13 @@ Deno.serve(async (req) => {
         // Update assignment status
         const avgRating = ratedCount > 0 ? Math.round((totalRating / ratedCount) * 100) / 100 : 0;
         if ((reviewRole === "manager" || reviewRole === "upward") && ratedCount > 0) {
-          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeConvAssignmentId}`, {
             status: "completed",
             overall_rating: avgRating,
             updated_at: new Date().toISOString(),
           });
         } else if (reviewRole === "self") {
-          await dbUpdate("review_assignments", `id=eq.${conv.assignment_id}`, {
+          await dbUpdate("review_assignments", `id=eq.${safeConvAssignmentId}`, {
             status: "in_progress",
             updated_at: new Date().toISOString(),
           });
@@ -2174,10 +2500,15 @@ Deno.serve(async (req) => {
           // Notify the manager that this employee's self-review is done
           (async () => {
             try {
-              const assignments = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=manager_id,cycle_id,cycle:performance_cycles!review_assignments_cycle_id_fkey(name)`);
+              const assignments = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=manager_id,cycle_id,cycle:performance_cycles!review_assignments_cycle_id_fkey(name)`);
               const a = assignments?.[0];
               if (a?.manager_id) {
-                const managers = await dbQuery("users", `id=eq.${a.manager_id}&select=slack_user_id,slack_name`);
+                const safeManagerId = asUuid(a.manager_id);
+                if (!safeManagerId) {
+                  console.error("[nami_submit_review] invalid manager_id from DB:", a.manager_id);
+                  return;
+                }
+                const managers = await dbQuery("users", `id=eq.${safeManagerId}&select=slack_user_id,slack_name`);
                 const mgr = managers?.[0];
                 if (mgr?.slack_user_id) {
                   const cycleName = a.cycle?.name || "the current cycle";
@@ -2246,10 +2577,13 @@ Deno.serve(async (req) => {
         });
 
         // WS4 + WS5: Update notification & check completions
-        updateOriginalNotification(conv.assignment_id).catch(console.error);
-        const aData = await dbQuery("review_assignments", `id=eq.${conv.assignment_id}&select=cycle_id`);
+        updateOriginalNotification(safeConvAssignmentId).catch(console.error);
+        const aData = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=cycle_id`);
         if (aData?.[0]?.cycle_id) {
-          checkAndNotifyCompletion(conv.assignment_id, aData[0].cycle_id, conv.workspace_id).catch(console.error);
+          const safeAssignCycleId = asUuid(aData[0].cycle_id);
+          if (safeAssignCycleId) {
+            checkAndNotifyCompletion(safeConvAssignmentId, safeAssignCycleId, wsId).catch(console.error);
+          }
         }
         return json({});
       }
@@ -2260,12 +2594,17 @@ Deno.serve(async (req) => {
       if (action?.action_id === "nami_edit_review") {
         const convId = action.value;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_edit_review] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv) return json({});
 
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           phase: "competencies",
           current_index: 0,
           updated_at: new Date().toISOString(),
@@ -2277,7 +2616,7 @@ Deno.serve(async (req) => {
         const editRatingScale = conv.rating_scale || undefined;
         const editSdByComp = conv.score_descriptors_by_comp || {};
         if (compNames.length > 0) {
-          const blocks = buildCompetencyPrompt(compNames[0], compDescsEdit[0] || "", 0, compNames.length, convId, conv.assignment_id, editRatingScale, editSdByComp[compIds[0]] || undefined);
+          const blocks = buildCompetencyPrompt(compNames[0], compDescsEdit[0] || "", 0, compNames.length, safeConvId, conv.assignment_id, editRatingScale, editSdByComp[compIds[0]] || undefined);
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
             text: `Editing review \u2014 rate ${compNames[0]} again`,
@@ -2297,8 +2636,13 @@ Deno.serve(async (req) => {
       if (action?.action_id === "nami_cancel_review") {
         const convId = action.value;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_cancel_review] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+        await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
           status: "expired",
           updated_at: new Date().toISOString(),
         });
@@ -2317,11 +2661,22 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { participantId, surveyId } = meta;
         if (!participantId || !surveyId) return json({});
+        const safeParticipantId = asUuid(participantId);
+        const safeSurveyId = asUuid(surveyId);
+        if (!safeParticipantId || !safeSurveyId) {
+          console.error("[nami_start_survey] invalid id rejected:", { participantId, surveyId });
+          return json({});
+        }
 
         const slackUserId = payload.user.id;
+        const safeSlackUserId = asSlackUserId(slackUserId);
+        if (!safeSlackUserId) {
+          console.warn("[nami_start_survey] invalid Slack user id:", slackUserId);
+          return json({});
+        }
 
         // Check if already completed
-        const existingP = await dbQuery("survey_participants", `id=eq.${participantId}&select=status`);
+        const existingP = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=status`);
         if (existingP?.[0]?.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
             channel: slackUserId,
@@ -2330,12 +2685,14 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        const user = await getOrCreateUser(ws.id, slackUserId, botToken);
+        const user = await getOrCreateUser(wsId, safeSlackUserId, botToken);
         if (!user) return json({});
+        const safeUserId = asUuid(user.id);
+        if (!safeUserId) return json({});
 
-        const surveys = await dbQuery("surveys", `id=eq.${surveyId}&select=id,name,config,workspace_id`);
+        const surveys = await dbQuery("surveys", `id=eq.${safeSurveyId}&select=id,name,config,workspace_id`);
         const survey = surveys?.[0];
-        if (!survey || survey.workspace_id !== ws.id) return json({});
+        if (!survey || survey.workspace_id !== wsId) return json({});
 
         const questions: any[] = survey.config?.questions || [];
         if (questions.length === 0) {
@@ -2349,17 +2706,17 @@ Deno.serve(async (req) => {
         const questionIds = questions.map((q: any) => q.id);
 
         // Expire existing active survey conversation_states
-        await dbUpdate("conversation_states", `slack_user_id=eq.${slackUserId}&status=eq.active&flow_type=eq.survey`, { status: "expired" });
+        await dbUpdate("conversation_states", `slack_user_id=eq.${safeSlackUserId}&status=eq.active&flow_type=eq.survey`, { status: "expired" });
 
         const convState = await dbInsert("conversation_states", {
-          workspace_id: ws.id,
-          user_id: user.id,
-          slack_user_id: slackUserId,
+          workspace_id: wsId,
+          user_id: safeUserId,
+          slack_user_id: safeSlackUserId,
           status: "active",
           flow_type: "survey",
           phase: "survey_questions",
-          survey_id: surveyId,
-          survey_participant_id: participantId,
+          survey_id: safeSurveyId,
+          survey_participant_id: safeParticipantId,
           survey_question_ids: questionIds,
           survey_answers: {},
           current_index: 0,
@@ -2380,7 +2737,7 @@ Deno.serve(async (req) => {
         const firstQ = questions[0];
         const blocks = buildSurveyQuestionPrompt(
           { prompt: firstQ.label || firstQ.prompt, type: firstQ.type, options: firstQ.options },
-          0, questions.length, convState[0].id, surveyId,
+          0, questions.length, convState[0].id, safeSurveyId,
         );
         await slackApi(botToken, "chat.postMessage", {
           channel: slackUserId,
@@ -2397,8 +2754,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId, surveyId, questionIndex, rating } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_survey_rate_*] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv || conv.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
@@ -2420,7 +2782,7 @@ Deno.serve(async (req) => {
 
         const nextIndex = currentIdx + 1;
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             survey_answers: answers,
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
@@ -2429,7 +2791,7 @@ Deno.serve(async (req) => {
           const nextQ = questions[nextIndex];
           const blocks = buildSurveyQuestionPrompt(
             { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
-            nextIndex, questions.length, convId, surveyId,
+            nextIndex, questions.length, safeConvId, surveyId,
           );
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
@@ -2438,7 +2800,7 @@ Deno.serve(async (req) => {
           });
         } else {
           // Survey complete — save responses
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             survey_answers: answers,
             status: "completed",
             phase: "completed",
@@ -2446,17 +2808,22 @@ Deno.serve(async (req) => {
           });
 
           const participantId = conv.survey_participant_id;
-          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const safeParticipantId = asUuid(participantId);
+          if (!safeParticipantId) {
+            console.error("[nami_survey_rate_*] invalid participantId from DB:", participantId);
+            return json({});
+          }
+          const participants = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=subject_user_id`);
           const participant = participants?.[0];
 
           await dbInsert("survey_responses", {
             survey_id: conv.survey_id,
-            participant_id: participantId,
+            participant_id: safeParticipantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
-            workspace_id: ws.id,
+            workspace_id: wsId,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("survey_participants", `id=eq.${safeParticipantId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -2476,8 +2843,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId, surveyId, questionIndex, selected } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_survey_select_*] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv || conv.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
@@ -2499,7 +2871,7 @@ Deno.serve(async (req) => {
 
         const nextIndex = currentIdx + 1;
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             survey_answers: answers,
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
@@ -2508,7 +2880,7 @@ Deno.serve(async (req) => {
           const nextQ = questions[nextIndex];
           const blocks = buildSurveyQuestionPrompt(
             { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
-            nextIndex, questions.length, convId, surveyId,
+            nextIndex, questions.length, safeConvId, surveyId,
           );
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
@@ -2517,7 +2889,7 @@ Deno.serve(async (req) => {
           });
         } else {
           // Survey complete — save responses
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             survey_answers: answers,
             status: "completed",
             phase: "completed",
@@ -2525,17 +2897,22 @@ Deno.serve(async (req) => {
           });
 
           const participantId = conv.survey_participant_id;
-          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const safeParticipantId = asUuid(participantId);
+          if (!safeParticipantId) {
+            console.error("[nami_survey_select_*] invalid participantId from DB:", participantId);
+            return json({});
+          }
+          const participants = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=subject_user_id`);
           const participant = participants?.[0];
 
           await dbInsert("survey_responses", {
             survey_id: conv.survey_id,
-            participant_id: participantId,
+            participant_id: safeParticipantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
-            workspace_id: ws.id,
+            workspace_id: wsId,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("survey_participants", `id=eq.${safeParticipantId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });
@@ -2555,8 +2932,13 @@ Deno.serve(async (req) => {
         const meta = safeParse(action.value);
         const { convId, surveyId, questionIndex } = meta;
         if (!convId) return json({});
+        const safeConvId = asUuid(convId);
+        if (!safeConvId) {
+          console.error("[nami_survey_skip] invalid convId rejected:", convId);
+          return json({});
+        }
 
-        const convStates = await dbQuery("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}&select=*`);
+        const convStates = await dbQuery("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}&select=*`);
         const conv = convStates?.[0];
         if (!conv || conv.status === "completed") {
           await slackApi(botToken, "chat.postMessage", {
@@ -2571,7 +2953,7 @@ Deno.serve(async (req) => {
         const nextIndex = currentIdx + 1;
 
         if (nextIndex < questions.length) {
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             current_index: nextIndex,
             updated_at: new Date().toISOString(),
           });
@@ -2579,7 +2961,7 @@ Deno.serve(async (req) => {
           const nextQ = questions[nextIndex];
           const blocks = buildSurveyQuestionPrompt(
             { prompt: nextQ.label || nextQ.prompt, type: nextQ.type, options: nextQ.options },
-            nextIndex, questions.length, convId, surveyId,
+            nextIndex, questions.length, safeConvId, surveyId,
           );
           await slackApi(botToken, "chat.postMessage", {
             channel: payload.user.id,
@@ -2589,24 +2971,29 @@ Deno.serve(async (req) => {
         } else {
           // Survey complete — save responses (with skipped questions omitted)
           const answers = conv.survey_answers || {};
-          await dbUpdate("conversation_states", `id=eq.${convId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("conversation_states", `id=eq.${safeConvId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             phase: "completed",
             updated_at: new Date().toISOString(),
           });
 
           const participantId = conv.survey_participant_id;
-          const participants = await dbQuery("survey_participants", `id=eq.${participantId}&select=subject_user_id`);
+          const safeParticipantId = asUuid(participantId);
+          if (!safeParticipantId) {
+            console.error("[nami_survey_skip] invalid participantId from DB:", participantId);
+            return json({});
+          }
+          const participants = await dbQuery("survey_participants", `id=eq.${safeParticipantId}&select=subject_user_id`);
           const participant = participants?.[0];
 
           await dbInsert("survey_responses", {
             survey_id: conv.survey_id,
-            participant_id: participantId,
+            participant_id: safeParticipantId,
             subject_user_id: participant?.subject_user_id || null,
             answers,
-            workspace_id: ws.id,
+            workspace_id: wsId,
           });
-          await dbUpdate("survey_participants", `id=eq.${participantId}&workspace_id=eq.${ws.id}`, {
+          await dbUpdate("survey_participants", `id=eq.${safeParticipantId}&workspace_id=eq.${wsId}`, {
             status: "completed",
             completed_at: new Date().toISOString(),
           });

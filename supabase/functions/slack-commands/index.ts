@@ -8,6 +8,7 @@
 
 import { callSlackApi } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { asSlackTeamId, asUuid } from "../_shared/postgrest-safe.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -233,6 +234,22 @@ Deno.serve(async (req) => {
   const valid = await verifySlackSignature(req, body);
   if (!valid) return new Response("Invalid signature", { status: 403 });
 
+  // Slack retried because we were slow. With Task 2's event_id dedup, the
+  // inbox catches event-callback retries; this is the catch-all for the
+  // other endpoints (commands, interactivity) that don't have an event_id.
+  // Either we already finished and Slack didn't get our 200 — doing it again
+  // risks side-effects firing twice. Or we're still processing the original.
+  // Either way, acknowledge fast so Slack stops retrying.
+  const retryNum = req.headers.get("x-slack-retry-num");
+  if (retryNum) {
+    console.warn(
+      `[slack-commands] retry #${retryNum} (reason=${
+        req.headers.get("x-slack-retry-reason") ?? "?"
+      }), short-circuiting to 200`,
+    );
+    return new Response("OK", { status: 200 });
+  }
+
   const params = new URLSearchParams(body);
   const command = params.get("command") || "";
   const triggerId = params.get("trigger_id") || "";
@@ -246,10 +263,29 @@ Deno.serve(async (req) => {
 
   // ── /kudos ───────────────────────────────────────────────────────────────
   if (command === "/kudos") {
+    // Validate Slack-supplied team_id before interpolating into PostgREST URL
+    const safeTeamId = asSlackTeamId(teamId);
+    if (!safeTeamId) {
+      console.warn(`[slack-commands] invalid team_id rejected:`, teamId);
+      return new Response(
+        JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
     // Look up workspace
-    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id&limit=1`);
+    const wsRows = await dbQuery("workspaces", `team_id=eq.${safeTeamId}&select=id&limit=1`);
     const ws = wsRows?.[0];
     if (!ws?.id) {
+      return new Response(
+        JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Defense in depth: ws.id is server-generated UUID, but validate before URL interpolation
+    const safeWsId = asUuid(ws.id);
+    if (!safeWsId) {
+      console.error(`[slack-commands] invalid workspace UUID from DB:`, ws.id);
       return new Response(
         JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
         { headers: { "Content-Type": "application/json" } },
@@ -259,7 +295,7 @@ Deno.serve(async (req) => {
     // Load form config (or use defaults)
     const configRows = await dbQuery(
       "feedback_form_configs",
-      `workspace_id=eq.${ws.id}&select=fields&limit=1`,
+      `workspace_id=eq.${safeWsId}&select=fields&limit=1`,
     );
     const hasConfig = configRows?.[0]?.fields?.length > 0;
     const fields: FormField[] = hasConfig ? configRows[0].fields : DEFAULT_FIELDS;
