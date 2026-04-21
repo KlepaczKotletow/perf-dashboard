@@ -178,6 +178,26 @@ Deno.serve(async (req) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?message=${encodeURIComponent(linkError.message || "Auth failed")}`, 302);
     }
 
+    // SECURITY: also persist slack_user_id in app_metadata, which (unlike
+    // user_metadata above) cannot be overwritten by the user via
+    // supabase.auth.updateUser. This is the canonical source the RLS helpers
+    // and getUserWorkspace() RPC actually trust. Failing here is fatal — we
+    // cannot let the user land on the dashboard without app_metadata set.
+    const linkedUserId = (linkData as { user?: { id?: string } } | null)?.user?.id;
+    if (linkedUserId) {
+      const { error: metaErr } = await supabase.auth.admin.updateUserById(
+        linkedUserId,
+        { app_metadata: { slack_user_id: slackUserId } },
+      );
+      if (metaErr) {
+        console.error("[dashboard-auth] failed to set app_metadata:", metaErr.message);
+        return Response.redirect(`${DASHBOARD_URL}/auth/error?message=Auth+failed`, 302);
+      }
+    } else {
+      console.error("[dashboard-auth] generateLink did not return a user id; cannot set app_metadata");
+      return Response.redirect(`${DASHBOARD_URL}/auth/error?message=Auth+failed`, 302);
+    }
+
     const actionLink = linkData?.properties?.action_link;
     if (actionLink) {
       const callbackUrl = extractCallbackUrl(actionLink);

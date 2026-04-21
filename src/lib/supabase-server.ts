@@ -39,15 +39,19 @@ export const getUserWorkspace = cache(async () => {
   const user = await getUser()
   if (!user) return null
 
-  const slackUserId = user.user_metadata?.slack_user_id
-  if (!slackUserId) return null
-
   const supabase = await createServerSupabaseClient()
 
-  // SECURITY: Look up the user by slack_user_id (from JWT, not editable by user).
-  // Never trust app_user_id or workspace_id from user_metadata — those can be
-  // modified by calling supabase.auth.updateUser().
-  // Also filter out deactivated users — removed from Slack workspace = no dashboard access.
+  // SECURITY: Resolve slack_user_id via the get_my_slack_user_id() RPC, which
+  // reads raw_app_meta_data (service-role-writable only). Reading
+  // user_metadata.slack_user_id directly is a cross-tenant data leak — any
+  // authenticated user can call supabase.auth.updateUser({ data: ... }) to
+  // overwrite their own user_metadata and pivot to another workspace's RLS
+  // scope. raw_app_meta_data can only be set by the auth admin SDK.
+  const { data: slackUserId } = await supabase.rpc('get_my_slack_user_id')
+  if (!slackUserId) return null
+
+  // Look up the public.users row by the safe slack_user_id. Filter out
+  // deactivated users (removed from Slack workspace = no dashboard access).
   const { data: dbUser } = await supabase
     .from('users')
     .select('id, workspace_id, role, slack_name, department, employee_status')
@@ -78,7 +82,7 @@ export const getUserWorkspace = cache(async () => {
     workspaceName: wsData?.team_name || user.user_metadata?.workspace_name,
     name: dbUser.slack_name || user.user_metadata?.name,
     role: dbUser.role || 'user',
-    slackUserId,
+    slackUserId: slackUserId as string,
     appUserId: dbUser.id,
     hasDirectReports: (directReportCount ?? 0) > 0,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
