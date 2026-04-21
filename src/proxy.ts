@@ -56,9 +56,13 @@ export async function proxy(request: NextRequest) {
       const isBillingPage = request.nextUrl.pathname.startsWith('/dashboard/settings/billing')
 
       if (!isBillingPage) {
-        // SECURITY: Derive workspace from DB via slack_user_id, NOT from user_metadata.
-        // user_metadata.workspace_id is user-editable via supabase.auth.updateUser().
-        const slackUserId = user.user_metadata?.slack_user_id
+        // SECURITY: Resolve slack_user_id via the SECURITY DEFINER RPC that
+        // reads raw_app_meta_data (service-role-writable only). Reading
+        // user.user_metadata.slack_user_id from the JWT is a cross-tenant data
+        // leak — users can rewrite their own user_metadata via
+        // supabase.auth.updateUser({ data: { ... } }) and pivot the
+        // subscription check to another workspace.
+        const { data: slackUserId } = await supabase.rpc('get_my_slack_user_id')
         if (slackUserId) {
           const { data: dbUser } = await supabase
             .from('users')
