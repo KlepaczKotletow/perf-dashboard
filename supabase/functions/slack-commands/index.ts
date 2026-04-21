@@ -8,6 +8,7 @@
 
 import { callSlackApi } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { asSlackTeamId, asUuid } from "../_shared/postgrest-safe.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -262,10 +263,29 @@ Deno.serve(async (req) => {
 
   // ── /kudos ───────────────────────────────────────────────────────────────
   if (command === "/kudos") {
+    // Validate Slack-supplied team_id before interpolating into PostgREST URL
+    const safeTeamId = asSlackTeamId(teamId);
+    if (!safeTeamId) {
+      console.warn(`[slack-commands] invalid team_id rejected:`, teamId);
+      return new Response(
+        JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
     // Look up workspace
-    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id&limit=1`);
+    const wsRows = await dbQuery("workspaces", `team_id=eq.${safeTeamId}&select=id&limit=1`);
     const ws = wsRows?.[0];
     if (!ws?.id) {
+      return new Response(
+        JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Defense in depth: ws.id is server-generated UUID, but validate before URL interpolation
+    const safeWsId = asUuid(ws.id);
+    if (!safeWsId) {
+      console.error(`[slack-commands] invalid workspace UUID from DB:`, ws.id);
       return new Response(
         JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
         { headers: { "Content-Type": "application/json" } },
@@ -275,7 +295,7 @@ Deno.serve(async (req) => {
     // Load form config (or use defaults)
     const configRows = await dbQuery(
       "feedback_form_configs",
-      `workspace_id=eq.${ws.id}&select=fields&limit=1`,
+      `workspace_id=eq.${safeWsId}&select=fields&limit=1`,
     );
     const hasConfig = configRows?.[0]?.fields?.length > 0;
     const fields: FormField[] = hasConfig ? configRows[0].fields : DEFAULT_FIELDS;

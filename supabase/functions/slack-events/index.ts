@@ -8,6 +8,7 @@ import {
 } from "../_shared/nami-blocks.ts";
 import { callSlackApi, sendSlackMessage as sendSlackMessageWithRetry } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { asUuid } from "../_shared/postgrest-safe.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -747,6 +748,13 @@ Deno.serve(async (req) => {
           //    the subject, the reviewer, or the manager. Matches Lattice /
           //    Leapsome behaviour: in-flight reviews don't silently carry on
           //    against someone who is no longer in the company.
+          // Defense in depth: appUser.id is a server-generated UUID, but it
+          // gets interpolated into a PostgREST `or=` filter — validate first.
+          const safeAppUserId = asUuid(appUser.id);
+          if (!safeAppUserId) {
+            console.error("[slack-events] team_leave: invalid app user UUID rejected:", appUser.id);
+            return;
+          }
           const { data: affected } = await supabase
             .from("review_assignments")
             .select(
@@ -758,7 +766,7 @@ Deno.serve(async (req) => {
             )
             .in("status", ["pending", "in_progress"])
             .or(
-              `employee_id.eq.${appUser.id},reviewer_id.eq.${appUser.id},manager_id.eq.${appUser.id}`,
+              `employee_id.eq.${safeAppUserId},reviewer_id.eq.${safeAppUserId},manager_id.eq.${safeAppUserId}`,
             );
 
           if (affected && affected.length > 0) {
