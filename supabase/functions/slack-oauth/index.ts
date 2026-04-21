@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { verifyOAuthState } from "../_shared/oauth-state.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -118,16 +119,44 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_request`, 302);
     }
 
-    // Reject obviously-malformed state values. Real states are either:
-    //   - nonce_<uuid>  (landing page / dashboard-auth install flows)
-    //   - <uuid>        (setup_token from checkout flow)
-    // Anything else is suspicious. This is a weak first line of defence;
-    // the stronger HMAC-signed state upgrade is tracked for a follow-up PR.
-    const NONCE_PATTERN = /^nonce_[0-9a-f-]{32,40}$/i;
-    const UUID_PATTERN = /^[0-9a-f-]{32,40}$/i;
-    if (!NONCE_PATTERN.test(state) && !UUID_PATTERN.test(state)) {
-      console.error("[slack-oauth] Malformed state parameter rejected:", state.slice(0, 20));
-      return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
+    // State validation. Three accepted formats:
+    //   1. signed       → HMAC-signed payload from Task 3 (preferred). Carries
+    //                     an optional `setup_token` extra used to link the new
+    //                     install to a pre-paid Stripe subscription.
+    //   2. <uuid>       → legacy raw setup_token from the /setup checkout
+    //                     flow, before Task 3.
+    //   3. nonce_<uuid> → legacy CSRF nonce from landing/dashboard-auth, before
+    //                     Task 3.
+    // Legacy formats are accepted with a warn log until OAUTH_STATE_LEGACY_DEADLINE
+    // (unix ms). After that they are rejected.
+    const verifiedState = await verifyOAuthState(state);
+    let setupTokenFromState: string | null = null;
+    if (verifiedState) {
+      // Signed state. Surface setup_token (if present) for subscription linking.
+      const st = verifiedState.setup_token;
+      if (typeof st === "string" && st.length > 0) setupTokenFromState = st;
+    } else {
+      const NONCE_PATTERN = /^nonce_[0-9a-f-]{32,40}$/i;
+      const UUID_PATTERN = /^[0-9a-f-]{32,40}$/i;
+      const isLegacy = NONCE_PATTERN.test(state) || UUID_PATTERN.test(state);
+      const deadline = parseInt(Deno.env.get("OAUTH_STATE_LEGACY_DEADLINE") ?? "0", 10);
+      if (isLegacy && deadline > 0 && Date.now() < deadline) {
+        console.warn(
+          "[slack-oauth] accepting legacy state format (grace window, expires",
+          new Date(deadline).toISOString(),
+          ")",
+        );
+        // Bare-UUID legacy state is itself the setup_token from /setup.
+        if (UUID_PATTERN.test(state) && !NONCE_PATTERN.test(state)) {
+          setupTokenFromState = state;
+        }
+      } else {
+        console.error(
+          "[slack-oauth] invalid or expired state, rejecting:",
+          state.slice(0, 20),
+        );
+        return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
+      }
     }
 
     if (!supabase) {
@@ -244,12 +273,13 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=token_storage`, 302);
     }
 
-    // Handle subscription linking (state is a setup_token from checkout flow)
-    if (state && !state.startsWith("nonce_")) {
+    // Handle subscription linking — setup_token comes either from the signed
+    // state's `setup_token` extra (new) or from the raw legacy UUID state.
+    if (setupTokenFromState) {
       await supabase
         .from("subscriptions")
         .update({ workspace_id: workspace.id, setup_token: null, updated_at: new Date().toISOString() })
-        .eq("setup_token", state)
+        .eq("setup_token", setupTokenFromState)
         .is("workspace_id", null);
     }
 
