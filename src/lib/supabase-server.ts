@@ -61,7 +61,7 @@ export const getUserWorkspace = cache(async () => {
   const [{ data: wsData }, { count: directReportCount }] = await Promise.all([
     supabase
       .from("workspaces")
-      .select("team_name, onboarding_completed, rating_scale, logo_url")
+      .select("team_name, onboarding_completed, rating_scale, logo_url, requires_reinstall")
       .eq("id", dbUser.workspace_id)
       .single(),
     supabase
@@ -84,6 +84,7 @@ export const getUserWorkspace = cache(async () => {
     onboardingCompleted: wsData?.onboarding_completed ?? true,
     ratingScale: wsData?.rating_scale as { min: number; max: number; labels: Record<string, string> } | null,
     logoUrl: (wsData as any)?.logo_url as string | null,
+    requiresReinstall: ((wsData as any)?.requires_reinstall ?? false) as boolean,
   }
 })
 

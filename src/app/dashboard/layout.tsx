@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
   Settings2,
   HelpCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { FooterDropdown } from "./footer-dropdown";
@@ -188,6 +189,20 @@ export default async function DashboardLayout({
           — mobile: full width with top padding for the fixed mobile header */}
       <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
         <div className="px-4 lg:px-8 py-6 lg:py-8">
+          {workspace.requiresReinstall && (
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-3 text-sm">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Slack connection expired</p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200/80 mt-0.5">
+                    Nami can&apos;t send messages to your team until an admin reinstalls.{" "}
+                    <a href="/setup" className="underline font-medium">Reinstall now &rarr;</a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           <WidgetErrorBoundary label="page">{children}</WidgetErrorBoundary>
         </div>
       </main>

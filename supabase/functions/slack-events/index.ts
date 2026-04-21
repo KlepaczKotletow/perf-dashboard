@@ -29,7 +29,12 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   const timestamp = req.headers.get("x-slack-request-timestamp") || "";
   const slackSig = req.headers.get("x-slack-signature") || "";
   const parsedTs = parseInt(timestamp);
-  if (isNaN(parsedTs) || Math.abs(Date.now() / 1000 - parsedTs) > 300) return false;
+  const nowSec = Date.now() / 1000;
+  // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
+  if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
+    console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
+    return false;
+  }
   const baseString = `v0:${timestamp}:${body}`;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -634,13 +639,16 @@ Deno.serve(async (req) => {
           .single();
 
         if (workspace) {
-          // Invalidate tokens — set to null so stale tokens can't be used
+          // Invalidate tokens — set to null so stale tokens can't be used.
+          // Also flip requires_reinstall so the dashboard banner surfaces.
           await supabase
             .from("workspaces")
             .update({
               bot_token: null,
               refresh_token: null,
               token_expires_at: null,
+              requires_reinstall: true,
+              requires_reinstall_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq("id", workspace.id);
@@ -675,7 +683,8 @@ Deno.serve(async (req) => {
     const revokedTokens = innerEvent.tokens;
     const cleanup = (async () => {
       try {
-        // If bot tokens were revoked, clear them from the workspace
+        // If bot tokens were revoked, clear them from the workspace and
+        // flip requires_reinstall so the dashboard banner surfaces.
         if (revokedTokens?.bot && revokedTokens.bot.length > 0) {
           await supabase
             .from("workspaces")
@@ -683,6 +692,8 @@ Deno.serve(async (req) => {
               bot_token: null,
               refresh_token: null,
               token_expires_at: null,
+              requires_reinstall: true,
+              requires_reinstall_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             })
             .eq("team_id", teamId);
@@ -690,9 +701,9 @@ Deno.serve(async (req) => {
           console.log("[slack-events] tokens_revoked: cleared bot tokens for", teamId);
         }
 
-        // If user tokens were revoked, log it (we don't store user tokens long-term)
+        // If user tokens were revoked, log a count (do NOT log token IDs).
         if (revokedTokens?.oauth && revokedTokens.oauth.length > 0) {
-          console.log("[slack-events] tokens_revoked: user tokens revoked for", teamId, revokedTokens.oauth);
+          console.log(`[slack-events] tokens_revoked: ${revokedTokens.oauth?.length ?? 0} oauth, ${revokedTokens.bot?.length ?? 0} bot for ${teamId}`);
         }
       } catch (err) {
         console.error("[slack-events] Error handling tokens_revoked:", err);

@@ -41,6 +41,30 @@ const DASHBOARD_URL: string = DASHBOARD_URL_RAW;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // =============================================================================
+//  Cron-secret cache: pulled once from vault.decrypted_secrets and memoised
+//  for the lifetime of the isolate. The drain cron fires every 60s, so we
+//  do NOT want a DB roundtrip per invocation. If the vault entry is missing
+//  (older deployment, vault not yet seeded) we fall back to the env var so
+//  rollouts don't break the cron.
+// =============================================================================
+let cachedVaultCronSecret: string | null | undefined = undefined;
+async function getVaultCronSecret(): Promise<string | null> {
+  if (cachedVaultCronSecret !== undefined) return cachedVaultCronSecret;
+  try {
+    const { data, error } = await supabase.rpc("get_cron_secret");
+    if (error || !data) {
+      cachedVaultCronSecret = null;
+      return null;
+    }
+    cachedVaultCronSecret = String(data);
+    return cachedVaultCronSecret;
+  } catch {
+    cachedVaultCronSecret = null;
+    return null;
+  }
+}
+
+// =============================================================================
 //  Shared helpers
 // =============================================================================
 
@@ -1924,9 +1948,17 @@ Deno.serve(async (req) => {
   const cronSecret = Deno.env.get("CRON_SECRET");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const authHeader = req.headers.get("authorization") || "";
+  // Vault-stored cron_secret is sent by pg_cron in a custom x-cron-secret
+  // header. We can't put it in Authorization because the Supabase API
+  // gateway requires Authorization to be a valid JWT (so the cron still
+  // sends Bearer <anon_key> there to clear the gateway). Fetched lazily
+  // and memoised so we don't add a DB roundtrip to every cron tick.
+  const cronSecretHeader = req.headers.get("x-cron-secret") || "";
+  const vaultCronSecret = await getVaultCronSecret();
   const hasCronAuth =
     (cronSecret && authHeader === `Bearer ${cronSecret}`) ||
-    (serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`);
+    (serviceRoleKey && authHeader === `Bearer ${serviceRoleKey}`) ||
+    (vaultCronSecret && cronSecretHeader === vaultCronSecret);
 
   // For JWT auth: extract the token and cryptographically verify it
   let callerWorkspaceId: string | null = null;
@@ -1941,10 +1973,11 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Parse body before the auth gate so we can carve out specifically the
-  // actions that authorize themselves at the data layer (e.g.
-  // drain_send_queue, whose jobs were already authorized by SECURITY DEFINER
-  // triggers on protected tables). Other actions still require cron or JWT.
+  // Parse body before the auth gate. Phase 3 / Task 10: every action now
+  // requires cron or JWT auth — drain_send_queue was previously on a
+  // no-auth carve-out because the cron sent only the public anon-key
+  // (which our auth.getUser-based JWT path can't validate). The cron now
+  // uses the vault-stored cron_secret instead, so the carve-out is gone.
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -1961,7 +1994,7 @@ Deno.serve(async (req) => {
     mode?: string;
   };
 
-  const ACTIONS_WITHOUT_AUTH = new Set(["drain_send_queue"]);
+  const ACTIONS_WITHOUT_AUTH = new Set<string>([]); // empty — every action requires auth
   if (!hasCronAuth && !hasJwtAuth && !ACTIONS_WITHOUT_AUTH.has(String(action))) {
     return new Response("Unauthorized", { status: 401, headers: corsHeaders });
   }
@@ -2049,22 +2082,16 @@ Deno.serve(async (req) => {
     }
 
     // -----------------------------------------------------------------------
-    //  drain_send_queue: no auth required. Claims up to 25 queued jobs
+    //  drain_send_queue: cron-only. Claims up to 25 queued jobs
     //  (feedback DMs, post-launch reviewer notifications), processes each,
     //  marks success/failure with exponential backoff.
     //
-    //  Auth-less is safe for this endpoint because:
-    //    - the queue only accepts rows from SECURITY DEFINER triggers on
-    //      authorized INSERTs (continuous_feedback, review_assignments)
-    //    - work is strictly bounded: 25 jobs per call, 5-attempt cap per job
-    //    - claim_slack_send_jobs uses FOR UPDATE SKIP LOCKED, so concurrent
-    //      calls can't double-process the same row
-    //    - no user-supplied input influences which jobs run; an attacker
-    //      calling this only causes the existing queue to drain faster
-    //
-    //  Keeping it auth-less sidesteps the pg_cron vault-secret plumbing
-    //  that the older send-deadline-reminders cron has been silently
-    //  failing on (no app.settings.service_role_key at the session level).
+    //  Phase 3 / Task 10: this endpoint now requires hasCronAuth — the
+    //  pg_cron job sends Bearer <vault.cron_secret> instead of the public
+    //  anon-key it used previously. The data-layer guarantees still hold
+    //  (SECURITY DEFINER triggers on the queue, 25-job cap, 5-attempt cap,
+    //  FOR UPDATE SKIP LOCKED on claim) but defense-in-depth: the auth
+    //  check now keeps random anon-key holders out of the drain loop.
     // -----------------------------------------------------------------------
     if (action === "drain_send_queue") {
       const result = await handleDrainSendQueue();

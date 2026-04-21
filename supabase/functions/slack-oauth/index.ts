@@ -245,6 +245,9 @@ Deno.serve(async (req: Request) => {
           bot_user_id: bot_user_id,
           installed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          // Reinstall just succeeded — clear the "needs reinstall" banner state.
+          requires_reinstall: false,
+          requires_reinstall_at: null,
         },
         { onConflict: "team_id" }
       )

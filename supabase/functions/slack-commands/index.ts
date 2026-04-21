@@ -9,6 +9,7 @@
 import { callSlackApi } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 import { asSlackTeamId, asUuid } from "../_shared/postgrest-safe.ts";
+import { validateFormFields } from "../_shared/form-config-schema.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -23,7 +24,12 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   const timestamp = req.headers.get("x-slack-request-timestamp") || "";
   const slackSig = req.headers.get("x-slack-signature") || "";
   const parsedTs = parseInt(timestamp);
-  if (isNaN(parsedTs) || Math.abs(Date.now() / 1000 - parsedTs) > 300) return false;
+  const nowSec = Date.now() / 1000;
+  // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
+  if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
+    console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
+    return false;
+  }
   const baseString = `v0:${timestamp}:${body}`;
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
@@ -44,15 +50,19 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   return crypto.subtle.timingSafeEqual(computed, received);
 }
 
-async function dbQuery(table: string, query: string) {
-  return (
-    await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-      headers: {
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    })
-  ).json();
+async function dbQuery(table: string, query: string): Promise<any> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    headers: {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[dbQuery] ${table} ${res.status}: ${body}`);
+    throw new Error(`dbQuery ${table} failed: ${res.status}`);
+  }
+  return res.json();
 }
 
 async function getFreshBotToken(workspaceId: string): Promise<string | null> {
@@ -79,6 +89,22 @@ async function getFreshBotToken(workspaceId: string): Promise<string | null> {
   const data = await res.json();
   if (!data.ok) {
     console.error("Token refresh failed:", data.error);
+    if (data.error === "invalid_auth" || data.error === "token_revoked") {
+      // Surface to the dashboard banner so an admin can reinstall.
+      await fetch(`${SUPABASE_URL}/rest/v1/workspaces?id=eq.${workspaceId}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          requires_reinstall: true,
+          requires_reinstall_at: new Date().toISOString(),
+        }),
+      }).catch((e) => console.error("[getFreshBotToken] flag write failed:", e));
+    }
     return tokens.botToken;  // serve stale rather than fail
   }
 
@@ -228,6 +254,7 @@ const DEFAULT_FIELDS: FormField[] = [
 // ── Main handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+ try {
   const body = await req.text();
 
   // Verify Slack signature
@@ -292,13 +319,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Load form config (or use defaults)
+    // Load form config (or use defaults). Validate the jsonb shape before
+    // it reaches buildFeedbackModalBlocks — the column is admin-controlled
+    // but a malformed/poisoned row shouldn't be able to break modal render
+    // or smuggle weird types into Block Kit.
     const configRows = await dbQuery(
       "feedback_form_configs",
       `workspace_id=eq.${safeWsId}&select=fields&limit=1`,
     );
-    const hasConfig = configRows?.[0]?.fields?.length > 0;
-    const fields: FormField[] = hasConfig ? configRows[0].fields : DEFAULT_FIELDS;
+    const validated = validateFormFields(configRows?.[0]?.fields);
+    const hasConfig = validated.length > 0;
+    const fields: FormField[] = hasConfig ? (validated as FormField[]) : DEFAULT_FIELDS;
     const blocks = buildFeedbackModalBlocks(fields);
 
     const view = {
@@ -357,4 +388,13 @@ Deno.serve(async (req) => {
     JSON.stringify({ response_type: "ephemeral", text: `Unknown command: ${command}` }),
     { headers: { "Content-Type": "application/json" } },
   );
+ } catch (err: any) {
+  console.error("[slack-commands] unhandled error:", err?.message || err);
+  // Slack-visible ephemeral so the user knows something failed (rather than
+  // an unhelpful "dispatch_failed" surface from Slack on a 500).
+  return new Response(
+    JSON.stringify({ response_type: "ephemeral", text: ":warning: Something went wrong. Please try again — if it keeps happening, let your admin know." }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+ }
 });

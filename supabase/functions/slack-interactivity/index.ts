@@ -25,9 +25,11 @@ Deno.serve(async (req) => {
     {
       const timestamp = req.headers.get("x-slack-request-timestamp") || "";
       const slackSig = req.headers.get("x-slack-signature") || "";
-      const fiveMin = 5 * 60;
       const parsedTs = parseInt(timestamp);
-      if (isNaN(parsedTs) || Math.abs(Date.now() / 1000 - parsedTs) > fiveMin) {
+      const nowSec = Date.now() / 1000;
+      // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
+      if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
+        console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
         return new Response("Request too old", { status: 403 });
       }
       const baseString = `v0:${timestamp}:${body}`;
@@ -70,13 +72,19 @@ Deno.serve(async (req) => {
     // ----------------------------------------------------------------
     // DB helpers
     // ----------------------------------------------------------------
-    async function dbQuery(table: string, query: string) {
-      return (await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+    async function dbQuery(table: string, query: string): Promise<any> {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
         headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-      })).json();
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[dbQuery] ${table} ${res.status}: ${body}`);
+        throw new Error(`dbQuery ${table} failed: ${res.status}`);
+      }
+      return res.json();
     }
     async function dbInsert(table: string, data: any) {
-      return (await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
         method: "POST",
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -85,10 +93,16 @@ Deno.serve(async (req) => {
           Prefer: "return=representation",
         },
         body: JSON.stringify(data),
-      })).json();
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[dbInsert] ${table} ${res.status}: ${body}`);
+        throw new Error(`dbInsert ${table} failed: ${res.status}`);
+      }
+      return res.json();
     }
     async function dbUpdate(table: string, query: string, data: any) {
-      return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
         method: "PATCH",
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -97,15 +111,27 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify(data),
       });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[dbUpdate] ${table} ${res.status}: ${body}`);
+        throw new Error(`dbUpdate ${table} failed: ${res.status}`);
+      }
+      return res;
     }
     async function dbDelete(table: string, query: string) {
-      return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
         method: "DELETE",
         headers: {
           apikey: SUPABASE_SERVICE_ROLE_KEY,
           Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
         },
       });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error(`[dbDelete] ${table} ${res.status}: ${body}`);
+        throw new Error(`dbDelete ${table} failed: ${res.status}`);
+      }
+      return res;
     }
     async function slackApi(token: string, method: string, data: any) {
       return callSlackApi(token, method, data);
@@ -136,6 +162,22 @@ Deno.serve(async (req) => {
       const data = await res.json();
       if (!data.ok) {
         console.error("[getFreshBotToken] refresh failed:", data.error);
+        if (data.error === "invalid_auth" || data.error === "token_revoked") {
+          // Surface to the dashboard banner so an admin can reinstall.
+          await fetch(`${SUPABASE_URL}/rest/v1/workspaces?id=eq.${workspaceId}`, {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_SERVICE_ROLE_KEY,
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal",
+            },
+            body: JSON.stringify({
+              requires_reinstall: true,
+              requires_reinstall_at: new Date().toISOString(),
+            }),
+          }).catch((e) => console.error("[getFreshBotToken] flag write failed:", e));
+        }
         return tokens.botToken;  // serve stale rather than fail
       }
 
