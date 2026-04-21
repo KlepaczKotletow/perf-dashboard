@@ -382,6 +382,25 @@ Deno.serve(async (req: Request) => {
       if (linkError) {
         console.error("[slack-oauth] Magic link error:", linkError.message);
       } else if (linkData?.properties?.action_link) {
+        // SECURITY: also persist slack_user_id in app_metadata so the RLS
+        // helpers (auth_workspace_id etc.) and getUserWorkspace's RPC can
+        // resolve the workspace. user_metadata above is user-modifiable and
+        // intentionally never trusted by the RLS layer.
+        const linkedUserId = (linkData as { user?: { id?: string } } | null)?.user?.id;
+        if (linkedUserId) {
+          const { error: metaErr } = await supabase.auth.admin.updateUserById(
+            linkedUserId,
+            { app_metadata: { slack_user_id: authedUserId } },
+          );
+          if (metaErr) {
+            console.error("[slack-oauth] failed to set app_metadata:", metaErr.message);
+            return Response.redirect(`${DASHBOARD_URL}/auth/error?error=app_metadata_failed`, 302);
+          }
+        } else {
+          console.error("[slack-oauth] generateLink returned no user id; cannot set app_metadata");
+          return Response.redirect(`${DASHBOARD_URL}/auth/error?error=app_metadata_failed`, 302);
+        }
+
         const callbackUrl = extractCallbackUrl(linkData.properties.action_link);
         if (callbackUrl) {
           sendWelcomeDM(access_token, authedUserId, isNewInstall).catch((e: any) => console.error("[slack-oauth] Welcome DM error:", e?.message));
