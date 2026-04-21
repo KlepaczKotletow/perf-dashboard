@@ -357,12 +357,14 @@ export default async function Home() {
             </p>
           </ScrollReveal>
 
-          {/* All 8 frameworks — visible proof the library is real.
-              Styled as *tags*, not buttons: no hover state, lock icon on the
-              ones that aren't shown on this landing, check on the one whose
-              matrix is rendered below. Signals "this is the full list, sign
-              in to open any of them" without the wrong button-affordance. */}
-          <ScrollReveal className="flex flex-wrap justify-center gap-2 mb-10">
+          {/* All 8 frameworks — visible proof the library is real. These are
+              tags, not buttons: the matrix preview below only renders
+              "Software Engineering". The other 7 are fully in the product,
+              but the landing only previews one. A Check marks the one being
+              shown; the rest are just muted tags. No hover state, no pointer
+              cursor — the affordance is "list of what's included," not
+              "click to preview." */}
+          <ScrollReveal className="flex flex-wrap justify-center gap-2 mb-4">
             {[
               "Software Engineering",
               "Product Management",
@@ -375,26 +377,25 @@ export default async function Home() {
             ].map((name, i) => (
               <span
                 key={name}
-                aria-disabled={i !== 0}
+                aria-current={i === 0 ? "true" : undefined}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border cursor-default select-none ${
                   i === 0
                     ? "bg-primary/10 text-primary border-primary/30"
                     : "bg-white/60 text-muted-foreground border-border/50"
                 }`}
               >
-                {i === 0 ? (
-                  <Check className="h-3 w-3" aria-hidden />
-                ) : (
-                  <Lock className="h-3 w-3 opacity-60" aria-hidden />
-                )}
+                {i === 0 && <Check className="h-3 w-3" aria-hidden />}
                 {name}
               </span>
             ))}
           </ScrollReveal>
-          <ScrollReveal className="text-center -mt-6 mb-10">
+          <ScrollReveal className="text-center mb-10">
             <p className="text-[12px] text-muted-foreground">
-              Previewing <span className="font-medium text-foreground">Software Engineering</span> below —
-              sign in to open any framework.
+              All 8 frameworks are included out of the box —
+              <Link href="#hero" className="text-primary font-medium hover:underline ml-1">
+                get started with Nami
+              </Link>
+              {" "}to use any of them.
             </p>
           </ScrollReveal>
 
