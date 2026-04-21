@@ -198,6 +198,10 @@ Deno.serve(async (req: Request) => {
       : null;
 
     // Upsert workspace WITHOUT tokens — tokens go through the Vault RPC below.
+    // We select xmax so we can tell whether this row was just inserted vs
+    // updated: xmax = '0' (PostgREST returns it as a string) means a fresh
+    // INSERT, anything else means we collided with an existing row and
+    // performed an UPDATE.
     const { data: workspace, error: dbError } = await supabase
       .from("workspaces")
       .upsert(
@@ -210,13 +214,15 @@ Deno.serve(async (req: Request) => {
         },
         { onConflict: "team_id" }
       )
-      .select("id")
+      .select("id, xmax")
       .single();
 
     if (dbError || !workspace) {
       console.error("[slack-oauth] DB error:", dbError);
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=database_error`, 302);
     }
+
+    const wasNewlyInserted = String((workspace as any).xmax) === "0";
 
     // Persist tokens encrypted-at-rest via Vault. Failure here means the
     // install is unusable, so bail rather than leaving a workspace row
@@ -228,7 +234,13 @@ Deno.serve(async (req: Request) => {
       tokenExpiresAt,
     );
     if (!tokensStored) {
-      console.error("[slack-oauth] failed to vault tokens for", workspace.id);
+      // Don't leak a half-installed workspace row if this was a fresh
+      // install. Re-installs (xmax !== '0') keep their previous secret
+      // pointer intact, so leaving the row alone is correct.
+      if (wasNewlyInserted) {
+        await supabase.from("workspaces").delete().eq("id", workspace.id);
+      }
+      console.error("[slack-oauth] vault write failed for workspace", workspace.id);
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=token_storage`, 302);
     }
 
