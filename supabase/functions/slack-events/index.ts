@@ -7,6 +7,7 @@ import {
   buildSurveyQuestionPrompt,
 } from "../_shared/nami-blocks.ts";
 import { callSlackApi, sendSlackMessage as sendSlackMessageWithRetry } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -213,7 +214,7 @@ Deno.serve(async (req) => {
     // Look up workspace by Slack team_id
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
-      .select("id, bot_token")
+      .select("id")
       .eq("team_id", teamId)
       .single();
 
@@ -221,7 +222,14 @@ Deno.serve(async (req) => {
       console.error("Workspace lookup error:", workspaceError.message, { teamId });
     }
 
-    if (!workspace?.bot_token) {
+    if (!workspace) {
+      console.error("Workspace not found for team_id:", teamId);
+      return new Response("Workspace not found", { status: 404 });
+    }
+
+    const tokens = await getWorkspaceSlackTokens(workspace.id);
+    const botToken = tokens?.botToken;
+    if (!botToken) {
       console.error("Workspace not found for team_id:", teamId);
       return new Response("Workspace not found", { status: 404 });
     }
@@ -236,7 +244,7 @@ Deno.serve(async (req) => {
 
     if (!appUser) {
       // User not yet in the system — show a simple welcome message
-      await publishHomeTab(workspace.bot_token, slackUserId, [
+      await publishHomeTab(botToken, slackUserId, [
         header("👋 Welcome to Nami"),
         section("You haven't been added to the workspace yet. Ask your admin to import the team from Slack."),
       ]);
@@ -244,7 +252,7 @@ Deno.serve(async (req) => {
     }
 
     const blocks = await buildHomeBlocks(appUser);
-    await publishHomeTab(workspace.bot_token, slackUserId, blocks);
+    await publishHomeTab(botToken, slackUserId, blocks);
   }
 
   // ================================================================
@@ -280,15 +288,17 @@ Deno.serve(async (req) => {
         if (convErr || !convRows || convRows.length === 0) return;
         const conv = convRows[0];
 
-        // Look up workspace bot_token
+        // Look up workspace bot token via vault helper
         const { data: ws } = await supabase
           .from("workspaces")
-          .select("id, bot_token")
+          .select("id")
           .eq("team_id", teamId)
           .single();
 
-        if (!ws?.bot_token) return;
-        const botToken = ws.bot_token;
+        if (!ws) return;
+        const tokens = await getWorkspaceSlackTokens(ws.id);
+        if (!tokens?.botToken) return;
+        const botToken = tokens.botToken;
 
         async function sendSlackMessage(channel: string, msgText: string, msgBlocks?: unknown[]) {
           await sendSlackMessageWithRetry(botToken, channel, msgText, msgBlocks);
@@ -653,11 +663,13 @@ Deno.serve(async (req) => {
         try {
           const { data: workspace } = await supabase
             .from("workspaces")
-            .select("id, bot_token")
+            .select("id")
             .eq("team_id", teamId)
             .single();
 
           if (!workspace) return;
+          const wsTokens = await getWorkspaceSlackTokens(workspace.id);
+          const wsBotToken = wsTokens?.botToken ?? null;
 
           // Look up the app user row so we can also close their open reviews.
           const { data: appUser } = await supabase
@@ -733,14 +745,14 @@ Deno.serve(async (req) => {
               byManager.set(key, entry);
             }
 
-            if (workspace.bot_token && byManager.size > 0) {
+            if (wsBotToken && byManager.size > 0) {
               for (const entry of byManager.values()) {
                 try {
                   // Open / reuse the DM channel, then post.
                   const open = await fetch("https://slack.com/api/conversations.open", {
                     method: "POST",
                     headers: {
-                      Authorization: `Bearer ${workspace.bot_token}`,
+                      Authorization: `Bearer ${wsBotToken}`,
                       "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ users: entry.slackId }),
@@ -760,7 +772,7 @@ Deno.serve(async (req) => {
                   await fetch("https://slack.com/api/chat.postMessage", {
                     method: "POST",
                     headers: {
-                      Authorization: `Bearer ${workspace.bot_token}`,
+                      Authorization: `Bearer ${wsBotToken}`,
                       "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ channel: channelId, text }),

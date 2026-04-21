@@ -17,6 +17,7 @@ import {
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
 import { callSlackApi, buildAuthedDashboardUrl, SlackRateLimitError } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -252,16 +253,17 @@ async function getManagerContext(
 // =============================================================================
 
 async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all") {
-  // Fetch cycle + workspace bot token
+  // Fetch cycle + workspace bot token (via vault helper)
   const { data: cycle } = await supabase
     .from("performance_cycles")
-    .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
+    .select("id, name, review_deadline, workspace_id")
     .eq("id", cycleId)
     .single();
 
   if (!cycle) return { sent: 0, skipped: 0, error: "Cycle not found" };
 
-  const botToken = (cycle as any).workspaces?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
 
   const workspaceId = cycle.workspace_id;
@@ -495,13 +497,14 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
 async function handleSurveyLaunch(surveyId: string) {
   const { data: survey } = await supabase
     .from("surveys")
-    .select("id, name, type, workspace_id, config, workspaces(bot_token)")
+    .select("id, name, type, workspace_id, config")
     .eq("id", surveyId)
     .single();
 
   if (!survey) return { sent: 0, skipped: 0, error: "Survey not found" };
 
-  const botToken = (survey as any).workspaces?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(survey.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
 
   const workspaceId = survey.workspace_id;
@@ -783,13 +786,14 @@ async function handleReminders() {
   // -----------------------------------------------------------------------
   const { data: cycles } = await supabase
     .from("performance_cycles")
-    .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
+    .select("id, name, review_deadline, workspace_id")
     .eq("status", "active")
     .eq("nami_confirmed", true);
 
   if (cycles) {
     for (const cycle of cycles) {
-      const botToken = (cycle as any).workspaces?.bot_token;
+      const cycleTokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+      const botToken = cycleTokens?.botToken;
       if (!botToken) continue;
 
       const workspaceId = cycle.workspace_id;
@@ -990,13 +994,14 @@ async function handleReminders() {
   // -----------------------------------------------------------------------
   const { data: surveys } = await supabase
     .from("surveys")
-    .select("id, name, closes_at, workspace_id, workspaces(bot_token)")
+    .select("id, name, closes_at, workspace_id")
     .eq("status", "active")
     .eq("nami_confirmed", true);
 
   if (surveys) {
     for (const survey of surveys) {
-      const botToken = (survey as any).workspaces?.bot_token;
+      const surveyTokens = await getWorkspaceSlackTokens(survey.workspace_id);
+      const botToken = surveyTokens?.botToken;
       if (!botToken) continue;
 
       const workspaceId = survey.workspace_id;
@@ -1268,20 +1273,21 @@ async function processSurveyReminder(
 // =============================================================================
 
 async function handleReleaseGrades(cycleId: string) {
-  // Fetch cycle + workspace bot token + stamped rating scale so the DM
-  // reflects the scale that was active at this cycle's launch (Lattice /
-  // Leapsome semantics: cycles freeze their scale at kickoff).
+  // Fetch cycle + stamped rating scale so the DM reflects the scale that was
+  // active at this cycle's launch (Lattice / Leapsome semantics: cycles freeze
+  // their scale at kickoff). Bot token is loaded separately via vault helper.
   const { data: cycle } = await supabase
     .from("performance_cycles")
     .select(
-      "id, name, workspace_id, rating_scale_id, workspaces(bot_token), rating_scale:rating_scales!performance_cycles_rating_scale_id_fkey(max_value)",
+      "id, name, workspace_id, rating_scale_id, rating_scale:rating_scales!performance_cycles_rating_scale_id_fkey(max_value)",
     )
     .eq("id", cycleId)
     .single();
 
   if (!cycle) return { sent: 0, skipped: 0, failed: 0, error: "Cycle not found" };
 
-  const botToken = (cycle as any).workspaces?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { sent: 0, skipped: 0, failed: 0, error: "No bot token" };
 
   const workspaceId = cycle.workspace_id;
@@ -1467,12 +1473,8 @@ async function sendFeedbackDm(job: QueueJob): Promise<{ ok: boolean; error?: str
   const recipient = (fb as { to_user?: { slack_user_id?: string; slack_name?: string } | null }).to_user;
   if (!recipient?.slack_user_id) return { ok: true };
 
-  const { data: ws } = await supabase
-    .from("workspaces")
-    .select("bot_token")
-    .eq("id", job.workspace_id)
-    .single();
-  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
   const sender = fb.is_anonymous
@@ -1520,12 +1522,8 @@ async function sendNewReviewerDm(job: QueueJob): Promise<{ ok: boolean; error?: 
   if (!reviewer?.slack_user_id) return { ok: true };
   const employee = (a as { employee?: { slack_name?: string } | null }).employee;
 
-  const { data: ws } = await supabase
-    .from("workspaces")
-    .select("bot_token")
-    .eq("id", job.workspace_id)
-    .single();
-  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
   const open = await callSlackApi(botToken, "conversations.open", { users: reviewer.slack_user_id });
@@ -1555,12 +1553,8 @@ async function refreshHomeTab(job: QueueJob): Promise<{ ok: boolean; error?: str
   const slackUserId = (u as { slack_user_id?: string } | null)?.slack_user_id;
   if (!slackUserId) return { ok: true }; // nothing to refresh — user has no Slack link
 
-  const { data: ws } = await supabase
-    .from("workspaces")
-    .select("bot_token")
-    .eq("id", job.workspace_id)
-    .single();
-  const botToken = (ws as { bot_token?: string } | null)?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(job.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { ok: false, error: "no bot token" };
 
   // Trigger a no-op views.publish. The slack-events handler listens for

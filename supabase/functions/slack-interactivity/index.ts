@@ -1,5 +1,6 @@
 import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, buildReviewSummary, buildSurveyQuestionPrompt } from "../_shared/nami-blocks.ts";
 import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -94,30 +95,41 @@ Deno.serve(async (req) => {
     }
 
     // Token refresh
-    async function getFreshBotToken(ws: any): Promise<string> {
-      if (ws.token_expires_at) {
-        const expiresAt = new Date(ws.token_expires_at).getTime();
-        if (Date.now() < expiresAt - 5 * 60 * 1000) return ws.bot_token;
-      }
-      if (!ws.refresh_token) return ws.bot_token;
+    async function getFreshBotToken(workspaceId: string): Promise<string | null> {
+      const tokens = await getWorkspaceSlackTokens(workspaceId);
+      if (!tokens) return null;
+
+      const expiresAt = tokens.tokenExpiresAt
+        ? new Date(tokens.tokenExpiresAt).getTime()
+        : null;
+      const needsRefresh = expiresAt !== null
+        && expiresAt - Date.now() < 5 * 60 * 1000;
+
+      if (!needsRefresh || !tokens.refreshToken) return tokens.botToken;
+
       const res = await fetch("https://slack.com/api/oauth.v2.access", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
-          client_id: SLACK_CLIENT_ID, client_secret: SLACK_CLIENT_SECRET,
-          grant_type: "refresh_token", refresh_token: ws.refresh_token,
+          client_id: SLACK_CLIENT_ID,
+          client_secret: SLACK_CLIENT_SECRET,
+          grant_type: "refresh_token",
+          refresh_token: tokens.refreshToken,
         }),
       });
       const data = await res.json();
-      if (data.ok) {
-        await dbUpdate("workspaces", `id=eq.${ws.id}`, {
-          bot_token: data.access_token, refresh_token: data.refresh_token,
-          token_expires_at: new Date(Date.now() + (data.expires_in || 43200) * 1000).toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        return data.access_token;
+      if (!data.ok) {
+        console.error("[getFreshBotToken] refresh failed:", data.error);
+        return tokens.botToken;  // serve stale rather than fail
       }
-      return ws.bot_token;
+
+      await setWorkspaceSlackTokens(
+        workspaceId,
+        data.access_token,
+        data.refresh_token ?? null,
+        new Date(Date.now() + (data.expires_in || 43200) * 1000).toISOString(),
+      );
+      return data.access_token;
     }
 
     // User lookup
@@ -148,10 +160,11 @@ Deno.serve(async (req) => {
     // Resolve workspace
     // ----------------------------------------------------------------
     const teamId = payload.team?.id || payload.user?.team_id;
-    const ws = (await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token,refresh_token,token_expires_at,rating_scale`))[0];
+    const ws = (await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,rating_scale`))[0];
     if (!ws) return json({ response_action: "clear" });
 
-    const botToken = await getFreshBotToken(ws);
+    const botToken = await getFreshBotToken(ws.id);
+    if (!botToken) return json({ response_action: "clear" });
     const cbId = payload.view?.callback_id;
     console.log("[interactivity] type:", payload.type, "callback:", cbId);
 
