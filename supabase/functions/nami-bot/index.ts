@@ -407,20 +407,34 @@ async function handleCycleLaunch(cycleId: string, mode: "all" | "missed" = "all"
     return { queued: 0 };
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  const { error: insErr } = await supabase
     .from("slack_send_queue")
-    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true })
-    .select("id");
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
   if (insErr) {
     console.error("[handleCycleLaunch] queue insert failed:", insErr);
     return { queued: 0, error: insErr.message };
   }
 
+  // Recount from DB instead of trusting the insert response. ignoreDuplicates
+  // only RETURNS rows it actually inserted, so a re-launch that collides with
+  // every existing pending job would report 0 queued — even though the
+  // drainer is still chewing through the originals. Counting actual pending
+  // rows for THIS launch (matched on the dedupe_keys we just tried to insert)
+  // reports the truth in all cases: first launch, partial collision, full
+  // collision.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", cycle.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+
   await supabase
     .from("performance_cycles")
     .update({ nami_confirmed: true })
     .eq("id", cycleId);
-  return { queued: inserted?.length ?? jobs.length };
+  return { queued: pending ?? jobs.length };
 }
 
 // =============================================================================
@@ -436,7 +450,13 @@ interface SurveyDmJobPayload {
   survey_id: string;
   survey_name: string;
   workspace_id: string;
+  // The Slack DM lands once per user, but a 360-style survey can give one user
+  // multiple participant rows (e.g. respondent + reviewer slots). Carry every
+  // participant_id the user holds in this survey so the deeplink targets the
+  // first row and (optionally, downstream) the handler can mark them all
+  // notified in one go.
   participant_id: string;
+  participant_ids: string[];
   question_count: number;
   role: string;
   subject_name?: string;
@@ -447,18 +467,20 @@ interface SurveyDmJobPayload {
 
 function makeSurveyDmJob(
   survey: { id: string; name: string; workspace_id: string },
-  participant: { id: string; role: string },
+  userParts: any[],
   recipient: { id: string; slack_user_id: string; slack_name?: string | null },
   questionCount: number,
   subjectName?: string | null,
 ) {
+  const primary = userParts[0];
   const payload: SurveyDmJobPayload = {
     survey_id: survey.id,
     survey_name: survey.name,
     workspace_id: survey.workspace_id,
-    participant_id: participant.id,
+    participant_id: primary.id,
+    participant_ids: userParts.map((p) => p.id),
     question_count: questionCount,
-    role: participant.role,
+    role: primary.role,
     subject_name: subjectName ?? undefined,
     recipient_app_user_id: recipient.id,
     recipient_slack_user_id: recipient.slack_user_id,
@@ -467,7 +489,13 @@ function makeSurveyDmJob(
   return {
     workspace_id: survey.workspace_id,
     action: "send_survey_invite",
-    dedupe_key: `survey_dm:${participant.id}`,
+    // Key on (survey_id, user_id) — NOT participant_id. The launch picks one
+    // participant per user but the choice is non-deterministic across
+    // retries (different sort orders return userParts[0] differently). A
+    // participant-keyed dedupe would let a re-launch enqueue a SECOND DM for
+    // the same user under a different participant. Per-user keying is
+    // stable.
+    dedupe_key: `survey_dm:${survey.id}:${recipient.id}`,
     payload,
   };
 }
@@ -519,11 +547,11 @@ async function handleSurveyLaunch(surveyId: string) {
 
   const jobs: ReturnType<typeof makeSurveyDmJob>[] = [];
   for (const [, userParts] of userParticipants) {
-    const p = userParts[0];
-    const user = p.user;
+    const primary = userParts[0];
+    const user = primary.user;
     if (!user?.slack_user_id) continue;
-    const subjectName = p.subject?.slack_name || undefined;
-    jobs.push(makeSurveyDmJob(survey, p, user, questionCount, subjectName));
+    const subjectName = primary.subject?.slack_name || undefined;
+    jobs.push(makeSurveyDmJob(survey, userParts, user, questionCount, subjectName));
   }
 
   if (jobs.length === 0) {
@@ -531,17 +559,27 @@ async function handleSurveyLaunch(surveyId: string) {
     return { queued: 0 };
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  const { error: insErr } = await supabase
     .from("slack_send_queue")
-    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true })
-    .select("id");
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
   if (insErr) {
     console.error("[handleSurveyLaunch] queue insert failed:", insErr);
     return { queued: 0, error: insErr.message };
   }
 
+  // See handleCycleLaunch above — count actual pending rows so the report is
+  // accurate whether we just inserted, collided with a previous launch, or
+  // some mix.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", survey.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+
   await supabase.from("surveys").update({ nami_confirmed: true }).eq("id", surveyId);
-  return { queued: inserted?.length ?? jobs.length };
+  return { queued: pending ?? jobs.length };
 }
 
 // =============================================================================
@@ -716,13 +754,22 @@ async function handleReminders() {
     // Clone the survey and create fresh participants
     const newSurveyId = await cloneAndLaunchRecurringSurvey(survey.id, survey.workspace_id, config, survey.type);
     if (newSurveyId) {
-      // Update last_recurrence_at on the template survey
-      await supabase.from("surveys").update({
-        config: { ...config, last_recurrence_at: now.toISOString() },
-      }).eq("id", survey.id);
-
       const result = await handleSurveyLaunch(newSurveyId);
-      sent += result.queued ?? 0;
+      // Only stamp last_recurrence_at AFTER the launch succeeds. If the
+      // queue insert errored we leave the timestamp alone so the next cron
+      // tick retries — otherwise a transient failure would silently skip
+      // this recurrence until the next interval (week/2weeks/month).
+      if (!result.error) {
+        await supabase.from("surveys").update({
+          config: { ...config, last_recurrence_at: now.toISOString() },
+        }).eq("id", survey.id);
+        sent += result.queued ?? 0;
+      } else {
+        console.warn(
+          `[handleReminders] recurring survey ${survey.id} launch failed; leaving last_recurrence_at unchanged for retry next tick:`,
+          result.error,
+        );
+      }
     }
   }
 
@@ -1305,15 +1352,25 @@ async function handleReleaseGrades(cycleId: string) {
 
   if (jobs.length === 0) return { queued: 0 };
 
-  const { data: inserted, error: insErr } = await supabase
+  const { error: insErr } = await supabase
     .from("slack_send_queue")
-    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true })
-    .select("id");
+    .upsert(jobs, { onConflict: "workspace_id,dedupe_key", ignoreDuplicates: true });
   if (insErr) {
     console.error("[handleReleaseGrades] queue insert failed:", insErr);
     return { queued: 0, error: insErr.message };
   }
-  return { queued: inserted?.length ?? jobs.length };
+
+  // See handleCycleLaunch above — count actual pending rows so the report is
+  // accurate whether we just inserted, collided with a previous launch, or
+  // some mix.
+  const dedupeKeys = jobs.map((j) => j.dedupe_key);
+  const { count: pending } = await supabase
+    .from("slack_send_queue")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", cycle.workspace_id)
+    .in("dedupe_key", dedupeKeys)
+    .is("completed_at", null);
+  return { queued: pending ?? jobs.length };
 }
 
 async function resolveCallerWorkspace(
@@ -1398,8 +1455,16 @@ async function sendCycleLaunchDm(
   const tokens = await tokenFor(p.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) {
-    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
-    return { ok: false, error: "no bot token" };
+    // Workspace has no Slack token (uninstalled or token revoked). Terminal —
+    // mark complete and don't retry. We deliberately do NOT roll back the
+    // notification_log row: if the workspace re-installs later, the row
+    // prevents an accidental re-delivery of a now-stale launch DM.
+    // TODO (Task 13): set workspaces.requires_reinstall = true here so the
+    // dashboard surfaces the issue.
+    console.warn(
+      `[send_cycle_dm] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
   }
 
   const deadline = p.deadline_iso
@@ -1463,7 +1528,11 @@ async function sendSurveyInviteDm(
   tokenFor: (wsId: string) => Promise<WorkspaceTokens | null>,
 ): Promise<DrainResult> {
   const p = job.payload as unknown as SurveyDmJobPayload;
-  const refId = `survey_${p.participant_id}`;
+  // Key the notification_log row on (survey_id, user_id) — matches the
+  // queue dedupe_key so both layers protect against the same double-DM
+  // scenario described on makeSurveyDmJob. Was: `survey_${participant_id}`,
+  // which let a re-launch with a different participant ordering re-deliver.
+  const refId = `survey_${p.survey_id}_user_${p.recipient_app_user_id}`;
   const eventType = "nami_survey_invite";
 
   const canSend = await logNotification(
@@ -1477,8 +1546,12 @@ async function sendSurveyInviteDm(
   const tokens = await tokenFor(p.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) {
-    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
-    return { ok: false, error: "no bot token" };
+    // See sendCycleLaunchDm — terminal, no rollback, TODO surfaces in
+    // dashboard via Task 13's requires_reinstall flag.
+    console.warn(
+      `[send_survey_invite] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
   }
 
   const blocks = buildSurveyOpening(
@@ -1524,8 +1597,12 @@ async function sendGradeReleaseDm(
   const tokens = await tokenFor(p.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) {
-    await rollbackNotification(p.workspace_id, p.recipient_app_user_id, eventType, refId);
-    return { ok: false, error: "no bot token" };
+    // See sendCycleLaunchDm — terminal, no rollback, TODO surfaces in
+    // dashboard via Task 13's requires_reinstall flag.
+    console.warn(
+      `[send_grade_release] workspace ${p.workspace_id} has no bot token — marking job complete without delivery`,
+    );
+    return { ok: true };
   }
 
   const ratingStr = p.overall_rating
