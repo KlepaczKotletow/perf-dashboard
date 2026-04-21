@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -196,17 +197,14 @@ Deno.serve(async (req: Request) => {
       ? new Date(Date.now() + expires_in * 1000).toISOString()
       : null;
 
-    // Upsert workspace
+    // Upsert workspace WITHOUT tokens — tokens go through the Vault RPC below.
     const { data: workspace, error: dbError } = await supabase
       .from("workspaces")
       .upsert(
         {
           team_id: team.id,
           team_name: team.name,
-          bot_token: access_token,
           bot_user_id: bot_user_id,
-          refresh_token: refresh_token || null,
-          token_expires_at: tokenExpiresAt,
           installed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
@@ -218,6 +216,20 @@ Deno.serve(async (req: Request) => {
     if (dbError || !workspace) {
       console.error("[slack-oauth] DB error:", dbError);
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=database_error`, 302);
+    }
+
+    // Persist tokens encrypted-at-rest via Vault. Failure here means the
+    // install is unusable, so bail rather than leaving a workspace row
+    // without callable tokens.
+    const tokensStored = await setWorkspaceSlackTokens(
+      workspace.id,
+      access_token,
+      refresh_token || null,
+      tokenExpiresAt,
+    );
+    if (!tokensStored) {
+      console.error("[slack-oauth] failed to vault tokens for", workspace.id);
+      return Response.redirect(`${DASHBOARD_URL}/auth/error?error=token_storage`, 302);
     }
 
     // Handle subscription linking (state is a setup_token from checkout flow)
