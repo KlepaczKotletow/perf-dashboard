@@ -357,7 +357,11 @@ export default async function Home() {
             </p>
           </ScrollReveal>
 
-          {/* All 8 frameworks — visible proof the library is real */}
+          {/* All 8 frameworks — visible proof the library is real.
+              Styled as *tags*, not buttons: no hover state, lock icon on the
+              ones that aren't shown on this landing, check on the one whose
+              matrix is rendered below. Signals "this is the full list, sign
+              in to open any of them" without the wrong button-affordance. */}
           <ScrollReveal className="flex flex-wrap justify-center gap-2 mb-10">
             {[
               "Software Engineering",
@@ -371,15 +375,27 @@ export default async function Home() {
             ].map((name, i) => (
               <span
                 key={name}
-                className={`inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-medium border ${
+                aria-disabled={i !== 0}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border cursor-default select-none ${
                   i === 0
                     ? "bg-primary/10 text-primary border-primary/30"
-                    : "bg-white text-foreground border-border/60"
+                    : "bg-white/60 text-muted-foreground border-border/50"
                 }`}
               >
+                {i === 0 ? (
+                  <Check className="h-3 w-3" aria-hidden />
+                ) : (
+                  <Lock className="h-3 w-3 opacity-60" aria-hidden />
+                )}
                 {name}
               </span>
             ))}
+          </ScrollReveal>
+          <ScrollReveal className="text-center -mt-6 mb-10">
+            <p className="text-[12px] text-muted-foreground">
+              Previewing <span className="font-medium text-foreground">Software Engineering</span> below —
+              sign in to open any framework.
+            </p>
           </ScrollReveal>
 
           <ScrollReveal>
