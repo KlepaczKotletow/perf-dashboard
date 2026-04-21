@@ -357,14 +357,17 @@ export default async function Home() {
             </p>
           </ScrollReveal>
 
-          {/* All 8 frameworks — visible proof the library is real. These are
-              tags, not buttons: the matrix preview below only renders
-              "Software Engineering". The other 7 are fully in the product,
-              but the landing only previews one. A Check marks the one being
-              shown; the rest are just muted tags. No hover state, no pointer
-              cursor — the affordance is "list of what's included," not
-              "click to preview." */}
-          <ScrollReveal className="flex flex-wrap justify-center gap-2 mb-4">
+          {/* All 8 frameworks — visible proof the library is real.
+              Only Software Engineering has a matrix preview below, so only
+              its chip gets the primary-pill button affordance (even though
+              it's not interactive, the visual matches the preview it
+              labels). The other 7 are rendered as plain dotted-border text
+              labels — muted, no background fill, no border on the pill
+              axis, lower opacity — so they clearly read as "items in the
+              list" rather than "click to swap the preview below." The CTA
+              under the chips tells the user to sign in to actually use
+              any of them. */}
+          <ScrollReveal className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 mb-4">
             {[
               "Software Engineering",
               "Product Management",
@@ -374,20 +377,25 @@ export default async function Home() {
               "Customer Success",
               "Marketing",
               "People & HR",
-            ].map((name, i) => (
-              <span
-                key={name}
-                aria-current={i === 0 ? "true" : undefined}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border cursor-default select-none ${
-                  i === 0
-                    ? "bg-primary/10 text-primary border-primary/30"
-                    : "bg-white/60 text-muted-foreground border-border/50"
-                }`}
-              >
-                {i === 0 && <Check className="h-3 w-3" aria-hidden />}
-                {name}
-              </span>
-            ))}
+            ].map((name, i) =>
+              i === 0 ? (
+                <span
+                  key={name}
+                  aria-current="true"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border cursor-default select-none bg-primary/10 text-primary border-primary/30"
+                >
+                  <Check className="h-3 w-3" aria-hidden />
+                  {name}
+                </span>
+              ) : (
+                <span
+                  key={name}
+                  className="inline-flex items-center text-[12px] text-muted-foreground/70 cursor-default select-none"
+                >
+                  {name}
+                </span>
+              ),
+            )}
           </ScrollReveal>
           <ScrollReveal className="text-center mb-10">
             <p className="text-[12px] text-muted-foreground">
