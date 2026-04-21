@@ -45,6 +45,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Slack retried because we were slow. With Task 2's event_id dedup, the
+    // inbox catches event-callback retries; this is the catch-all for the
+    // other endpoints (commands, interactivity) that don't have an event_id.
+    // Either we already finished and Slack didn't get our 200 — doing it again
+    // risks side-effects firing twice. Or we're still processing the original.
+    // Either way, acknowledge fast so Slack stops retrying.
+    const retryNum = req.headers.get("x-slack-retry-num");
+    if (retryNum) {
+      console.warn(
+        `[slack-interactivity] retry #${retryNum} (reason=${
+          req.headers.get("x-slack-retry-reason") ?? "?"
+        }), short-circuiting to 200`,
+      );
+      return new Response("OK", { status: 200 });
+    }
+
     const p = new URLSearchParams(body);
     const payloadStr = p.get("payload");
     if (!payloadStr) return new Response("No payload", { status: 400 });
