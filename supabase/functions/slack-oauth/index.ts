@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
+import { verifyOAuthState } from "../_shared/oauth-state.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -117,16 +119,49 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_request`, 302);
     }
 
-    // Reject obviously-malformed state values. Real states are either:
-    //   - nonce_<uuid>  (landing page / dashboard-auth install flows)
-    //   - <uuid>        (setup_token from checkout flow)
-    // Anything else is suspicious. This is a weak first line of defence;
-    // the stronger HMAC-signed state upgrade is tracked for a follow-up PR.
-    const NONCE_PATTERN = /^nonce_[0-9a-f-]{32,40}$/i;
-    const UUID_PATTERN = /^[0-9a-f-]{32,40}$/i;
-    if (!NONCE_PATTERN.test(state) && !UUID_PATTERN.test(state)) {
-      console.error("[slack-oauth] Malformed state parameter rejected:", state.slice(0, 20));
-      return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
+    // State validation. Three accepted formats:
+    //   1. signed       → HMAC-signed payload from Task 3 (preferred). Carries
+    //                     an optional `setup_token` extra used to link the new
+    //                     install to a pre-paid Stripe subscription.
+    //   2. <uuid>       → legacy raw setup_token from the /setup checkout
+    //                     flow, before Task 3.
+    //   3. nonce_<uuid> → legacy CSRF nonce from landing/dashboard-auth, before
+    //                     Task 3.
+    // Legacy formats are accepted with a warn log until OAUTH_STATE_LEGACY_DEADLINE
+    // (unix ms). After that they are rejected.
+    const verifiedState = await verifyOAuthState(state);
+    let setupTokenFromState: string | null = null;
+    if (verifiedState) {
+      // Signed state. Surface setup_token (if present) for subscription linking.
+      // UUIDs are 36 chars; cap defensively at 64 to reject unbounded payload abuse.
+      const setupToken =
+        typeof verifiedState?.setup_token === "string" && verifiedState.setup_token.length <= 64
+          ? verifiedState.setup_token
+          : null;
+      if (setupToken && setupToken.length > 0) setupTokenFromState = setupToken;
+    } else {
+      const UUID_BODY = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+      const LEGACY_STATE_RE = new RegExp(`^(?:nonce_|oidc_)?${UUID_BODY}$`, "i");
+      const LEGACY_PREFIX_RE = /^(?:nonce_|oidc_)/i;
+      const isLegacy = LEGACY_STATE_RE.test(state);
+      const deadline = parseInt(Deno.env.get("OAUTH_STATE_LEGACY_DEADLINE") ?? "0", 10);
+      if (isLegacy && deadline > 0 && Date.now() < deadline) {
+        console.warn(
+          "[slack-oauth] accepting legacy state format (grace window, expires",
+          new Date(deadline).toISOString(),
+          ")",
+        );
+        // Bare-UUID legacy state is itself the setup_token from /setup.
+        // `nonce_<uuid>` and `oidc_<uuid>` are CSRF nonces, not setup tokens.
+        if (!LEGACY_PREFIX_RE.test(state)) {
+          setupTokenFromState = state;
+        }
+      } else {
+        console.error(
+          `[slack-oauth] invalid state — len=${state.length} hasDot=${state.includes(".")}`,
+        );
+        return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
+      }
     }
 
     if (!supabase) {
@@ -196,23 +231,24 @@ Deno.serve(async (req: Request) => {
       ? new Date(Date.now() + expires_in * 1000).toISOString()
       : null;
 
-    // Upsert workspace
+    // Upsert workspace WITHOUT tokens — tokens go through the Vault RPC below.
+    // We select xmax so we can tell whether this row was just inserted vs
+    // updated: xmax = '0' (PostgREST returns it as a string) means a fresh
+    // INSERT, anything else means we collided with an existing row and
+    // performed an UPDATE.
     const { data: workspace, error: dbError } = await supabase
       .from("workspaces")
       .upsert(
         {
           team_id: team.id,
           team_name: team.name,
-          bot_token: access_token,
           bot_user_id: bot_user_id,
-          refresh_token: refresh_token || null,
-          token_expires_at: tokenExpiresAt,
           installed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "team_id" }
       )
-      .select("id")
+      .select("id, xmax")
       .single();
 
     if (dbError || !workspace) {
@@ -220,12 +256,35 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${DASHBOARD_URL}/auth/error?error=database_error`, 302);
     }
 
-    // Handle subscription linking (state is a setup_token from checkout flow)
-    if (state && !state.startsWith("nonce_")) {
+    const wasNewlyInserted = String((workspace as any).xmax) === "0";
+
+    // Persist tokens encrypted-at-rest via Vault. Failure here means the
+    // install is unusable, so bail rather than leaving a workspace row
+    // without callable tokens.
+    const tokensStored = await setWorkspaceSlackTokens(
+      workspace.id,
+      access_token,
+      refresh_token || null,
+      tokenExpiresAt,
+    );
+    if (!tokensStored) {
+      // Don't leak a half-installed workspace row if this was a fresh
+      // install. Re-installs (xmax !== '0') keep their previous secret
+      // pointer intact, so leaving the row alone is correct.
+      if (wasNewlyInserted) {
+        await supabase.from("workspaces").delete().eq("id", workspace.id);
+      }
+      console.error("[slack-oauth] vault write failed for workspace", workspace.id);
+      return Response.redirect(`${DASHBOARD_URL}/auth/error?error=token_storage`, 302);
+    }
+
+    // Handle subscription linking — setup_token comes either from the signed
+    // state's `setup_token` extra (new) or from the raw legacy UUID state.
+    if (setupTokenFromState) {
       await supabase
         .from("subscriptions")
         .update({ workspace_id: workspace.id, setup_token: null, updated_at: new Date().toISOString() })
-        .eq("setup_token", state)
+        .eq("setup_token", setupTokenFromState)
         .is("workspace_id", null);
     }
 

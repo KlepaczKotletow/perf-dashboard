@@ -7,6 +7,7 @@
  */
 
 import { callSlackApi } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -53,44 +54,40 @@ async function dbQuery(table: string, query: string) {
   ).json();
 }
 
-async function dbUpdate(table: string, query: string, data: Record<string, unknown>) {
-  return fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
-    method: "PATCH",
-    headers: {
-      apikey: SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
-    body: JSON.stringify(data),
-  });
-}
+async function getFreshBotToken(workspaceId: string): Promise<string | null> {
+  const tokens = await getWorkspaceSlackTokens(workspaceId);
+  if (!tokens) return null;
 
-async function getFreshBotToken(ws: any): Promise<string> {
-  if (ws.token_expires_at) {
-    const expiresAt = new Date(ws.token_expires_at).getTime();
-    if (Date.now() < expiresAt - 5 * 60 * 1000) return ws.bot_token;
-  }
-  if (!ws.refresh_token) return ws.bot_token;
+  const expiresAt = tokens.tokenExpiresAt
+    ? new Date(tokens.tokenExpiresAt).getTime()
+    : null;
+  const needsRefresh = expiresAt === null || expiresAt - Date.now() < 5 * 60 * 1000;
+
+  if (!tokens.refreshToken || !needsRefresh) return tokens.botToken;
+
   const res = await fetch("https://slack.com/api/oauth.v2.access", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: SLACK_CLIENT_ID, client_secret: SLACK_CLIENT_SECRET,
-      grant_type: "refresh_token", refresh_token: ws.refresh_token,
+      client_id: SLACK_CLIENT_ID,
+      client_secret: SLACK_CLIENT_SECRET,
+      grant_type: "refresh_token",
+      refresh_token: tokens.refreshToken,
     }),
   });
   const data = await res.json();
-  if (data.ok) {
-    await dbUpdate("workspaces", `id=eq.${ws.id}`, {
-      bot_token: data.access_token, refresh_token: data.refresh_token,
-      token_expires_at: new Date(Date.now() + (data.expires_in || 43200) * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-    return data.access_token;
+  if (!data.ok) {
+    console.error("Token refresh failed:", data.error);
+    return tokens.botToken;  // serve stale rather than fail
   }
-  console.error("Token refresh failed:", data.error);
-  return ws.bot_token;
+
+  await setWorkspaceSlackTokens(
+    workspaceId,
+    data.access_token,
+    data.refresh_token ?? null,
+    new Date(Date.now() + (data.expires_in || 43200) * 1000).toISOString(),
+  );
+  return data.access_token;
 }
 
 async function slackApi(token: string, method: string, body: Record<string, unknown>) {
@@ -250,9 +247,9 @@ Deno.serve(async (req) => {
   // ── /kudos ───────────────────────────────────────────────────────────────
   if (command === "/kudos") {
     // Look up workspace
-    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id,bot_token,refresh_token,token_expires_at&limit=1`);
+    const wsRows = await dbQuery("workspaces", `team_id=eq.${teamId}&select=id&limit=1`);
     const ws = wsRows?.[0];
-    if (!ws?.bot_token) {
+    if (!ws?.id) {
       return new Response(
         JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
         { headers: { "Content-Type": "application/json" } },
@@ -278,7 +275,13 @@ Deno.serve(async (req) => {
       blocks,
     };
 
-    const botToken = await getFreshBotToken(ws);
+    const botToken = await getFreshBotToken(ws.id);
+    if (!botToken) {
+      return new Response(
+        JSON.stringify({ response_type: "ephemeral", text: "Workspace not connected. Please reinstall the app." }),
+        { headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const result = await slackApi(botToken, "views.open", {
       trigger_id: triggerId,

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -61,13 +62,14 @@ async function handleCycleLaunch(cycleId: string) {
   // Fetch cycle + workspace bot token
   const { data: cycle } = await supabase
     .from("performance_cycles")
-    .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
+    .select("id, name, review_deadline, workspace_id")
     .eq("id", cycleId)
     .single();
 
   if (!cycle) return { sent: 0, skipped: 0 };
 
-  const botToken = (cycle as any).workspaces?.bot_token;
+  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+  const botToken = tokens?.botToken;
   if (!botToken) return { sent: 0, skipped: 0, error: "No bot token" };
 
   // Fetch all review assignments for this cycle (both standard and upward)
@@ -190,13 +192,8 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
   if (!manager?.slack_user_id) return { sent: 0, skipped: 1 };
 
   // Get bot token
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("bot_token")
-    .eq("id", goal.workspace_id)
-    .single();
-
-  if (!workspace?.bot_token) return { sent: 0, skipped: 1 };
+  const tokens = await getWorkspaceSlackTokens(goal.workspace_id);
+  if (!tokens?.botToken) return { sent: 0, skipped: 1 };
 
   const statusLabels: Record<string, string> = {
     at_risk: "⚠️ At risk",
@@ -213,7 +210,7 @@ async function handleGoalStatusUpdate(goalId: string, newStatus: string, employe
 
   const url = await authedUrl(manager.id, "/dashboard/goals");
   const text = `${label} — *${goal.title}*\n${employee.slack_name}'s goal status has changed.\n→ ${url}`;
-  const ok = await sendSlackDM(workspace.bot_token, manager.slack_user_id, text);
+  const ok = await sendSlackDM(tokens.botToken, manager.slack_user_id, text);
   if (!ok) {
     await rollbackNotification(goal.workspace_id, manager.id, "goal_status_update", referenceId);
     return { sent: 0, skipped: 1 };
@@ -228,7 +225,7 @@ async function handleSelfSubmitted(assignmentId: string) {
       id, cycle_id,
       employee:users!review_assignments_employee_id_fkey(id, slack_name),
       manager:users!review_assignments_manager_id_fkey(id, slack_user_id, slack_name),
-      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, workspace_id, workspaces(bot_token))
+      cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, workspace_id)
     `)
     .eq("id", assignmentId)
     .single();
@@ -238,10 +235,13 @@ async function handleSelfSubmitted(assignmentId: string) {
   const mgr = (assignment as any).manager;
   const emp = (assignment as any).employee;
   const cycle = (assignment as any).cycle;
-  const botToken = cycle?.workspaces?.bot_token;
   const workspaceId = cycle?.workspace_id;
 
-  if (!mgr?.slack_user_id || !botToken || !workspaceId) return { sent: 0, skipped: 1 };
+  if (!mgr?.slack_user_id || !workspaceId) return { sent: 0, skipped: 1 };
+
+  const tokens = await getWorkspaceSlackTokens(workspaceId);
+  const botToken = tokens?.botToken;
+  if (!botToken) return { sent: 0, skipped: 1 };
 
   const canSend = await logNotification(workspaceId, mgr.id, "self_review_submitted", assignmentId);
   if (!canSend) return { sent: 0, skipped: 1 };

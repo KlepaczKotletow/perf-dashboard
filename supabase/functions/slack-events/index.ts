@@ -7,6 +7,7 @@ import {
   buildSurveyQuestionPrompt,
 } from "../_shared/nami-blocks.ts";
 import { callSlackApi, sendSlackMessage as sendSlackMessageWithRetry } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -204,6 +205,39 @@ Deno.serve(async (req) => {
     return new Response("OK", { status: 200 });
   }
 
+  // Idempotency: every Events API delivery has a unique event_id.
+  // INSERT into the inbox; if it conflicts, we've seen it before — return
+  // 200 immediately so Slack stops retrying. If the insert succeeds we
+  // own the event and run side effects exactly once.
+  const eventId = event.event_id;
+  if (eventId) {
+    const dedupRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/slack_processed_events`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          event_id: eventId,
+          team_id: event.team_id ?? "unknown",
+          event_type: event.event?.type ?? event.type,
+        }),
+      },
+    );
+    if (dedupRes.status === 409) {
+      console.log(`[slack-events] duplicate event_id ${eventId}, skipping`);
+      return new Response("OK", { status: 200 });
+    }
+    if (!dedupRes.ok) {
+      console.error(`[slack-events] dedup insert failed: ${dedupRes.status}`);
+      // Fall through — better to risk a duplicate than drop the event.
+    }
+  }
+
   const innerEvent = event.event;
 
   if (innerEvent?.type === "app_home_opened") {
@@ -213,7 +247,7 @@ Deno.serve(async (req) => {
     // Look up workspace by Slack team_id
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
-      .select("id, bot_token")
+      .select("id")
       .eq("team_id", teamId)
       .single();
 
@@ -221,9 +255,16 @@ Deno.serve(async (req) => {
       console.error("Workspace lookup error:", workspaceError.message, { teamId });
     }
 
-    if (!workspace?.bot_token) {
+    if (!workspace) {
       console.error("Workspace not found for team_id:", teamId);
       return new Response("Workspace not found", { status: 404 });
+    }
+
+    const tokens = await getWorkspaceSlackTokens(workspace.id);
+    const botToken = tokens?.botToken;
+    if (!botToken) {
+      console.error("[slack-events] Workspace token unreadable for team_id:", teamId);
+      return new Response("Workspace token unavailable", { status: 503 });
     }
 
     // Look up the app user by slack_user_id + workspace_id
@@ -236,7 +277,7 @@ Deno.serve(async (req) => {
 
     if (!appUser) {
       // User not yet in the system — show a simple welcome message
-      await publishHomeTab(workspace.bot_token, slackUserId, [
+      await publishHomeTab(botToken, slackUserId, [
         header("👋 Welcome to Nami"),
         section("You haven't been added to the workspace yet. Ask your admin to import the team from Slack."),
       ]);
@@ -244,7 +285,7 @@ Deno.serve(async (req) => {
     }
 
     const blocks = await buildHomeBlocks(appUser);
-    await publishHomeTab(workspace.bot_token, slackUserId, blocks);
+    await publishHomeTab(botToken, slackUserId, blocks);
   }
 
   // ================================================================
@@ -280,15 +321,17 @@ Deno.serve(async (req) => {
         if (convErr || !convRows || convRows.length === 0) return;
         const conv = convRows[0];
 
-        // Look up workspace bot_token
+        // Look up workspace bot token via vault helper
         const { data: ws } = await supabase
           .from("workspaces")
-          .select("id, bot_token")
+          .select("id")
           .eq("team_id", teamId)
           .single();
 
-        if (!ws?.bot_token) return;
-        const botToken = ws.bot_token;
+        if (!ws) return;
+        const tokens = await getWorkspaceSlackTokens(ws.id);
+        if (!tokens?.botToken) return;
+        const botToken = tokens.botToken;
 
         async function sendSlackMessage(channel: string, msgText: string, msgBlocks?: unknown[]) {
           await sendSlackMessageWithRetry(botToken, channel, msgText, msgBlocks);
@@ -653,11 +696,13 @@ Deno.serve(async (req) => {
         try {
           const { data: workspace } = await supabase
             .from("workspaces")
-            .select("id, bot_token")
+            .select("id")
             .eq("team_id", teamId)
             .single();
 
           if (!workspace) return;
+          const wsTokens = await getWorkspaceSlackTokens(workspace.id);
+          const wsBotToken = wsTokens?.botToken ?? null;
 
           // Look up the app user row so we can also close their open reviews.
           const { data: appUser } = await supabase
@@ -733,14 +778,14 @@ Deno.serve(async (req) => {
               byManager.set(key, entry);
             }
 
-            if (workspace.bot_token && byManager.size > 0) {
+            if (wsBotToken && byManager.size > 0) {
               for (const entry of byManager.values()) {
                 try {
                   // Open / reuse the DM channel, then post.
                   const open = await fetch("https://slack.com/api/conversations.open", {
                     method: "POST",
                     headers: {
-                      Authorization: `Bearer ${workspace.bot_token}`,
+                      Authorization: `Bearer ${wsBotToken}`,
                       "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ users: entry.slackId }),
@@ -760,7 +805,7 @@ Deno.serve(async (req) => {
                   await fetch("https://slack.com/api/chat.postMessage", {
                     method: "POST",
                     headers: {
-                      Authorization: `Bearer ${workspace.bot_token}`,
+                      Authorization: `Bearer ${wsBotToken}`,
                       "Content-Type": "application/json",
                     },
                     body: JSON.stringify({ channel: channelId, text }),

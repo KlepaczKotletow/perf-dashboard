@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callSlackApi } from "../_shared/slack-api.ts";
+import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -52,7 +53,7 @@ Deno.serve(async (req) => {
       // Find active cycles with deadline on this date
       const { data: cycles, error: cyclesError } = await supabase
         .from("performance_cycles")
-        .select("id, name, review_deadline, workspace_id, workspaces(bot_token)")
+        .select("id, name, review_deadline, workspace_id")
         .eq("status", "active")
         .gte("review_deadline", `${dateStr}T00:00:00Z`)
         .lt("review_deadline", `${nextDateStr}T00:00:00Z`);
@@ -61,7 +62,8 @@ Deno.serve(async (req) => {
       if (!cycles) continue;
 
       for (const cycle of cycles) {
-        const botToken = (cycle as any).workspaces?.bot_token;
+        const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+        const botToken = tokens?.botToken;
         if (!botToken) continue;
 
         const deadline = new Date(cycle.review_deadline).toLocaleDateString("en-GB", {

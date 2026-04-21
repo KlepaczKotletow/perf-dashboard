@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { signOAuthState } from "../_shared/oauth-state.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -43,11 +44,11 @@ Deno.serve(async (req) => {
   }
 
   if (!code) {
-    // Initial request — redirect to Slack OIDC with CSRF state
+    // Initial request — redirect to Slack OIDC with HMAC-signed CSRF state
     const redirectUri = `${SUPABASE_URL}/functions/v1/dashboard-auth`;
     const scopes = "openid,email,profile";
-    const csrfState = `oidc_${crypto.randomUUID()}`;
-    const slackAuthUrl = `https://slack.com/openid/connect/authorize?response_type=code&client_id=${SLACK_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${csrfState}&nonce=${crypto.randomUUID()}`;
+    const csrfState = await signOAuthState({ purpose: "signin" });
+    const slackAuthUrl = `https://slack.com/openid/connect/authorize?response_type=code&client_id=${SLACK_CLIENT_ID}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(csrfState)}&nonce=${crypto.randomUUID()}`;
     return Response.redirect(slackAuthUrl, 302);
   }
 
@@ -104,8 +105,8 @@ Deno.serve(async (req) => {
       const scopes = "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
       const userScopes = "identity.basic,identity.email";
       const installRedirectUri = `${SUPABASE_URL}/functions/v1/slack-oauth`;
-      const oauthState = `nonce_${crypto.randomUUID()}`;
-      const installUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(installRedirectUri)}&state=${oauthState}`;
+      const oauthState = await signOAuthState({ purpose: "install" });
+      const installUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(installRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
       return Response.redirect(installUrl, 302);
     }
 
