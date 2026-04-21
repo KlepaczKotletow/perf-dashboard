@@ -205,6 +205,39 @@ Deno.serve(async (req) => {
     return new Response("OK", { status: 200 });
   }
 
+  // Idempotency: every Events API delivery has a unique event_id.
+  // INSERT into the inbox; if it conflicts, we've seen it before — return
+  // 200 immediately so Slack stops retrying. If the insert succeeds we
+  // own the event and run side effects exactly once.
+  const eventId = event.event_id;
+  if (eventId) {
+    const dedupRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/slack_processed_events`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          event_id: eventId,
+          team_id: event.team_id ?? "unknown",
+          event_type: event.event?.type ?? event.type,
+        }),
+      },
+    );
+    if (dedupRes.status === 409) {
+      console.log(`[slack-events] duplicate event_id ${eventId}, skipping`);
+      return new Response("OK", { status: 200 });
+    }
+    if (!dedupRes.ok) {
+      console.error(`[slack-events] dedup insert failed: ${dedupRes.status}`);
+      // Fall through — better to risk a duplicate than drop the event.
+    }
+  }
+
   const innerEvent = event.event;
 
   if (innerEvent?.type === "app_home_opened") {
