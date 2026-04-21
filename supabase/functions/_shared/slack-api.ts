@@ -78,6 +78,50 @@ export async function sendSlackMessage(
   return callSlackApi(token, "chat.postMessage", payload);
 }
 
+// =============================================================================
+//  sendSlackBlocksWithTs — chat.postMessage with explicit "we don't know"
+//  semantics. Critical for safe retries: only rollback notification_log when
+//  knownRejected=true. Rate-limit errors propagate up (caught by drain loop).
+// =============================================================================
+
+export interface SlackSendResult {
+  ok: boolean;
+  ts?: string;
+  knownRejected: boolean;
+  error?: string;
+}
+
+export async function sendSlackBlocksWithTs(
+  token: string,
+  channel: string,
+  text: string,
+  blocks?: unknown[],
+): Promise<SlackSendResult> {
+  try {
+    const result = await callSlackApi(token, "chat.postMessage", {
+      channel,
+      text,
+      ...(blocks ? { blocks } : {}),
+    });
+    if (result?.ok && result?.ts) {
+      return { ok: true, ts: result.ts, knownRejected: false };
+    }
+    if (result?.ok === false && typeof result?.error === "string") {
+      return { ok: false, knownRejected: true, error: result.error };
+    }
+    return { ok: false, knownRejected: false, error: "unknown response shape" };
+  } catch (err) {
+    // Let rate-limit errors bubble up so the queue worker can requeue
+    // without burning an attempt.
+    if (err instanceof SlackRateLimitError) throw err;
+    return {
+      ok: false,
+      knownRejected: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 /**
  * Send multiple messages with a delay between each to avoid hitting rate limits.
  * Uses a 1-second gap between messages (Slack Tier 1 rate limit is ~1 msg/sec).
