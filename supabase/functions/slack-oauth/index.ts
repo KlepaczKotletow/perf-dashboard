@@ -133,12 +133,17 @@ Deno.serve(async (req: Request) => {
     let setupTokenFromState: string | null = null;
     if (verifiedState) {
       // Signed state. Surface setup_token (if present) for subscription linking.
-      const st = verifiedState.setup_token;
-      if (typeof st === "string" && st.length > 0) setupTokenFromState = st;
+      // UUIDs are 36 chars; cap defensively at 64 to reject unbounded payload abuse.
+      const setupToken =
+        typeof verifiedState?.setup_token === "string" && verifiedState.setup_token.length <= 64
+          ? verifiedState.setup_token
+          : null;
+      if (setupToken && setupToken.length > 0) setupTokenFromState = setupToken;
     } else {
-      const NONCE_PATTERN = /^nonce_[0-9a-f-]{32,40}$/i;
-      const UUID_PATTERN = /^[0-9a-f-]{32,40}$/i;
-      const isLegacy = NONCE_PATTERN.test(state) || UUID_PATTERN.test(state);
+      const UUID_BODY = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+      const LEGACY_STATE_RE = new RegExp(`^(?:nonce_|oidc_)?${UUID_BODY}$`, "i");
+      const LEGACY_PREFIX_RE = /^(?:nonce_|oidc_)/i;
+      const isLegacy = LEGACY_STATE_RE.test(state);
       const deadline = parseInt(Deno.env.get("OAUTH_STATE_LEGACY_DEADLINE") ?? "0", 10);
       if (isLegacy && deadline > 0 && Date.now() < deadline) {
         console.warn(
@@ -147,13 +152,13 @@ Deno.serve(async (req: Request) => {
           ")",
         );
         // Bare-UUID legacy state is itself the setup_token from /setup.
-        if (UUID_PATTERN.test(state) && !NONCE_PATTERN.test(state)) {
+        // `nonce_<uuid>` and `oidc_<uuid>` are CSRF nonces, not setup tokens.
+        if (!LEGACY_PREFIX_RE.test(state)) {
           setupTokenFromState = state;
         }
       } else {
         console.error(
-          "[slack-oauth] invalid or expired state, rejecting:",
-          state.slice(0, 20),
+          `[slack-oauth] invalid state — len=${state.length} hasDot=${state.includes(".")}`,
         );
         return Response.redirect(`${DASHBOARD_URL}/auth/error?error=invalid_state`, 302);
       }

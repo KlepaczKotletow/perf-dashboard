@@ -4,6 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import { SetupClient } from "./setup-client";
 import { signOAuthState } from "@/lib/oauth-state";
 
+// signOAuthState produces a per-request token; never cache this page.
+export const dynamic = "force-dynamic";
+
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: "2026-01-28.clover",

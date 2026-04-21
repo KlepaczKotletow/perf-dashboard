@@ -10,6 +10,9 @@ import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { FeatureTabs } from "@/components/landing/feature-tabs";
 import { signOAuthState } from "@/lib/oauth-state";
 
+// signOAuthState produces a per-request token; never cache this page.
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;

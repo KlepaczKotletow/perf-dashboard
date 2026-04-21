@@ -3,7 +3,16 @@
 // sig     = HMAC-SHA256(payload, OAUTH_STATE_SECRET)
 
 const SECRET = Deno.env.get("OAUTH_STATE_SECRET");
-if (!SECRET) console.warn("[oauth-state] OAUTH_STATE_SECRET not set");
+if (!SECRET) {
+  throw new Error("[oauth-state] OAUTH_STATE_SECRET not set — refusing to boot");
+}
+// One-line digest at boot so we can confirm Vercel + Supabase have the same secret.
+crypto.subtle
+  .digest("SHA-256", new TextEncoder().encode(SECRET))
+  .then((d) => {
+    const hex = Array.from(new Uint8Array(d)).map((b) => b.toString(16).padStart(2, "0")).join("");
+    console.log(`[oauth-state] boot — secret digest=${hex.slice(0, 8)}`);
+  });
 
 const STATE_TTL_MS = 10 * 60 * 1000;  // 10 min
 
