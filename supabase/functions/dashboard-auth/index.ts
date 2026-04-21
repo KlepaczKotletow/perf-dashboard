@@ -74,7 +74,9 @@ Deno.serve(async (req) => {
 
     const tokens = await tokenResponse.json();
     if (!tokens.ok) {
-      console.error("[dashboard-auth] Token exchange failed:", tokens);
+      // Log only the error code — never the full body, which on success
+      // would include access_token. Defensive even on the error branch.
+      console.error("[dashboard-auth] Token exchange failed:", tokens?.error || "unknown");
       return Response.redirect(`${DASHBOARD_URL}/auth/error?message=Token+exchange+failed`, 302);
     }
 
