@@ -80,7 +80,7 @@ export default function PricingPage() {
 
   async function handleCheckout(planId: string) {
     if (planId === "enterprise") {
-      window.location.href = "mailto:sales@getperf.com?subject=Enterprise%20Plan%20Inquiry";
+      window.location.href = "mailto:hello@namihr.com?subject=Enterprise%20Plan%20Inquiry";
       return;
     }
 

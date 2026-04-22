@@ -136,7 +136,7 @@ export default function TermsPage() {
             <p className="mb-3">
               All fees are non-refundable except where required by applicable law. Refund requests may
               be submitted to{" "}
-              <a href="mailto:support@getperf.com" className="text-primary underline">support@getperf.com</a>{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>{" "}
               and will be reviewed on a case-by-case basis at our sole discretion.
             </p>
 
@@ -311,7 +311,7 @@ export default function TermsPage() {
             <h3 className="font-medium text-foreground mt-4 mb-2">9.3 Support</h3>
             <p>
               Support is provided via email at{" "}
-              <a href="mailto:support@getperf.com" className="text-primary underline">support@getperf.com</a>.
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
               Response times and support levels vary by subscription plan. Enterprise customers may
               negotiate dedicated support and service level agreements (&quot;SLA&quot;) under a
               separate agreement.
@@ -495,7 +495,7 @@ export default function TermsPage() {
             <p className="mb-3">
               Before filing any legal claim, you agree to attempt to resolve the dispute informally by
               contacting us at{" "}
-              <a href="mailto:legal@getperf.com" className="text-primary underline">legal@getperf.com</a>.
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
               We will attempt to resolve the dispute informally within sixty (60) days. If we cannot
               resolve the dispute informally, either party may proceed with formal legal action as
               described in Section 14.
@@ -580,11 +580,11 @@ export default function TermsPage() {
             <ul className="space-y-1">
               <li>
                 Email:{" "}
-                <a href="mailto:legal@getperf.com" className="text-primary underline">legal@getperf.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
               </li>
               <li>
                 Support:{" "}
-                <a href="mailto:support@getperf.com" className="text-primary underline">support@getperf.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
               </li>
             </ul>
           </section>

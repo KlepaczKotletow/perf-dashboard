@@ -411,7 +411,7 @@ export default function PrivacyPolicyPage() {
             <h3 className="font-medium text-foreground mt-4 mb-2">8.4 Exercising Your Rights</h3>
             <p>
               To exercise any of these rights, contact us at{" "}
-              <a href="mailto:privacy@getperf.com" className="text-primary underline">privacy@getperf.com</a>.
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
               We will respond to your request within thirty (30) days. We may ask you to verify your
               identity before processing your request. Workspace administrators may also exercise
               rights on behalf of their organization&apos;s users.
@@ -444,7 +444,7 @@ export default function PrivacyPolicyPage() {
               collected personal information from a child under 16, we will take immediate steps to
               delete that information. If you believe we have collected information from a child under
               16, please contact us at{" "}
-              <a href="mailto:privacy@getperf.com" className="text-primary underline">privacy@getperf.com</a>.
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
             </p>
           </section>
 
@@ -455,7 +455,7 @@ export default function PrivacyPolicyPage() {
               For customers who require a Data Processing Agreement (DPA) for GDPR compliance or
               other regulatory requirements, we offer a standard DPA that covers our obligations as a
               data processor. To request a DPA, contact us at{" "}
-              <a href="mailto:legal@getperf.com" className="text-primary underline">legal@getperf.com</a>.
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
               Enterprise customers may negotiate custom data processing terms as part of their
               Enterprise agreement.
             </p>
@@ -487,15 +487,15 @@ export default function PrivacyPolicyPage() {
             <ul className="space-y-1">
               <li>
                 Privacy inquiries:{" "}
-                <a href="mailto:privacy@getperf.com" className="text-primary underline">privacy@getperf.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
               </li>
               <li>
                 Legal inquiries:{" "}
-                <a href="mailto:legal@getperf.com" className="text-primary underline">legal@getperf.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
               </li>
               <li>
                 General support:{" "}
-                <a href="mailto:support@getperf.com" className="text-primary underline">support@getperf.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
               </li>
             </ul>
           </section>

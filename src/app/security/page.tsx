@@ -279,10 +279,10 @@ export default function SecurityPage() {
                 deletion of their workspace or of specific user records by
                 emailing{" "}
                 <a
-                  href="mailto:privacy@getperf.com"
+                  href="mailto:hello@namihr.com"
                   className="text-primary underline"
                 >
-                  privacy@getperf.com
+                  hello@namihr.com
                 </a>
                 .
               </li>
@@ -315,10 +315,10 @@ export default function SecurityPage() {
                 covering Standard Contractual Clauses for international
                 transfers is available to any customer on request via{" "}
                 <a
-                  href="mailto:legal@getperf.com"
+                  href="mailto:hello@namihr.com"
                   className="text-primary underline"
                 >
-                  legal@getperf.com
+                  hello@namihr.com
                 </a>
                 .
               </li>
@@ -342,10 +342,10 @@ export default function SecurityPage() {
               compliance. If your procurement process requires one of these and
               you want to discuss it, write to{" "}
               <a
-                href="mailto:security@getperf.com"
+                href="mailto:hello@namihr.com"
                 className="text-primary underline"
               >
-                security@getperf.com
+                hello@namihr.com
               </a>
               .
             </p>
@@ -394,10 +394,10 @@ export default function SecurityPage() {
               We welcome reports from security researchers. If you believe you
               have found a vulnerability in Nami, please email{" "}
               <a
-                href="mailto:security@getperf.com"
+                href="mailto:hello@namihr.com"
                 className="text-primary underline"
               >
-                security@getperf.com
+                hello@namihr.com
               </a>{" "}
               with a description of the issue and steps to reproduce.
             </p>
@@ -423,28 +423,28 @@ export default function SecurityPage() {
               <li>
                 Security reports and questions:{" "}
                 <a
-                  href="mailto:security@getperf.com"
+                  href="mailto:hello@namihr.com"
                   className="text-primary underline"
                 >
-                  security@getperf.com
+                  hello@namihr.com
                 </a>
               </li>
               <li>
                 Privacy and data requests:{" "}
                 <a
-                  href="mailto:privacy@getperf.com"
+                  href="mailto:hello@namihr.com"
                   className="text-primary underline"
                 >
-                  privacy@getperf.com
+                  hello@namihr.com
                 </a>
               </li>
               <li>
                 DPAs and contracts:{" "}
                 <a
-                  href="mailto:legal@getperf.com"
+                  href="mailto:hello@namihr.com"
                   className="text-primary underline"
                 >
-                  legal@getperf.com
+                  hello@namihr.com
                 </a>
               </li>
             </ul>

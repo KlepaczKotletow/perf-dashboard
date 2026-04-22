@@ -19,7 +19,7 @@ export default function HelpPage() {
         title="Help Center"
         description="No articles available yet. Need help? Reach out to our support team."
         actions={[
-          { label: "Contact Support", href: "mailto:support@namihr.com" },
+          { label: "Contact Support", href: "mailto:hello@namihr.com" },
           { label: "Back to Dashboard", href: "/dashboard", variant: "outline" },
         ]}
       />

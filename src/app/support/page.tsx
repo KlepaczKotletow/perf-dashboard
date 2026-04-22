@@ -123,7 +123,7 @@ export default function SupportPage() {
             </p>
             <div className="flex gap-4">
               <Button asChild>
-                <a href="mailto:support@360feedback.app">
+                <a href="mailto:hello@namihr.com">
                   <Mail className="h-4 w-4 mr-2" />
                   Email Support
                 </a>
