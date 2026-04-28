@@ -110,4 +110,38 @@ describe('POST /api/webhooks/stripe', () => {
     )
     expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_456')
   })
+
+  it('marks subscription past_due on invoice.payment_failed', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_failed',
+      data: { object: { subscription: 'sub_789' } },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'past_due' }),
+    )
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_789')
+  })
+
+  it('reactivates subscription on invoice.payment_succeeded', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_succeeded',
+      data: {
+        object: {
+          subscription: 'sub_999',
+          period_end: 1735689600,
+        },
+      },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'active',
+        current_period_end: expect.any(String),
+      }),
+    )
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_999')
+  })
 })

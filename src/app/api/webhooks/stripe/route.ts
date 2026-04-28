@@ -38,6 +38,18 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ received: true });
 }
 
+// Stripe API 2025-03-31 / SDK v18+ moved the subscription reference off the
+// top-level Invoice object onto `parent.subscription_details.subscription`.
+// Live webhook payloads still emit the legacy top-level `subscription` field,
+// so we read the typed location first and fall back to the legacy field.
+function extractSubscriptionId(inv: Stripe.Invoice): string | null {
+  const fromParent = inv.parent?.subscription_details?.subscription;
+  const legacy = (inv as unknown as { subscription?: string | Stripe.Subscription }).subscription;
+  const ref = fromParent ?? legacy;
+  if (!ref) return null;
+  return typeof ref === "string" ? ref : ref.id;
+}
+
 async function handleEvent(event: Stripe.Event) {
   switch (event.type) {
     case "customer.subscription.updated": {
@@ -71,6 +83,31 @@ async function handleEvent(event: Stripe.Event) {
           status: "canceled",
         })
         .eq("stripe_subscription_id", sub.id);
+      return;
+    }
+    case "invoice.payment_failed": {
+      const inv = event.data.object as Stripe.Invoice;
+      const subId = extractSubscriptionId(inv);
+      if (!subId) return;
+      const supabase = createServiceRoleClient();
+      await supabase
+        .from("subscriptions")
+        .update({ status: "past_due" })
+        .eq("stripe_subscription_id", subId);
+      return;
+    }
+    case "invoice.payment_succeeded": {
+      const inv = event.data.object as Stripe.Invoice;
+      const subId = extractSubscriptionId(inv);
+      if (!subId) return;
+      const supabase = createServiceRoleClient();
+      await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          current_period_end: new Date(inv.period_end * 1000).toISOString(),
+        })
+        .eq("stripe_subscription_id", subId);
       return;
     }
     default:
