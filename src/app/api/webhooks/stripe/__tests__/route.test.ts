@@ -11,14 +11,29 @@ vi.mock('stripe', () => {
   return { default: MockStripe }
 })
 
-const mockSupabase = {
+const mockSupabase: {
+  from: ReturnType<typeof vi.fn>
+  update: ReturnType<typeof vi.fn>
+  upsert: ReturnType<typeof vi.fn>
+  insert: ReturnType<typeof vi.fn>
+  select: ReturnType<typeof vi.fn>
+  eq: ReturnType<typeof vi.fn>
+  maybeSingle: ReturnType<typeof vi.fn>
+  then: (resolve: (v: { data: null; error: null }) => unknown) => unknown
+} = {
   from: vi.fn(() => mockSupabase),
   update: vi.fn(() => mockSupabase),
   upsert: vi.fn(() => mockSupabase),
   insert: vi.fn(() => mockSupabase),
   select: vi.fn(() => mockSupabase),
-  eq: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  // Read chain (.from().select().eq().maybeSingle()) needs eq to return the
+  // chain so maybeSingle can be called. Write chain (.from().update().eq())
+  // terminates by being awaited — handled by the thenable below.
+  eq: vi.fn(() => mockSupabase),
   maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  // Make mockSupabase itself thenable so `await chain.eq(...)` resolves.
+  // Plain function (not vi.fn) so vi.clearAllMocks() doesn't disturb it.
+  then: (resolve) => resolve({ data: null, error: null }),
 }
 vi.mock('@/lib/supabase-server', () => ({
   createServiceRoleClient: () => mockSupabase,
@@ -167,5 +182,52 @@ describe('POST /api/webhooks/stripe', () => {
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
     expect(mockSupabase.update).not.toHaveBeenCalled()
+  })
+
+  it('inserts subscription row on checkout.session.completed when not present', async () => {
+    mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_1',
+          subscription: 'sub_new',
+          customer: 'cus_new',
+          customer_email: 'admin@acme.com',
+          metadata: { plan: 'pro' },
+        },
+      },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripe_subscription_id: 'sub_new',
+        stripe_customer_id: 'cus_new',
+        stripe_customer_email: 'admin@acme.com',
+        plan: 'pro',
+        status: 'trialing',
+      }),
+    )
+  })
+
+  it('skips insert on checkout.session.completed when row exists', async () => {
+    mockSupabase.maybeSingle.mockResolvedValueOnce({
+      data: { id: 'existing-id' },
+      error: null,
+    })
+    mockConstructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_2',
+          subscription: 'sub_existing',
+          customer: 'cus_existing',
+        },
+      },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.insert).not.toHaveBeenCalled()
   })
 })

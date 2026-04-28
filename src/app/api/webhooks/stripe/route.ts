@@ -112,6 +112,41 @@ async function handleEvent(event: Stripe.Event) {
         .eq("stripe_subscription_id", subId);
       return;
     }
+    case "checkout.session.completed": {
+      // Safety net: the /setup page already creates the subscriptions row when
+      // the customer is redirected back from Stripe Checkout. This webhook
+      // handles the case where the browser dies mid-redirect. Idempotent —
+      // skip insert if a row already exists for this subscription id.
+      const session = event.data.object as Stripe.Checkout.Session;
+      const subId = typeof session.subscription === "string"
+        ? session.subscription
+        : session.subscription?.id;
+      if (!subId) return;
+
+      const supabase = createServiceRoleClient();
+      const { data: existing } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("stripe_subscription_id", subId)
+        .maybeSingle();
+
+      if (existing) return;
+
+      const customerId = typeof session.customer === "string"
+        ? session.customer
+        : session.customer?.id || "";
+
+      await supabase.from("subscriptions").insert({
+        stripe_subscription_id: subId,
+        stripe_customer_id: customerId,
+        stripe_customer_email: session.customer_email || "",
+        plan: session.metadata?.plan || "pro",
+        status: "trialing",
+        user_limit: 10000,
+        setup_token: crypto.randomUUID(),
+      });
+      return;
+    }
     default:
       // Unknown / ignored event types — return 200 to avoid Stripe retries.
       return;
