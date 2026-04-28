@@ -2,14 +2,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import {
   ArrowRight,
   Check,
   Slack,
   Users,
-  BarChart3,
   Shield,
   Zap,
   Loader2,
@@ -17,98 +15,53 @@ import {
 
 const plans = [
   {
-    id: "starter",
-    name: "Starter",
-    description: "For small teams getting started with structured reviews.",
-    monthlyPrice: 1,
-    annualPrice: 10,
-    userLimit: "50 users",
+    id: "pro",
+    name: "Nami",
+    description: "Performance reviews, 360 feedback, and OKRs — in Slack.",
+    monthlyPrice: 5,
     features: [
-      "Up to 50 users",
       "Unlimited review cycles",
-      "Slack integration",
-      "Competency framework",
-      "Basic analytics",
-      "Email support",
+      "360° reviews via Slack",
+      "9-box calibration",
+      "Competency frameworks",
+      "Goal & OKR tracking",
+      "Pulse surveys & eNPS",
+      "Smart Slack reminders",
+      "Trend analytics",
     ],
-    cta: "Get started",
-    popular: false,
-  },
-  {
-    id: "professional",
-    name: "Professional",
-    description: "For growing teams that need advanced insights.",
-    monthlyPrice: 3,
-    annualPrice: 30,
-    userLimit: "500 users",
-    features: [
-      "Up to 500 users",
-      "Everything in Starter",
-      "Advanced analytics & 9-box",
-      "Calibration tools",
-      "Custom templates",
-      "Priority support",
-    ],
-    cta: "Get started",
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    description: "For large organizations with custom needs.",
-    monthlyPrice: null,
-    annualPrice: null,
-    userLimit: "Unlimited",
-    features: [
-      "Unlimited users",
-      "Everything in Professional",
-      "SSO / SAML",
-      "Custom integrations",
-      "Dedicated CSM",
-      "SLA guarantee",
-    ],
-    cta: "Contact sales",
-    popular: false,
+    cta: "Start 14-day free trial",
   },
 ];
 
 export default function PricingPage() {
-  const [annual, setAnnual] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-  const [showEmail, setShowEmail] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleCheckout(planId: string) {
-    if (planId === "enterprise") {
-      window.location.href = "mailto:hello@namihr.com?subject=Enterprise%20Plan%20Inquiry";
-      return;
-    }
-
-    if (!showEmail || showEmail !== planId) {
-      setShowEmail(planId);
-      return;
-    }
-
-    if (!email || !email.includes("@")) {
-      return;
-    }
-
-    setLoadingPlan(planId);
+  async function handleCheckout() {
+    setError(null);
+    setLoadingPlan("pro");
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, email, annual }),
+        body: JSON.stringify({}),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Request failed (${res.status})`);
+        setLoadingPlan(null);
+        return;
+      }
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
-        alert(data.error || "Something went wrong");
+        setError("Checkout failed");
+        setLoadingPlan(null);
       }
-    } catch {
-      alert("Failed to start checkout. Please try again.");
-    } finally {
+    } catch (err) {
+      console.error("Checkout error:", err);
+      setError("Something went wrong. Please try again.");
       setLoadingPlan(null);
     }
   }
@@ -145,53 +98,16 @@ export default function PricingPage() {
         <p className="mt-4 text-lg text-muted-foreground max-w-lg mx-auto">
           Pay per user, cancel anytime. Start running better reviews in minutes.
         </p>
-
-        {/* Annual toggle */}
-        <div className="mt-8 inline-flex items-center gap-3 bg-muted rounded-full p-1">
-          <button
-            onClick={() => setAnnual(false)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              !annual
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setAnnual(true)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-              annual
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground"
-            }`}
-          >
-            Annual
-            <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 py-0">
-              Save 17%
-            </Badge>
-          </button>
-        </div>
       </section>
 
-      {/* Plans */}
+      {/* Plan */}
       <section className="max-w-5xl mx-auto px-6 pb-24">
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="max-w-md mx-auto">
           {plans.map((plan) => (
             <div
               key={plan.id}
-              className={`relative rounded-2xl border p-6 flex flex-col ${
-                plan.popular
-                  ? "border-primary shadow-lg shadow-primary/10 ring-1 ring-primary/20"
-                  : "border-border/60 bg-card/50"
-              }`}
+              className="relative rounded-2xl border border-primary shadow-lg shadow-primary/10 ring-1 ring-primary/20 p-8 flex flex-col"
             >
-              {plan.popular && (
-                <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-xs">
-                  Most popular
-                </Badge>
-              )}
-
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-foreground">
                   {plan.name}
@@ -202,67 +118,40 @@ export default function PricingPage() {
               </div>
 
               <div className="mb-6">
-                {plan.monthlyPrice !== null ? (
-                  <>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-foreground">
-                        ${annual ? plan.annualPrice : plan.monthlyPrice}
-                      </span>
-                      <span className="text-muted-foreground text-sm">
-                        /user/{annual ? "year" : "month"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {plan.userLimit} included
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-4xl font-bold text-foreground">
-                      Custom
-                    </span>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Tailored to your organization
-                    </p>
-                  </>
-                )}
+                <div className="flex items-baseline gap-1">
+                  <span className="text-4xl font-bold text-foreground">
+                    ${plan.monthlyPrice}
+                  </span>
+                  <span className="text-muted-foreground text-sm">
+                    /user/month
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  No credit card required
+                </p>
               </div>
 
-              {/* Email input - shown when user clicks CTA */}
-              {showEmail === plan.id && plan.id !== "enterprise" && (
-                <div className="mb-4">
-                  <input
-                    type="email"
-                    placeholder="Work email address"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCheckout(plan.id);
-                    }}
-                  />
-                </div>
-              )}
-
               <Button
-                onClick={() => handleCheckout(plan.id)}
+                onClick={() => handleCheckout()}
                 disabled={loadingPlan === plan.id}
-                variant={plan.popular ? "default" : "outline"}
-                className="w-full mb-6"
+                className="w-full mb-2"
               >
                 {loadingPlan === plan.id ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : null}
-                {showEmail === plan.id && plan.id !== "enterprise"
-                  ? "Continue to payment"
-                  : plan.cta}
-                {!(showEmail === plan.id) && (
+                {plan.cta}
+                {loadingPlan !== plan.id && (
                   <ArrowRight className="h-4 w-4 ml-1" />
                 )}
               </Button>
 
-              <ul className="space-y-2.5 flex-1">
+              {error && (
+                <p className="text-sm text-destructive mt-2 mb-2 text-center">
+                  {error}
+                </p>
+              )}
+
+              <ul className="space-y-2.5 flex-1 mt-6">
                 {plan.features.map((feature) => (
                   <li
                     key={feature}
@@ -275,6 +164,13 @@ export default function PricingPage() {
               </ul>
             </div>
           ))}
+
+          <p className="text-center text-sm text-muted-foreground mt-8">
+            Need custom pricing or onboarding?{" "}
+            <a href="mailto:hello@namihr.com" className="text-primary hover:underline">
+              Talk to us
+            </a>
+          </p>
         </div>
       </section>
 
