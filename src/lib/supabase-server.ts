@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
+import { env } from "@/lib/env"
 
 export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
@@ -93,10 +95,24 @@ export const getUserWorkspace = cache(async () => {
 })
 
 /**
- * Get the workspace_id for the current user. 
+ * Get the workspace_id for the current user.
  * Returns null if not authenticated.
  */
 export async function getWorkspaceId(): Promise<string | null> {
   const workspace = await getUserWorkspace()
   return workspace?.workspaceId || null
+}
+
+/**
+ * Service-role client. Bypasses RLS — call sites are responsible for
+ * scoping queries by tenant identifier (workspace_id / stripe_subscription_id).
+ * Never expose to the browser; only use in route handlers and server actions.
+ */
+export function createServiceRoleClient() {
+  if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required for service-role operations");
+  }
+  return createSupabaseClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
