@@ -20,9 +20,9 @@ type EnvShape = {
 
   // Server-only ----------------------------------------------------------
   SUPABASE_SERVICE_ROLE_KEY: string | undefined;
-  STRIPE_SECRET_KEY: string | undefined;
+  STRIPE_SECRET_KEY: string;
   STRIPE_WEBHOOK_SECRET: string | undefined;
-  SEAT_SYNC_SECRET: string | undefined;
+  SEAT_SYNC_SECRET: string;
   DASHBOARD_URL: string | undefined;
   CRON_SECRET: string | undefined;
 };
@@ -54,9 +54,9 @@ export const env: EnvShape = {
   NEXT_PUBLIC_SUPABASE_ANON_KEY: required("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   NEXT_PUBLIC_SLACK_CLIENT_ID: optional("NEXT_PUBLIC_SLACK_CLIENT_ID"),
   SUPABASE_SERVICE_ROLE_KEY: optional("SUPABASE_SERVICE_ROLE_KEY"),
-  STRIPE_SECRET_KEY: optional("STRIPE_SECRET_KEY"),
+  STRIPE_SECRET_KEY: required("STRIPE_SECRET_KEY"),
   STRIPE_WEBHOOK_SECRET: optional("STRIPE_WEBHOOK_SECRET"),
-  SEAT_SYNC_SECRET: optional("SEAT_SYNC_SECRET"),
+  SEAT_SYNC_SECRET: required("SEAT_SYNC_SECRET"),
   DASHBOARD_URL: optional("DASHBOARD_URL"),
   CRON_SECRET: optional("CRON_SECRET"),
 };
