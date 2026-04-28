@@ -58,7 +58,6 @@ async function handleEvent(event: Stripe.Event) {
           current_period_end: periodEnd
             ? new Date(periodEnd * 1000).toISOString()
             : null,
-          updated_at: new Date().toISOString(),
         })
         .eq("stripe_subscription_id", sub.id);
       return;
@@ -70,7 +69,6 @@ async function handleEvent(event: Stripe.Event) {
         .from("subscriptions")
         .update({
           status: "canceled",
-          updated_at: new Date().toISOString(),
         })
         .eq("stripe_subscription_id", sub.id);
       return;
