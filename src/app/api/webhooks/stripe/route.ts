@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
+import { createServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -39,7 +40,41 @@ export async function POST(request: NextRequest) {
 
 async function handleEvent(event: Stripe.Event) {
   switch (event.type) {
-    // event handlers added in Tasks 5, 6, 7
+    case "customer.subscription.updated": {
+      const sub = event.data.object as Stripe.Subscription;
+      // current_period_end was relocated to subscription items in Stripe API
+      // 2025-03-31 / SDK v18+, but still appears on the top-level object in
+      // event payloads. Read from the item for type-safe access, fall back to
+      // the legacy top-level field for older payloads.
+      const periodEnd =
+        sub.items?.data[0]?.current_period_end ??
+        (sub as unknown as { current_period_end?: number }).current_period_end;
+      const supabase = createServiceRoleClient();
+      await supabase
+        .from("subscriptions")
+        .update({
+          status: sub.status,
+          cancel_at_period_end: sub.cancel_at_period_end,
+          current_period_end: periodEnd
+            ? new Date(periodEnd * 1000).toISOString()
+            : null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_subscription_id", sub.id);
+      return;
+    }
+    case "customer.subscription.deleted": {
+      const sub = event.data.object as Stripe.Subscription;
+      const supabase = createServiceRoleClient();
+      await supabase
+        .from("subscriptions")
+        .update({
+          status: "canceled",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("stripe_subscription_id", sub.id);
+      return;
+    }
     default:
       // Unknown / ignored event types — return 200 to avoid Stripe retries.
       return;

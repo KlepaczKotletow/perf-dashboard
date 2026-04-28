@@ -72,4 +72,42 @@ describe('POST /api/webhooks/stripe', () => {
     const body = await res.json()
     expect(body.error).toBe('Webhook not configured')
   })
+
+  it('updates subscription row on customer.subscription.updated', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          id: 'sub_123',
+          status: 'active',
+          cancel_at_period_end: false,
+          current_period_end: 1735689600,
+          items: { data: [{ price: { lookup_key: 'pro_monthly' } }] },
+        },
+      },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'active',
+        cancel_at_period_end: false,
+        current_period_end: expect.any(String),
+      }),
+    )
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_123')
+  })
+
+  it('marks subscription canceled on customer.subscription.deleted', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.deleted',
+      data: { object: { id: 'sub_456' } },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'canceled' }),
+    )
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_456')
+  })
 })
