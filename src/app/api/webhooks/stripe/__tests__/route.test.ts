@@ -64,4 +64,12 @@ describe('POST /api/webhooks/stripe', () => {
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
   })
+
+  it('returns 500 when STRIPE_WEBHOOK_SECRET is not configured', async () => {
+    delete process.env.STRIPE_WEBHOOK_SECRET
+    const res = await POST(makeRequest('{}', 'any-sig'))
+    expect(res.status).toBe(500)
+    const body = await res.json()
+    expect(body.error).toBe('Webhook not configured')
+  })
 })

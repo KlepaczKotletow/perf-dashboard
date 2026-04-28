@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { createServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 
@@ -13,14 +12,16 @@ export async function POST(request: NextRequest) {
 
   const rawBody = await request.text();
 
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not configured");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+
   let event: Stripe.Event;
   try {
     const stripe = getStripe();
-    event = stripe.webhooks.constructEvent(
-      rawBody,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
-    );
+    event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
     console.error("Stripe webhook signature verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
@@ -37,13 +38,10 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleEvent(event: Stripe.Event) {
-  const supabase = createServiceRoleClient();
   switch (event.type) {
     // event handlers added in Tasks 5, 6, 7
     default:
       // Unknown / ignored event types — return 200 to avoid Stripe retries.
       return;
   }
-  // Suppress unused-variable warning for skeleton implementation.
-  void supabase;
 }
