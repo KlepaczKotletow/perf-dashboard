@@ -245,6 +245,11 @@ Confirm production domain before registering in Stripe. Default assumption: `htt
 | Live-mode mistakes can't be undone | Only one product + one price created. Anything we get wrong, we archive (not delete) and re-create. Confirm domain and prices via MCP before mutation. |
 | Trial-no-card abuse | Out of scope for this task. Stripe's standard trial cancellation policy applies; abuse vectors handled at signup-flow level later. |
 
+## Live IDs (NamiHR account, live mode)
+
+- Product: `prod_UQ14QLfAhKaVsX` (`Nami`)
+- Price: `price_1TRB2gRDOszymcTKty32wLKa` ($5.00 USD/month, `lookup_key=pro_monthly`, `usage_type=licensed`)
+
 ## Verification plan
 
 After implementation, test in live mode with a real card on a throwaway workspace:
