@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
 import { signOAuthState } from "@/lib/oauth-state";
+import { getUserWorkspace } from "@/lib/supabase-server";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
@@ -86,6 +87,23 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     .maybeSingle();
 
   const setupToken = row?.setup_token ?? newToken;
+
+  // Check if this is an existing admin upgrading from inside the dashboard.
+  // (For brand-new customers without a workspace, getUserWorkspace returns null
+  // and we fall through to the Slack-install flow as before.)
+  const existingWorkspace = await getUserWorkspace().catch(() => null);
+  if (existingWorkspace?.workspaceId) {
+    // Link the just-created subscriptions row to the existing workspace.
+    // Only update if workspace_id is currently NULL — protects against
+    // accidental overwrites if some other flow already linked it.
+    await supabase
+      .from("subscriptions")
+      .update({ workspace_id: existingWorkspace.workspaceId })
+      .eq("stripe_subscription_id", subscriptionId)
+      .is("workspace_id", null);
+
+    redirect("/dashboard/settings/billing?upgraded=true");
+  }
 
   // Build the Add to Slack URL with HMAC-signed state. We embed the
   // setup_token inside the signed payload so the slack-oauth callback can

@@ -37,8 +37,23 @@ export function UpgradeButton({ workspaceId, customerId, isManage = false }: Upg
           setButtonError(data.error || "Failed to open billing portal");
         }
       } else {
-        // Redirect to pricing page for new subscriptions
-        window.location.href = "/pricing";
+        // Start trial — go straight to Stripe Checkout (admin is already authenticated)
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          setButtonError(errData.error || `Request failed (${res.status}). Please try again.`);
+          return;
+        }
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          setButtonError("Failed to start checkout");
+        }
       }
     } catch (err) {
       console.error("Error:", err);

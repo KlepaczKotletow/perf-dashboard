@@ -47,6 +47,15 @@ export default function PricingPage() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
+        if (res.status === 403) {
+          // Not signed in (or not an admin in any workspace) — start with Slack install,
+          // then come back to /dashboard/settings/billing to start the trial.
+          const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, "");
+          if (supabaseUrl) {
+            window.location.href = `${supabaseUrl}/functions/v1/dashboard-auth`;
+            return;
+          }
+        }
         const errData = await res.json().catch(() => ({}));
         setError(errData.error || `Request failed (${res.status})`);
         setLoadingPlan(null);
