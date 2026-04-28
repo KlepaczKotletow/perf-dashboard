@@ -24,6 +24,7 @@ type EnvShape = {
   STRIPE_WEBHOOK_SECRET: string | undefined;
   SEAT_SYNC_SECRET: string | undefined;
   DASHBOARD_URL: string | undefined;
+  CRON_SECRET: string | undefined;
 };
 
 function required(name: keyof EnvShape): string {
@@ -57,4 +58,5 @@ export const env: EnvShape = {
   STRIPE_WEBHOOK_SECRET: optional("STRIPE_WEBHOOK_SECRET"),
   SEAT_SYNC_SECRET: optional("SEAT_SYNC_SECRET"),
   DASHBOARD_URL: optional("DASHBOARD_URL"),
+  CRON_SECRET: optional("CRON_SECRET"),
 };
