@@ -5,6 +5,9 @@ import { verifySeatSync } from "@/lib/seat-sync";
 
 export const runtime = "nodejs";
 
+// active, trialing: obvious. past_due: keep syncing so quantity stays accurate
+// during dunning — otherwise customers who deactivate users while delinquent
+// would be unfairly billed for those seats once they recover.
 const BILLABLE_STATUSES = new Set(["active", "trialing", "past_due"]);
 
 export async function POST(request: NextRequest) {
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest) {
     .from("users")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", workspace_id)
-    .not("employee_status", "is", "deactivated");
+    .neq("employee_status", "deactivated");
 
   const billableSeats = count ?? 0;
 
@@ -60,10 +63,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, noop: true, quantity: billableSeats });
   }
 
-  await stripe.subscriptions.update(sub.stripe_subscription_id, {
-    items: [{ id: item.id, quantity: billableSeats }],
-    proration_behavior: "create_prorations",
-  });
+  await stripe.subscriptions.update(
+    sub.stripe_subscription_id,
+    {
+      items: [{ id: item.id, quantity: billableSeats }],
+      proration_behavior: "create_prorations",
+    },
+    {
+      idempotencyKey: `seat-sync-${workspace_id}-${billableSeats}-${Math.floor(Date.now() / 60000)}`,
+    },
+  );
 
   return NextResponse.json({ ok: true, quantity: billableSeats });
 }

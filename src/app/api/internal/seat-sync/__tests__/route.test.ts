@@ -28,16 +28,13 @@ const mockCountChain = {
   from: vi.fn((_table: string) => mockCountChain),
   select: vi.fn((_cols: string, _opts?: unknown) => mockCountChain),
   eq: vi.fn((_col: string, _val: unknown) => mockCountChain),
-  not: vi.fn((_col: string, _op: string, _val: unknown) => mockCountChain),
+  neq: vi.fn((_col: string, _val: unknown) => mockCountChain),
   // Make awaitable: returns the count result.
   then: (resolve: (v: typeof mockCountResult) => void) => resolve(mockCountResult),
 }
 
-let useCountChain = false
 const mockSupabase = {
-  from: (table: string) => {
-    return useCountChain ? mockCountChain.from(table) : mockReadChain.from(table)
-  },
+  from: (_table: string) => mockReadChain as unknown,
 }
 vi.mock('@/lib/supabase-server', () => ({
   createServiceRoleClient: () => mockSupabase,
@@ -64,9 +61,13 @@ describe('POST /api/internal/seat-sync', () => {
     vi.clearAllMocks()
     process.env.STRIPE_SECRET_KEY = 'sk_test_fake'
     process.env.SEAT_SYNC_SECRET = SECRET
-    useCountChain = false
     mockCountResult.count = 0
     mockCountResult.error = null
+    mockSupabase.from = (table: string) => {
+      if (table === 'subscriptions') return mockReadChain.from(table)
+      if (table === 'users') return mockCountChain.from(table)
+      throw new Error(`unexpected table: ${table}`)
+    }
   })
 
   it('rejects requests without a signature header', async () => {
@@ -105,17 +106,6 @@ describe('POST /api/internal/seat-sync', () => {
       data: { stripe_subscription_id: 'sub_active', status: 'active' },
       error: null,
     })
-    // Tell the next .from() call to return the count chain (route makes second call).
-    // Since route makes two .from() calls in a row (first read, then count),
-    // we flip useCountChain after the first call.
-    let firstCall = true
-    mockSupabase.from = ((table: string) => {
-      if (firstCall) {
-        firstCall = false
-        return mockReadChain.from(table)
-      }
-      return mockCountChain.from(table)
-    }) as typeof mockSupabase.from
     mockCountResult.count = 7
     mockSubscriptionsRetrieve.mockResolvedValue({
       items: { data: [{ id: 'si_1', quantity: 1 }] },
@@ -123,10 +113,14 @@ describe('POST /api/internal/seat-sync', () => {
 
     const res = await POST(makeRequest('ws-active'))
     expect(res.status).toBe(200)
-    expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_active', {
-      items: [{ id: 'si_1', quantity: 7 }],
-      proration_behavior: 'create_prorations',
-    })
+    expect(mockSubscriptionsUpdate).toHaveBeenCalledWith(
+      'sub_active',
+      expect.objectContaining({
+        items: [{ id: 'si_1', quantity: 7 }],
+        proration_behavior: 'create_prorations',
+      }),
+      expect.objectContaining({ idempotencyKey: expect.stringContaining('seat-sync-ws-active-7-') }),
+    )
   })
 
   it('skips Stripe update when quantity already matches', async () => {
@@ -134,14 +128,6 @@ describe('POST /api/internal/seat-sync', () => {
       data: { stripe_subscription_id: 'sub_match', status: 'trialing' },
       error: null,
     })
-    let firstCall = true
-    mockSupabase.from = ((table: string) => {
-      if (firstCall) {
-        firstCall = false
-        return mockReadChain.from(table)
-      }
-      return mockCountChain.from(table)
-    }) as typeof mockSupabase.from
     mockCountResult.count = 5
     mockSubscriptionsRetrieve.mockResolvedValue({
       items: { data: [{ id: 'si_1', quantity: 5 }] },
