@@ -46,7 +46,7 @@ describe('POST /api/checkout', () => {
 
   it('returns 403 when user is not authenticated', async () => {
     mockGetUserWorkspace.mockResolvedValue(null)
-    const res = await POST(makeRequest({ plan: 'starter' }))
+    const res = await POST(makeRequest({}))
     expect(res.status).toBe(403)
     const body = await res.json()
     expect(body.error).toBe('Unauthorized')
@@ -58,7 +58,7 @@ describe('POST /api/checkout', () => {
       email: 'user@test.com',
       workspaceId: 'ws-1',
     })
-    const res = await POST(makeRequest({ plan: 'starter' }))
+    const res = await POST(makeRequest({}))
     expect(res.status).toBe(403)
   })
 
@@ -68,7 +68,7 @@ describe('POST /api/checkout', () => {
       email: 'manager@test.com',
       workspaceId: 'ws-1',
     })
-    const res = await POST(makeRequest({ plan: 'starter' }))
+    const res = await POST(makeRequest({}))
     expect(res.status).toBe(403)
   })
 
@@ -78,96 +78,52 @@ describe('POST /api/checkout', () => {
       email: 'hr@test.com',
       workspaceId: 'ws-1',
     })
-    const res = await POST(makeRequest({ plan: 'starter' }))
+    const res = await POST(makeRequest({}))
     expect(res.status).toBe(403)
   })
 
-  it('returns 400 for missing plan', async () => {
+  it('returns 200 and creates trial session for admin (no card required)', async () => {
     mockGetUserWorkspace.mockResolvedValue({
       role: 'admin',
       email: 'admin@test.com',
       workspaceId: 'ws-1',
     })
+    mockPricesList.mockResolvedValue({ data: [{ id: 'price_pro' }] })
+    mockCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/s' })
+
     const res = await POST(makeRequest({}))
-    expect(res.status).toBe(400)
-  })
-
-  it('returns 400 for invalid plan name', async () => {
-    mockGetUserWorkspace.mockResolvedValue({
-      role: 'admin',
-      email: 'admin@test.com',
-      workspaceId: 'ws-1',
-    })
-    const res = await POST(makeRequest({ plan: 'nonexistent_plan' }))
-    expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body.error).toBe('Invalid plan')
-  })
-
-  it('creates checkout session for admin with valid plan', async () => {
-    mockGetUserWorkspace.mockResolvedValue({
-      role: 'admin',
-      email: 'admin@test.com',
-      workspaceId: 'ws-1',
-    })
-    mockPricesList.mockResolvedValue({
-      data: [{ id: 'price_123' }],
-    })
-    mockCreate.mockResolvedValue({
-      url: 'https://checkout.stripe.com/session_123',
-    })
-
-    const res = await POST(makeRequest({ plan: 'starter' }))
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.url).toBe('https://checkout.stripe.com/session_123')
 
     expect(mockPricesList).toHaveBeenCalledWith({
-      lookup_keys: ['starter_monthly'],
+      lookup_keys: ['pro_monthly'],
       active: true,
       limit: 1,
     })
-  })
-
-  it('uses annual lookup key when annual flag is true', async () => {
-    mockGetUserWorkspace.mockResolvedValue({
-      role: 'admin',
-      email: 'admin@test.com',
-      workspaceId: 'ws-1',
-    })
-    mockPricesList.mockResolvedValue({
-      data: [{ id: 'price_annual_123' }],
-    })
-    mockCreate.mockResolvedValue({
-      url: 'https://checkout.stripe.com/session_annual',
-    })
-
-    await POST(makeRequest({ plan: 'professional', annual: true }))
-
-    expect(mockPricesList).toHaveBeenCalledWith({
-      lookup_keys: ['professional_annual'],
-      active: true,
-      limit: 1,
-    })
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'subscription',
+        payment_method_collection: 'if_required',
+        subscription_data: expect.objectContaining({
+          trial_period_days: 14,
+        }),
+        line_items: [expect.objectContaining({ quantity: 1, price: 'price_pro' })],
+      }),
+    )
   })
 
   it('uses authenticated user email, not request body email', async () => {
     mockGetUserWorkspace.mockResolvedValue({
       role: 'admin',
-      email: 'real-admin@test.com',
+      email: 'real@test.com',
       workspaceId: 'ws-1',
     })
-    mockPricesList.mockResolvedValue({
-      data: [{ id: 'price_123' }],
-    })
+    mockPricesList.mockResolvedValue({ data: [{ id: 'price_pro' }] })
     mockCreate.mockResolvedValue({ url: 'https://checkout.stripe.com/s' })
 
-    await POST(makeRequest({ plan: 'starter', email: 'attacker@evil.com' }))
+    await POST(makeRequest({ email: 'attacker@evil.com' }))
 
     expect(mockCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer_email: 'real-admin@test.com',
-      })
+      expect.objectContaining({ customer_email: 'real@test.com' }),
     )
   })
 
@@ -179,7 +135,7 @@ describe('POST /api/checkout', () => {
     })
     mockPricesList.mockResolvedValue({ data: [] })
 
-    const res = await POST(makeRequest({ plan: 'starter' }))
+    const res = await POST(makeRequest({}))
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toContain('Price not found')

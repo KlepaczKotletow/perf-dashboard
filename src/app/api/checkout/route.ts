@@ -3,93 +3,43 @@ import { getStripe } from "@/lib/stripe";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/roles";
 
-// Map plan names to Stripe price lookup keys
-// These must match the lookup_keys you configure in Stripe Dashboard
-const PLAN_LOOKUP_KEYS: Record<string, string> = {
-  starter: "starter_monthly",
-  professional: "professional_monthly",
-  enterprise: "enterprise_monthly",
-  starter_annual: "starter_annual",
-  professional_annual: "professional_annual",
-  enterprise_annual: "enterprise_annual",
-};
+const PRO_LOOKUP_KEY = "pro_monthly";
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     const workspace = await getUserWorkspace();
-
     if (!workspace || !isAdmin(workspace.role)) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-
-    const body = await request.json();
-    const { plan, annual } = body as {
-      plan: string;
-      annual?: boolean;
-    };
-
-    // Use the authenticated user's email, not the request body
-    const email = workspace.email;
-
-    if (!plan || !email) {
-      return NextResponse.json(
-        { error: "Missing plan or email" },
-        { status: 400 }
-      );
-    }
-
-    const lookupKey = annual
-      ? PLAN_LOOKUP_KEYS[`${plan}_annual`]
-      : PLAN_LOOKUP_KEYS[plan];
-
-    if (!lookupKey) {
-      return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
     const stripe = getStripe();
 
-    // Look up the price by its lookup key
     const prices = await stripe.prices.list({
-      lookup_keys: [lookupKey],
+      lookup_keys: [PRO_LOOKUP_KEY],
       active: true,
       limit: 1,
     });
-
     if (prices.data.length === 0) {
       return NextResponse.json(
         { error: "Price not found. Please configure Stripe prices." },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-    const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      customer_email: email,
-      line_items: [
-        {
-          price: prices.data[0].id,
-          // For per-seat pricing, start with quantity 1 (the admin)
-          // Quantity updates happen via webhook when new users join
-          quantity: 1,
-        },
-      ],
-      metadata: {
-        plan,
-        annual: annual ? "true" : "false",
+      customer_email: workspace.email,
+      line_items: [{ price: prices.data[0].id, quantity: 1 }],
+      payment_method_collection: "if_required",
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: { plan: "pro" },
       },
+      metadata: { plan: "pro" },
       success_url: `${siteUrl}/setup?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/pricing`,
-      subscription_data: {
-        metadata: {
-          plan,
-        },
-      },
     });
 
     return NextResponse.json({ url: session.url });
@@ -102,9 +52,6 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
-    return NextResponse.json(
-      { error: "Failed to create checkout session" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Failed to create checkout session" }, { status: 500 });
   }
 }
