@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { getStripe } from "@/lib/stripe";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/roles";
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2026-01-28.clover",
-  });
-}
 
 export async function POST(request: NextRequest) {
   try {

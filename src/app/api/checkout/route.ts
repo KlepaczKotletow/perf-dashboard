@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { getStripe } from "@/lib/stripe";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/roles";
-
-function getStripe() {
-  // Throw a recognisable, generic error if STRIPE_SECRET_KEY is missing so the
-  // caller sees "Payments not configured" instead of leaking SDK internals like
-  // "Neither apiKey nor config.authenticator provided".
-  if (!process.env.STRIPE_SECRET_KEY) {
-    const e = new Error("Payments not configured");
-    (e as Error & { code?: string }).code = "stripe_not_configured";
-    throw e;
-  }
-  return new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2026-01-28.clover",
-  });
-}
 
 // Map plan names to Stripe price lookup keys
 // These must match the lookup_keys you configure in Stripe Dashboard
