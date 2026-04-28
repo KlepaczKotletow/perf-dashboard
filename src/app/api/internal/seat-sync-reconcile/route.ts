@@ -41,9 +41,21 @@ export async function GET(request: NextRequest) {
     }),
   );
 
+  const failed = results
+    .map((r, i) => ({ r, workspace_id: subs[i].workspace_id }))
+    .filter(({ r }) =>
+      r.status === "rejected" ||
+      (r.status === "fulfilled" && (r.value.status < 200 || r.value.status >= 300))
+    )
+    .map(({ workspace_id, r }) => ({
+      workspace_id,
+      error: r.status === "rejected" ? String(r.reason) : `HTTP ${r.value.status}`,
+    }));
+
   return NextResponse.json({
     total: subs.length,
-    successes: results.filter((r) => r.status === "fulfilled").length,
-    failures: results.filter((r) => r.status === "rejected").length,
+    successes: results.length - failed.length,
+    failures: failed.length,
+    failed,
   });
 }
