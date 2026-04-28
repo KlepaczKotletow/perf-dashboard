@@ -185,7 +185,6 @@ describe('POST /api/webhooks/stripe', () => {
   })
 
   it('inserts subscription row on checkout.session.completed when not present', async () => {
-    mockSupabase.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -200,7 +199,7 @@ describe('POST /api/webhooks/stripe', () => {
     })
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
-    expect(mockSupabase.insert).toHaveBeenCalledWith(
+    expect(mockSupabase.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         stripe_subscription_id: 'sub_new',
         stripe_customer_id: 'cus_new',
@@ -208,14 +207,14 @@ describe('POST /api/webhooks/stripe', () => {
         plan: 'pro',
         status: 'trialing',
       }),
+      expect.objectContaining({
+        onConflict: 'stripe_subscription_id',
+        ignoreDuplicates: true,
+      }),
     )
   })
 
-  it('skips insert on checkout.session.completed when row exists', async () => {
-    mockSupabase.maybeSingle.mockResolvedValueOnce({
-      data: { id: 'existing-id' },
-      error: null,
-    })
+  it('upserts with onConflict ignore on checkout.session.completed', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'checkout.session.completed',
       data: {
@@ -228,6 +227,12 @@ describe('POST /api/webhooks/stripe', () => {
     })
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
-    expect(mockSupabase.insert).not.toHaveBeenCalled()
+    expect(mockSupabase.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ stripe_subscription_id: 'sub_existing' }),
+      expect.objectContaining({
+        onConflict: 'stripe_subscription_id',
+        ignoreDuplicates: true,
+      }),
+    )
   })
 })

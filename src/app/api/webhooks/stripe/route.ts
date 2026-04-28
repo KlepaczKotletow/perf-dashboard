@@ -113,38 +113,35 @@ async function handleEvent(event: Stripe.Event) {
       return;
     }
     case "checkout.session.completed": {
-      // Safety net: the /setup page already creates the subscriptions row when
-      // the customer is redirected back from Stripe Checkout. This webhook
-      // handles the case where the browser dies mid-redirect. Idempotent —
-      // skip insert if a row already exists for this subscription id.
       const session = event.data.object as Stripe.Checkout.Session;
       const subId = typeof session.subscription === "string"
         ? session.subscription
         : session.subscription?.id;
       if (!subId) return;
 
-      const supabase = createServiceRoleClient();
-      const { data: existing } = await supabase
-        .from("subscriptions")
-        .select("id")
-        .eq("stripe_subscription_id", subId)
-        .maybeSingle();
-
-      if (existing) return;
-
       const customerId = typeof session.customer === "string"
         ? session.customer
-        : session.customer?.id || "";
+        : session.customer?.id ?? null;
 
-      await supabase.from("subscriptions").insert({
-        stripe_subscription_id: subId,
-        stripe_customer_id: customerId,
-        stripe_customer_email: session.customer_email || "",
-        plan: session.metadata?.plan || "pro",
-        status: "trialing",
-        user_limit: 10000,
-        setup_token: crypto.randomUUID(),
-      });
+      const supabase = createServiceRoleClient();
+      // Idempotency is guaranteed by the partial unique index on stripe_subscription_id
+      // (migration 20260428_subscriptions_stripe_ready). The /setup page is the
+      // primary insert path; this webhook is the safety net for browsers that die
+      // mid-redirect. Either path can run first; the second one is a no-op.
+      await supabase
+        .from("subscriptions")
+        .upsert(
+          {
+            stripe_subscription_id: subId,
+            stripe_customer_id: customerId,
+            stripe_customer_email: session.customer_email ?? null,
+            plan: session.metadata?.plan ?? "pro",
+            status: "trialing",
+            user_limit: 10000,
+            setup_token: crypto.randomUUID(),
+          },
+          { onConflict: "stripe_subscription_id", ignoreDuplicates: true },
+        );
       return;
     }
     default:
