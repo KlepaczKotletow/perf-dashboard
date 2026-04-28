@@ -56,7 +56,7 @@ export function UpgradeButton({ workspaceId, customerId, isManage = false }: Upg
         ) : (
           <ExternalLink className="h-4 w-4 mr-2" />
         )}
-        {isManage ? "Manage Subscription" : "Upgrade Plan"}
+        {isManage ? "Manage billing" : "Start 14-day free trial"}
       </Button>
       {buttonError && (
         <p className="text-xs text-red-600 dark:text-red-400 mt-1">{buttonError}</p>
