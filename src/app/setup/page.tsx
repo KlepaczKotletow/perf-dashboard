@@ -41,11 +41,11 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   }
 
   // Verify payment was successful
-  if (session.payment_status !== "paid") {
+  if (session.payment_status !== "paid" && session.payment_status !== "no_payment_required") {
     redirect("/pricing?error=payment_incomplete");
   }
 
-  const plan = (session.metadata?.plan as string) || "starter";
+  const plan = (session.metadata?.plan as string) || "pro";
   const customerEmail = session.customer_email || "";
   const customerId =
     typeof session.customer === "string"
@@ -56,41 +56,36 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
       ? session.subscription
       : (session.subscription as Stripe.Subscription)?.id || "";
 
-  // Check if we already have a subscription for this checkout (idempotent)
-  const { data: existing } = await supabase
+  // Idempotent insert. The partial unique index on stripe_subscription_id
+  // (migration 20260428_subscriptions_stripe_ready) makes this race-safe with
+  // the webhook safety net at /api/webhooks/stripe.
+  const newToken = crypto.randomUUID();
+  const isTrialing = session.payment_status === "no_payment_required";
+
+  await supabase
     .from("subscriptions")
-    .select("id, setup_token")
+    .upsert(
+      {
+        stripe_customer_id: customerId || null,
+        stripe_subscription_id: subscriptionId,
+        stripe_customer_email: customerEmail || null,
+        plan,
+        status: isTrialing ? "trialing" : "active",
+        user_limit: 10000,
+        setup_token: newToken,
+      },
+      { onConflict: "stripe_subscription_id", ignoreDuplicates: true },
+    );
+
+  // Read back the row to get the actually-used setup_token (the row that won
+  // the upsert race — could be ours or the webhook's, both have valid tokens).
+  const { data: row } = await supabase
+    .from("subscriptions")
+    .select("setup_token")
     .eq("stripe_subscription_id", subscriptionId)
     .maybeSingle();
 
-  let setupToken: string;
-
-  if (existing) {
-    // Already created, reuse the setup token
-    setupToken = existing.setup_token || crypto.randomUUID();
-    if (!existing.setup_token) {
-      await supabase
-        .from("subscriptions")
-        .update({ setup_token: setupToken })
-        .eq("id", existing.id);
-    }
-  } else {
-    // Create a new subscription record (workspace_id is NULL until Slack install)
-    setupToken = crypto.randomUUID();
-
-    const userLimit =
-      plan === "enterprise" ? 10000 : plan === "professional" ? 500 : 50;
-
-    await supabase.from("subscriptions").insert({
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscriptionId,
-      stripe_customer_email: customerEmail,
-      plan,
-      status: "active",
-      user_limit: userLimit,
-      setup_token: setupToken,
-    });
-  }
+  const setupToken = row?.setup_token ?? newToken;
 
   // Build the Add to Slack URL with HMAC-signed state. We embed the
   // setup_token inside the signed payload so the slack-oauth callback can
