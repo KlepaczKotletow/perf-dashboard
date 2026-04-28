@@ -40,8 +40,6 @@ export function UpgradeButton({ workspaceId, customerId, isManage = false }: Upg
         // Start trial — go straight to Stripe Checkout (admin is already authenticated)
         const res = await fetch("/api/checkout", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
         });
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));

@@ -55,6 +55,12 @@ export default function PricingPage() {
             window.location.href = `${supabaseUrl}/functions/v1/dashboard-auth`;
             return;
           }
+          // NEXT_PUBLIC_SUPABASE_URL is baked at build time, so an empty value
+          // means the build is misconfigured. Surface a clearer next step
+          // instead of falling through to the generic error.
+          setError("Sign in to start your trial");
+          setLoadingPlan(null);
+          return;
         }
         const errData = await res.json().catch(() => ({}));
         setError(errData.error || `Request failed (${res.status})`);

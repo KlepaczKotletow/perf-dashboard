@@ -5,6 +5,7 @@ import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
 import { signOAuthState } from "@/lib/oauth-state";
 import { getUserWorkspace } from "@/lib/supabase-server";
+import { isAdmin } from "@/lib/roles";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
@@ -92,17 +93,46 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   // (For brand-new customers without a workspace, getUserWorkspace returns null
   // and we fall through to the Slack-install flow as before.)
   const existingWorkspace = await getUserWorkspace().catch(() => null);
-  if (existingWorkspace?.workspaceId) {
-    // Link the just-created subscriptions row to the existing workspace.
-    // Only update if workspace_id is currently NULL — protects against
-    // accidental overwrites if some other flow already linked it.
-    await supabase
-      .from("subscriptions")
-      .update({ workspace_id: existingWorkspace.workspaceId })
-      .eq("stripe_subscription_id", subscriptionId)
-      .is("workspace_id", null);
+  if (existingWorkspace?.workspaceId && isAdmin(existingWorkspace.role)) {
+    // Tenant isolation: getUserWorkspace() only confirms "some admin is logged
+    // in in this browser", not that they are the buyer of THIS session. If a
+    // session_id URL leaks (referrer, history, shared link), a logged-in admin
+    // from workspace A could land on /setup?session_id=<sub-paid-by-someone-else>
+    // and link the subscription to their wrong workspace. Compare emails to
+    // confirm the buyer matches the logged-in admin before linking.
+    const sessionEmail = (session.customer_email ?? "").trim().toLowerCase();
+    const adminEmail = (existingWorkspace.email ?? "").trim().toLowerCase();
+    if (!sessionEmail || !adminEmail || sessionEmail !== adminEmail) {
+      console.warn("[setup] checkout session email does not match logged-in admin", {
+        session_id: sessionId,
+        session_email_present: !!sessionEmail,
+        workspace_id: existingWorkspace.workspaceId,
+      });
+      // Fall through to render the Slack-install CTA. The legitimate buyer
+      // can complete from a fresh browser tab; logged-in admin is unaffected.
+    } else {
+      // Pre-Stripe rows are placeholder 'free' rows from before the workspace
+      // ever upgraded. They have workspace_id set but no stripe_subscription_id.
+      // Drop them so the partial unique index
+      // (subscriptions_workspace_id_unique_when_set) doesn't block the linking
+      // update below. Safe because they carry no Stripe state.
+      await supabase
+        .from("subscriptions")
+        .delete()
+        .eq("workspace_id", existingWorkspace.workspaceId)
+        .is("stripe_subscription_id", null);
 
-    redirect("/dashboard/settings/billing?upgraded=true");
+      // Link the just-created subscriptions row to the existing workspace.
+      // Only update if workspace_id is currently NULL — protects against
+      // accidental overwrites if some other flow already linked it.
+      await supabase
+        .from("subscriptions")
+        .update({ workspace_id: existingWorkspace.workspaceId })
+        .eq("stripe_subscription_id", subscriptionId)
+        .is("workspace_id", null);
+
+      redirect("/dashboard/settings/billing?upgraded=true");
+    }
   }
 
   // Build the Add to Slack URL with HMAC-signed state. We embed the
