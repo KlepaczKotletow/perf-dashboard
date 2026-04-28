@@ -144,4 +144,28 @@ describe('POST /api/webhooks/stripe', () => {
     )
     expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_999')
   })
+
+  it('extracts subscription id from parent.subscription_details on invoice events', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_failed',
+      data: {
+        object: {
+          parent: { subscription_details: { subscription: 'sub_typed_path' } },
+        },
+      },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_typed_path')
+  })
+
+  it('returns 200 with no DB write when invoice has no subscription', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_failed',
+      data: { object: {} },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSupabase.update).not.toHaveBeenCalled()
+  })
 })

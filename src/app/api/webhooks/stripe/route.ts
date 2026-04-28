@@ -89,6 +89,8 @@ async function handleEvent(event: Stripe.Event) {
       const inv = event.data.object as Stripe.Invoice;
       const subId = extractSubscriptionId(inv);
       if (!subId) return;
+      // Lazy: skip service-role client construction when invoice has no
+      // subscription reference (one-off invoices, etc.). Same pattern as Task 5.
       const supabase = createServiceRoleClient();
       await supabase
         .from("subscriptions")
