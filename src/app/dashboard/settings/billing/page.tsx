@@ -172,11 +172,14 @@ export default async function BillingPage() {
 
       {billingState.kind === "trialing_with_card" && (
         <Card>
-          <CardContent className="pt-6">
-            <p className="font-semibold">Trial ends {format(billingState.trialEnd, "MMM d")}</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              First charge: ${(billingState.nextAmountCents / 100).toFixed(2)} ({billableSeats} billable users × $5).
-            </p>
+          <CardContent className="pt-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">Trial ends {format(billingState.trialEnd, "MMM d")}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                First charge: ${(billingState.nextAmountCents / 100).toFixed(2)} ({billableSeats} billable users × $5).
+              </p>
+            </div>
+            <UpgradeButton workspaceId={workspace?.workspaceId} customerId={subscription?.stripe_customer_id} isManage />
           </CardContent>
         </Card>
       )}
@@ -209,13 +212,16 @@ export default async function BillingPage() {
 
       {billingState.kind === "active" && (
         <Card>
-          <CardContent className="pt-6">
-            <p className="font-semibold">
-              ${(billingState.nextAmountCents / 100).toFixed(2)}/month
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Next charge {format(billingState.nextChargeDate, "MMM d, yyyy")} ({billableSeats} billable users × $5).
-            </p>
+          <CardContent className="pt-6 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">
+                ${(billingState.nextAmountCents / 100).toFixed(2)}/month
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Next charge {format(billingState.nextChargeDate, "MMM d, yyyy")} ({billableSeats} billable users × $5).
+              </p>
+            </div>
+            <UpgradeButton workspaceId={workspace?.workspaceId} customerId={subscription?.stripe_customer_id} isManage />
           </CardContent>
         </Card>
       )}
@@ -241,36 +247,29 @@ export default async function BillingPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-lg bg-muted p-4 mb-6">
+          <div className="rounded-lg bg-muted p-4">
             <p className="text-lg font-semibold">
               {billableSeats} billable users × $5 = ${monthlyTotal}/month
             </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {billableSeats} billable users
-            </p>
           </div>
 
-          <p className="text-sm font-medium mb-3">What&apos;s included:</p>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {planFeatures.map((feature) => (
-              <li key={feature} className="flex items-center gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
-                {feature}
-              </li>
-            ))}
-          </ul>
+          {!hasSubscription && (
+            <>
+              <p className="text-sm font-medium mb-3 mt-6">What&apos;s included:</p>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {planFeatures.map((feature) => (
+                  <li key={feature} className="flex items-center gap-2 text-sm">
+                    <CheckCircle className="h-4 w-4 text-primary flex-shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
 
-          <div className="mt-6 flex gap-3">
-            {hasSubscription ? (
-              <UpgradeButton
-                workspaceId={workspace?.workspaceId}
-                customerId={subscription?.stripe_customer_id}
-                isManage
-              />
-            ) : (
-              <UpgradeButton workspaceId={workspace?.workspaceId} />
-            )}
-          </div>
+              <div className="mt-6 flex gap-3">
+                <UpgradeButton workspaceId={workspace?.workspaceId} />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
