@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { syncSubscriptionState } from "@/lib/subscription-sync";
 
 export const runtime = "nodejs";
 
@@ -50,66 +51,50 @@ function extractSubscriptionId(inv: Stripe.Invoice): string | null {
   return typeof ref === "string" ? ref : ref.id;
 }
 
+// Throw on supabase errors so the outer try/catch returns 500 and Stripe
+// retries. supabase-js never throws on Postgres errors itself — silent
+// .error swallowing here previously caused state drift.
+function throwIfError(error: { message: string } | null, op: string): void {
+  if (error) throw new Error(`${op}: ${error.message}`);
+}
+
 async function handleEvent(event: Stripe.Event) {
   switch (event.type) {
     case "customer.subscription.updated": {
       const sub = event.data.object as Stripe.Subscription;
-      // current_period_end was relocated to subscription items in Stripe API
-      // 2025-03-31 / SDK v18+, but still appears on the top-level object in
-      // event payloads. Read from the item for type-safe access, fall back to
-      // the legacy top-level field for older payloads.
-      const periodEnd =
-        sub.items?.data[0]?.current_period_end ??
-        (sub as unknown as { current_period_end?: number }).current_period_end;
-      const supabase = createServiceRoleClient();
-      await supabase
-        .from("subscriptions")
-        .update({
-          status: sub.status,
-          cancel_at_period_end: sub.cancel_at_period_end,
-          current_period_end: periodEnd
-            ? new Date(periodEnd * 1000).toISOString()
-            : null,
-        })
-        .eq("stripe_subscription_id", sub.id);
+      await syncSubscriptionState(sub.id);
       return;
     }
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
       const supabase = createServiceRoleClient();
-      await supabase
+      const { error } = await supabase
         .from("subscriptions")
-        .update({
-          status: "canceled",
-        })
+        .update({ status: "canceled" })
         .eq("stripe_subscription_id", sub.id);
+      throwIfError(error, "subscriptions cancel");
       return;
     }
     case "invoice.payment_failed": {
       const inv = event.data.object as Stripe.Invoice;
       const subId = extractSubscriptionId(inv);
       if (!subId) return;
-      // Lazy: skip service-role client construction when invoice has no
-      // subscription reference (one-off invoices, etc.). Same pattern as Task 5.
       const supabase = createServiceRoleClient();
-      await supabase
+      const { error } = await supabase
         .from("subscriptions")
         .update({ status: "past_due" })
         .eq("stripe_subscription_id", subId);
+      throwIfError(error, "subscriptions past_due");
       return;
     }
     case "invoice.payment_succeeded": {
       const inv = event.data.object as Stripe.Invoice;
       const subId = extractSubscriptionId(inv);
       if (!subId) return;
-      const supabase = createServiceRoleClient();
-      await supabase
-        .from("subscriptions")
-        .update({
-          status: "active",
-          current_period_end: new Date(inv.period_end * 1000).toISOString(),
-        })
-        .eq("stripe_subscription_id", subId);
+      // Refetch authoritative state from Stripe — see syncSubscriptionState.
+      // Stripe auto-pays $0 trial and proration invoices, so we cannot infer
+      // status from the invoice being paid.
+      await syncSubscriptionState(subId);
       return;
     }
     case "checkout.session.completed": {
@@ -124,11 +109,11 @@ async function handleEvent(event: Stripe.Event) {
         : session.customer?.id ?? null;
 
       const supabase = createServiceRoleClient();
-      // Idempotency is guaranteed by the partial unique index on stripe_subscription_id
-      // (migration 20260428_subscriptions_stripe_ready). The /setup page is the
-      // primary insert path; this webhook is the safety net for browsers that die
-      // mid-redirect. Either path can run first; the second one is a no-op.
-      await supabase
+      // Idempotency is guaranteed by the unique index on stripe_subscription_id
+      // (migration 20260429_fix_subscriptions_stripe_sub_on_conflict). /setup
+      // is the primary insert path; this webhook is the safety net for browsers
+      // that die mid-redirect. Either path can run first; the second is a no-op.
+      const { error } = await supabase
         .from("subscriptions")
         .upsert(
           {
@@ -142,6 +127,7 @@ async function handleEvent(event: Stripe.Event) {
           },
           { onConflict: "stripe_subscription_id", ignoreDuplicates: true },
         );
+      throwIfError(error, "subscriptions upsert");
       return;
     }
     default:

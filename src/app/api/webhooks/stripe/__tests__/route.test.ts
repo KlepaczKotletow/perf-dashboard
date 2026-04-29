@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const mockConstructEvent = vi.fn()
+const mockSubscriptionsRetrieve = vi.fn()
 vi.mock('stripe', () => {
   const MockStripe = vi.fn(function () {
     return {
       webhooks: { constructEvent: mockConstructEvent },
+      subscriptions: { retrieve: mockSubscriptionsRetrieve },
     }
   })
   return { default: MockStripe }
@@ -19,7 +21,7 @@ const mockSupabase: {
   select: ReturnType<typeof vi.fn>
   eq: ReturnType<typeof vi.fn>
   maybeSingle: ReturnType<typeof vi.fn>
-  then: (resolve: (v: { data: null; error: null }) => unknown) => unknown
+  then: (resolve: (v: { data: null; error: { message: string } | null }) => unknown) => unknown
 } = {
   from: vi.fn(() => mockSupabase),
   update: vi.fn(() => mockSupabase),
@@ -88,21 +90,20 @@ describe('POST /api/webhooks/stripe', () => {
     expect(body.error).toBe('Webhook not configured')
   })
 
-  it('updates subscription row on customer.subscription.updated', async () => {
+  it('refetches subscription and updates row on customer.subscription.updated', async () => {
     mockConstructEvent.mockReturnValue({
       type: 'customer.subscription.updated',
-      data: {
-        object: {
-          id: 'sub_123',
-          status: 'active',
-          cancel_at_period_end: false,
-          current_period_end: 1735689600,
-          items: { data: [{ price: { lookup_key: 'pro_monthly' } }] },
-        },
-      },
+      data: { object: { id: 'sub_123' } },
+    })
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      id: 'sub_123',
+      status: 'active',
+      cancel_at_period_end: false,
+      items: { data: [{ current_period_end: 1735689600 }] },
     })
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
+    expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_123')
     expect(mockSupabase.update).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'active',
@@ -139,15 +140,47 @@ describe('POST /api/webhooks/stripe', () => {
     expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_789')
   })
 
-  it('reactivates subscription on invoice.payment_succeeded', async () => {
+  it('refetches sub on invoice.payment_succeeded — keeps trialing for $0 trial invoices', async () => {
+    // Stripe auto-pays $0 trial/proration invoices. The sub itself is still
+    // trialing — we must NOT write status='active' just because the invoice
+    // succeeded. Refetching the live sub is what protects against this.
     mockConstructEvent.mockReturnValue({
       type: 'invoice.payment_succeeded',
       data: {
         object: {
-          subscription: 'sub_999',
+          subscription: 'sub_trial',
           period_end: 1735689600,
         },
       },
+    })
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      id: 'sub_trial',
+      status: 'trialing',
+      cancel_at_period_end: false,
+      items: { data: [{ current_period_end: 1778673651 }] },
+    })
+    const res = await POST(makeRequest('{}', 'valid'))
+    expect(res.status).toBe(200)
+    expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_trial')
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'trialing',
+        current_period_end: expect.any(String),
+      }),
+    )
+    expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_trial')
+  })
+
+  it('writes status from refetched sub on invoice.payment_succeeded — active for real period invoices', async () => {
+    mockConstructEvent.mockReturnValue({
+      type: 'invoice.payment_succeeded',
+      data: { object: { subscription: 'sub_999' } },
+    })
+    mockSubscriptionsRetrieve.mockResolvedValue({
+      id: 'sub_999',
+      status: 'active',
+      cancel_at_period_end: false,
+      items: { data: [{ current_period_end: 1735689600 }] },
     })
     const res = await POST(makeRequest('{}', 'valid'))
     expect(res.status).toBe(200)
@@ -158,6 +191,26 @@ describe('POST /api/webhooks/stripe', () => {
       }),
     )
     expect(mockSupabase.eq).toHaveBeenCalledWith('stripe_subscription_id', 'sub_999')
+  })
+
+  it('returns 500 when supabase update reports an error', async () => {
+    // supabase-js does not throw on PG errors — it returns them in .error.
+    // Without throw-on-error, Stripe would receive 200 and never retry,
+    // leaving the row stale on transient DB problems.
+    mockConstructEvent.mockReturnValue({
+      type: 'customer.subscription.deleted',
+      data: { object: { id: 'sub_err' } },
+    })
+    // Override the chain's terminal thenable to surface a PG error once.
+    const originalThen = mockSupabase.then
+    mockSupabase.then = (resolve: (v: { data: null; error: { message: string } | null }) => unknown) =>
+      resolve({ data: null, error: { message: 'connection lost' } })
+    try {
+      const res = await POST(makeRequest('{}', 'valid'))
+      expect(res.status).toBe(500)
+    } finally {
+      mockSupabase.then = originalThen
+    }
   })
 
   it('extracts subscription id from parent.subscription_details on invoice events', async () => {
