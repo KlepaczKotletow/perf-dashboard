@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
 import { signOAuthState } from "@/lib/oauth-state";
+import { signSeatSync } from "@/lib/seat-sync";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isAdmin } from "@/lib/roles";
 
@@ -64,7 +65,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const newToken = crypto.randomUUID();
   const isTrialing = session.payment_status === "no_payment_required";
 
-  await supabase
+  const { error: upsertError } = await supabase
     .from("subscriptions")
     .upsert(
       {
@@ -78,6 +79,17 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
       },
       { onConflict: "stripe_subscription_id", ignoreDuplicates: true },
     );
+  // supabase-js does not throw on Postgres errors — it returns them in `error`.
+  // Without this check a failure (e.g. constraint violation) would silently let
+  // the page redirect, leaving the buyer with no subscription row linked.
+  if (upsertError) {
+    console.error("[setup] subscription upsert failed:", {
+      session_id: sessionId,
+      stripe_subscription_id: subscriptionId,
+      error: upsertError.message,
+    });
+    redirect("/pricing?error=setup_failed");
+  }
 
   // Read back the row to get the actually-used setup_token (the row that won
   // the upsert race — could be ours or the webhook's, both have valid tokens).
@@ -125,11 +137,43 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
       // Link the just-created subscriptions row to the existing workspace.
       // Only update if workspace_id is currently NULL — protects against
       // accidental overwrites if some other flow already linked it.
-      await supabase
+      const { error: linkError } = await supabase
         .from("subscriptions")
         .update({ workspace_id: existingWorkspace.workspaceId })
         .eq("stripe_subscription_id", subscriptionId)
         .is("workspace_id", null);
+      if (linkError) {
+        console.error("[setup] failed to link subscription to workspace:", {
+          workspace_id: existingWorkspace.workspaceId,
+          stripe_subscription_id: subscriptionId,
+          error: linkError.message,
+        });
+        redirect("/pricing?error=setup_failed");
+      }
+
+      // Sync Stripe quantity to billable seat count. The checkout creates the
+      // subscription with quantity=1 and the DB trigger only fires on user
+      // mutations — so without this call, the first invoice for an existing
+      // workspace would underbill until someone edits a user. The reconcile
+      // cron at /api/internal/seat-sync-reconcile is a slower backstop.
+      const seatSyncSecret = process.env.SEAT_SYNC_SECRET;
+      if (seatSyncSecret) {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+        const body = JSON.stringify({ workspace_id: existingWorkspace.workspaceId });
+        const sig = signSeatSync(existingWorkspace.workspaceId, seatSyncSecret);
+        try {
+          await fetch(`${siteUrl}/api/internal/seat-sync`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Seat-Sync-Signature": sig,
+            },
+            body,
+          });
+        } catch (err) {
+          console.warn("[setup] post-link seat-sync failed (cron will reconcile):", err);
+        }
+      }
 
       redirect("/dashboard/settings/billing?upgraded=true");
     }
