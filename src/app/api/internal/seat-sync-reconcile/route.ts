@@ -6,14 +6,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+  // This endpoint is purpose-specific to seat-sync, so it shares auth with
+  // /api/internal/seat-sync (HMAC-verified there). We accept the same secret
+  // as a bearer here — pg_cron sends it from vault.seat_sync_secret which
+  // already matches the Vercel SEAT_SYNC_SECRET env (the per-mutation trigger
+  // would otherwise be broken). One secret is easier to rotate than two.
   const secret = process.env.SEAT_SYNC_SECRET;
   if (!secret) {
     return NextResponse.json({ error: "SEAT_SYNC_SECRET missing" }, { status: 500 });
+  }
+  const auth = request.headers.get("authorization");
+  if (auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createServiceRoleClient();

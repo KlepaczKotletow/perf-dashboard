@@ -34,21 +34,31 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceRoleClient();
 
-  const { data: sub } = await supabase
+  // supabase-js returns PG errors in .error rather than throwing; surface them
+  // as 500s so the trigger / cron retries instead of silently no-op'ing.
+  const { data: sub, error: subErr } = await supabase
     .from("subscriptions")
     .select("stripe_subscription_id, status")
     .eq("workspace_id", workspace_id)
     .maybeSingle();
+  if (subErr) {
+    console.error("[seat-sync] subscriptions select failed:", subErr.message);
+    return NextResponse.json({ error: "Subscription lookup failed" }, { status: 500 });
+  }
 
   if (!sub?.stripe_subscription_id || !BILLABLE_STATUSES.has(sub.status)) {
     return NextResponse.json({ ok: true, skipped: true });
   }
 
-  const { count } = await supabase
+  const { count, error: countErr } = await supabase
     .from("users")
     .select("id", { count: "exact", head: true })
     .eq("workspace_id", workspace_id)
     .neq("employee_status", "deactivated");
+  if (countErr) {
+    console.error("[seat-sync] users count failed:", countErr.message);
+    return NextResponse.json({ error: "Seat count failed" }, { status: 500 });
+  }
 
   const billableSeats = count ?? 0;
 
