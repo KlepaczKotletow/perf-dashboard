@@ -31,4 +31,17 @@ describe("computePhaseRanges", () => {
   it("returns empty array when end <= start", () => {
     expect(computePhaseRanges(end, start, [])).toEqual([]);
   });
+
+  it("phase widths match DEFAULT_PHASES proportions when no overrides", () => {
+    const phases = computePhaseRanges(start, end, []);
+    const totalMs = end.getTime() - start.getTime();
+    for (let i = 0; i < phases.length; i++) {
+      const widthMs = phases[i].end_date.getTime() - phases[i].start_date.getTime();
+      const expectedRatio = DEFAULT_PHASES[i].proportion;
+      const actualRatio = widthMs / totalMs;
+      // Allow tiny float drift (1ms tolerance over a 92-day window)
+      expect(Math.abs(actualRatio - expectedRatio)).toBeLessThan(0.001);
+      expect(phases[i].phase_type).toBe(DEFAULT_PHASES[i].phase_type);
+    }
+  });
 });
