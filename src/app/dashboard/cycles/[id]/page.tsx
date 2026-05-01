@@ -25,6 +25,7 @@ import { CycleActions } from "./cycle-actions";
 import { AddEmployeesForm } from "./add-employees-form";
 import { CycleQuestions } from "./cycle-questions";
 import { PageHeader } from "@/components/page-header";
+import { PhaseDeadlineEditor } from "./phase-deadline-editor";
 
 async function getCycle(id: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -208,6 +209,9 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const managerCompletionRate = assignmentsWithManager.length > 0
     ? Math.round((managerDoneCount / assignmentsWithManager.length) * 100)
     : 0;
+
+  // Phase deadline editing — HR+ only, and only while cycle is not completed
+  const canEditPhases = isHROrAbove(workspace?.role) && cycle.status !== "completed";
 
   return (
     <div className="space-y-6">
@@ -438,6 +442,33 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                 );
               })}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Phases & Deadlines ───────────────────────────────────────────── */}
+      {phases.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              Phases & Deadlines
+            </CardTitle>
+            <CardDescription className="text-xs">
+              {canEditPhases
+                ? "Click the pencil to adjust a phase deadline."
+                : "Phase schedule for this cycle."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {phases.map((p: any) => (
+              <PhaseDeadlineEditor
+                key={p.id}
+                phase={p}
+                canEdit={canEditPhases}
+                cycleId={cycle.id}
+              />
+            ))}
           </CardContent>
         </Card>
       )}
