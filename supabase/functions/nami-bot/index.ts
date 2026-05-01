@@ -819,7 +819,16 @@ async function handleReminders() {
       // otherwise fall back to cycle.review_deadline / cycle.end_date. The
       // 7d/3d/1d/overdue thresholds and the manager deadline alert below
       // both consume the resulting daysLeft.
-      const deadlineDate = await getDeadlineForCycle(supabase, cycle.id, workspaceId);
+      // Wrap the resolver in try/catch so one bad cycle (network blip,
+      // unexpected DB error) doesn't abort processing of all later cycles
+      // in this cron run.
+      let deadlineDate: Date | null = null;
+      try {
+        deadlineDate = await getDeadlineForCycle(supabase, cycle.id, workspaceId);
+      } catch (err) {
+        console.error(`[nami] getDeadlineForCycle failed for cycle ${cycle.id}:`, err);
+        continue; // skip this cycle, keep processing the rest
+      }
       const daysLeft = deadlineDate
         ? Math.ceil(
             (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),

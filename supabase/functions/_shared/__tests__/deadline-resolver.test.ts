@@ -40,9 +40,10 @@ describe("getDeadlineForCycle", () => {
     expect(d?.toISOString()).toBe("2026-09-01T00:00:00.000Z");
   });
 
-  it("falls back to cycle.end_date when review_deadline is null", async () => {
+  it("falls back to cycle.end_date when review_deadline is null (flag on, no active phase)", async () => {
     const sb = mockSupabase({
-      workspaces: { phase_deadline_reminders_enabled: false },
+      workspaces: { phase_deadline_reminders_enabled: true },
+      cycle_phases__active_phase: null,
       performance_cycles: { review_deadline: null, end_date: "2026-09-30T00:00:00Z" },
     });
     const d = await getDeadlineForCycle(sb as any, "cycle-1", "ws-1");
@@ -57,6 +58,15 @@ describe("getDeadlineForCycle", () => {
     });
     const d = await getDeadlineForCycle(sb as any, "cycle-1", "ws-1");
     expect(d?.toISOString()).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("flag off + null review_deadline returns null (not cycle end_date)", async () => {
+    const sb = mockSupabase({
+      workspaces: { phase_deadline_reminders_enabled: false },
+      performance_cycles: { review_deadline: null, end_date: "2026-09-30T00:00:00Z" },
+    });
+    const d = await getDeadlineForCycle(sb as any, "cycle-1", "ws-1");
+    expect(d).toBeNull();
   });
 
   it("returns null when no source can resolve a date", async () => {
