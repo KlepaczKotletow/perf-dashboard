@@ -5,11 +5,13 @@
 --   p_cycle_id uuid
 --   p_phase_dates jsonb (array): [{"phase_id": "...", "start_date": "ISO", "end_date": "ISO"}]
 --
--- Returns: jsonb { updated: int, errors: text[] }
+-- Returns: jsonb { updated: int, skipped: int, errors: text[] }
 --
--- AuthZ note: roles checked are ('admin', 'hr'), matching the rest of the
--- codebase (see roles.ts and launch_cycle / progress_cycle_phases). There is
--- no `owner` role in this schema.
+-- AuthZ note: this app authenticates via Slack OAuth, so auth.uid() is the
+-- Supabase Auth UUID, NOT public.users.id. We resolve the app user via the
+-- auth_user_id() helper (defined in 20260421_08_fix_tenant_isolation.sql),
+-- matching the launch_cycle / update_calibration_grades pattern. Roles
+-- accepted are ('admin', 'hr') — see roles.ts and launch_cycle.
 
 create or replace function update_cycle_phase_dates(
   p_cycle_id uuid,
@@ -21,27 +23,45 @@ set search_path = public
 as $$
 declare
   v_workspace_id uuid;
-  v_user_workspace_id uuid;
-  v_user_role text;
+  v_caller_user_id uuid;
   v_phase record;
   v_prev_end timestamptz;
   v_updated int := 0;
+  v_input_count int;
   v_errors text[] := '{}';
 begin
-  -- AuthZ: user must be HR-or-above in the cycle's workspace
+  -- Up-front input validation: bad shape returns a structured error instead
+  -- of a Postgres exception. Bad UUIDs / timestamps inside the array are
+  -- programmer errors and are allowed to raise.
+  if p_phase_dates is null or jsonb_typeof(p_phase_dates) <> 'array' then
+    return jsonb_build_object(
+      'updated', 0,
+      'skipped', 0,
+      'errors', array['p_phase_dates must be a JSON array']
+    );
+  end if;
+
+  -- Resolve the cycle's workspace.
   select workspace_id into v_workspace_id
   from performance_cycles where id = p_cycle_id;
   if v_workspace_id is null then
-    raise exception 'Cycle not found' using errcode = '42704';
+    raise exception 'Cycle not found' using errcode = '22023';
   end if;
 
-  select workspace_id, role into v_user_workspace_id, v_user_role
-  from users where id = auth.uid();
-  if v_user_workspace_id is distinct from v_workspace_id then
-    raise exception 'Workspace mismatch' using errcode = '42501';
+  -- Resolve the caller's app user id (Slack-OAuth-aware) and verify
+  -- admin/hr role in the cycle's workspace.
+  v_caller_user_id := auth_user_id();
+  if v_caller_user_id is null then
+    raise exception 'Not authenticated' using errcode = '42501';
   end if;
-  if v_user_role not in ('admin', 'hr') then
-    raise exception 'Insufficient role' using errcode = '42501';
+
+  if not exists (
+    select 1 from users u
+    where u.id = v_caller_user_id
+      and u.workspace_id = v_workspace_id
+      and u.role in ('admin', 'hr')
+  ) then
+    raise exception 'Not authorised to update cycle phase dates' using errcode = '42501';
   end if;
 
   -- Validate ordering: load phases in sort_order, walk through proposed dates
@@ -65,11 +85,11 @@ begin
     v_prev_end := v_phase.new_end;
   end loop;
 
-  if array_length(v_errors, 1) > 0 then
-    return jsonb_build_object('updated', 0, 'errors', v_errors);
+  if cardinality(v_errors) > 0 then
+    return jsonb_build_object('updated', 0, 'skipped', 0, 'errors', v_errors);
   end if;
 
-  -- Apply updates only for phases present in the input
+  -- Apply updates only for phases present in the input that belong to this cycle
   update cycle_phases cp
   set
     start_date = (p->>'start_date')::timestamptz,
@@ -82,12 +102,19 @@ begin
 
   get diagnostics v_updated = row_count;
 
-  return jsonb_build_object('updated', v_updated, 'errors', '{}'::text[]);
+  -- skipped = input rows that didn't match any phase in this cycle
+  -- (e.g. caller sent a phase_id from a different cycle or a stale id).
+  v_input_count := jsonb_array_length(p_phase_dates);
+  return jsonb_build_object(
+    'updated', v_updated,
+    'skipped', greatest(v_input_count - v_updated, 0),
+    'errors', '{}'::text[]
+  );
 end;
 $$;
 
 comment on function update_cycle_phase_dates(uuid, jsonb) is
-  'Atomically updates per-phase start/end dates for a cycle. Validates ordering. Marks phases as user_customized. HR/admin only.';
+  'Atomically updates per-phase start/end dates for a cycle. Validates ordering. Marks phases as user_customized. HR/admin only. AuthZ via auth_user_id() (Slack OAuth aware).';
 
 -- Lock down: explicitly revoke from anon/public per the project lockdown pattern
 revoke all on function update_cycle_phase_dates(uuid, jsonb) from public, anon;
