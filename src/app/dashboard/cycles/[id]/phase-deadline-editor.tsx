@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,11 +26,19 @@ interface Props {
   onUpdated?: (newEndDate: Date) => void;
 }
 
+function toUtcNoonIso(d: Date): string {
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0)).toISOString();
+}
+
 export function PhaseDeadlineEditor({ phase, canEdit, cycleId, onUpdated }: Props) {
   const [editing, setEditing] = useState(false);
   const [draftDate, setDraftDate] = useState<Date>(new Date(phase.end_date));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraftDate(new Date(phase.end_date));
+  }, [phase.end_date]);
 
   async function save() {
     setSaving(true);
@@ -44,7 +52,7 @@ export function PhaseDeadlineEditor({ phase, canEdit, cycleId, onUpdated }: Prop
       p_phase_dates: [{
         phase_id: phase.id,
         start_date: phase.start_date,
-        end_date: draftDate.toISOString(),
+        end_date: toUtcNoonIso(draftDate),
       }],
     });
     setSaving(false);
@@ -79,7 +87,16 @@ export function PhaseDeadlineEditor({ phase, canEdit, cycleId, onUpdated }: Prop
           {format(new Date(phase.start_date), "MMM d")} → {format(new Date(phase.end_date), "MMM d, yyyy")}
         </span>
         {canEdit && phase.status !== "completed" && (
-          <Popover open={editing} onOpenChange={setEditing}>
+          <Popover
+            open={editing}
+            onOpenChange={(open) => {
+              setEditing(open);
+              if (!open) {
+                setError(null);
+                setDraftDate(new Date(phase.end_date));
+              }
+            }}
+          >
             <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" aria-label="Edit deadline">
                 <Pencil className="h-3 w-3" />
