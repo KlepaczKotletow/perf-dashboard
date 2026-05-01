@@ -23,6 +23,7 @@ import {
   sendSlackBlocksWithTs,
 } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
+import { getDeadlineForCycle } from "../_shared/deadline-resolver.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -802,7 +803,7 @@ async function handleReminders() {
   // -----------------------------------------------------------------------
   const { data: cycles } = await supabase
     .from("performance_cycles")
-    .select("id, name, review_deadline, workspace_id")
+    .select("id, name, workspace_id")
     .eq("status", "active")
     .eq("nami_confirmed", true);
 
@@ -813,9 +814,12 @@ async function handleReminders() {
       if (!botToken) continue;
 
       const workspaceId = cycle.workspace_id;
-      const deadlineDate = cycle.review_deadline
-        ? new Date(cycle.review_deadline)
-        : null;
+      // Phase-aware deadline: if workspaces.phase_deadline_reminders_enabled
+      // is on and there's an active phase, target that phase's end_date;
+      // otherwise fall back to cycle.review_deadline / cycle.end_date. The
+      // 7d/3d/1d/overdue thresholds and the manager deadline alert below
+      // both consume the resulting daysLeft.
+      const deadlineDate = await getDeadlineForCycle(supabase, cycle.id, workspaceId);
       const daysLeft = deadlineDate
         ? Math.ceil(
             (deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
