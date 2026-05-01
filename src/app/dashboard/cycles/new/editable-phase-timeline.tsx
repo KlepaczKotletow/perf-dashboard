@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useCallback } from "react";
+import { useMemo, useRef, useCallback, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
 import {
@@ -23,6 +23,11 @@ interface Props {
 
 export function EditablePhaseTimeline({ startDate, endDate, overrides, onChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragAbortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => () => {
+    dragAbortRef.current?.abort();
+  }, []);
 
   const phases: PhaseRange[] = useMemo(() => {
     if (!startDate || !endDate) return [];
@@ -45,6 +50,10 @@ export function EditablePhaseTimeline({ startDate, endDate, overrides, onChange 
     ev.preventDefault();
     const rect = containerRef.current.getBoundingClientRect();
 
+    dragAbortRef.current?.abort();
+    const controller = new AbortController();
+    dragAbortRef.current = controller;
+
     function onMove(e: PointerEvent) {
       const xPx = e.clientX - rect.left;
       const newDate = xToDate(xPx, rect.width);
@@ -59,11 +68,11 @@ export function EditablePhaseTimeline({ startDate, endDate, overrides, onChange 
       onChange(updated);
     }
     function onUp() {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      controller.abort();
+      dragAbortRef.current = null;
     }
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointermove", onMove, { signal: controller.signal });
+    window.addEventListener("pointerup", onUp, { signal: controller.signal });
   }
 
   if (!startDate || !endDate || endDate <= startDate || phases.length === 0) {
