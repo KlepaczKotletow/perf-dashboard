@@ -21,6 +21,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { getClientIdentity } from "@/lib/client-auth";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
+import { PhaseOverride } from "@/lib/cycle-phases";
+import { EditablePhaseTimeline } from "./editable-phase-timeline";
 
 const CYCLE_TYPES = [
   { value: "annual", label: "Annual Review" },
@@ -215,6 +217,7 @@ export default function NewCyclePage() {
     const d = new Date(); d.setMonth(d.getMonth() + 3); return d;
   });
   const [reviewDeadline, setReviewDeadline] = useState<Date | undefined>();
+  const [phaseOverrides, setPhaseOverrides] = useState<PhaseOverride[]>([]);
   const [description, setDescription] = useState("");
   const [showDescription, setShowDescription] = useState(false);
 
@@ -297,6 +300,21 @@ export default function NewCyclePage() {
           if (draft.start_date) setStartDate(new Date(draft.start_date));
           if (draft.end_date) setEndDate(new Date(draft.end_date));
           if (draft.review_deadline) setReviewDeadline(new Date(draft.review_deadline));
+
+          // Restore any user-customized phase boundaries
+          if (draft.id) {
+            const { data: customPhases } = await supabase
+              .from("cycle_phases")
+              .select("phase_type, end_date, is_user_customized")
+              .eq("cycle_id", draft.id)
+              .eq("is_user_customized", true);
+            if (customPhases?.length) {
+              setPhaseOverrides(customPhases.map((p: any) => ({
+                phase_type: p.phase_type,
+                end_date: new Date(p.end_date),
+              })));
+            }
+          }
 
           // Restore wizard-specific state from wizard_metadata
           const meta = draft.wizard_metadata as Record<string, any> | null;
@@ -530,18 +548,18 @@ export default function NewCyclePage() {
 
     // Create timeline phases
     if (startDate && endDate) {
-      const cycleDurationMs = endDate.getTime() - startDate.getTime();
-      let cumulativeProportion = 0;
-      const phases = DEFAULT_PHASES.map((phase, idx) => {
-        const phaseStart = new Date(startDate.getTime() + cumulativeProportion * cycleDurationMs);
-        cumulativeProportion += phase.proportion;
-        const phaseEnd = new Date(startDate.getTime() + cumulativeProportion * cycleDurationMs);
-        return {
-          cycle_id: cycleId, phase_type: phase.phase_type, name: phase.name,
-          start_date: phaseStart.toISOString(), end_date: phaseEnd.toISOString(),
-          status: "pending", sort_order: idx,
-        };
-      });
+      const { computePhaseRanges } = await import("@/lib/cycle-phases");
+      const ranges = computePhaseRanges(startDate, endDate, phaseOverrides);
+      const phases = ranges.map((p, idx) => ({
+        cycle_id: cycleId,
+        phase_type: p.phase_type,
+        name: p.name,
+        start_date: p.start_date.toISOString(),
+        end_date: p.end_date.toISOString(),
+        status: "pending",
+        sort_order: idx,
+        is_user_customized: p.is_user_customized,
+      }));
       await supabase.from("cycle_phases").insert(phases);
     }
 
@@ -842,7 +860,12 @@ export default function NewCyclePage() {
           </div>
 
           {/* Phase timeline preview */}
-          <PhaseTimelinePreview startDate={startDate} endDate={endDate} />
+          <EditablePhaseTimeline
+            startDate={startDate}
+            endDate={endDate}
+            overrides={phaseOverrides}
+            onChange={setPhaseOverrides}
+          />
 
           {/* Description toggle */}
           {!showDescription ? (
