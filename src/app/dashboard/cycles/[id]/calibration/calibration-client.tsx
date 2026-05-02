@@ -27,6 +27,8 @@ import { createBrowserClient } from "@supabase/ssr";
 import { NineBoxGrid } from "./nine-box-grid";
 import type { BoxCoord } from "@/lib/nine-box";
 import { EvidenceSheet } from "./evidence-sheet";
+import { MoveConfirmDialog, type PendingMove } from "./move-confirm-dialog";
+import { CalibrationAuditLog } from "./audit-log";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -423,6 +425,11 @@ export default function CalibrationClient({
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [moveError, setMoveError] = useState<string | null>(null);
 
+  // Pending grid move awaiting user confirmation in the rationale dialog.
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  // Bumped after each successful move so the audit log refetches.
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
+
   // Keep liveGrades in sync with saves so the distribution chart updates live.
   const handleGradeSaved = useCallback(
     (assignmentId: string, grade: string) => {
@@ -440,22 +447,48 @@ export default function CalibrationClient({
   );
 
   // ── 9-box drag handler ────────────────────────────────────────────────
-  // Optimistic: update local state, fire the v2 RPC; revert on error/skip.
-  async function handleGridMove(assignmentId: string, target: BoxCoord) {
+  // Two-phase: dragging stages a `pendingMove` and opens the confirm dialog.
+  // The actual RPC call happens only inside `confirmMove` (with the rationale
+  // attached). Optimistic UI update + revert-on-error logic still applies.
+  async function openConfirmFor(assignmentId: string, target: BoxCoord) {
     const { boxToGrade } = await import("@/lib/nine-box");
     const proposal = boxToGrade(target);
-    const prevGrade = liveGrades[assignmentId];
-    const prevPotential = livePotentials[assignmentId];
-    setLiveGrades((p) => ({ ...p, [assignmentId]: proposal.final_grade }));
-    setLivePotentials((p) => ({ ...p, [assignmentId]: proposal.potential }));
+    const a = assignments.find((x) => x.id === assignmentId);
+    setPendingMove({
+      assignmentId,
+      employeeName: a?.employee?.slack_name ?? null,
+      before: {
+        // Use the *current* live state, not the server-loaded value, so a
+        // user who already moved this chip in this session sees the right
+        // "from" grade in the dialog.
+        final_grade: liveGrades[assignmentId] ?? a?.final_grade ?? null,
+        potential: livePotentials[assignmentId] ?? a?.potential_rating ?? null,
+      },
+      after: {
+        final_grade: proposal.final_grade,
+        potential: proposal.potential,
+      },
+    });
+  }
+
+  async function confirmMove(note: string) {
+    if (!pendingMove) return;
+    const { assignmentId, before, after } = pendingMove;
+
+    // Optimistic update + close dialog immediately.
+    setLiveGrades((p) => ({ ...p, [assignmentId]: after.final_grade }));
+    setLivePotentials((p) => ({ ...p, [assignmentId]: after.potential }));
     setMoveError(null);
+    setPendingMove(null);
 
     const { data, error } = await supabase.rpc("update_calibration_grades", {
       p_changes: [
         {
           assignment_id: assignmentId,
-          grade: proposal.final_grade,
-          potential_rating: proposal.potential,
+          grade: after.final_grade,
+          potential_rating: after.potential,
+          // Only forward `note` when present — keep the RPC payload minimal.
+          ...(note ? { note } : {}),
         },
       ],
     });
@@ -464,18 +497,25 @@ export default function CalibrationClient({
       // Revert
       setLiveGrades((p) => {
         const next = { ...p };
-        if (prevGrade) next[assignmentId] = prevGrade;
+        if (before.final_grade) next[assignmentId] = before.final_grade;
         else delete next[assignmentId];
         return next;
       });
       setLivePotentials((p) => {
         const next = { ...p };
-        if (prevPotential != null) next[assignmentId] = prevPotential;
+        if (before.potential != null) next[assignmentId] = before.potential;
         else delete next[assignmentId];
         return next;
       });
       setMoveError(error?.message ?? "Move was skipped — check permissions");
+      return;
     }
+    // Refresh the audit log (one increment = one re-fetch).
+    setAuditRefreshKey((k) => k + 1);
+  }
+
+  function cancelMove() {
+    setPendingMove(null);
   }
 
   // Enriched view of assignments with the live grade+potential overrides
@@ -769,11 +809,34 @@ export default function CalibrationClient({
             <NineBoxGrid
               assignments={enrichedForGrid}
               onChipClick={(id) => setEvidenceAssignmentId(id)}
-              onMove={handleGridMove}
+              onMove={openConfirmFor}
             />
           </CardContent>
         </Card>
       )}
+
+      {/* ── Activity log (only shown alongside the grid view) ─────────── */}
+      {viewMode === "grid" && (
+        <details className="rounded-lg border border-border/60 p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Activity log
+          </summary>
+          <div className="mt-3">
+            <CalibrationAuditLog
+              cycleId={cycle.id}
+              refreshKey={auditRefreshKey}
+            />
+          </div>
+        </details>
+      )}
+
+      {/* ── Move-confirm dialog (mounted at top level so it survives ── */}
+      {/*    a viewMode flip mid-interaction). ─────────────────────────── */}
+      <MoveConfirmDialog
+        pending={pendingMove}
+        onConfirm={confirmMove}
+        onCancel={cancelMove}
+      />
 
       {/* ── Evidence side sheet (opens when a chip is clicked) ──────────── */}
       <EvidenceSheet
