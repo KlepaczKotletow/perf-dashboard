@@ -22,6 +22,23 @@ interface Props {
   assignments: AssignmentLite[];
 }
 
+// Recency window for the "Recent" badge. Items within this window are flagged
+// so calibrators can consciously weight against recency bias — research finds
+// ~40% of annual appraisals show recency error (SHRM/Engagedly).
+const RECENT_WINDOW_DAYS = 14;
+
+function isRecent(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  const ageMs = Date.now() - new Date(iso).getTime();
+  return ageMs >= 0 && ageMs <= RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
+// Minimum anonymous-kudos count required to surface them at calibration time.
+// Single anonymous comments are too easy to weaponize (Bloomfield et al. 2024
+// on strategic peer-harming disclosures); 360 instruments anonymize peers in
+// aggregate (≥3 raters per category) for the same reason.
+const ANON_AGGREGATE_THRESHOLD = 3;
+
 export function EvidenceSheet({ assignmentId, open, onClose, workspaceId, cycleId, assignments }: Props) {
   const [data, setData] = useState<EmployeeEvidence | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,8 +122,15 @@ export function EvidenceSheet({ assignmentId, open, onClose, workspaceId, cycleI
                   {data.peerComments.slice(0, 5).map((p, i) => (
                     <blockquote key={i} className="border-l-2 border-border pl-3 py-1 text-sm italic">
                       &ldquo;{p.comment}&rdquo;
-                      <div className="text-[10px] text-muted-foreground not-italic mt-0.5">
-                        {p.created_at && format(new Date(p.created_at), "MMM d")}
+                      <div className="text-[10px] text-muted-foreground not-italic mt-0.5 flex items-center gap-1.5">
+                        {p.created_at && (
+                          <span>{format(new Date(p.created_at), "MMM d")}</span>
+                        )}
+                        {isRecent(p.created_at) && (
+                          <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal h-4 border-amber-300 text-amber-700 dark:border-amber-400/40 dark:text-amber-400">
+                            Recent
+                          </Badge>
+                        )}
                       </div>
                     </blockquote>
                   ))}
@@ -121,27 +145,72 @@ export function EvidenceSheet({ assignmentId, open, onClose, workspaceId, cycleI
                   {data.upwardComments.map((p, i) => (
                     <blockquote key={i} className="border-l-2 border-amber-300 pl-3 py-1 text-sm italic">
                       &ldquo;{p.comment}&rdquo;
+                      {isRecent(p.created_at) && (
+                        <div className="text-[10px] text-muted-foreground not-italic mt-0.5">
+                          <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal h-4 border-amber-300 text-amber-700 dark:border-amber-400/40 dark:text-amber-400">
+                            Recent
+                          </Badge>
+                        </div>
+                      )}
                     </blockquote>
                   ))}
                 </div>
               </section>
             )}
 
-            {data.recentKudos.length > 0 && (
-              <section>
-                <h4 className="text-sm font-semibold mb-2">Recent kudos</h4>
-                <div className="space-y-2">
-                  {data.recentKudos.map((k, i) => (
-                    <div key={i} className="text-sm">
-                      <span className="text-xs text-muted-foreground">
-                        {k.anonymous ? "Anonymous" : k.sender_name ?? "Someone"} &middot; {k.created_at && format(new Date(k.created_at), "MMM d")}
-                      </span>
-                      <p className="mt-0.5">{k.message}</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+            {(() => {
+              // Split kudos into named (always shown individually) and anonymous
+              // (aggregated when count >= threshold; suppressed below threshold to
+              // avoid weaponizing single anonymous comments at decision time).
+              const named = data.recentKudos.filter((k) => !k.anonymous);
+              const anon = data.recentKudos.filter((k) => k.anonymous);
+              const showAnonAggregate = anon.length >= ANON_AGGREGATE_THRESHOLD;
+              if (named.length === 0 && anon.length === 0) return null;
+              return (
+                <section>
+                  <h4 className="text-sm font-semibold mb-2">Recent kudos</h4>
+                  <div className="space-y-2">
+                    {named.map((k, i) => (
+                      <div key={`named-${i}`} className="text-sm">
+                        <span className="text-xs text-muted-foreground inline-flex items-center gap-1.5">
+                          <span>{k.sender_name ?? "Someone"}</span>
+                          <span aria-hidden>&middot;</span>
+                          <span>{k.created_at && format(new Date(k.created_at), "MMM d")}</span>
+                          {isRecent(k.created_at) && (
+                            <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal h-4 border-amber-300 text-amber-700 dark:border-amber-400/40 dark:text-amber-400">
+                              Recent
+                            </Badge>
+                          )}
+                        </span>
+                        <p className="mt-0.5">{k.message}</p>
+                      </div>
+                    ))}
+                    {showAnonAggregate ? (
+                      <div className="text-sm rounded-md border border-dashed border-border/60 bg-muted/20 p-2.5">
+                        <p className="text-xs text-muted-foreground">
+                          {anon.length} anonymous kudos
+                          {anon.some((k) => isRecent(k.created_at)) && (
+                            <>
+                              {" "}
+                              <Badge variant="outline" className="px-1 py-0 text-[9px] font-normal h-4 border-amber-300 text-amber-700 dark:border-amber-400/40 dark:text-amber-400">
+                                Recent
+                              </Badge>
+                            </>
+                          )}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          Individual content withheld at calibration time. Anonymous content has not been verified by a named author &mdash; weight accordingly.
+                        </p>
+                      </div>
+                    ) : anon.length > 0 ? (
+                      <p className="text-[11px] text-muted-foreground italic">
+                        {anon.length} anonymous kudos withheld (below {ANON_AGGREGATE_THRESHOLD}-rater aggregation threshold).
+                      </p>
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })()}
 
             {data.managerResponses.length === 0 &&
              data.peerComments.length === 0 &&

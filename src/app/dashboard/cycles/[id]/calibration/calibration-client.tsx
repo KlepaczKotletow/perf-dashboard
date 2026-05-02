@@ -38,6 +38,7 @@ interface AssignmentRow {
   overall_rating: number | null;
   final_grade: string | null;
   potential_rating: number | null;
+  calibrated_by: string | null;
   employee: {
     id: string;
     slack_name: string;
@@ -596,6 +597,19 @@ export default function CalibrationClient({
     ? allRatings.reduce((s, v) => s + v, 0) / allRatings.length
     : null;
 
+  // Cross-functional calibrator detection. Bock's *Work Rules!* and SHRM
+  // (Grote) both recommend cross-manager calibration sessions — a single
+  // calibrator's rating distribution typically reflects their own bias more
+  // than the underlying performance. We surface a soft nudge once a single
+  // calibrator has set 5+ grades on a cycle without anyone else weighing in.
+  const distinctCalibrators = new Set(
+    assignments
+      .map((a) => a.calibrated_by)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const singleCalibratorWarn =
+    distinctCalibrators.size === 1 && calibratedCount >= 5;
+
   return (
     <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
@@ -640,6 +654,24 @@ export default function CalibrationClient({
         <div className="flex items-center gap-3 px-4 py-3 rounded-lg border text-sm font-medium bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-400/10 dark:border-amber-400/20 dark:text-amber-400">
           <TriangleAlert className="h-4 w-4 shrink-0" />
           Grades have already been released to employees.
+        </div>
+      )}
+
+      {/* ── Cross-functional calibrator nudge ─────────────────────────── */}
+      {singleCalibratorWarn && !cycle.grades_released && (
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg border text-sm bg-sky-50 border-sky-200 text-sky-800 dark:bg-sky-400/10 dark:border-sky-400/20 dark:text-sky-300">
+          <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Consider a second calibrator</p>
+            <p className="mt-0.5 text-xs">
+              All {calibratedCount} grades so far have been set by one person.
+              Calibration is most rigorous when at least one cross-functional
+              perspective participates — typically an HR partner or department
+              head outside the team being calibrated. Bock&apos;s research on
+              Google calibration: &ldquo;diminishes bias by forcing managers
+              to justify their decisions to another.&rdquo;
+            </p>
+          </div>
         </div>
       )}
 

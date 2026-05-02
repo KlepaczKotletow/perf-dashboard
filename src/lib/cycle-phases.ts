@@ -1,12 +1,18 @@
 // Default phase weights (in 12ths). Rebalanced 2026-05-02 to match 15Five's
 // published timeline guidance: calibration is committee-scheduling-bound
 // (cross-manager meetings) so the previous 1/12 (~3 days on a 6-week cycle)
-// was too tight; 2/12 (~1 week) matches the published minimum. Goal-setting
-// drops to 1/12 since most cycles ratify pre-existing OKRs rather than write
-// goals from scratch — the modern HBR consensus (Cappelli, Buckingham) and
-// Gallup decouple goal-setting cadence from review cadence.
+// was too tight; 2/12 (~1 week) matches the published minimum. The opening
+// phase drops to 1/12 since most cycles ratify pre-existing OKRs rather than
+// write goals from scratch — the modern HBR consensus (Cappelli, Buckingham)
+// and Gallup decouple goal-setting cadence from review cadence.
+//
+// Naming: phase_type "goal_setting" stays as the DB key for backward compat,
+// but the user-facing label is "Goal Check-in" — the phase is a brief moment
+// to confirm or refresh existing goals at the start of a review cycle, not
+// from-scratch goal authoring (which lives outside the review cadence in the
+// modern playbook).
 export const DEFAULT_PHASES = [
-  { phase_type: "goal_setting" as const,    name: "Goal Setting",          proportion: 1 / 12 },
+  { phase_type: "goal_setting" as const,    name: "Goal Check-in",         proportion: 1 / 12 },
   { phase_type: "self_assessment" as const, name: "Self Assessment",        proportion: 2 / 12 },
   { phase_type: "peer_review" as const,     name: "Peer Review",            proportion: 3 / 12 },
   { phase_type: "manager_review" as const,  name: "Manager Review",         proportion: 2 / 12 },

@@ -1,5 +1,17 @@
 "use client";
 
+// IMPORTANT (anchoring-bias guard): when this form ever gains a context panel
+// showing other reviewers' responses (e.g. manager seeing peer/self/upward
+// data alongside their own draft), DO NOT display rating *numbers* — only
+// comments. Harvard Kennedy School's 2025 natural experiment found managers
+// score employees lower (especially women and women of colour, who self-rate
+// lowest) when they see self-evaluation scores while drafting. Lattice's
+// own bias playbook recommends restricting manager access to peer/self
+// scores during the review process. Comments alone preserve evidence value
+// without anchoring on a numeric prior.
+//   - HKS: https://www.hks.harvard.edu/faculty-research/policy-topics/gender-race-identity/self-ratings-and-bias-performance-reviews
+//   - Lattice: https://lattice.com/library/combatting-anchor-bias-in-performance-reviews
+
 import { useState, useEffect, useRef, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@supabase/ssr";
