@@ -26,6 +26,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
 import { NineBoxGrid } from "./nine-box-grid";
 import type { BoxCoord } from "@/lib/nine-box";
+import { EvidenceSheet } from "./evidence-sheet";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ interface CalibrationClientProps {
   cycle: Cycle;
   assignments: AssignmentRow[];
   cycleId: string;
+  workspaceId: string;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -385,8 +387,10 @@ export default function CalibrationClient({
   cycle,
   assignments,
   cycleId,
+  workspaceId,
 }: CalibrationClientProps) {
   const [sortAsc, setSortAsc] = useState(false);
+  const [evidenceAssignmentId, setEvidenceAssignmentId] = useState<string | null>(null);
 
   const supabase = useMemo(
     () =>
@@ -764,14 +768,22 @@ export default function CalibrationClient({
             )}
             <NineBoxGrid
               assignments={enrichedForGrid}
-              onChipClick={() => {
-                /* Sprint 2 Task 7+8 wires the evidence sheet */
-              }}
+              onChipClick={(id) => setEvidenceAssignmentId(id)}
               onMove={handleGridMove}
             />
           </CardContent>
         </Card>
       )}
+
+      {/* ── Evidence side sheet (opens when a chip is clicked) ──────────── */}
+      <EvidenceSheet
+        assignmentId={evidenceAssignmentId}
+        open={evidenceAssignmentId != null}
+        onClose={() => setEvidenceAssignmentId(null)}
+        workspaceId={workspaceId}
+        cycleId={cycle.id}
+        assignments={enrichedForGrid}
+      />
     </div>
   );
 }

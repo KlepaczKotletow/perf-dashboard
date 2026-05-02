@@ -94,6 +94,7 @@ export default async function CalibrationPage({ params }: { params: Promise<{ id
       cycle={data.cycle}
       assignments={data.assignments}
       cycleId={cycleId}
+      workspaceId={workspace.workspaceId!}
     />
   );
 }
