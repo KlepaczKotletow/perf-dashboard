@@ -787,3 +787,161 @@ export function buildManagerDeadlineAlert(
     },
   ];
 }
+
+// ---------------------------------------------------------------------------
+//  Daily digest — Sprint 3.5
+//  Consolidates a user's pending tasks into one DM at their chosen local
+//  hour. Replaces the per-event reminder spam that digest-mode users have
+//  opted out of.
+// ---------------------------------------------------------------------------
+
+export interface DigestPendingItem {
+  /** Short label visible to the user (e.g. cycle name, employee name + cycle). */
+  label: string;
+  /** Optional ISO date that should be highlighted ("due Aug 15"). */
+  due?: string | null;
+  /** Optional deeplink — clicking jumps the user into the right page. */
+  url?: string | null;
+}
+
+export interface DigestSections {
+  /** Manager review-write tasks owed to direct reports. */
+  pendingReviews: DigestPendingItem[];
+  /** Self-assessments owed by the user themselves. */
+  pendingSelfAssessments: DigestPendingItem[];
+  /** Peer-review tasks owed by the user. */
+  pendingPeerReviews: DigestPendingItem[];
+  /** Goals flagged at-risk or delayed. */
+  attentionGoals: DigestPendingItem[];
+  /** Optional dashboard URL to surface as a wrap-up link. */
+  dashboardUrl?: string | null;
+}
+
+function formatDue(due?: string | null): string {
+  if (!due) return "";
+  try {
+    const d = new Date(due);
+    if (Number.isNaN(d.getTime())) return "";
+    return ` _(due ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })})_`;
+  } catch {
+    return "";
+  }
+}
+
+function digestItemLine(item: DigestPendingItem): string {
+  const label = item.url ? `<${item.url}|${item.label}>` : item.label;
+  return `• ${label}${formatDue(item.due)}`;
+}
+
+/**
+ * Build a digest DM. Returns null when the user has nothing pending — the
+ * cron should skip the send entirely so users in digest mode don't get a
+ * "you have nothing to do" message every day. Critical messages bypass this
+ * digest entirely (different code path).
+ */
+export function buildDigest(
+  userName: string,
+  sections: DigestSections,
+): unknown[] | null {
+  const totalItems =
+    sections.pendingReviews.length +
+    sections.pendingSelfAssessments.length +
+    sections.pendingPeerReviews.length +
+    sections.attentionGoals.length;
+  if (totalItems === 0) return null;
+
+  const blocks: unknown[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `☀️ Your daily Nami digest`,
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `Good morning ${userName}! Here's what needs your attention today.`,
+      },
+    },
+  ];
+
+  if (sections.pendingReviews.length > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*📋 ${sections.pendingReviews.length} review${
+          sections.pendingReviews.length > 1 ? "s" : ""
+        } to write*\n${sections.pendingReviews.slice(0, 5).map(digestItemLine).join("\n")}`,
+      },
+    });
+  }
+
+  if (sections.pendingSelfAssessments.length > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*✍️ ${sections.pendingSelfAssessments.length} self-assessment${
+          sections.pendingSelfAssessments.length > 1 ? "s" : ""
+        } due*\n${sections.pendingSelfAssessments.slice(0, 5).map(digestItemLine).join("\n")}`,
+      },
+    });
+  }
+
+  if (sections.pendingPeerReviews.length > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*🤝 ${sections.pendingPeerReviews.length} peer review${
+          sections.pendingPeerReviews.length > 1 ? "s" : ""
+        } owed*\n${sections.pendingPeerReviews.slice(0, 5).map(digestItemLine).join("\n")}`,
+      },
+    });
+  }
+
+  if (sections.attentionGoals.length > 0) {
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*🎯 ${sections.attentionGoals.length} goal${
+          sections.attentionGoals.length > 1 ? "s" : ""
+        } needing attention*\n${sections.attentionGoals.slice(0, 4).map(digestItemLine).join("\n")}`,
+      },
+    });
+  }
+
+  // Footer actions: open dashboard + snooze controls.
+  const actionElements: any[] = [];
+  if (sections.dashboardUrl) {
+    actionElements.push({
+      type: "button",
+      text: { type: "plain_text", text: "Open dashboard", emoji: true },
+      url: sections.dashboardUrl,
+      action_id: "open_dashboard",
+    });
+  }
+  actionElements.push(
+    {
+      type: "button",
+      text: { type: "plain_text", text: "💤 Snooze 24h", emoji: true },
+      action_id: "snooze_24h",
+      value: "24",
+    },
+    {
+      type: "button",
+      text: { type: "plain_text", text: "🔔 Switch to realtime", emoji: true },
+      action_id: "set_notification_mode_realtime",
+      style: "danger",
+    },
+  );
+
+  blocks.push({ type: "actions", elements: actionElements });
+
+  return blocks;
+}

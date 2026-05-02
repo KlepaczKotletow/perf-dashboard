@@ -72,6 +72,38 @@ function header(text: string) {
   return { type: "header", text: { type: "plain_text", text, emoji: true } };
 }
 
+// Time-bucket helpers for the App Home pending-tasks sections. Items due in
+// the next 24h get a red 🔥 marker; items due in the next 7 days get a 📅;
+// everything else (or no deadline) renders unmarked. Lattice and 15Five
+// surface comparable "what's due now" stripes; the marker is purely visual
+// — calibrators / managers still see the full list.
+const URGENT_HOURS = 24;
+const SOON_HOURS = 24 * 7;
+function bucketByDeadline(deadlineIso: string | null | undefined, now: Date = new Date()): "today" | "week" | "later" | "none" {
+  if (!deadlineIso) return "none";
+  const d = new Date(deadlineIso);
+  if (Number.isNaN(d.getTime())) return "none";
+  const diffH = (d.getTime() - now.getTime()) / 36e5;
+  if (diffH < 0) return "today";       // overdue collapses into Today
+  if (diffH <= URGENT_HOURS) return "today";
+  if (diffH <= SOON_HOURS) return "week";
+  return "later";
+}
+function bucketEmoji(b: "today" | "week" | "later" | "none"): string {
+  return b === "today" ? "🔥" : b === "week" ? "📅" : "";
+}
+function bucketCounts<T extends { cycle?: { review_deadline?: string | null } | null }>(items: T[]): { today: number; week: number } {
+  const now = new Date();
+  let today = 0;
+  let week = 0;
+  for (const r of items) {
+    const b = bucketByDeadline((r as any).cycle?.review_deadline ?? null, now);
+    if (b === "today") today++;
+    else if (b === "week") week++;
+  }
+  return { today, week };
+}
+
 async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id: string }) {
   const blocks: unknown[] = [];
   const { id: userId, role, workspace_id: workspaceId } = appUser;
@@ -86,13 +118,29 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
 
   if (pendingReviews && pendingReviews.length > 0) {
     blocks.push(header("📋 Pending Reviews"));
-    for (const r of pendingReviews.slice(0, 5)) {
+    const { today, week } = bucketCounts(pendingReviews as any[]);
+    if (today > 0 || week > 0) {
+      const parts: string[] = [];
+      if (today > 0) parts.push(`🔥 *${today} due today*`);
+      if (week > 0) parts.push(`📅 ${week} this week`);
+      blocks.push(section(parts.join("  ·  ")));
+    }
+    // Render most-urgent first so the calibrator's eye catches them.
+    const sorted = [...pendingReviews].sort((a: any, b: any) => {
+      const da = a.cycle?.review_deadline ? new Date(a.cycle.review_deadline).getTime() : Infinity;
+      const db = b.cycle?.review_deadline ? new Date(b.cycle.review_deadline).getTime() : Infinity;
+      return da - db;
+    });
+    for (const r of sorted.slice(0, 5)) {
       const emp = (r as any).employee;
       const cycle = (r as any).cycle;
+      const bucket = bucketByDeadline(cycle?.review_deadline);
+      const emoji = bucketEmoji(bucket);
       const deadline = cycle?.review_deadline
         ? new Date(cycle.review_deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
         : "no deadline";
-      blocks.push(section(`*${emp?.slack_name || "Unknown"}* — ${cycle?.name || "Review"}\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/cycles/${r.cycle_id}|Complete review>`));
+      const prefix = emoji ? `${emoji} ` : "";
+      blocks.push(section(`${prefix}*${emp?.slack_name || "Unknown"}* — ${cycle?.name || "Review"}\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/cycles/${(r as any).cycle_id}|Complete review>`));
     }
     if (pendingReviews.length > 5) {
       blocks.push(section(`_...and ${pendingReviews.length - 5} more. <${DASHBOARD_URL}/dashboard/performance|View all>_`));
@@ -109,12 +157,27 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
 
   if (selfPending && selfPending.length > 0) {
     blocks.push(header("✍️ Self-Assessments Due"));
-    for (const r of selfPending.slice(0, 3)) {
+    const { today, week } = bucketCounts(selfPending as any[]);
+    if (today > 0 || week > 0) {
+      const parts: string[] = [];
+      if (today > 0) parts.push(`🔥 *${today} due today*`);
+      if (week > 0) parts.push(`📅 ${week} this week`);
+      blocks.push(section(parts.join("  ·  ")));
+    }
+    const sorted = [...selfPending].sort((a: any, b: any) => {
+      const da = a.cycle?.review_deadline ? new Date(a.cycle.review_deadline).getTime() : Infinity;
+      const db = b.cycle?.review_deadline ? new Date(b.cycle.review_deadline).getTime() : Infinity;
+      return da - db;
+    });
+    for (const r of sorted.slice(0, 3)) {
       const cycle = (r as any).cycle;
+      const bucket = bucketByDeadline(cycle?.review_deadline);
+      const emoji = bucketEmoji(bucket);
       const deadline = cycle?.review_deadline
         ? new Date(cycle.review_deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
         : "no deadline";
-      blocks.push(section(`*${cycle?.name || "Review"}*\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/performance|Start>`));
+      const prefix = emoji ? `${emoji} ` : "";
+      blocks.push(section(`${prefix}*${cycle?.name || "Review"}*\n_Due: ${deadline}_ | <${DASHBOARD_URL}/dashboard/performance|Start>`));
     }
     blocks.push(divider());
   }

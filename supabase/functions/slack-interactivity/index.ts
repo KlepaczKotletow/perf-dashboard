@@ -3123,6 +3123,21 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (action?.action_id === "set_notification_mode_realtime") {
+        // One-click "switch back to realtime" — used as a danger button on
+        // the daily digest DM. No selected_option, just a hardcoded mode.
+        const slackUserId = asSlackUserId(payload.user?.id);
+        if (!slackUserId) return json({});
+        const appUser = await getOrCreateUser(wsId, slackUserId, botToken);
+        if (!appUser?.id) return json({});
+        await updatePrefs(appUser.id, { mode: "realtime" });
+        return json({
+          response_type: "ephemeral",
+          replace_original: false,
+          text: "Switched to realtime — you'll get pings as things happen.",
+        });
+      }
+
       if (action?.action_id === "set_notification_mode") {
         const slackUserId = asSlackUserId(payload.user?.id);
         if (!slackUserId) return json({});

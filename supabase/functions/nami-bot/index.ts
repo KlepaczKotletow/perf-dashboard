@@ -12,6 +12,9 @@ import {
   buildReminderMessage,
   buildDeadlineReminder,
   buildManagerDeadlineAlert,
+  buildDigest,
+  type DigestSections,
+  type DigestPendingItem,
 } from "../_shared/nami-blocks.ts";
 import {
   callSlackApi,
@@ -24,6 +27,7 @@ import { getDeadlineForCycle } from "../_shared/deadline-resolver.ts";
 import {
   shouldDeliverNow,
   coercePrefs,
+  isDueForDigest,
   type Priority,
 } from "../_shared/notification-rules.ts";
 
@@ -1124,6 +1128,184 @@ interface AssignmentReminderParams {
   actionValue: string;
 }
 
+// =============================================================================
+//  handleDigests — Sprint 3.5
+//  Hourly cron iterates all users with mode=digest and sends a single
+//  consolidated DM to those whose local digest_hour matches the current
+//  hour in their digest_timezone. Skips users with nothing pending and
+//  users who already received a digest in the last 23h (notification_log
+//  dedup, event_type='nami_digest', reference_id=YYYY-MM-DD).
+// =============================================================================
+async function handleDigests(): Promise<{
+  sent: number;
+  skipped_empty: number;
+  skipped_dedup: number;
+  skipped_not_due: number;
+  skipped_send_error: number;
+}> {
+  const now = new Date();
+  let sent = 0;
+  let skippedEmpty = 0;
+  let skippedDedup = 0;
+  let skippedNotDue = 0;
+  let skippedSendError = 0;
+
+  // Pull every digest-mode user across all workspaces. The user count is
+  // small (one row per HR user × workspace); fanning out per workspace adds
+  // round-trips for no benefit.
+  const { data: digestUsers, error: usersErr } = await supabase
+    .from("users")
+    .select("id, slack_user_id, slack_name, workspace_id, notification_prefs, role")
+    .eq("notification_prefs->>mode", "digest")
+    .not("slack_user_id", "is", null);
+
+  if (usersErr) {
+    console.error("[handleDigests] failed to load digest users:", usersErr.message);
+    return { sent, skipped_empty: 0, skipped_dedup: 0, skipped_not_due: 0, skipped_send_error: 0 };
+  }
+
+  const todayKey = now.toISOString().slice(0, 10); // YYYY-MM-DD — one digest per day per user
+
+  for (const user of digestUsers || []) {
+    const prefs = coercePrefs((user as any).notification_prefs);
+    if (!isDueForDigest(prefs, now)) {
+      skippedNotDue++;
+      continue;
+    }
+
+    // Workspace bot token (digest is sent as the workspace's Nami bot, not
+    // a global service account).
+    const tokens = await getWorkspaceSlackTokens(user.workspace_id);
+    if (!tokens?.botToken) {
+      skippedSendError++;
+      continue;
+    }
+
+    // Per-day dedup. Claims the slot up-front; rolls back on send error.
+    const claimed = await logNotification(
+      user.workspace_id,
+      user.id,
+      "nami_digest",
+      todayKey,
+    );
+    if (!claimed) {
+      skippedDedup++;
+      continue;
+    }
+
+    // Build the digest sections from the same data sources App Home uses.
+    const sections = await buildDigestSectionsForUser(user.id, user.role || "user");
+    const blocks = buildDigest(user.slack_name || "there", {
+      ...sections,
+      dashboardUrl: `${DASHBOARD_URL}/dashboard`,
+    });
+    if (!blocks) {
+      // Nothing pending — don't ship an empty digest. Still keep the
+      // notification_log claim so we don't try again until tomorrow's
+      // digest hour rolls around.
+      skippedEmpty++;
+      continue;
+    }
+
+    const ok = await sendSlackBlocks(
+      tokens.botToken,
+      user.slack_user_id,
+      "Your daily Nami digest",
+      blocks,
+    );
+    if (ok) {
+      sent++;
+    } else {
+      // Send failed — release the claim so tomorrow's tick (or a manual
+      // re-fire) can retry.
+      await rollbackNotification(user.workspace_id, user.id, "nami_digest", todayKey);
+      skippedSendError++;
+    }
+  }
+
+  return {
+    sent,
+    skipped_empty: skippedEmpty,
+    skipped_dedup: skippedDedup,
+    skipped_not_due: skippedNotDue,
+    skipped_send_error: skippedSendError,
+  };
+}
+
+async function buildDigestSectionsForUser(
+  userId: string,
+  role: string,
+): Promise<DigestSections> {
+  const isManagerOrAbove = role === "manager" || role === "admin" || role === "hr";
+
+  const sections: DigestSections = {
+    pendingReviews: [],
+    pendingSelfAssessments: [],
+    pendingPeerReviews: [],
+    attentionGoals: [],
+  };
+
+  // Manager reviews to write
+  if (isManagerOrAbove) {
+    const { data: pendingReviews } = await supabase
+      .from("review_assignments")
+      .select(
+        "id, cycle_id, employee:users!review_assignments_employee_id_fkey(slack_name), cycle:performance_cycles(name, review_deadline)",
+      )
+      .eq("manager_id", userId)
+      .eq("status", "pending");
+    sections.pendingReviews = (pendingReviews || []).slice(0, 10).map((r: any) => ({
+      label: `${r.employee?.slack_name || "Unknown"} — ${r.cycle?.name || "Review"}`,
+      due: r.cycle?.review_deadline ?? null,
+      url: `${DASHBOARD_URL}/dashboard/cycles/${r.cycle_id}`,
+    })) as DigestPendingItem[];
+  }
+
+  // Self-assessments
+  const { data: selfPending } = await supabase
+    .from("review_assignments")
+    .select(
+      "id, cycle_id, cycle:performance_cycles(name, review_deadline)",
+    )
+    .eq("employee_id", userId)
+    .eq("status", "pending")
+    .eq("assignment_type", "standard");
+  sections.pendingSelfAssessments = (selfPending || []).slice(0, 10).map((r: any) => ({
+    label: r.cycle?.name || "Performance Review",
+    due: r.cycle?.review_deadline ?? null,
+    url: `${DASHBOARD_URL}/dashboard/performance`,
+  })) as DigestPendingItem[];
+
+  // Peer reviews owed (the user is a reviewer for someone else)
+  const { data: peerPending } = await supabase
+    .from("review_assignments")
+    .select(
+      "id, cycle_id, employee:users!review_assignments_employee_id_fkey(slack_name), cycle:performance_cycles(name, review_deadline)",
+    )
+    .eq("reviewer_id", userId)
+    .eq("status", "pending")
+    .eq("assignment_type", "upward");
+  sections.pendingPeerReviews = (peerPending || []).slice(0, 10).map((r: any) => ({
+    label: `${r.employee?.slack_name || "Manager"} — ${r.cycle?.name || "Upward Feedback"}`,
+    due: r.cycle?.review_deadline ?? null,
+    url: `${DASHBOARD_URL}/dashboard/performance`,
+  })) as DigestPendingItem[];
+
+  // At-risk / delayed goals
+  const { data: badGoals } = await supabase
+    .from("goals")
+    .select("id, title, tracking_status")
+    .eq("employee_id", userId)
+    .eq("status", "active")
+    .in("tracking_status", ["at_risk", "delayed"]);
+  sections.attentionGoals = (badGoals || []).slice(0, 6).map((g: any) => ({
+    label: g.title || "Goal",
+    url: `${DASHBOARD_URL}/dashboard/goals`,
+  })) as DigestPendingItem[];
+
+  return sections;
+}
+
 async function processAssignmentReminder(
   params: AssignmentReminderParams,
 ): Promise<{ sent: number; skipped: number }> {
@@ -2051,6 +2233,24 @@ Deno.serve(async (req) => {
         );
       }
       const result = await handleReminders();
+      return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    //  run_digests: hourly cron — find users with mode=digest whose local
+    //  digest_hour matches the current UTC hour-mapped-to-their-tz, and
+    //  send a consolidated DM. Skips users with nothing pending.
+    // -----------------------------------------------------------------------
+    if (action === "run_digests") {
+      if (!hasCronAuth) {
+        return new Response(
+          JSON.stringify({ error: "run_digests requires CRON_SECRET auth" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      const result = await handleDigests();
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
