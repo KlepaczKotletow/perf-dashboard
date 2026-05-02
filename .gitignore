@@ -41,6 +41,9 @@ yarn-error.log*
 .claude/worktrees/
 .worktrees/
 
+# Local daily security/improvement audits — contain exploit details, never push
+docs/plans/*-daily-improvement-audit.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
