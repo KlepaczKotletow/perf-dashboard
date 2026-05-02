@@ -3,7 +3,8 @@
 --    overall_rating; nullable so existing assignments stay valid.
 -- 2. Adds calibration_notes — one row per grade or potential change for audit
 --    trail and decision memory. Read-restricted to the cycle's workspace;
---    writes only via the v2 update_calibration_grades RPC (security definer).
+--    written via the v2 update_calibration_grades RPC, which runs
+--    security invoker (RLS gates writes via INSERT policy).
 
 alter table review_assignments
   add column if not exists potential_rating numeric(3,1);
