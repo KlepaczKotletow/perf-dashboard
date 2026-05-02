@@ -21,7 +21,7 @@ async function getCalibrationData(cycleId: string, workspaceId: string) {
   const { data: assignments } = await supabase
     .from("review_assignments")
     .select(`
-      id, status, overall_rating, final_grade, employee_id,
+      id, status, overall_rating, final_grade, potential_rating, employee_id,
       employee:users!review_assignments_employee_id_fkey(id, slack_name, department, level_id, level:levels(name, grade)),
       manager:users!review_assignments_manager_id_fkey(slack_name)
     `)

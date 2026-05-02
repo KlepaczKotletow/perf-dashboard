@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { createBrowserClient } from "@supabase/ssr";
+import { NineBoxGrid } from "./nine-box-grid";
+import type { BoxCoord } from "@/lib/nine-box";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,7 @@ interface AssignmentRow {
   status: string;
   overall_rating: number | null;
   final_grade: string | null;
+  potential_rating: number | null;
   employee: {
     id: string;
     slack_name: string;
@@ -403,6 +406,19 @@ export default function CalibrationClient({
     return map;
   });
 
+  // Track current potential ratings for the 9-box grid.
+  const [livePotentials, setLivePotentials] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    assignments.forEach((a) => {
+      if (a.potential_rating != null) map[a.id] = a.potential_rating;
+    });
+    return map;
+  });
+
+  // ── View toggle: "table" (default, dropdown grid) | "grid" (9-box) ──────
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
+  const [moveError, setMoveError] = useState<string | null>(null);
+
   // Keep liveGrades in sync with saves so the distribution chart updates live.
   const handleGradeSaved = useCallback(
     (assignmentId: string, grade: string) => {
@@ -417,6 +433,61 @@ export default function CalibrationClient({
       });
     },
     [],
+  );
+
+  // ── 9-box drag handler ────────────────────────────────────────────────
+  // Optimistic: update local state, fire the v2 RPC; revert on error/skip.
+  async function handleGridMove(assignmentId: string, target: BoxCoord) {
+    const { boxToGrade } = await import("@/lib/nine-box");
+    const proposal = boxToGrade(target);
+    const prevGrade = liveGrades[assignmentId];
+    const prevPotential = livePotentials[assignmentId];
+    setLiveGrades((p) => ({ ...p, [assignmentId]: proposal.final_grade }));
+    setLivePotentials((p) => ({ ...p, [assignmentId]: proposal.potential }));
+    setMoveError(null);
+
+    const { data, error } = await supabase.rpc("update_calibration_grades", {
+      p_changes: [
+        {
+          assignment_id: assignmentId,
+          grade: proposal.final_grade,
+          potential_rating: proposal.potential,
+        },
+      ],
+    });
+    const skipped = (data as { skipped?: number } | null)?.skipped ?? 0;
+    if (error || skipped > 0) {
+      // Revert
+      setLiveGrades((p) => {
+        const next = { ...p };
+        if (prevGrade) next[assignmentId] = prevGrade;
+        else delete next[assignmentId];
+        return next;
+      });
+      setLivePotentials((p) => {
+        const next = { ...p };
+        if (prevPotential != null) next[assignmentId] = prevPotential;
+        else delete next[assignmentId];
+        return next;
+      });
+      setMoveError(error?.message ?? "Move was skipped — check permissions");
+    }
+  }
+
+  // Enriched view of assignments with the live grade+potential overrides
+  // applied. Memoized so the grid only re-buckets when something changes.
+  const enrichedForGrid = useMemo(
+    () =>
+      assignments.map((a) => ({
+        id: a.id,
+        employee: a.employee
+          ? { id: a.employee.id, slack_name: a.employee.slack_name, department: a.employee.department }
+          : null,
+        final_grade: liveGrades[a.id] ?? a.final_grade,
+        potential_rating: livePotentials[a.id] ?? a.potential_rating,
+        overall_rating: a.overall_rating,
+      })),
+    [assignments, liveGrades, livePotentials],
   );
 
   // ── Bulk apply: one RPC call instead of one UPDATE per unset row ────────
@@ -485,7 +556,7 @@ export default function CalibrationClient({
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Calibration — {cycle.name}
           </h1>
@@ -493,6 +564,26 @@ export default function CalibrationClient({
             Set final grades for each employee before releasing results.
           </p>
         </div>
+      </div>
+
+      {/* ── View-mode toggle ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant={viewMode === "table" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("table")}
+        >
+          Table
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === "grid" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setViewMode("grid")}
+        >
+          9-box grid
+        </Button>
       </div>
 
       {/* ── Grades-released warning ─────────────────────────────────────── */}
@@ -503,6 +594,8 @@ export default function CalibrationClient({
         </div>
       )}
 
+      {viewMode === "table" && (
+        <>
       {/* ── Stats row ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card className="border-border/60">
@@ -654,6 +747,31 @@ export default function CalibrationClient({
 
       {/* ── Grade distribution ─────────────────────────────────────────────── */}
       <GradeDistribution grades={liveGrades} />
+        </>
+      )}
+
+      {/* ── 9-box grid view ─────────────────────────────────────────────── */}
+      {viewMode === "grid" && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">9-box calibration grid</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {moveError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {moveError}
+              </div>
+            )}
+            <NineBoxGrid
+              assignments={enrichedForGrid}
+              onChipClick={() => {
+                /* Sprint 2 Task 7+8 wires the evidence sheet */
+              }}
+              onMove={handleGridMove}
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
