@@ -32,12 +32,15 @@ const CYCLE_TYPES = [
   { value: "custom", label: "Custom" },
 ];
 
+// Kept in sync with src/lib/cycle-phases.ts DEFAULT_PHASES. Only used by the
+// (currently unrendered) PhaseTimelinePreview helper below; the live wizard
+// timeline reads from the helper module directly via EditablePhaseTimeline.
 const DEFAULT_PHASES = [
-  { phase_type: "goal_setting",    name: "Goal Setting",          proportion: 2 / 12 },
+  { phase_type: "goal_setting",    name: "Goal Setting",          proportion: 1 / 12 },
   { phase_type: "self_assessment", name: "Self Assessment",        proportion: 2 / 12 },
   { phase_type: "peer_review",     name: "Peer Review",            proportion: 3 / 12 },
   { phase_type: "manager_review",  name: "Manager Review",         proportion: 2 / 12 },
-  { phase_type: "calibration",     name: "Calibration",            proportion: 1 / 12 },
+  { phase_type: "calibration",     name: "Calibration",            proportion: 2 / 12 },
   { phase_type: "communication",   name: "Results Communication",  proportion: 2 / 12 },
 ];
 

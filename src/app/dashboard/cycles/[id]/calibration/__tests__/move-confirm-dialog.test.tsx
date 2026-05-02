@@ -21,7 +21,7 @@ describe("<MoveConfirmDialog>", () => {
     render(
       <MoveConfirmDialog
         pending={null}
-        onConfirm={() => {}}
+        onConfirm={async () => {}}
         onCancel={() => {}}
       />,
     );
@@ -32,7 +32,7 @@ describe("<MoveConfirmDialog>", () => {
     render(
       <MoveConfirmDialog
         pending={samplePending}
-        onConfirm={() => {}}
+        onConfirm={async () => {}}
         onCancel={() => {}}
       />,
     );
@@ -43,12 +43,12 @@ describe("<MoveConfirmDialog>", () => {
   });
 
   it("calls onConfirm with the typed note (trimmed) when Confirm is clicked", () => {
-    const handler = vi.fn();
+    const handler = vi.fn().mockResolvedValue(undefined);
     render(
       <MoveConfirmDialog
         pending={samplePending}
         onConfirm={handler}
-        onCancel={() => {}}
+        onCancel={async () => {}}
       />,
     );
     const textarea = screen.getByRole("textbox");
@@ -57,12 +57,29 @@ describe("<MoveConfirmDialog>", () => {
     expect(handler).toHaveBeenCalledWith("Strong delivery");
   });
 
+  it("shows the error message and stays open when onConfirm rejects", async () => {
+    const handler = vi.fn().mockRejectedValue(new Error("Move was skipped"));
+    render(
+      <MoveConfirmDialog
+        pending={samplePending}
+        onConfirm={handler}
+        onCancel={async () => {}}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /confirm/i }));
+    // Microtask flush — allow the rejected promise to be caught by the dialog
+    await new Promise((r) => setTimeout(r, 0));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Move was skipped/);
+    // Dialog still open
+    expect(screen.getByText(/Why this change/i)).toBeInTheDocument();
+  });
+
   it("calls onCancel when Cancel is clicked", () => {
     const handler = vi.fn();
     render(
       <MoveConfirmDialog
         pending={samplePending}
-        onConfirm={() => {}}
+        onConfirm={async () => {}}
         onCancel={handler}
       />,
     );

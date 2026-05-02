@@ -10,10 +10,7 @@ import {
   buildUpwardFeedbackOpening,
   buildSurveyOpening,
   buildReminderMessage,
-  buildManagerEscalation,
-  buildFinalWarning,
   buildDeadlineReminder,
-  buildOverdueNotice,
   buildManagerDeadlineAlert,
 } from "../_shared/nami-blocks.ts";
 import {
@@ -1115,21 +1112,23 @@ async function processAssignmentReminder(
   let sent = 0;
   let skipped = 0;
 
-  // Deadline-anchored events: each fires at most once via notification_log dedup
+  // Deadline-anchored events: each fires at most once via notification_log
+  // dedup. Three pre-deadline tiers — survey-research sweet spot is 2-3
+  // reminders before diminishing returns. The post-deadline ("overdue") tier
+  // was dropped: by the time it would fire, the phase has typically
+  // auto-advanced and the reminder is noise (negative-spillover research,
+  // PMC PMC11046690). Manager escalation at deadline boundary is the
+  // evidence-supported path for late submissions and lives separately
+  // (manager_deadline_alert).
   const deadlineEvents = [
     { eventType: "nami_reminder_7d", threshold: 7 },
     { eventType: "nami_reminder_3d", threshold: 3 },
     { eventType: "nami_reminder_1d", threshold: 1 },
-    { eventType: "nami_overdue",     threshold: -1 },
   ];
 
   for (const { eventType, threshold } of deadlineEvents) {
-    // For overdue: fires when daysLeft < 0 (past deadline)
-    // For reminders: fires when daysLeft <= threshold
-    const shouldFire =
-      eventType === "nami_overdue"
-        ? daysLeft < 0
-        : daysLeft <= threshold;
+    // Reminders fire when daysLeft <= threshold (i.e., approaching deadline).
+    const shouldFire = daysLeft <= threshold;
 
     if (!shouldFire) continue;
 
@@ -1144,27 +1143,14 @@ async function processAssignmentReminder(
       continue;
     }
 
-    let blocks: any[];
-    let fallbackText: string;
-
-    if (eventType === "nami_overdue") {
-      blocks = buildOverdueNotice(
-        targetUser.slack_name || "there",
-        itemName,
-        actionValue,
-        actionId,
-      );
-      fallbackText = `Overdue: ${itemName}`;
-    } else {
-      blocks = buildDeadlineReminder(
-        targetUser.slack_name || "there",
-        itemName,
-        daysLeft,
-        actionValue,
-        actionId,
-      );
-      fallbackText = `Reminder: ${itemName} — ${daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`}`;
-    }
+    const blocks = buildDeadlineReminder(
+      targetUser.slack_name || "there",
+      itemName,
+      daysLeft,
+      actionValue,
+      actionId,
+    );
+    const fallbackText = `Reminder: ${itemName} — ${daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`}`;
 
     const ok = await sendSlackBlocks(
       botToken,

@@ -11,12 +11,21 @@ export type BoxCoord = { row: 0 | 1 | 2; col: 0 | 1 | 2 };
 
 /**
  * Map a numeric rating (1..5) to the 9-box row index.
- * Thresholds: <2.5 → 0, <3.5 → 1, ≥3.5 → 2.
+ *
+ * Thresholds are asymmetric on purpose: a symmetric (2.5/3.5) cut would
+ * expect ~33% of the workforce to land in High Potential, but CEB / Harvard
+ * benchmarking puts true HiPo prevalence at ~3-5%. Calibrating the cuts so
+ * "High Potential" requires top-of-scale (≥4.5) avoids the inflation that
+ * symmetric cuts produce. See docs/research/2026-05-02-calibration-evidence-base.md.
+ *
+ *   r < 2  → row 0 (Low Potential)        — bottom decile
+ *   r < 4.5 → row 1 (Core Player)         — broad middle (most employees)
+ *   r ≥ 4.5 → row 2 (High Potential)      — top of scale only
  */
 export function ratingToAxis(r: number | null | undefined): 0 | 1 | 2 | null {
   if (r === null || r === undefined) return null;
-  if (r < 2.5) return 0;
-  if (r < 3.5) return 1;
+  if (r < 2) return 0;
+  if (r < 4.5) return 1;
   return 2;
 }
 
@@ -63,13 +72,18 @@ export function gradeToBox(
  * Inverse: given a 9-box coordinate (a target box the user dragged a chip
  * into), propose a {final_grade, potential_rating} pair that snaps to that
  * box's centroid. Used when someone drags a chip and we need to write back.
+ *
+ * Potential centroids must round-trip cleanly through ratingToAxis: dragging
+ * a chip into row 2 must set a value that ratingToAxis maps back to row 2,
+ * otherwise the chip would visually jump after save.
  */
 const COL_TO_GRADE: Record<0 | 1 | 2, string> = {
   0: "Below Expectations",
   1: "Meets Expectations",
   2: "Exceeds Expectations",
 };
-const ROW_TO_POTENTIAL: Record<0 | 1 | 2, number> = { 0: 2, 1: 3, 2: 4 };
+// 1.5 round-trips to row 0 (<2); 3 round-trips to row 1 ([2, 4.5)); 5 round-trips to row 2 (≥4.5).
+const ROW_TO_POTENTIAL: Record<0 | 1 | 2, number> = { 0: 1.5, 1: 3, 2: 5 };
 
 export function boxToGrade(coord: BoxCoord): { final_grade: string; potential: number } {
   return {

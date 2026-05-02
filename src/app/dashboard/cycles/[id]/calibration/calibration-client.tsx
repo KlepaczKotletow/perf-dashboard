@@ -475,11 +475,13 @@ export default function CalibrationClient({
     if (!pendingMove) return;
     const { assignmentId, before, after } = pendingMove;
 
-    // Optimistic update + close dialog immediately.
+    // Optimistic UI on the chip itself (it visually moves immediately) but
+    // the dialog stays open until the RPC returns — the dialog handles its
+    // own "Saving…" / "Saved" / "error" lifecycle. NN/g guidance: confirm
+    // success before dismissing for high-stakes operations.
     setLiveGrades((p) => ({ ...p, [assignmentId]: after.final_grade }));
     setLivePotentials((p) => ({ ...p, [assignmentId]: after.potential }));
     setMoveError(null);
-    setPendingMove(null);
 
     const { data, error } = await supabase.rpc("update_calibration_grades", {
       p_changes: [
@@ -494,7 +496,7 @@ export default function CalibrationClient({
     });
     const skipped = (data as { skipped?: number } | null)?.skipped ?? 0;
     if (error || skipped > 0) {
-      // Revert
+      // Revert the optimistic UI so the chip jumps back to the prior box.
       setLiveGrades((p) => {
         const next = { ...p };
         if (before.final_grade) next[assignmentId] = before.final_grade;
@@ -507,8 +509,11 @@ export default function CalibrationClient({
         else delete next[assignmentId];
         return next;
       });
-      setMoveError(error?.message ?? "Move was skipped — check permissions");
-      return;
+      const message = error?.message ?? "Move was skipped — check permissions";
+      setMoveError(message);
+      // Throw so the dialog stays open with the error visible. The dialog
+      // catches and renders the message; pendingMove stays set until cancel.
+      throw new Error(message);
     }
     // Refresh the audit log (one increment = one re-fetch).
     setAuditRefreshKey((k) => k + 1);

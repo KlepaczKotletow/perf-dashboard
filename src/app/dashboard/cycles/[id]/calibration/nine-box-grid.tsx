@@ -118,10 +118,15 @@ export function NineBoxGrid({ assignments, onChipClick, onMove }: Props) {
               ([0, 1, 2] as const).map((col) => {
                 const k = `${row}-${col}`;
                 const list = buckets[k] || [];
+                // Asymmetric coloring: keep positive reinforcement for top-right
+                // (HiPo + Strong), use neutral muted styling everywhere else.
+                // Gallup research finds red "LoPo" cells anchor calibrators on
+                // a single salient cue and discourage further evidence review.
+                // We deliberately do NOT color the bottom-left red.
                 const tone =
-                  row === 2 && col === 2 ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-400/5 dark:border-emerald-400/20" :
-                  row === 0 && col === 0 ? "bg-rose-50 border-rose-200 dark:bg-rose-400/5 dark:border-rose-400/20" :
-                  "bg-muted/30 border-border/60";
+                  row === 2 && col === 2
+                    ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-400/5 dark:border-emerald-400/20"
+                    : "bg-muted/30 border-border/60";
                 return (
                   <BoxDroppable key={k} row={row} col={col} tone={tone}>
                     {list.map((a) => (
