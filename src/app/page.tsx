@@ -95,7 +95,7 @@ export default async function Home() {
                   </Button>
                 </div>
                 <p className="mt-4 text-xs text-white/30 tracking-wide">
-                  Free for up to 10 people · No credit card · Installs in 60 seconds
+                  No credit card · Installs in 60 seconds
                 </p>
               </div>
             </div>
