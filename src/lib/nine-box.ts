@@ -20,7 +20,12 @@ export function ratingToAxis(r: number | null | undefined): 0 | 1 | 2 | null {
   return 2;
 }
 
+// Two vocabularies float around the codebase: the active calibration-client
+// page uses "Unsatisfactory" as the bottom grade; the older calibration-view
+// uses "Needs Improvement". Accept both so existing data with either label
+// maps cleanly to the same box.
 const GRADE_TO_COL: Record<string, 0 | 1 | 2> = {
+  "Unsatisfactory": 0,
   "Needs Improvement": 0,
   "Below Expectations": 0,
   "Meets Expectations": 1,
@@ -30,6 +35,7 @@ const GRADE_TO_COL: Record<string, 0 | 1 | 2> = {
 
 // When potential is unknown, the grade implies a default row (matches column).
 const GRADE_TO_DEFAULT_ROW: Record<string, 0 | 1 | 2> = {
+  "Unsatisfactory": 0,
   "Needs Improvement": 0,
   "Below Expectations": 0,
   "Meets Expectations": 1,

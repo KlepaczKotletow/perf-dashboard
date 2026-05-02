@@ -51,3 +51,10 @@ describe("nine-box helpers", () => {
     });
   });
 });
+
+describe("vocabulary compat", () => {
+  it("accepts both Unsatisfactory and Needs Improvement as col 0", () => {
+    expect(gradeToBox("Unsatisfactory", null)).toEqual({ row: 0, col: 0 });
+    expect(gradeToBox("Needs Improvement", null)).toEqual({ row: 0, col: 0 });
+  });
+});
