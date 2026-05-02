@@ -3052,6 +3052,98 @@ Deno.serve(async (req) => {
       if (action?.action_id === "view_dashboard" || action?.action_id === "view_calibration" || action?.action_id === "open_dashboard") {
         // These are URL buttons, no action needed
       }
+
+      // ───────────────────────────────────────────────────────────────────
+      // Notification-prefs handlers (Sprint 3): snooze, wake, mode-switch.
+      // The RPC set_notification_prefs uses auth_user_id() and won't work
+      // from the service-role context this edge function runs in, so we
+      // do a direct read-modify-write on users.notification_prefs.
+      // ───────────────────────────────────────────────────────────────────
+      async function updatePrefs(
+        appUserId: string,
+        patch: Record<string, unknown>,
+      ): Promise<void> {
+        const safeId = asUuid(appUserId);
+        if (!safeId) return;
+        const rows = await dbQuery(
+          "users",
+          `id=eq.${safeId}&select=notification_prefs`,
+        );
+        const current = (rows?.[0]?.notification_prefs as Record<string, unknown>) ?? {
+          mode: "realtime",
+          digest_hour: 9,
+          digest_timezone: "UTC",
+          snoozed_until: null,
+        };
+        const next = { ...current, ...patch };
+        await dbUpdate("users", `id=eq.${safeId}`, { notification_prefs: next });
+      }
+
+      if (action?.action_id?.startsWith("snooze_")) {
+        const slackUserId = asSlackUserId(payload.user?.id);
+        if (!slackUserId) return json({});
+        const appUser = await getOrCreateUser(wsId, slackUserId, botToken);
+        if (!appUser?.id) return json({});
+
+        const hours =
+          action.action_id === "snooze_4h"
+            ? 4
+            : action.action_id === "snooze_24h"
+              ? 24
+              : null; // snooze_until_done
+
+        // "until done" = far-future timestamp (1 year). User can wake via
+        // App Home or by clicking the dashboard "wake me up" control.
+        const snoozedUntil = hours
+          ? new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+          : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+
+        await updatePrefs(appUser.id, { snoozed_until: snoozedUntil });
+
+        const message = hours
+          ? `Snoozed for ${hours}h. We'll only ping you for critical updates until then.`
+          : "Paused. Open Nami's home tab whenever you want to resume.";
+        return json({
+          response_type: "ephemeral",
+          replace_original: false,
+          text: message,
+        });
+      }
+
+      if (action?.action_id === "clear_snooze") {
+        const slackUserId = asSlackUserId(payload.user?.id);
+        if (!slackUserId) return json({});
+        const appUser = await getOrCreateUser(wsId, slackUserId, botToken);
+        if (!appUser?.id) return json({});
+        await updatePrefs(appUser.id, { snoozed_until: null });
+        return json({
+          response_type: "ephemeral",
+          replace_original: false,
+          text: "Welcome back — reminders re-enabled.",
+        });
+      }
+
+      if (action?.action_id === "set_notification_mode") {
+        const slackUserId = asSlackUserId(payload.user?.id);
+        if (!slackUserId) return json({});
+        const appUser = await getOrCreateUser(wsId, slackUserId, botToken);
+        if (!appUser?.id) return json({});
+        const mode = action.selected_option?.value;
+        if (mode !== "realtime" && mode !== "digest" && mode !== "critical_only") {
+          return json({});
+        }
+        await updatePrefs(appUser.id, { mode });
+        return json({
+          response_type: "ephemeral",
+          replace_original: false,
+          text:
+            mode === "realtime"
+              ? "Switched to realtime — you'll get pings as things happen."
+              : mode === "digest"
+                ? "Switched to daily digest — one DM per day, snoozable."
+                : "Switched to critical only — you'll only hear from us for cycle launches, grade releases, and final escalations.",
+        });
+      }
     }
 
     return json({});

@@ -21,6 +21,11 @@ import {
 } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
 import { getDeadlineForCycle } from "../_shared/deadline-resolver.ts";
+import {
+  shouldDeliverNow,
+  coercePrefs,
+  type Priority,
+} from "../_shared/notification-rules.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -108,6 +113,30 @@ async function logNotification(
     referenceId,
   });
   return false;
+}
+
+/**
+ * Check whether a non-critical message should reach a recipient given their
+ * notification_prefs (mode + snooze). Returns true if delivery is allowed,
+ * false if the message should be deferred. Critical-priority callers should
+ * skip this check entirely — critical messages always deliver.
+ *
+ * Defensive: if the user lookup fails or prefs are malformed, falls back to
+ * "deliver" (realtime default). Never blocks delivery on a query error.
+ */
+async function isAllowedByPrefs(
+  appUserId: string,
+  priority: Priority,
+  now: Date = new Date(),
+): Promise<boolean> {
+  if (priority === "critical") return true;
+  const { data } = await supabase
+    .from("users")
+    .select("notification_prefs")
+    .eq("id", appUserId)
+    .maybeSingle();
+  const prefs = coercePrefs((data as any)?.notification_prefs);
+  return shouldDeliverNow(prefs, priority, now);
 }
 
 async function rollbackNotification(
@@ -1131,6 +1160,17 @@ async function processAssignmentReminder(
     const shouldFire = daysLeft <= threshold;
 
     if (!shouldFire) continue;
+
+    // Honor user notification_prefs BEFORE claiming the dedup slot. If the
+    // user is snoozed or in digest/critical_only mode, skip — the cron will
+    // re-evaluate on the next tick and send once snooze expires or the user
+    // flips back to realtime. We don't claim the notification_log row in
+    // this branch, so retry is naturally allowed.
+    const allowed = await isAllowedByPrefs(targetUser.id, "normal");
+    if (!allowed) {
+      skipped++;
+      continue;
+    }
 
     const canSend = await logNotification(
       workspaceId,

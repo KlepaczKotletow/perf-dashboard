@@ -685,6 +685,32 @@ export function buildDeadlineReminder(
         },
       ],
     },
+    // Snooze controls — let recipients pause non-critical reminders without
+    // turning the bot off entirely. Critical messages (final escalations,
+    // grade releases) still bypass snooze server-side.
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "💤 Snooze 4h", emoji: true },
+          action_id: "snooze_4h",
+          value: "4",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "💤 Until tomorrow", emoji: true },
+          action_id: "snooze_24h",
+          value: "24",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "🔕 Pause until I'm done", emoji: true },
+          action_id: "snooze_until_done",
+          value: "until_done",
+        },
+      ],
+    },
   ];
 }
 

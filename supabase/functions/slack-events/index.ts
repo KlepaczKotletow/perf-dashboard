@@ -183,6 +183,81 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
     blocks.push(section(`<${DASHBOARD_URL}/dashboard|Open full dashboard>`));
   }
 
+  // ── Notification settings (Sprint 3) ─────────────────────────────
+  // Mode + snooze control. Lets users opt in to digest mode or pause
+  // reminders without an admin getting involved.
+  const { data: prefsRow } = await supabase
+    .from("users")
+    .select("notification_prefs")
+    .eq("id", userId)
+    .maybeSingle();
+  const prefs = (prefsRow?.notification_prefs ?? {}) as Record<string, unknown>;
+  const mode = (prefs.mode === "digest" || prefs.mode === "critical_only" ? prefs.mode : "realtime") as
+    | "realtime"
+    | "digest"
+    | "critical_only";
+  const digestHour =
+    typeof prefs.digest_hour === "number" && prefs.digest_hour >= 0 && prefs.digest_hour <= 23
+      ? prefs.digest_hour
+      : 9;
+  const digestTz =
+    typeof prefs.digest_timezone === "string" && prefs.digest_timezone.length > 0
+      ? prefs.digest_timezone
+      : "UTC";
+  const snoozedUntilIso = typeof prefs.snoozed_until === "string" ? prefs.snoozed_until : null;
+  const snoozedUntilDate = snoozedUntilIso ? new Date(snoozedUntilIso) : null;
+  const isSnoozed =
+    !!snoozedUntilDate && !Number.isNaN(snoozedUntilDate.getTime()) && snoozedUntilDate > new Date();
+
+  blocks.push(divider());
+  blocks.push(header("⚙️ Notification settings"));
+
+  const modeLabel =
+    mode === "digest"
+      ? `Daily digest at ${String(digestHour).padStart(2, "0")}:00 ${digestTz}`
+      : mode === "critical_only"
+        ? "Critical only"
+        : "Realtime (each event)";
+  blocks.push(section(`*Current mode:* ${modeLabel}`));
+
+  if (isSnoozed) {
+    blocks.push(
+      section(
+        `_Snoozed until ${snoozedUntilDate!.toLocaleString("en-GB", {
+          dateStyle: "short",
+          timeStyle: "short",
+        })}_`,
+      ),
+    );
+  }
+
+  const modeOptions = [
+    { text: { type: "plain_text", text: "Realtime (each event)" }, value: "realtime" },
+    { text: { type: "plain_text", text: "Daily digest" }, value: "digest" },
+    { text: { type: "plain_text", text: "Critical only" }, value: "critical_only" },
+  ];
+  const initialModeOption = modeOptions.find((o) => o.value === mode) ?? modeOptions[0];
+
+  const settingsActions: any[] = [
+    {
+      type: "static_select",
+      action_id: "set_notification_mode",
+      placeholder: { type: "plain_text", text: "Notification mode" },
+      initial_option: initialModeOption,
+      options: modeOptions,
+    },
+  ];
+  if (isSnoozed) {
+    settingsActions.push({
+      type: "button",
+      text: { type: "plain_text", text: "Wake me up", emoji: true },
+      style: "primary",
+      action_id: "clear_snooze",
+    });
+  }
+
+  blocks.push({ type: "actions", elements: settingsActions });
+
   return blocks;
 }
 
