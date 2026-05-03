@@ -64,27 +64,27 @@ export function EvidenceSheet({ assignmentId, open, onClose, workspaceId, cycleI
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto px-6">
+        <SheetHeader className="px-0 pt-2 pb-4">
           <SheetTitle>{assignment?.employee?.slack_name ?? "Evidence"}</SheetTitle>
           <SheetDescription>What&apos;s underneath this calibration decision</SheetDescription>
         </SheetHeader>
 
         {loading && (
-          <div className="mt-6 space-y-3">
+          <div className="space-y-3 pb-6">
             <Skeleton className="h-24" />
             <Skeleton className="h-24" />
           </div>
         )}
 
         {error && (
-          <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
             {error}
           </div>
         )}
 
         {data && !loading && (
-          <div className="mt-6 space-y-6 px-1">
+          <div className="space-y-6 pb-6">
             {data.priorGrade && (
               <section>
                 <h4 className="text-sm font-semibold mb-2">Last cycle</h4>

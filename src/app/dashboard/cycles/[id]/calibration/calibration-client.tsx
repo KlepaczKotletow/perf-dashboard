@@ -77,17 +77,6 @@ const GRADE_OPTIONS = [
   { value: "Unsatisfactory", label: "Unsatisfactory", color: "text-red-700 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-400/10 dark:border-red-400/20" },
 ] as const;
 
-const COMPETENCY_COLORS = [
-  "bg-violet-400",
-  "bg-sky-400",
-  "bg-emerald-400",
-  "bg-amber-400",
-  "bg-rose-400",
-  "bg-indigo-400",
-  "bg-teal-400",
-  "bg-orange-400",
-];
-
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getAvgRating(responses: AssignmentRow["responses"], role?: string): number | null {
@@ -112,52 +101,6 @@ function getInitials(name: string | null | undefined): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-// ── Mini competency bar chart ────────────────────────────────────────────────
-
-function CompetencyBars({ responses }: { responses: AssignmentRow["responses"] }) {
-  // Average by competency (use manager responses if available, else all)
-  const byCompetency = useMemo(() => {
-    const map: Record<string, { name: string; ratings: number[] }> = {};
-    const mgrResponses = responses.filter((r) => r.reviewer_role === "manager" && r.competency && r.rating > 0);
-    const useResponses = mgrResponses.length > 0 ? mgrResponses : responses.filter((r) => r.competency && r.rating > 0);
-    useResponses.forEach((r) => {
-      const key = r.competency!.name;
-      if (!map[key]) map[key] = { name: key, ratings: [] };
-      map[key].ratings.push(r.rating);
-    });
-    return Object.values(map).map((c) => ({
-      name: c.name,
-      avg: c.ratings.reduce((s, v) => s + v, 0) / c.ratings.length,
-    }));
-  }, [responses]);
-
-  if (byCompetency.length === 0) {
-    return <span className="text-xs text-muted-foreground/40">No data</span>;
-  }
-
-  return (
-    <div className="flex items-end gap-1 h-8" title="Competency scores (1–5)">
-      {byCompetency.map((c, i) => {
-        const heightPct = (c.avg / 5) * 100;
-        const color = COMPETENCY_COLORS[i % COMPETENCY_COLORS.length];
-        return (
-          <div
-            key={c.name}
-            className="flex flex-col items-center justify-end gap-0.5"
-            style={{ minWidth: 10 }}
-            title={`${c.name}: ${c.avg.toFixed(1)}`}
-          >
-            <div
-              className={`w-2.5 rounded-sm ${color} opacity-80`}
-              style={{ height: `${Math.max(heightPct * 0.28, 3)}px` }}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
 }
 
 // ── Rating bar ───────────────────────────────────────────────────────────────
@@ -292,7 +235,7 @@ function AssignmentTableRow({
   }
 
   return (
-    <div className="grid grid-cols-[minmax(160px,1fr)_80px_60px_180px_180px_80px] gap-x-4 items-center px-5 py-3 hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0 min-w-[760px]">
+    <div className="grid grid-cols-[minmax(180px,1fr)_100px_140px_200px_60px] gap-x-4 items-center px-5 py-3 hover:bg-muted/30 transition-colors border-b border-border/40 last:border-0 min-w-[680px]">
       {/* Employee */}
       <div className="min-w-0 pr-2">
         <div className="flex items-center gap-2">
@@ -327,11 +270,6 @@ function AssignmentTableRow({
       {/* Avg rating + bar */}
       <div>
         <RatingBar value={displayAvg} />
-      </div>
-
-      {/* Competency breakdown */}
-      <div>
-        <CompetencyBars responses={assignment.responses} />
       </div>
 
       {/* Final grade select */}
@@ -781,7 +719,7 @@ export default function CalibrationClient({
         </CardHeader>
         <CardContent className="p-0 mt-4 overflow-x-auto">
           {/* Column headers */}
-          <div className="grid grid-cols-[minmax(160px,1fr)_80px_60px_180px_180px_80px] gap-x-4 items-center px-5 pb-2.5 border-b border-border/60 min-w-[760px]">
+          <div className="grid grid-cols-[minmax(180px,1fr)_100px_140px_200px_60px] gap-x-4 items-center px-5 pb-2.5 border-b border-border/60 min-w-[680px]">
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
               Employee
             </p>
@@ -795,9 +733,6 @@ export default function CalibrationClient({
               Rating
               <ArrowUpDown className="h-3 w-3" />
             </button>
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-              Competencies
-            </p>
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
               Final Grade
             </p>
