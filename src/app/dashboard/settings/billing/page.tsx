@@ -34,10 +34,10 @@ const planFeatures = [
 ];
 
 const statusColors: Record<string, string> = {
-  active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  past_due: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  canceled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  trialing: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
+  active: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
+  past_due: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
+  canceled: "text-red-700 bg-red-50 dark:text-red-400 dark:bg-red-400/10",
+  trialing: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
 };
 
 function formatStatus(status: string): string {
