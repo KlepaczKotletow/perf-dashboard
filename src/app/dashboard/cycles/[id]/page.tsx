@@ -630,7 +630,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
             <CardDescription className="text-xs">Direct reports reviewing their managers</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/60">
               {upwardAssignments.map((assignment: any) => {
                 const done = assignment.status === "completed";
                 return (

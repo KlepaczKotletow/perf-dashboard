@@ -67,7 +67,7 @@ export default async function ProfilePage() {
   ];
 
   return (
-    <div className="max-w-lg space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <PageHeader
         hat="my-work"
         title="Profile"
@@ -89,7 +89,7 @@ export default async function ProfilePage() {
 
       {/* Details */}
       <Card>
-        <CardContent className="divide-y divide-border p-0">
+        <CardContent className="divide-y divide-border/60 p-0">
           {detailRows.map((row) => (
             <div key={row.label} className="flex items-center gap-3 px-5 py-3.5">
               <row.icon className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -142,7 +142,7 @@ export default async function ProfilePage() {
             </Link>
           </div>
           <Card className="border-border/60">
-            <CardContent className="divide-y divide-border p-0">
+            <CardContent className="divide-y divide-border/60 p-0">
               {recentReviews.map((r: any) => (
                 <div key={r.id} className="flex items-center justify-between px-5 py-3">
                   <div className="flex items-center gap-3">

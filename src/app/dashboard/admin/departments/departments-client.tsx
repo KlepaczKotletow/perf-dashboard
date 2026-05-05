@@ -157,7 +157,7 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
             <p className="text-sm text-muted-foreground">Add your first department to get started.</p>
           </div>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-border/60">
             {initialDepartments.map((dept) => (
               <li key={dept.id} className="group flex items-center justify-between px-5 py-3.5 hover:bg-muted/30 transition-colors">
                 {renamingId === dept.id ? (

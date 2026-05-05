@@ -122,7 +122,7 @@ export function ResultsSection({
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Feedback
             </p>
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/60">
               {feedbackPreviews.map((fb, idx) => {
                 const badgeClass =
                   roleBadgeColors[fb.reviewerRole] || roleBadgeColors.peer;
