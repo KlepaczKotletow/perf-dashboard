@@ -308,7 +308,7 @@ export default function GoalDetailClient({
   // ─── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="max-w-3xl mx-auto space-y-6">
       <PageHeader hat="my-work" title={goal.title} />
       {/* Header */}
       <div className="flex items-start justify-between gap-3">

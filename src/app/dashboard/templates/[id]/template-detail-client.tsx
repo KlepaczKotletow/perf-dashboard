@@ -115,7 +115,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
 
   if (editing) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
         <PageHeader
           hat="manage"
           title={template.name || "Edit Template"}
@@ -170,7 +170,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
           </CardHeader>
           <CardContent>
             {editQuestions.length === 0 ? (
-              <p className="text-center text-slate-500 py-4">
+              <p className="text-center text-muted-foreground py-4">
                 No questions yet. Click &quot;Add Question&quot; to get started.
               </p>
             ) : (
@@ -178,9 +178,9 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
                 {editQuestions.map((question, index) => (
                   <div
                     key={question.id}
-                    className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                    className="flex items-start gap-3 p-4 bg-muted/40 rounded-lg"
                   >
-                    <span className="text-sm font-medium text-slate-400 w-6 pt-2">
+                    <span className="text-sm font-medium text-muted-foreground w-6 pt-2">
                       {index + 1}.
                     </span>
                     <div className="flex-1 space-y-3">
@@ -222,7 +222,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950 shrink-0 mt-1"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0 mt-1"
                       onClick={() => removeQuestion(index)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -240,7 +240,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
   // ── Read-only view ────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         hat="manage"
         title={template.name}
@@ -251,7 +251,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
           <div className="flex items-center gap-3">
             {template.is_default && <Badge variant="secondary">Default</Badge>}
             {template.is_system && (
-              <Badge variant="outline" className="border-blue-200 text-blue-700 dark:border-blue-800 dark:text-blue-400">
+              <Badge variant="outline" className="border-sky-200 text-sky-700 dark:border-sky-400/30 dark:text-sky-400">
                 System
               </Badge>
             )}
@@ -265,7 +265,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
       </div>
 
       {template.is_system && (
-        <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-3">
+        <div className="flex items-center gap-2 text-sm text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-400/10 border border-sky-200 dark:border-sky-400/20 rounded-lg px-4 py-3">
           <Info className="h-4 w-4 shrink-0" />
           System template &mdash; duplicate to customize
         </div>
@@ -275,7 +275,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Questions</CardTitle>
-            <FileText className="h-4 w-4 text-slate-500" />
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{questions.length}</div>
@@ -284,7 +284,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Reviews Using</CardTitle>
-            <Star className="h-4 w-4 text-slate-500" />
+            <Star className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{reviewCount}</div>
@@ -293,13 +293,13 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Created</CardTitle>
-            <MessageSquare className="h-4 w-4 text-slate-500" />
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-lg font-medium">
               {format(new Date(template.created_at), "MMM d, yyyy")}
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground">
               by {template.creator?.slack_name || "System"}
             </p>
           </CardContent>
@@ -313,15 +313,15 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
         </CardHeader>
         <CardContent>
           {questions.length === 0 ? (
-            <p className="text-center text-slate-500 py-4">No questions defined</p>
+            <p className="text-center text-muted-foreground py-4">No questions defined</p>
           ) : (
             <div className="space-y-3">
               {questions.map((question: any, index: number) => (
                 <div
                   key={question.id || index}
-                  className="flex items-start gap-4 p-4 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                  className="flex items-start gap-4 p-4 bg-muted/40 rounded-lg"
                 >
-                  <span className="text-sm font-medium text-slate-400 w-6">
+                  <span className="text-sm font-medium text-muted-foreground w-6">
                     {index + 1}.
                   </span>
                   <div className="flex-1">
@@ -331,7 +331,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
                         {question.type === "rating" ? "Rating (1-5)" : "Text"}
                       </Badge>
                       {question.required && (
-                        <Badge variant="outline" className="text-xs text-red-600 border-red-200">
+                        <Badge variant="outline" className="text-xs text-amber-700 border-amber-200 dark:text-amber-400 dark:border-amber-400/30">
                           Required
                         </Badge>
                       )}

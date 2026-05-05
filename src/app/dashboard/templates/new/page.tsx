@@ -232,7 +232,7 @@ export default function NewTemplatePage() {
               {questions.map((question, idx) => (
                 <div
                   key={question.id}
-                  className="flex gap-3 items-start p-4 bg-slate-50 dark:bg-slate-900 rounded-lg"
+                  className="flex gap-3 items-start p-4 bg-muted/40 rounded-lg"
                 >
                   <div className="flex flex-col gap-0.5">
                     <button

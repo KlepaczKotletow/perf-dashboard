@@ -44,14 +44,14 @@ async function getSurveys(workspaceId: string) {
 
 const TYPE_LABELS: Record<string, string> = { "360": "360°", pulse: "Pulse", enps: "eNPS" };
 const TYPE_COLORS: Record<string, string> = {
-  "360": "bg-purple-100 text-purple-700 border-purple-200",
-  pulse: "bg-blue-100 text-blue-700 border-blue-200",
-  enps: "bg-green-100 text-green-700 border-green-200",
+  "360": "text-violet-700 bg-violet-50 border-violet-200 dark:text-violet-400 dark:bg-violet-400/10 dark:border-violet-400/20",
+  pulse: "text-sky-700 bg-sky-50 border-sky-200 dark:text-sky-400 dark:bg-sky-400/10 dark:border-sky-400/20",
+  enps: "text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20",
 };
 const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-gray-100 text-gray-600 border-gray-200",
-  active: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  closed: "bg-slate-100 text-slate-600 border-slate-200",
+  draft: "text-zinc-600 bg-zinc-100 border-zinc-200 dark:text-zinc-400 dark:bg-zinc-400/10 dark:border-zinc-400/20",
+  active: "text-emerald-700 bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:bg-emerald-400/10 dark:border-emerald-400/20",
+  closed: "text-zinc-600 bg-zinc-100 border-zinc-200 dark:text-zinc-400 dark:bg-zinc-400/10 dark:border-zinc-400/20",
 };
 
 export default async function SurveysPage() {

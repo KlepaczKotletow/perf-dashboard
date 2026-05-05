@@ -115,15 +115,15 @@ export default async function BillingPage() {
   if (!isAdmin(workspace?.role)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <Lock className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold text-foreground mb-2">
-          Access Restricted
-        </h1>
-        <p className="text-muted-foreground mb-6">
+        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+          <Lock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h1>
+        <p className="text-sm text-muted-foreground mb-5 max-w-xs">
           Billing management is only available to workspace administrators.
         </p>
-        <Button asChild>
-          <Link href="/dashboard">Go to Dashboard</Link>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard">Back to Dashboard</Link>
         </Button>
       </div>
     );
@@ -280,9 +280,9 @@ export default async function BillingPage() {
             <CardTitle>Recent invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="divide-y">
+            <ul className="divide-y divide-border/60">
               {invoices.map((inv) => (
-                <li key={inv.id} className="py-2 flex items-center justify-between">
+                <li key={inv.id} className="py-2.5 flex items-center justify-between">
                   <div>
                     <p className="font-medium">
                       {inv.created ? format(new Date(inv.created * 1000), "MMM d, yyyy") : "—"}

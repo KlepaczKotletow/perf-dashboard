@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { isHROrAbove } from "@/lib/roles";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
 import { PageHeader } from "@/components/page-header";
+import { ScrollText } from "lucide-react";
 
 const PAGE_SIZE = 100;
 
@@ -66,7 +68,7 @@ export default async function AuditLogPage({
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Audit log"
@@ -101,8 +103,16 @@ export default async function AuditLogPage({
         </CardHeader>
         <CardContent className="p-0">
           {!rows || rows.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
-              No events recorded yet.
+            <div className="py-16 text-center">
+              <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                <ScrollText className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">No events recorded yet</p>
+              <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                {actionFilter
+                  ? "Try a different filter — there are no entries for this action."
+                  : "Sensitive actions will be logged here as they happen."}
+              </p>
             </div>
           ) : (
             <ol className="divide-y divide-border/60">
@@ -134,31 +144,13 @@ export default async function AuditLogPage({
         </CardContent>
       </Card>
 
-      {count !== null && count !== undefined && count > PAGE_SIZE && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            Page {page} of {Math.max(1, Math.ceil(count / PAGE_SIZE))}
-          </span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <a
-                href={`?page=${page - 1}${actionFilter ? `&action=${actionFilter}` : ""}`}
-                className="underline hover:no-underline"
-              >
-                Previous
-              </a>
-            )}
-            {page * PAGE_SIZE < count && (
-              <a
-                href={`?page=${page + 1}${actionFilter ? `&action=${actionFilter}` : ""}`}
-                className="underline hover:no-underline"
-              >
-                Next
-              </a>
-            )}
-          </div>
-        </div>
-      )}
+      <Pagination
+        page={page}
+        pageSize={PAGE_SIZE}
+        total={count ?? 0}
+        basePath="/dashboard/admin/audit"
+        searchParams={actionFilter ? { action: actionFilter } : {}}
+      />
     </div>
   );
 }

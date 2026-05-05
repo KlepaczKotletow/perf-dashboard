@@ -89,7 +89,7 @@ export default async function TeamPage({
   const departments = [...new Set(users.map((u: any) => u.department).filter(Boolean))].sort();
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Directory"

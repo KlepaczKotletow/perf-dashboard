@@ -29,12 +29,7 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
     if (goalError) {
       console.error("[goal-detail] goal query failed:", goalError.code, goalError.message);
     }
-    if (!goal) {
-      console.error("[goal-detail] goal is null for id:", id);
-      notFound();
-    }
-
-    console.log("[goal-detail] goal loaded:", goal.id, goal.title);
+    if (!goal) notFound();
 
     // Fetch child goals
     const { data: childGoals } = await supabase
@@ -71,8 +66,6 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
         .order("created_at", { ascending: false })
         .limit(100),
     ]);
-
-    console.log("[goal-detail] rendering GoalDetailClient");
 
     return (
       <GoalDetailClient

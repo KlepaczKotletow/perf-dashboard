@@ -71,7 +71,7 @@ export default async function CyclesPage() {
 
       {/* ── List ── */}
       {cycles.length === 0 ? (
-        <div className="rounded-lg border border-border/60 bg-card py-16 text-center">
+        <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
           <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
             <CalendarClock className="h-5 w-5 text-muted-foreground" />
           </div>

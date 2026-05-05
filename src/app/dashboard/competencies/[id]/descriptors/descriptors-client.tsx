@@ -108,7 +108,7 @@ export default function DescriptorsClient({
   for (let s = scale.min; s <= scale.max; s++) scores.push(s);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Score descriptors"

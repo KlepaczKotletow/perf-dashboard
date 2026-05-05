@@ -541,7 +541,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                           Done
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70">
                           <Circle className="h-3.5 w-3.5" />
                           Pending
                         </span>
@@ -560,7 +560,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                           Done
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70">
                           <Circle className="h-3.5 w-3.5" />
                           Pending
                         </span>
@@ -648,7 +648,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                           Submitted
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70">
                           <Circle className="h-3.5 w-3.5" />
                           Pending
                         </span>
@@ -801,7 +801,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                           Reminded
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70">
                           <Circle className="h-3.5 w-3.5" />
                           Pending
                         </span>
@@ -813,7 +813,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
                       ) : row.sentAt ? (
                         <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">Sent</Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] text-zinc-500 border-zinc-300">Pending</Badge>
+                        <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/60">Pending</Badge>
                       )}
                     </div>
                     <div className="flex justify-center">

@@ -1191,7 +1191,7 @@ export default function GoalsClient({
       )}
       <Sheet open={showCreatePanel} onOpenChange={setShowCreatePanel}>
         <SheetContent className="sm:max-w-md overflow-y-auto px-6">
-          <SheetHeader className="pb-4">
+          <SheetHeader className="px-0 pt-2 pb-4">
             <SheetTitle>Create Goal</SheetTitle>
             <SheetDescription>Set a KPI target for your team or individual.</SheetDescription>
           </SheetHeader>
@@ -1285,7 +1285,7 @@ export default function GoalsClient({
               </div>
             )}
           </div>
-          <SheetFooter className="pt-6">
+          <SheetFooter className="px-0 pt-6 pb-2">
             <Button onClick={handleCreate} disabled={createLoading || !newGoal.title || !newGoal.employee_id} className="w-full">
               {createLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
               Create Goal
@@ -1296,7 +1296,7 @@ export default function GoalsClient({
 
       <Sheet open={showEditPanel} onOpenChange={setShowEditPanel}>
         <SheetContent className="sm:max-w-md overflow-y-auto px-6">
-          <SheetHeader className="pb-4">
+          <SheetHeader className="px-0 pt-2 pb-4">
             <SheetTitle>Edit Goal</SheetTitle>
             <SheetDescription>Update this KPI target.</SheetDescription>
           </SheetHeader>
@@ -1401,7 +1401,7 @@ export default function GoalsClient({
               <p className="text-[11px] text-muted-foreground">0 to 1.0 — relative importance</p>
             </div>
           </div>
-          <SheetFooter className="pt-6">
+          <SheetFooter className="px-0 pt-6 pb-2">
             <Button onClick={handleEdit} disabled={editLoading || !editForm.title} className="w-full">
               {editLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Changes

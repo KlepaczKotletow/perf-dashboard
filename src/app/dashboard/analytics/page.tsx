@@ -753,12 +753,16 @@ export default async function AnalyticsPage({
   if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <Lock className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>
-        <p className="text-muted-foreground mb-6 max-w-md">
+        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+          <Lock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h1>
+        <p className="text-sm text-muted-foreground mb-5 max-w-xs">
           Analytics are only available to managers and administrators.
         </p>
-        <Button asChild><Link href="/dashboard">Go to Dashboard</Link></Button>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard">Back to Dashboard</Link>
+        </Button>
       </div>
     );
   }
@@ -922,13 +926,13 @@ export default async function AnalyticsPage({
 
           {/* Performance Ranking */}
           {analytics.rankingData.length > 0 && (
-            <Card>
-              <div className="px-6 pt-6 pb-2">
+            <Card className="border-border/60">
+              <div className="px-6 pt-5 pb-3 border-b border-border/60">
                 <div className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-amber-500" />
-                  <h2 className="text-base font-semibold">Performance Ranking</h2>
+                  <Star className="h-4 w-4 text-amber-500" />
+                  <h2 className="text-sm font-semibold text-foreground">Performance Ranking</h2>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Employees ranked by average rating. Tier: Exceptional ≥ 4.5 · Strong ≥ 4.0 · Solid ≥ 3.0 · Needs Dev &lt; 3.0
                 </p>
               </div>
@@ -993,10 +997,10 @@ export default async function AnalyticsPage({
 
       {activeTab === "heatmap" && heatmapData && (
         <Card className="border-border/60">
-          <div className="px-6 pt-6 pb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold">Competency Heatmap</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">
+          <div className="px-6 pt-5 pb-4 border-b border-border/60 flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-foreground">Competency Heatmap</h2>
+              <p className="text-xs text-muted-foreground mt-1">
                 Average ratings across competencies, grouped by the selected dimension. Colors reflect your rating scale.
               </p>
             </div>

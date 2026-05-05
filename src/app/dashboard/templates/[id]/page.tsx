@@ -47,7 +47,7 @@ export default async function TemplateDetailPage({
   const { template, reviewCount } = data;
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-start gap-4">
         <Button variant="outline" size="icon" asChild>
           <Link href="/dashboard/templates">

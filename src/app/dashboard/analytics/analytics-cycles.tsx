@@ -29,10 +29,10 @@ interface AnalyticsCyclesProps {
 type BreakdownView = "department" | "function" | "manager";
 
 const STATUS_BADGE: Record<string, string> = {
-  active: "bg-blue-50 text-blue-700 dark:bg-blue-400/10 dark:text-blue-400",
-  in_review: "bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400",
-  completed: "bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400",
-  closed: "bg-gray-100 text-gray-600 dark:bg-gray-400/10 dark:text-gray-400",
+  active: "text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10",
+  in_review: "text-amber-700 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10",
+  completed: "text-sky-700 bg-sky-50 dark:text-sky-400 dark:bg-sky-400/10",
+  closed: "text-zinc-600 bg-zinc-100 dark:text-zinc-400 dark:bg-zinc-400/10",
 };
 
 function formatDateRange(start: string | null, end: string | null) {

@@ -12,7 +12,7 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader hat="my-work" title="Help" />
       <EmptyState
         icon={HelpCircle}
