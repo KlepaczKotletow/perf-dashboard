@@ -16,7 +16,6 @@ import {
   MessageSquare,
   Star,
   Medal,
-  BarChart3,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
@@ -236,35 +235,6 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
           </div>
         </div>
       )}
-
-      {/* Quick links */}
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3">
-          Quick links
-        </h2>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {[
-            { href: "/dashboard/goals", label: "My Goals", description: "Track and update your goals", icon: Flag, color: "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-400/10" },
-            { href: "/dashboard/performance", label: "Performance", description: "View your review history", icon: BarChart3, color: "text-primary bg-primary/10" },
-            { href: "/dashboard/feedback", label: "Kudos", description: "See feedback from your team", icon: MessageSquare, color: "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-400/10" },
-          ].map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="group flex items-center gap-3 p-3.5 rounded-xl border border-border/60 bg-card hover:border-border hover:shadow-sm transition-all"
-            >
-              <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${link.color} shrink-0`}>
-                <link.icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">{link.label}</p>
-                <p className="text-xs text-muted-foreground">{link.description}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0 ml-auto" />
-            </Link>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

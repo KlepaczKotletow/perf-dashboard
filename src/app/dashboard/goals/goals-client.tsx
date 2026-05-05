@@ -790,10 +790,10 @@ export default function GoalsClient({
         title="Goals"
         subtitle={
           role === "admin" || role === "hr"
-            ? "All objectives and key results across the organisation"
+            ? "All goals across the organisation"
             : role === "manager"
-            ? "Company, team, and individual goals for you and your direct reports"
-            : "Company-wide goals and your personal objectives"
+            ? "Your goals and your direct reports'"
+            : "Your goals and company goals"
         }
         actions={
           <>

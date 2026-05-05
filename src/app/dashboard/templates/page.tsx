@@ -1761,7 +1761,7 @@ export default async function TemplatesPage() {
       <PageHeader
         hat="manage"
         title="Templates"
-        subtitle="Pre-built starting points for reviews, functions, competencies, cycles, and goals"
+        subtitle="Pre-built starting points you can clone and edit"
         actions={
           <Button size="sm" asChild>
             <Link href="/dashboard/templates/new">

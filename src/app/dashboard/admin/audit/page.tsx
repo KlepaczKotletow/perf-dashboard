@@ -72,7 +72,7 @@ export default async function AuditLogPage({
       <PageHeader
         hat="manage"
         title="Audit log"
-        subtitle="Sensitive actions in this workspace: cycle status changes, grade releases, calibration grade edits, and user role changes. Read-only."
+        subtitle="Read-only history of sensitive workspace actions"
       />
 
       <nav className="flex flex-wrap gap-1.5">

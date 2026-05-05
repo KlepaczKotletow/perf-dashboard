@@ -169,7 +169,7 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
       <PageHeader
         hat="manage"
         title="Settings"
-        subtitle="Configure how reviews, ratings, and notifications work across your organisation"
+        subtitle="Workspace defaults"
         actions={
           <Button onClick={handleSave} disabled={saving} className="gap-2">
             {saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}

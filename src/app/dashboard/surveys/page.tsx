@@ -81,7 +81,7 @@ export default async function SurveysPage() {
       <PageHeader
         hat="manage"
         title="Surveys"
-        subtitle="360 reviews, pulse checks, and eNPS — all via Slack"
+        subtitle="360°, pulse, and eNPS surveys"
         actions={
           isAdminOrHR ? (
             <Button size="sm" asChild>
