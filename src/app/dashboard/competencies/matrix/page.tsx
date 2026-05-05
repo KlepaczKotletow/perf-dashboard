@@ -45,10 +45,12 @@ export default async function CompetencyMatrixPage() {
   if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <Lock className="h-16 w-16 text-muted-foreground mb-4" />
-        <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>
-        <p className="text-muted-foreground mb-6">Only managers and admins can view the competency matrix.</p>
-        <Button asChild><Link href="/dashboard">Go to Dashboard</Link></Button>
+        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+          <Lock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h1>
+        <p className="text-sm text-muted-foreground mb-5 max-w-xs">Only managers and admins can view the competency matrix.</p>
+        <Button variant="outline" size="sm" asChild><Link href="/dashboard">Back to Dashboard</Link></Button>
       </div>
     );
   }
@@ -80,14 +82,14 @@ export default async function CompetencyMatrixPage() {
   const categories = [...new Set(competencies.map((c: any) => c.category || "Uncategorized"))];
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/dashboard/admin/functions"><ArrowLeft className="h-4 w-4" /></Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Competency Matrix</h1>
-          <p className="text-muted-foreground mt-1">Expected proficiency levels per job level</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">Competency matrix</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Expected proficiency levels per job level</p>
         </div>
       </div>
 

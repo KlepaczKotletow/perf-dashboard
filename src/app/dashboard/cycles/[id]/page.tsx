@@ -16,6 +16,7 @@ import {
   ExternalLink,
   TrendingUp,
   Bot,
+  Lock,
 } from "lucide-react";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
@@ -144,10 +145,13 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   if (!isManagerOrAbove(workspace?.role) && !workspace?.hasDirectReports) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <h1 className="text-2xl font-bold text-foreground mb-2">Access Restricted</h1>
-        <p className="text-muted-foreground mb-6">You do not have permission to view this page.</p>
-        <Button asChild>
-          <Link href="/dashboard">Go to Dashboard</Link>
+        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
+          <Lock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <h1 className="text-lg font-semibold text-foreground mb-1">Access Restricted</h1>
+        <p className="text-sm text-muted-foreground mb-5 max-w-xs">You do not have permission to view this page.</p>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard">Back to Dashboard</Link>
         </Button>
       </div>
     );
@@ -214,7 +218,7 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
   const canEditPhases = isHROrAbove(workspace?.role) && cycle.status !== "completed";
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title={cycle.name}

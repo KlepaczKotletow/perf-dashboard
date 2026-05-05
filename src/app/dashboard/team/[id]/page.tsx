@@ -176,7 +176,7 @@ export default async function EmployeeProfilePage({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground leading-tight">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
                 {user.slack_name || "Unknown"}
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">

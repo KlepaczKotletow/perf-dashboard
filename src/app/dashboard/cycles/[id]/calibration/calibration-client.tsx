@@ -549,7 +549,7 @@ export default function CalibrationClient({
     distinctCalibrators.size === 1 && calibratedCount >= 5;
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3">
         <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" asChild>
@@ -558,7 +558,7 @@ export default function CalibrationClient({
           </Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
             Calibration — {cycle.name}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">

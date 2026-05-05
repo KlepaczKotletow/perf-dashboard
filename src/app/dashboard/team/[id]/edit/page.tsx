@@ -200,9 +200,10 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <h1 className="text-2xl font-bold text-foreground mb-2">User Not Found</h1>
-        <Button asChild>
-          <Link href="/dashboard/team">Back to Team</Link>
+        <h1 className="text-lg font-semibold text-foreground mb-1">User not found</h1>
+        <p className="text-sm text-muted-foreground mb-5 max-w-xs">This person may have been removed from the workspace.</p>
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard/team">Back to Directory</Link>
         </Button>
       </div>
     );
@@ -217,8 +218,8 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Edit Profile</h1>
-          <p className="text-muted-foreground">{user.slack_name} ({user.slack_email})</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">Edit profile</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{user.slack_name} · {user.slack_email}</p>
         </div>
       </div>
 
