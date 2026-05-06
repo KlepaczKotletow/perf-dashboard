@@ -20,6 +20,9 @@ describe("nine-box helpers", () => {
     });
     it("returns null for null/undefined", () => {
       expect(ratingToAxis(null)).toBeNull();
+      // Test that the function handles unexpected null-like inputs at runtime
+      // even when the type signature disallows them.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       expect(ratingToAxis(undefined as any)).toBeNull();
     });
   });

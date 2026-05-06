@@ -18,6 +18,24 @@ interface FeedbackFilters {
   period?: string;
 }
 
+interface FeedbackItem {
+  id: string;
+  message: string | null;
+  feedback_type: string;
+  is_anonymous: boolean | null;
+  created_at: string | null;
+  shared_with_employee?: boolean;
+  from_user_id?: string | null;
+  to_user_id?: string | null;
+  from_user?: { slack_name: string | null } | { slack_name: string | null }[] | null;
+  to_user?: { slack_name: string | null } | { slack_name: string | null }[] | null;
+}
+
+function asUser(u: FeedbackItem["from_user"]): { slack_name: string | null } | null {
+  if (!u) return null;
+  return Array.isArray(u) ? u[0] ?? null : u;
+}
+
 /** null means "no restriction" (HR/admin). An array (possibly empty) means "only these IDs". */
 interface FeedbackScope {
   userIds: string[] | null;       // restrict continuous_feedback by to_user_id
@@ -59,7 +77,7 @@ async function getScope(
 
     const allUserIds = [
       currentUserId,
-      ...((reports || []).map((r: any) => r.id)),
+      ...(((reports || []) as { id: string }[]).map((r) => r.id)),
     ];
 
     return { userIds: allUserIds };
@@ -79,7 +97,7 @@ async function getContinuousFeedback(
   role: string | undefined,
   hasDirectReports?: boolean,
   page: number = 1,
-): Promise<{ data: any[]; total: number }> {
+): Promise<{ data: FeedbackItem[]; total: number }> {
   if (!workspaceId) return { data: [], total: 0 };
 
   // If scope is an empty array we know there's nothing to return
@@ -147,13 +165,13 @@ async function getContinuousFeedback(
 
   const { data, count, error: continuousFeedbackErr } = await query;
   if (continuousFeedbackErr) console.error("Failed to fetch continuous feedback:", continuousFeedbackErr.message);
-  let results = data || [];
+  let results = (data || []) as unknown as FeedbackItem[];
 
   if (filters.search) {
     const s = filters.search.toLowerCase();
-    results = results.filter((item: any) =>
-      item.from_user?.slack_name?.toLowerCase().includes(s) ||
-      item.to_user?.slack_name?.toLowerCase().includes(s) ||
+    results = results.filter((item) =>
+      asUser(item.from_user)?.slack_name?.toLowerCase().includes(s) ||
+      asUser(item.to_user)?.slack_name?.toLowerCase().includes(s) ||
       item.message?.toLowerCase().includes(s)
     );
   }
@@ -192,7 +210,7 @@ export default async function FeedbackPage({
       .select("id, slack_name")
       .eq("workspace_id", workspaceId)
       .order("slack_name");
-    userList = (users || []).map((u: any) => ({ id: u.id, name: u.slack_name || "Unknown" }));
+    userList = ((users || []) as { id: string; slack_name: string | null }[]).map((u) => ({ id: u.id, name: u.slack_name || "Unknown" }));
   }
 
   const { data: continuousFeedback, total: feedbackTotal } = await getContinuousFeedback(params, scope, workspaceId, currentUserId, role, workspace?.hasDirectReports, currentPage);
@@ -235,19 +253,21 @@ export default async function FeedbackPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {continuousFeedback.map((item: any) => {
+                  {continuousFeedback.map((item) => {
                     const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+                    const fromUser = asUser(item.from_user);
+                    const toUser = asUser(item.to_user);
                     return (
                       <TableRow key={item.id}>
                         <TableCell className="pl-5 font-medium">
                           {item.is_anonymous ? (
                             <span className="text-muted-foreground italic">Anonymous</span>
                           ) : (
-                            item.from_user?.slack_name || "Unknown"
+                            fromUser?.slack_name || "Unknown"
                           )}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {item.to_user?.slack_name || "Unknown"}
+                          {toUser?.slack_name || "Unknown"}
                         </TableCell>
                         <TableCell>
                           <Badge className={`text-[10px] font-medium ${typeConf.className}`}>
@@ -272,15 +292,17 @@ export default async function FeedbackPage({
 
           {/* ── Mobile card list (shown below lg) ── */}
           <div className="lg:hidden space-y-2">
-            {continuousFeedback.map((item: any) => {
+            {continuousFeedback.map((item) => {
               const typeConf = feedbackTypeConfig[item.feedback_type] || feedbackTypeConfig.general;
+              const fromUser = asUser(item.from_user);
+              const toUser = asUser(item.to_user);
               return (
                 <div key={item.id} className="p-4 rounded-xl border border-border/60 bg-card space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium text-foreground">
-                      {item.is_anonymous ? <span className="text-muted-foreground italic">Anonymous</span> : (item.from_user?.slack_name || "Unknown")}
+                      {item.is_anonymous ? <span className="text-muted-foreground italic">Anonymous</span> : (fromUser?.slack_name || "Unknown")}
                       <span className="text-muted-foreground font-normal"> → </span>
-                      {item.to_user?.slack_name || "Unknown"}
+                      {toUser?.slack_name || "Unknown"}
                     </p>
                     <Badge className={`text-[10px] font-medium shrink-0 ${typeConf.className}`}>
                       {typeConf.label}

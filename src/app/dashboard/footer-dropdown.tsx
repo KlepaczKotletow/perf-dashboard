@@ -52,6 +52,7 @@ export function FooterDropdown({ initials, name, roleLabel, isAdmin }: Props) {
   // menu after mount sidesteps the mismatch without changing what the user
   // sees.
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot SSR-hydration flag
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {

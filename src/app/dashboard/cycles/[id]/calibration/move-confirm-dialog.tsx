@@ -105,9 +105,16 @@ export function MoveConfirmDialog({ pending, onConfirm, onCancel }: Props) {
 
   // Reset the textarea + save state when a new move arrives so they don't
   // bleed across moves (e.g. drag A, cancel, drag B — B starts fresh).
+  // The rule flags state-resetting effects, but here the move identity
+  // (assignmentId/grade/potential combo) is the natural reset key — using
+  // <key={...}> on the parent would force a remount of the textarea every
+  // time, losing focus styles. Keep behaviour identical, suppress.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNote("");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSaveState("idle");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setErrorMessage(null);
   }, [
     pending?.assignmentId,

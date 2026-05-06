@@ -1639,7 +1639,7 @@ async function seedSystemTemplates(workspaceId: string) {
     .eq("workspace_id", workspaceId)
     .eq("is_system", true);
 
-  const existingNames = new Set((existing || []).map((t: any) => t.name));
+  const existingNames = new Set(((existing || []) as { name: string }[]).map((t) => t.name));
 
   // Seed review templates (skip already-existing by name)
   const reviewRows = SYSTEM_REVIEW_TEMPLATES

@@ -62,7 +62,20 @@ function UserCell({
   );
 }
 
-export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any; standard: any[]; upward: any[] }[] }) {
+type UserRef = { id?: string; slack_name?: string | null; job_title?: string | null; department?: string | null; avatar_url?: string | null };
+type CycleRef = { id: string; name: string; status: string; start_date: string | null; end_date: string | null };
+type ReviewItem = {
+  id: string;
+  status: string;
+  assignment_type?: string | null;
+  employee?: UserRef | null;
+  manager?: UserRef | null;
+  reviewer?: UserRef | null;
+};
+
+type CycleGroup = { cycle: CycleRef | null; standard: ReviewItem[]; upward: ReviewItem[] };
+
+export function ReviewsContent({ cycles: initialCycles }: { cycles: CycleGroup[] }) {
   const [sort, setSort] = useState("newest");
 
   // Collapse by default — only the first cycle (by current sort) stays expanded.
@@ -89,7 +102,7 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
         );
       case "active_first":
         return copy.sort((a, b) =>
-          (CYCLE_STATUS_ORDER[a.cycle?.status] ?? 9) - (CYCLE_STATUS_ORDER[b.cycle?.status] ?? 9)
+          (CYCLE_STATUS_ORDER[a.cycle?.status ?? ""] ?? 9) - (CYCLE_STATUS_ORDER[b.cycle?.status ?? ""] ?? 9)
         );
       case "pending_first":
         return copy.sort((a, b) => {
@@ -129,10 +142,10 @@ export function ReviewsContent({ cycles: initialCycles }: { cycles: { cycle: any
           Assignments are created when a performance cycle is launched.
         </p>
         <Button size="sm" className="mt-5 gap-1.5" asChild>
-          <a href="/dashboard/cycles/new">
+          <Link href="/dashboard/cycles/new">
             <Plus className="h-3.5 w-3.5" />
             Launch a Cycle
-          </a>
+          </Link>
         </Button>
       </div>
     );
@@ -263,7 +276,7 @@ function ReviewGroup({
   icon: typeof Users;
   label: string;
   count: number;
-  rows: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+  rows: ReviewItem[];
   kind: "standard" | "upward";
   showLabel?: boolean;
 }) {
@@ -291,14 +304,14 @@ function ReviewGroup({
                 <UserCell
                   name={a.employee?.slack_name || "Unknown"}
                   subtitle={a.employee?.department || a.employee?.job_title || undefined}
-                  avatarUrl={a.employee?.avatar_url}
+                  avatarUrl={a.employee?.avatar_url ?? undefined}
                 />
               </div>
               <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground shrink-0">
                 <span className="text-muted-foreground/50">→</span>
                 <UserCell
-                  name={reviewer?.slack_name}
-                  avatarUrl={reviewer?.avatar_url}
+                  name={reviewer?.slack_name || ""}
+                  avatarUrl={reviewer?.avatar_url ?? undefined}
                   compact
                 />
               </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -48,12 +48,12 @@ export function CalibrationAuditLog({ cycleId, refreshKey = 0 }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Resetting loading/error before each fetch — standard fetch-on-mount/refresh pattern.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    const supabase = createClient();
     supabase
       .from("calibration_notes")
       .select(

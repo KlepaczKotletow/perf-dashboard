@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import {
   Table,
   TableBody,
@@ -157,13 +157,7 @@ export default function GoalsClient({
   workspaceId,
 }: GoalsClientProps) {
   const router = useRouter();
-  const supabase = useMemo(
-    () => createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ),
-    []
-  );
+  const supabase = useMemo(() => createClient(), []);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
 
   // Active tab drives which goals we render.
@@ -1205,7 +1199,7 @@ export default function GoalsClient({
               <Select value={newGoal.employee_id} onValueChange={(v) => setNewGoal({ ...newGoal, employee_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select owner" /></SelectTrigger>
                 <SelectContent>
-                  {(employees || []).map((e: any) => (
+                  {(employees || []).map((e) => (
                     <SelectItem key={e.id} value={e.id}>{e.slack_name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1270,7 +1264,7 @@ export default function GoalsClient({
                   <Select value={newGoal.parent_id} onValueChange={(v) => setNewGoal({ ...newGoal, parent_id: v })}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                     <SelectContent>
-                      {goals.map((g: any) => (<SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>))}
+                      {goals.map((g) => (<SelectItem key={g.id} value={g.id}>{g.title}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1310,7 +1304,7 @@ export default function GoalsClient({
               <Select value={editForm.employee_id} onValueChange={(v) => setEditForm({ ...editForm, employee_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Select owner" /></SelectTrigger>
                 <SelectContent>
-                  {(employees || []).map((e: any) => (
+                  {(employees || []).map((e) => (
                     <SelectItem key={e.id} value={e.id}>{e.slack_name}</SelectItem>
                   ))}
                 </SelectContent>

@@ -6,6 +6,21 @@ import { Suspense } from "react";
 import { isHROrAbove } from "@/lib/roles";
 import { PageHeader } from "@/components/page-header";
 
+type UserRef = { id: string; slack_name: string | null; job_title?: string | null; department?: string | null; avatar_url?: string | null };
+type CycleRef = { id: string; name: string; status: string; start_date: string | null; end_date: string | null };
+type ReviewAssignmentItem = {
+  id: string;
+  status: string;
+  overall_rating: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  assignment_type: string | null;
+  employee?: UserRef | null;
+  manager?: UserRef | null;
+  reviewer?: UserRef | null;
+  cycle?: CycleRef | null;
+};
+
 async function getReviewAssignments(workspaceId: string, status?: string, search?: string) {
   const supabase = await createServerSupabaseClient();
 
@@ -15,7 +30,7 @@ async function getReviewAssignments(workspaceId: string, status?: string, search
     .select("id")
     .eq("workspace_id", workspaceId);
   if (cyclesErr) console.error("Failed to fetch review cycles:", cyclesErr.message);
-  const cycleIds = (cycles || []).map((c: any) => c.id);
+  const cycleIds = ((cycles || []) as { id: string }[]).map((c) => c.id);
   if (cycleIds.length === 0) return [];
 
   let query = supabase
@@ -37,14 +52,14 @@ async function getReviewAssignments(workspaceId: string, status?: string, search
 
   const { data, error: assignmentsErr } = await query;
   if (assignmentsErr) console.error("Failed to fetch review assignments:", assignmentsErr.message);
-  let results = (data || []) as any[];
+  let results = (data || []) as unknown as ReviewAssignmentItem[];
 
   if (search) {
     const s = search.toLowerCase();
-    results = results.filter((r: any) =>
+    results = results.filter((r) =>
       r.employee?.slack_name?.toLowerCase().includes(s) ||
       r.manager?.slack_name?.toLowerCase().includes(s) ||
-      (r.cycle as any)?.name?.toLowerCase().includes(s)
+      r.cycle?.name?.toLowerCase().includes(s)
     );
   }
 
@@ -61,9 +76,9 @@ export default async function ReviewsPage({
   const assignments = await getReviewAssignments(workspace!.workspaceId, params.status, params.search);
 
   // Group by cycle, then by assignment_type within each cycle
-  const cycleMap = new Map<string, { cycle: any; standard: any[]; upward: any[] }>();
+  const cycleMap = new Map<string, { cycle: CycleRef | null; standard: ReviewAssignmentItem[]; upward: ReviewAssignmentItem[] }>();
   for (const a of assignments) {
-    const cycle = a.cycle as any;
+    const cycle = a.cycle ?? null;
     const cid = cycle?.id ?? "__none__";
     if (!cycleMap.has(cid)) {
       cycleMap.set(cid, { cycle, standard: [], upward: [] });

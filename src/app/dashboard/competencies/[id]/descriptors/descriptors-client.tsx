@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { ArrowLeft, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -28,14 +28,7 @@ export default function DescriptorsClient({
   scale,
 }: Props) {
   const router = useRouter();
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      ),
-    [],
-  );
+  const supabase = useMemo(() => createClient(), []);
 
   // Seed a row per score value in the scale, prefilled from existing descriptors.
   const initial = useMemo(() => {

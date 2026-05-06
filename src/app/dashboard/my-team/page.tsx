@@ -3,10 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
-import { Users, Target, ClipboardCheck, AlertCircle, ArrowRight, Star, Pencil } from "lucide-react";
+import { Users, ArrowRight, Star, Pencil } from "lucide-react";
 import { isManagerOrAbove } from "@/lib/roles";
 import { getAssignmentStatus } from "@/lib/status";
 import TeamGoalsTable from "./team-goals-table";
+import type { GoalRow as GoalRowFull } from "@/lib/goals-utils";
 import { PageHeader } from "@/components/page-header";
 
 export default async function MyTeamPage() {
@@ -41,10 +42,29 @@ export default async function MyTeamPage() {
     .eq("workspace_id", workspace.workspaceId)
     .order("slack_name");
 
-  const reportIds = (directReports || []).map((r: any) => r.id);
+  type DirectReportRow = {
+    id: string;
+    slack_name: string | null;
+    slack_email: string | null;
+    job_title: string | null;
+    department: string | null;
+    role: string | null;
+    level: { name: string | null; grade: string | null } | null;
+  };
+  type AssignmentRow = {
+    id: string;
+    employee_id: string;
+    status: string;
+    overall_rating: number | null;
+    cycle?: { id: string; name: string | null; status: string | null; grades_released?: boolean; workspace_id?: string | null } | null;
+    employee?: { id: string; slack_name: string | null } | null;
+  };
+  type TeamGoalRow = GoalRowFull & { employee_id: string };
+
+  const reportIds = ((directReports || []) as unknown as DirectReportRow[]).map((r) => r.id);
 
   // 2. Get active review assignments for direct reports
-  let reviewAssignments: any[] = [];
+  let reviewAssignments: AssignmentRow[] = [];
   if (reportIds.length > 0) {
     const { data } = await supabase
       .from("review_assignments")
@@ -56,11 +76,11 @@ export default async function MyTeamPage() {
       .in("employee_id", reportIds)
       .eq("cycle.workspace_id", workspace.workspaceId)
       .order("created_at", { ascending: false });
-    reviewAssignments = data || [];
+    reviewAssignments = (data || []) as unknown as AssignmentRow[];
   }
 
   // 3. Get goals for direct reports (full shape for team goals table)
-  let teamGoals: any[] = [];
+  let teamGoals: TeamGoalRow[] = [];
   if (reportIds.length > 0) {
     const { data } = await supabase
       .from("goals")
@@ -75,7 +95,7 @@ export default async function MyTeamPage() {
       .eq("workspace_id", workspace.workspaceId)
       .in("status", ["active", "draft"])
       .order("due_date");
-    teamGoals = data || [];
+    teamGoals = (data || []) as unknown as TeamGoalRow[];
   }
 
   // 4. Get cycles for filter dropdown
@@ -86,19 +106,19 @@ export default async function MyTeamPage() {
     .order("created_at", { ascending: false });
 
   // Build aggregated view per employee
-  const employeeSummaries = (directReports || []).map((emp: any) => {
-    const assignments = reviewAssignments.filter((a: any) => a.employee_id === emp.id);
+  const employeeSummaries = ((directReports || []) as unknown as DirectReportRow[]).map((emp) => {
+    const assignments = reviewAssignments.filter((a) => a.employee_id === emp.id);
     // Only count pending reviews from *active* cycles — completed cycles are no longer actionable
     const pendingReviews = assignments.filter(
-      (a: any) => a.status !== "completed" && a.cycle?.status === "active"
+      (a) => a.status !== "completed" && a.cycle?.status === "active"
     ).length;
-    const completedReviews = assignments.filter((a: any) => a.status === "completed").length;
-    const latestRating = assignments.find((a: any) => a.overall_rating)?.overall_rating;
+    const completedReviews = assignments.filter((a) => a.status === "completed").length;
+    const latestRating = assignments.find((a) => a.overall_rating)?.overall_rating;
 
-    const goals = teamGoals.filter((g: any) => g.employee_id === emp.id);
-    const activeGoals = goals.filter((g: any) => g.status === "active").length;
+    const goals = teamGoals.filter((g) => g.employee_id === emp.id);
+    const activeGoals = goals.filter((g) => g.status === "active").length;
     const avgProgress = goals.length > 0
-      ? Math.round(goals.reduce((sum: number, g: any) => sum + (g.progress || 0), 0) / goals.length)
+      ? Math.round(goals.reduce((sum, g) => sum + (g.progress || 0), 0) / goals.length)
       : 0;
 
     return {
@@ -224,7 +244,7 @@ export default async function MyTeamPage() {
 
       {/* Pending Review Assignments for your team — active cycles only */}
       {(() => {
-        const pending = reviewAssignments.filter((a: any) => a.status !== "completed" && a.cycle?.status === "active");
+        const pending = reviewAssignments.filter((a) => a.status !== "completed" && a.cycle?.status === "active");
         if (pending.length === 0) return null;
         return (
           <section className="space-y-2">
@@ -233,7 +253,7 @@ export default async function MyTeamPage() {
               <span className="ml-1.5 text-xs font-medium text-muted-foreground">· {pending.length}</span>
             </h2>
             <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
-              {pending.map((assignment: any) => (
+              {pending.map((assignment) => (
                 <div key={assignment.id} className="flex items-center gap-3 px-4 py-3">
                   <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
                     {assignment.employee?.slack_name || "Unknown"}
@@ -263,9 +283,9 @@ export default async function MyTeamPage() {
           <TeamGoalsTable
             goals={teamGoals}
             cycles={cycles || []}
-            employees={(directReports || []).map((r: any) => ({
+            employees={((directReports || []) as unknown as DirectReportRow[]).map((r) => ({
               id: r.id,
-              slack_name: r.slack_name,
+              slack_name: r.slack_name ?? "Unknown",
             }))}
           />
         </div>

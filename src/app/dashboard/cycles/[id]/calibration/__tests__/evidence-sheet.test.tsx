@@ -14,9 +14,9 @@ vi.mock("../evidence-data", () => ({
   })),
 }));
 
-// Mock createBrowserClient so the component constructs without env vars.
-vi.mock("@supabase/ssr", () => ({
-  createBrowserClient: vi.fn(() => ({})),
+// Mock the browser supabase helper so the component constructs without env vars.
+vi.mock("@/lib/supabase", () => ({
+  createClient: vi.fn(() => ({})),
 }));
 
 import { EvidenceSheet } from "../evidence-sheet";

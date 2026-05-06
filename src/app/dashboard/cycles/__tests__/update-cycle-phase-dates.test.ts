@@ -93,6 +93,9 @@ const skip = !url || !serviceKey || url.includes(".supabase.co");
   it("returns structured error for non-array input", async () => {
     const { data } = await supabase.rpc("update_cycle_phase_dates", {
       p_cycle_id: cycleId,
+      // Test that the RPC rejects non-array input even though the typed
+       // signature insists on an array.
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       p_phase_dates: null as any,
     });
     expect(data.updated).toBe(0);

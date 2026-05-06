@@ -45,6 +45,66 @@ interface HeatmapData {
   grandTotal: HeatmapCell;
 }
 
+// ─── Internal row shapes (narrowed from Supabase select strings) ────────────
+
+type FilterUserRow = {
+  id: string;
+  department: string | null;
+  slack_name: string | null;
+  level_id: string | null;
+  level: { name: string | null; job_family_id: string | null; job_family: { name: string | null } | null } | null;
+};
+
+type GoalRow = { id: string; tracking_status: string | null; status: string | null };
+
+type CycleStatusRow = { id: string; status: string };
+
+type TrendUserRow = { id: string; department: string | null; level: { job_family_id: string | null } | null };
+
+type AssignmentRow = { id: string; status: string; employee_id: string; cycle_id: string };
+
+type ResponseRow = { rating: number | null; assignment_id: string };
+
+type HeatmapUserRow = {
+  id: string;
+  role: string | null;
+  department: string | null;
+  start_date: string | null;
+  slack_name: string | null;
+  manager_id: string | null;
+  level: { name: string | null; job_family_id: string | null } | null;
+};
+
+type HeatmapResponseRow = {
+  rating: number | null;
+  competency: { name: string | null } | null;
+  assignment: { employee_id: string | null; cycle_id: string | null } | null;
+};
+
+type CyclesUserRow = {
+  id: string;
+  department: string | null;
+  slack_name: string | null;
+  manager_id: string | null;
+  level: { name: string | null; job_family: { name: string | null } | null } | null;
+};
+
+type CyclesAssignmentRow = {
+  id: string;
+  status: string;
+  employee_id: string;
+  cycle_id: string;
+  overall_rating: number | null;
+};
+
+type CyclesCycleRow = {
+  id: string;
+  name: string;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+};
+
 // ─── Heatmap helpers ──────────────────────────────────────────────────────────
 
 function getEmployeeTenureBucket(
@@ -88,7 +148,7 @@ async function getFilterOptions(workspaceId: string | undefined) {
   if (functionsErr) console.error("Failed to fetch filter functions:", functionsErr.message);
   if (usersErr) console.error("Failed to fetch filter users:", usersErr.message);
 
-  const departments = [...new Set((users || []).map((u: any) => u.department).filter(Boolean))].sort() as string[];
+  const departments = [...new Set((users || []).map((u: { department: string | null }) => u.department).filter(Boolean))].sort() as string[];
 
   return {
     cycles: cycles || [],
@@ -109,20 +169,19 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
   const { data: usersData, error: usersDataErr } = await usersQ;
   if (usersDataErr) console.error("Failed to fetch analytics users:", usersDataErr.message);
 
-  const allUsers = usersData || [];
+  const allUsers = (usersData || []) as unknown as FilterUserRow[];
 
   // Apply department filter to user list
   const filteredUsers = filters.department
-    ? allUsers.filter((u: any) => u.department === filters.department)
+    ? allUsers.filter((u) => u.department === filters.department)
     : allUsers;
 
   // Apply function filter to user list (via level → job_family_id)
   const functionFilteredUsers = filters.functionId
-    ? filteredUsers.filter((u: any) => u.level?.job_family_id === filters.functionId)
+    ? filteredUsers.filter((u) => u.level?.job_family_id === filters.functionId)
     : filteredUsers;
 
-  const filteredUserIds = new Set(functionFilteredUsers.map((u: any) => u.id));
-  const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
+  const userMap = new Map<string, FilterUserRow>(allUsers.map((u) => [u.id, u]));
 
   // 2. Pre-aggregated analytics via RPCs. Replaces what used to be unbounded
   // SELECTs on review_assignments + review_responses with two focused,
@@ -202,13 +261,13 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     .sort((a, b) => b.value - a.value);
 
   const rankingData = responseAgg.by_employee.map((e) => {
-    const user = userMap.get(e.employee_id) as any;
+    const user = userMap.get(e.employee_id);
     return {
       id: e.employee_id,
       name: user?.slack_name || "Unknown",
       department: user?.department || "—",
-      functionName: (user?.level as any)?.job_family?.name || "—",
-      levelName: (user?.level as any)?.name || "—",
+      functionName: user?.level?.job_family?.name || "—",
+      levelName: user?.level?.name || "—",
       avgRating: Number(e.avg_rating),
       reviewCount: e.n,
     };
@@ -225,9 +284,9 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     .sort((a, b) => b.value - a.value);
 
   // Goal status
-  const activeGoals = (goalsData || []).filter((g: any) => g.status === "active" || g.status === "draft");
+  const activeGoals = ((goalsData || []) as GoalRow[]).filter((g) => g.status === "active" || g.status === "draft");
   const trackingCounts: Record<string, number> = { on_track: 0, at_risk: 0, delayed: 0, achieved: 0 };
-  activeGoals.forEach((g: any) => {
+  activeGoals.forEach((g) => {
     if (g.tracking_status && g.tracking_status in trackingCounts) {
       trackingCounts[g.tracking_status]++;
     }
@@ -285,7 +344,7 @@ async function getAnalyticsData(filters: FilterParams, workspaceId: string | und
     totalAssignments,
     completedAssignments,
     cycleStats: {
-      active: (allCycles || []).filter((c: any) => c.status === "active").length,
+      active: ((allCycles || []) as CycleStatusRow[]).filter((c) => c.status === "active").length,
       total: (allCycles || []).length,
     },
     rankingData,
@@ -323,28 +382,28 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
   if (trendsUsersErr) console.error("Failed to fetch trends users:", trendsUsersErr.message);
 
   const filteredUserIds = new Set(
-    (usersData || [])
-      .filter((u: any) => {
+    ((usersData || []) as unknown as TrendUserRow[])
+      .filter((u) => {
         if (filters.department && u.department !== filters.department) return false;
         if (filters.functionId && u.level?.job_family_id !== filters.functionId) return false;
         return true;
       })
-      .map((u: any) => u.id)
+      .map((u) => u.id)
   );
 
   // Batch: fetch all assignments for all cycles at once (already workspace-scoped via cycles)
-  const cycleIds = recentCycles.map((c: any) => c.id);
+  const cycleIds = recentCycles.map((c) => c.id);
   const { data: allAssignmentsRaw, error: trendAssignmentsErr } = await supabase
     .from("review_assignments")
     .select("id, status, employee_id, cycle_id")
     .in("cycle_id", cycleIds);
   if (trendAssignmentsErr) console.error("Failed to fetch trend assignments:", trendAssignmentsErr.message);
 
-  const allAssignments = (allAssignmentsRaw || []).filter((a: any) => filteredUserIds.has(a.employee_id));
-  const allAssignmentIds = allAssignments.map((a: any) => a.id);
+  const allAssignments = ((allAssignmentsRaw || []) as AssignmentRow[]).filter((a) => filteredUserIds.has(a.employee_id));
+  const allAssignmentIds = allAssignments.map((a) => a.id);
 
   // Batch: fetch all responses for all assignments at once
-  let allResponses: any[] = [];
+  let allResponses: ResponseRow[] = [];
   if (allAssignmentIds.length > 0) {
     const { data: responsesRaw, error: trendResponsesErr } = await supabase
       .from("review_responses")
@@ -352,7 +411,7 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
       .in("assignment_id", allAssignmentIds)
       .not("rating", "is", null);
     if (trendResponsesErr) console.error("Failed to fetch trend responses:", trendResponsesErr.message);
-    allResponses = responsesRaw || [];
+    allResponses = (responsesRaw || []) as ResponseRow[];
   }
 
   // Build lookup maps
@@ -376,9 +435,9 @@ async function getTrendsData(filters: Omit<FilterParams, "cycleId">, workspaceId
   for (const cycle of recentCycles) {
     const cycleAssignments = assignmentsByCycle.get(cycle.id) || [];
     const total = cycleAssignments.length;
-    const completed = cycleAssignments.filter((a: any) => a.status === "completed").length;
+    const completed = cycleAssignments.filter((a) => a.status === "completed").length;
 
-    const cycleRatings = cycleAssignments.flatMap((a: any) => responsesByAssignment.get(a.id) || []);
+    const cycleRatings = cycleAssignments.flatMap((a) => responsesByAssignment.get(a.id) || []);
     const avgRating = cycleRatings.length > 0
       ? cycleRatings.reduce((a: number, b: number) => a + b, 0) / cycleRatings.length
       : 0;
@@ -416,26 +475,26 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   const { data: usersRaw, error: heatmapUsersErr } = await heatmapUsersQ;
   if (heatmapUsersErr) console.error("Failed to fetch heatmap users:", heatmapUsersErr.message);
 
-  const allUsers = usersRaw || [];
+  const allUsers = (usersRaw || []) as unknown as HeatmapUserRow[];
 
-  const userMap = new Map(
+  const userMap = new Map<string, string>(
     allUsers
-      .filter((u: any) => {
+      .filter((u) => {
         if (filters.department && u.department !== filters.department) return false;
-        if (filters.functionId && (u.level as any)?.job_family_id !== filters.functionId) return false;
+        if (filters.functionId && u.level?.job_family_id !== filters.functionId) return false;
         return true;
       })
-      .map((u: any) => {
+      .map((u) => {
         let groupValue: string;
         if (dim === "role") groupValue = u.role || "Unknown";
         else if (dim === "department") groupValue = u.department || "Unknown";
-        else if (dim === "level") groupValue = (u.level as any)?.name || "Unknown";
+        else if (dim === "level") groupValue = u.level?.name || "Unknown";
         else if (dim === "manager") {
-          const mgr = allUsers.find((m: any) => m.id === u.manager_id);
-          groupValue = mgr ? mgr.slack_name : "No manager";
+          const mgr = allUsers.find((m) => m.id === u.manager_id);
+          groupValue = mgr ? (mgr.slack_name || "No manager") : "No manager";
         }
         else groupValue = getEmployeeTenureBucket(u.start_date, tenureBuckets);
-        return [u.id as string, groupValue];
+        return [u.id, groupValue];
       })
   );
 
@@ -444,7 +503,7 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   hmCyclesQ = hmCyclesQ.eq("workspace_id", workspaceId);
   const { data: hmCyclesData, error: hmCyclesErr } = await hmCyclesQ;
   if (hmCyclesErr) console.error("Failed to fetch heatmap cycles:", hmCyclesErr.message);
-  const hmCycleIdSet = new Set((hmCyclesData || []).map((c: any) => c.id));
+  const hmCycleIdSet = new Set(((hmCyclesData || []) as { id: string }[]).map((c) => c.id));
 
   const { data: responsesRaw, error: hmResponsesErr } = await supabase
     .from("review_responses")
@@ -453,11 +512,11 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
     .limit(10000);
   if (hmResponsesErr) console.error("Failed to fetch heatmap responses:", hmResponsesErr.message);
 
-  const responses = (responsesRaw || []).filter((r: any) => {
-    const cycleId = (r.assignment as any)?.cycle_id;
+  const responses = ((responsesRaw || []) as unknown as HeatmapResponseRow[]).filter((r) => {
+    const cycleId = r.assignment?.cycle_id;
     if (!cycleId || !hmCycleIdSet.has(cycleId)) return false;
     if (filters.cycleId && cycleId !== filters.cycleId) return false;
-    const empId = (r.assignment as any)?.employee_id;
+    const empId = r.assignment?.employee_id;
     if (!empId) return false;
     return userMap.has(empId);
   });
@@ -476,10 +535,10 @@ async function getHeatmapData(filters: FilterParams, dim: HeatmapDim, workspaceI
   }
 
   for (const r of responses) {
-    const comp = (r.competency as any)?.name as string | undefined;
-    const empId = (r.assignment as any)?.employee_id as string;
+    const comp = r.competency?.name ?? undefined;
+    const empId = r.assignment?.employee_id ?? "";
     const group = userMap.get(empId);
-    const rating = r.rating as number;
+    const rating = r.rating ?? 0;
 
     if (!comp || !group) continue;
 
@@ -586,7 +645,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
     return { cycles: [], byDepartment: {}, byFunction: {}, byManager: {}, topManagers: [], bottomManagers: [], hasMore: false, allManagers: [] };
   }
 
-  const cycleIds = allCycles.map((c: any) => c.id);
+  const cycleIds = (allCycles as CyclesCycleRow[]).map((c) => c.id);
 
   // 2. Fetch all assignments for these cycles
   const { data: assignmentsRaw, error: assignmentsErr } = await supabase
@@ -594,7 +653,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
     .select("id, status, employee_id, cycle_id, overall_rating")
     .in("cycle_id", cycleIds);
   if (assignmentsErr) console.error("Failed to fetch cycles assignments:", assignmentsErr.message);
-  const assignments = assignmentsRaw || [];
+  const assignments = (assignmentsRaw || []) as CyclesAssignmentRow[];
 
   // 3. Fetch users with department, job_family (via level), and manager info
   let usersQ = supabase
@@ -603,19 +662,19 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   usersQ = usersQ.eq("workspace_id", workspaceId);
   const { data: usersRaw, error: usersErr } = await usersQ;
   if (usersErr) console.error("Failed to fetch cycles users:", usersErr.message);
-  const allUsers = usersRaw || [];
-  const userMap = new Map(allUsers.map((u: any) => [u.id, u]));
+  const allUsers = (usersRaw || []) as unknown as CyclesUserRow[];
+  const userMap = new Map<string, CyclesUserRow>(allUsers.map((u) => [u.id, u]));
 
   // Build cycle rows
-  const cycleRows: CycleRow[] = allCycles.map((c: any) => {
-    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === c.id);
+  const cycleRows: CycleRow[] = (allCycles as CyclesCycleRow[]).map((c) => {
+    const cycleAssignments = assignments.filter((a) => a.cycle_id === c.id);
     const total = cycleAssignments.length;
-    const completed = cycleAssignments.filter((a: any) => a.status === "completed").length;
-    const rated = cycleAssignments.filter((a: any) => a.overall_rating != null);
+    const completed = cycleAssignments.filter((a) => a.status === "completed").length;
+    const rated = cycleAssignments.filter((a) => a.overall_rating != null);
     const avgRating = rated.length > 0
-      ? parseFloat((rated.reduce((sum: number, a: any) => sum + (a.overall_rating as number), 0) / rated.length).toFixed(2))
+      ? parseFloat((rated.reduce((sum, a) => sum + (a.overall_rating as number), 0) / rated.length).toFixed(2))
       : null;
-    const participants = new Set(cycleAssignments.map((a: any) => a.employee_id)).size;
+    const participants = new Set(cycleAssignments.map((a) => a.employee_id)).size;
 
     return {
       id: c.id,
@@ -632,11 +691,11 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   // 4. Compute breakdowns by department
   const byDepartment: Record<string, BreakdownRow[]> = {};
   for (const cycleId of cycleIds) {
-    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const cycleAssignments = assignments.filter((a) => a.cycle_id === cycleId);
     const deptGroups = new Map<string, { completed: number; total: number; ratings: number[] }>();
     for (const a of cycleAssignments) {
       const emp = userMap.get(a.employee_id);
-      const dept = (emp as any)?.department || "Unknown";
+      const dept = emp?.department || "Unknown";
       const g = deptGroups.get(dept) || { completed: 0, total: 0, ratings: [] };
       g.total++;
       if (a.status === "completed") g.completed++;
@@ -655,11 +714,11 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   // 5. Compute breakdowns by function (job_family)
   const byFunction: Record<string, BreakdownRow[]> = {};
   for (const cycleId of cycleIds) {
-    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const cycleAssignments = assignments.filter((a) => a.cycle_id === cycleId);
     const funcGroups = new Map<string, { completed: number; total: number; ratings: number[] }>();
     for (const a of cycleAssignments) {
       const emp = userMap.get(a.employee_id);
-      const funcName = (emp as any)?.level?.job_family?.name || "Unknown";
+      const funcName = emp?.level?.job_family?.name || "Unknown";
       const g = funcGroups.get(funcName) || { completed: 0, total: 0, ratings: [] };
       g.total++;
       if (a.status === "completed") g.completed++;
@@ -679,14 +738,14 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   const byManager: Record<string, ManagerBreakdownRow[]> = {};
   const managerIdSet = new Set<string>();
   for (const cycleId of cycleIds) {
-    const cycleAssignments = assignments.filter((a: any) => a.cycle_id === cycleId);
+    const cycleAssignments = assignments.filter((a) => a.cycle_id === cycleId);
     const mgrGroups = new Map<string, { managerId: string; managerName: string; completed: number; total: number; ratings: number[] }>();
     for (const a of cycleAssignments) {
       const emp = userMap.get(a.employee_id);
-      const managerId = (emp as any)?.manager_id;
+      const managerId = emp?.manager_id;
       if (!managerId) continue;
       const mgr = userMap.get(managerId);
-      const managerName = (mgr as any)?.slack_name || "Unknown";
+      const managerName = mgr?.slack_name || "Unknown";
       managerIdSet.add(managerId);
       const g = mgrGroups.get(managerId) || { managerId, managerName, completed: 0, total: 0, ratings: [] as number[] };
       g.total++;
@@ -707,7 +766,7 @@ async function getCyclesComparisonData(workspaceId: string | undefined, showAll:
   // All managers for dropdown
   const allManagers = [...managerIdSet].map((id) => {
     const mgr = userMap.get(id);
-    return { id, name: (mgr as any)?.slack_name || "Unknown" };
+    return { id, name: mgr?.slack_name || "Unknown" };
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   // 7. Top/bottom 5 managers by current (most recent) cycle completion

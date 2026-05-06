@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,13 +28,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [selectedFunctionId, setSelectedFunctionId] = useState<string>("");
 
-  const supabase = useMemo(
-    () => createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ),
-    []
-  );
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function load() {
@@ -121,8 +115,8 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         .in("id", selectedIds)
         .eq("workspace_id", wsId);
 
-      const selectedAdminCount = (selectedUserRoles || []).filter(
-        (u: any) => u.role === "admin"
+      const selectedAdminCount = ((selectedUserRoles || []) as { id: string; role: string | null }[]).filter(
+        (u) => u.role === "admin"
       ).length;
 
       if ((adminCount || 0) - selectedAdminCount < 1) {
@@ -160,7 +154,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       }
     }
 
-    const updateData: any = { updated_at: new Date().toISOString() };
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     if (action === "department") updateData.department = value;
     if (action === "manager") updateData.manager_id = value === "none" ? null : value;

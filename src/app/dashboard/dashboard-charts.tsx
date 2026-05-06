@@ -113,7 +113,7 @@ export function DashboardCharts({ data }: DashboardChartsProps) {
         <BarChart3 className="h-10 w-10 text-muted-foreground/25 mb-3" />
         <p className="text-sm font-medium text-muted-foreground">Analytics will appear here</p>
         <p className="text-xs text-muted-foreground/70 mt-1 max-w-xs">
-          Once reviews start coming in, you'll see completion rates, trends, and department breakdowns.
+          Once reviews start coming in, you&apos;ll see completion rates, trends, and department breakdowns.
         </p>
       </div>
     );

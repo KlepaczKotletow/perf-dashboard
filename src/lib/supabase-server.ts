@@ -8,8 +8,8 @@ export async function createServerSupabaseClient() {
   const cookieStore = await cookies()
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
@@ -89,8 +89,8 @@ export const getUserWorkspace = cache(async () => {
     hasDirectReports: (directReportCount ?? 0) > 0,
     onboardingCompleted: wsData?.onboarding_completed ?? true,
     ratingScale: wsData?.rating_scale as { min: number; max: number; labels: Record<string, string> } | null,
-    logoUrl: (wsData as any)?.logo_url as string | null,
-    requiresReinstall: ((wsData as any)?.requires_reinstall ?? false) as boolean,
+    logoUrl: (wsData as { logo_url?: string | null } | null)?.logo_url ?? null,
+    requiresReinstall: (wsData as { requires_reinstall?: boolean } | null)?.requires_reinstall ?? false,
   }
 })
 

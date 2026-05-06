@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -173,10 +173,7 @@ export default function NewSurveyPage() {
   // Step 2 — eNPS specific
   const [enpsFollowUp, setEnpsFollowUp] = useState("What's the main reason for your score?");
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   useEffect(() => {
     async function loadTeam() {
@@ -222,7 +219,7 @@ export default function NewSurveyPage() {
     else setPulseQuestions(prev => prev.filter(q => q.id !== id));
   }
 
-  function updateQuestion(set: "360" | "pulse", id: string, field: keyof Question, value: any) {
+  function updateQuestion(set: "360" | "pulse", id: string, field: keyof Question, value: string | boolean) {
     const updater = (prev: Question[]) => prev.map(q => q.id === id ? { ...q, [field]: value } : q);
     if (set === "360") setQuestions360(updater);
     else setPulseQuestions(updater);
@@ -250,7 +247,7 @@ export default function NewSurveyPage() {
       const { data: userData } = await supabase.from("users").select("id, workspace_id, manager_id").eq("id", identity.userId).single();
       if (!userData) throw new Error("User not found");
 
-      let config: any = {};
+      let config: Record<string, unknown> = {};
       if (surveyType === "360") {
         config = {
           questions: questions360,
@@ -297,7 +294,14 @@ export default function NewSurveyPage() {
       if (surveyErr) throw surveyErr;
 
       const wsId = userData.workspace_id;
-      const participants: any[] = [];
+      type Participant = {
+        survey_id: string;
+        user_id: string;
+        subject_user_id?: string;
+        role: string;
+        workspace_id: string;
+      };
+      const participants: Participant[] = [];
       if (surveyType === "360") {
         const { data: wsUsers } = await supabase
           .from("users")
@@ -335,7 +339,7 @@ export default function NewSurveyPage() {
           targetUsers = data || [];
         } else if (targetMode === "departments") {
           const { data } = await supabase.from("users").select("id, department").eq("workspace_id", wsId);
-          targetUsers = (data || []).filter((u: any) => selectedDepartments.has(u.department || ""));
+          targetUsers = ((data || []) as { id: string; department: string | null }[]).filter((u) => selectedDepartments.has(u.department || ""));
         } else {
           targetUsers = Array.from(selectedPeople).map(id => ({ id }));
         }
@@ -361,8 +365,8 @@ export default function NewSurveyPage() {
       setNamiParticipantCount(uniqueParticipants.length);
       setPendingSurveyId(survey.id);
       setShowNamiConfirm(true);
-    } catch (e: any) {
-      setError(e.message || "Something went wrong");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : "") || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -378,7 +382,7 @@ export default function NewSurveyPage() {
       const identity = await getClientIdentity(supabase);
       const wsId = identity?.workspaceId;
 
-      const updatePayload: any = { nami_confirmed: true, status: "active" };
+      const updatePayload: Record<string, unknown> = { nami_confirmed: true, status: "active" };
 
       if (namiScheduleMode === "recurring") {
         // Fetch current config and merge recurrence settings
@@ -403,8 +407,8 @@ export default function NewSurveyPage() {
       }
 
       router.push(`/dashboard/surveys/${pendingSurveyId}`);
-    } catch (e: any) {
-      setError(e.message || "Failed to send Nami messages");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : "") || "Failed to send Nami messages");
       setLoading(false);
     }
   }
@@ -525,7 +529,7 @@ export default function NewSurveyPage() {
                             onCheckedChange={checked => {
                               setSelectedSubjects(prev => {
                                 const next = new Set(prev);
-                                checked ? next.add(u.id) : next.delete(u.id);
+                                if (checked) next.add(u.id); else next.delete(u.id);
                                 return next;
                               });
                             }}
@@ -631,7 +635,7 @@ export default function NewSurveyPage() {
                 <div className="space-y-2">
                   <Label>Questions <span className="text-xs text-muted-foreground font-normal ml-1">(5-15 recommended)</span></Label>
                   <div className="space-y-2">
-                    {pulseQuestions.map((q, i) => (
+                    {pulseQuestions.map((q) => (
                       <div key={q.id} className="flex gap-2 items-start">
                         <div className="flex-1 space-y-1">
                           <Input value={q.label} onChange={e => updateQuestion("pulse", q.id, "label", e.target.value)} placeholder="Question text" />

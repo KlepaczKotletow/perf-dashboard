@@ -23,7 +23,7 @@ import {
   Star,
 } from "lucide-react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { NineBoxGrid } from "./nine-box-grid";
 import type { BoxCoord } from "@/lib/nine-box";
 import { EvidenceSheet } from "./evidence-sheet";
@@ -176,13 +176,18 @@ function GradeDistribution({ grades }: { grades: Record<string, string> }) {
 
 function useRowSave(
   assignmentId: string,
-  supabase: ReturnType<typeof createBrowserClient>,
+  supabase: ReturnType<typeof createClient>,
   onSuccess?: (grade: string) => void,
 ) {
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Compares the saved timestamp to "now" to drive a 3-second auto-hide on
+  // the "Saved" pill. The setTimeout in `save()` schedules a re-render that
+  // re-evaluates this — Date.now() during render is non-pure, but since we
+  // only use it for ephemeral UI state, the staleness window is safe.
+  // eslint-disable-next-line react-hooks/purity
   const showSaved = savedAt !== null && Date.now() - savedAt < 3000;
 
   async function save(grade: string) {
@@ -216,7 +221,7 @@ function AssignmentTableRow({
   onGradeSaved,
 }: {
   assignment: AssignmentRow;
-  supabase: ReturnType<typeof createBrowserClient>;
+  supabase: ReturnType<typeof createClient>;
   onGradeSaved?: (assignmentId: string, grade: string) => void;
 }) {
   const [grade, setGrade] = useState(assignment.final_grade || "");
@@ -333,14 +338,7 @@ export default function CalibrationClient({
   const [sortAsc, setSortAsc] = useState(false);
   const [evidenceAssignmentId, setEvidenceAssignmentId] = useState<string | null>(null);
 
-  const supabase = useMemo(
-    () =>
-      createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      ),
-    []
-  );
+  const supabase = useMemo(() => createClient(), []);
 
   // Track current grades for the distribution section
   const [liveGrades, setLiveGrades] = useState<Record<string, string>>(() => {

@@ -28,7 +28,7 @@ interface Assignment {
   final_grade: string | null;
   manager_id: string | null;
   cycle: { id: string; name: string; status: string } | null;
-  manager: { slack_name: string } | null;
+  manager: { slack_name: string | null } | null;
 }
 
 interface FeedbackItem {

@@ -3,15 +3,45 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+type SurveyQuestion = {
+  id: string;
+  type: string;
+  label: string;
+};
+
+type SurveyConfig = {
+  questions?: SurveyQuestion[];
+  min_raters_to_show?: number;
+};
+
+type SurveyRow = {
+  id: string;
+  type: string;
+  config?: SurveyConfig;
+};
+
+type SurveyResponseRow = {
+  id?: string;
+  participant_id?: string;
+  subject_user_id?: string;
+  answers?: Record<string, unknown> & { score?: string | number; follow_up?: string };
+};
+
+type SurveyParticipantRow = {
+  id: string;
+  role: "self" | "subject" | "rater";
+  subject_user_id: string;
+};
+
 interface Props {
-  survey: any;
-  responses: any[];
-  participants: any[];
+  survey: SurveyRow;
+  responses: SurveyResponseRow[];
+  participants: SurveyParticipantRow[];
   subjectNames: Record<string, string>;
 }
 
-function eNPSScore(responses: any[]) {
-  const scores = responses.map(r => parseInt(r.answers?.score)).filter(s => !isNaN(s));
+function eNPSScore(responses: SurveyResponseRow[]) {
+  const scores = responses.map(r => parseInt(String(r.answers?.score ?? ""))).filter(s => !isNaN(s));
   if (!scores.length) return null;
   const promoters = scores.filter(s => s >= 9).length;
   const detractors = scores.filter(s => s <= 6).length;
@@ -25,7 +55,7 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
   if (survey.type === "enps") {
     const score = eNPSScore(responses);
     const followUps = responses.map(r => r.answers?.follow_up).filter(Boolean);
-    const scores = responses.map(r => parseInt(r.answers?.score)).filter(s => !isNaN(s));
+    const scores = responses.map(r => parseInt(String(r.answers?.score ?? ""))).filter(s => !isNaN(s));
     const promoters = scores.filter(s => s >= 9).length;
     const passives = scores.filter(s => s >= 7 && s <= 8).length;
     const detractors = scores.filter(s => s <= 6).length;
@@ -91,13 +121,13 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
 
   // ── Pulse ─────────────────────────────────────────────────────────────────
   if (survey.type === "pulse") {
-    const questions: any[] = survey.config?.questions || [];
+    const questions: SurveyQuestion[] = survey.config?.questions || [];
     if (!questions.length) {
       return <p className="text-sm text-muted-foreground">No questions configured.</p>;
     }
     return (
       <div className="space-y-4">
-        {questions.map((q: any) => {
+        {questions.map((q) => {
           const qResponses = responses
             .map(r => r.answers?.[q.id])
             .filter(v => v !== undefined && v !== null && v !== "");
@@ -112,7 +142,7 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                     : (
                       <div className="space-y-2">
                         {qResponses.map((text, i) => (
-                          <div key={i} className="text-sm bg-muted/40 rounded-md px-3 py-2 border">{text}</div>
+                          <div key={i} className="text-sm bg-muted/40 rounded-md px-3 py-2 border">{String(text)}</div>
                         ))}
                       </div>
                     )}
@@ -124,7 +154,6 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
           // rating_7: distribution bar chart
           const numericResponses = qResponses.map(v => parseInt(String(v), 10)).filter(n => !isNaN(n));
           const counts = [1, 2, 3, 4, 5, 6, 7].map(n => numericResponses.filter(v => v === n).length);
-          const max = Math.max(...counts, 1);
           const avg = numericResponses.length
             ? (numericResponses.reduce((a, b) => a + b, 0) / numericResponses.length).toFixed(1)
             : null;
@@ -176,21 +205,21 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
     }
 
     const activeSubjectId = selected360Subject || subjects[0]?.subject_user_id;
-    const subjectResponses = responses.filter(r => r.subject_user_id === activeSubjectId);
+    const subjectResponses = responses.filter((r: SurveyResponseRow) => r.subject_user_id === activeSubjectId);
     const selfParticipant = participants.find(p => p.subject_user_id === activeSubjectId && p.role === "self");
     const selfResp = selfParticipant
       ? subjectResponses.find(r => r.participant_id === selfParticipant.id)
       : null;
     const othersResp = subjectResponses.filter(r => r !== selfResp);
-    const MIN_RATERS = (survey.config?.min_raters_to_show as number) || 3;
-    const questions: any[] = survey.config?.questions || [];
+    const MIN_RATERS = survey.config?.min_raters_to_show || 3;
+    const questions: SurveyQuestion[] = survey.config?.questions || [];
 
     return (
       <div className="space-y-4">
         {/* Subject selector for multi-subject surveys */}
         {subjects.length > 1 && (
           <div className="flex gap-2 flex-wrap">
-            {subjects.map((s: any) => (
+            {subjects.map((s) => (
               <button
                 key={s.subject_user_id}
                 onClick={() => setSelected360Subject(s.subject_user_id)}
@@ -219,10 +248,10 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                 {othersResp.length} of {MIN_RATERS} raters responded — anonymity threshold not yet met. Results shown to admins only.
               </div>
             )}
-            {questions.filter((q: any) => q.type === "rating_7").map((q: any) => {
-              const selfScore = selfResp ? parseFloat(selfResp.answers?.[q.id]) : null;
+            {questions.filter((q) => q.type === "rating_7").map((q) => {
+              const selfScore = selfResp ? parseFloat(String(selfResp.answers?.[q.id] ?? "")) : null;
               const otherScores = othersResp
-                .map((r: any) => parseFloat(r.answers?.[q.id]))
+                .map((r) => parseFloat(String(r.answers?.[q.id] ?? "")))
                 .filter(s => !isNaN(s));
               const othersAvg = otherScores.length
                 ? (otherScores.reduce((a, b) => a + b, 0) / otherScores.length)
@@ -261,8 +290,8 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                 </Card>
               );
             })}
-            {questions.filter((q: any) => q.type === "text").map((q: any) => {
-              const textResp = othersResp.map((r: any) => r.answers?.[q.id]).filter(Boolean);
+            {questions.filter((q) => q.type === "text").map((q) => {
+              const textResp = othersResp.map((r) => r.answers?.[q.id]).filter(Boolean) as string[];
               if (!textResp.length) return null;
               return (
                 <Card key={q.id}>
@@ -271,7 +300,7 @@ export function SurveyResults({ survey, responses, participants, subjectNames }:
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {textResp.map((t: any, i: number) => (
+                      {textResp.map((t, i) => (
                         <div key={i} className="text-sm bg-muted/40 rounded-md px-3 py-2 border">{t}</div>
                       ))}
                     </div>

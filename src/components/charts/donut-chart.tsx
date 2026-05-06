@@ -33,6 +33,7 @@ export function DonutChart({
   // on the client. Avoids a [data] dependency that would cause re-renders
   // every time the parent re-renders with a new array reference.
   const [mounted, setMounted] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot SSR-hydration flag
   useEffect(() => { setMounted(true); }, []);
 
   if (data.length === 0 || data.every((d) => d.value === 0)) {

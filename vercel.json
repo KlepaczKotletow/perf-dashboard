@@ -1,9 +1,3 @@
 {
-  "regions": ["lhr1"],
-  "crons": [
-    {
-      "path": "/api/internal/seat-sync-reconcile",
-      "schedule": "0 3 * * *"
-    }
-  ]
+  "regions": ["lhr1"]
 }

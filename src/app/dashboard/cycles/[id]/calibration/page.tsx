@@ -1,3 +1,4 @@
+import type React from "react";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove } from "@/lib/roles";
 import { notFound } from "next/navigation";
@@ -5,6 +6,32 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import CalibrationClient from "./calibration-client";
+
+type LevelJoin = { name: string | null; grade: string | null };
+type EmployeeJoin = { id: string; slack_name: string | null; department: string | null; level_id: string | null; level?: LevelJoin | LevelJoin[] | null };
+type ManagerJoin = { slack_name: string | null };
+type CompetencyJoin = { name: string | null; category: string | null };
+
+type CalibrationAssignmentRow = {
+  id: string;
+  status: string;
+  overall_rating: number | null;
+  final_grade: string | null;
+  potential_rating: number | null;
+  calibrated_by: string | null;
+  employee_id: string;
+  employee?: EmployeeJoin | EmployeeJoin[] | null;
+  manager?: ManagerJoin | ManagerJoin[] | null;
+};
+
+type CalibrationResponseRow = {
+  id: string;
+  assignment_id: string;
+  rating: number | null;
+  reviewer_role: string;
+  competency_id: string | null;
+  competency?: CompetencyJoin | CompetencyJoin[] | null;
+};
 
 async function getCalibrationData(cycleId: string, workspaceId: string) {
   const supabase = await createServerSupabaseClient();
@@ -28,8 +55,9 @@ async function getCalibrationData(cycleId: string, workspaceId: string) {
     .eq("cycle_id", cycleId)
     .eq("assignment_type", "standard");
 
-  const assignmentIds = (assignments || []).map((a: any) => a.id);
-  let responses: any[] = [];
+  const typedAssignments = (assignments || []) as unknown as CalibrationAssignmentRow[];
+  const assignmentIds = typedAssignments.map((a) => a.id);
+  let responses: CalibrationResponseRow[] = [];
   if (assignmentIds.length > 0) {
     const { data } = await supabase
       .from("review_responses")
@@ -38,12 +66,12 @@ async function getCalibrationData(cycleId: string, workspaceId: string) {
         competency:competencies(name, category)
       `)
       .in("assignment_id", assignmentIds);
-    responses = data || [];
+    responses = (data || []) as unknown as CalibrationResponseRow[];
   }
 
   // Group responses by assignment
-  const responsesByAssignment: Record<string, any[]> = {};
-  responses.forEach((r: any) => {
+  const responsesByAssignment: Record<string, CalibrationResponseRow[]> = {};
+  responses.forEach((r) => {
     if (!responsesByAssignment[r.assignment_id]) {
       responsesByAssignment[r.assignment_id] = [];
     }
@@ -52,11 +80,11 @@ async function getCalibrationData(cycleId: string, workspaceId: string) {
 
   return {
     cycle,
-    assignments: (assignments || []).map((a: any) => ({
+    assignments: typedAssignments.map((a) => ({
       ...a,
       employee: Array.isArray(a.employee) ? a.employee[0] ?? null : a.employee,
       manager: Array.isArray(a.manager) ? a.manager[0] ?? null : a.manager,
-      responses: (responsesByAssignment[a.id] || []).map((r: any) => ({
+      responses: (responsesByAssignment[a.id] || []).map((r) => ({
         ...r,
         competency: Array.isArray(r.competency) ? r.competency[0] ?? null : r.competency,
       })),
@@ -94,7 +122,7 @@ export default async function CalibrationPage({ params }: { params: Promise<{ id
   return (
     <CalibrationClient
       cycle={data.cycle}
-      assignments={data.assignments}
+      assignments={data.assignments as unknown as React.ComponentProps<typeof CalibrationClient>["assignments"]}
       cycleId={cycleId}
       workspaceId={workspace.workspaceId!}
     />

@@ -17,6 +17,7 @@ type EnvShape = {
   NEXT_PUBLIC_SUPABASE_URL: string;
   NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
   NEXT_PUBLIC_SLACK_CLIENT_ID: string | undefined;
+  NEXT_PUBLIC_SITE_URL: string | undefined;
 
   // Server-only ----------------------------------------------------------
   SUPABASE_SERVICE_ROLE_KEY: string | undefined;
@@ -53,6 +54,7 @@ export const env: EnvShape = {
   NEXT_PUBLIC_SUPABASE_URL: required("NEXT_PUBLIC_SUPABASE_URL"),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: required("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
   NEXT_PUBLIC_SLACK_CLIENT_ID: optional("NEXT_PUBLIC_SLACK_CLIENT_ID"),
+  NEXT_PUBLIC_SITE_URL: optional("NEXT_PUBLIC_SITE_URL"),
   SUPABASE_SERVICE_ROLE_KEY: optional("SUPABASE_SERVICE_ROLE_KEY"),
   STRIPE_SECRET_KEY: required("STRIPE_SECRET_KEY"),
   STRIPE_WEBHOOK_SECRET: optional("STRIPE_WEBHOOK_SECRET"),

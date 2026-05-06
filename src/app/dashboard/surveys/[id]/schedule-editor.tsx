@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,10 +39,7 @@ export function ScheduleEditor({
   onUpdated,
 }: ScheduleEditorProps) {
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
+  const supabase = createClient();
 
   const currentRecurrence = (initialConfig as { recurrence?: Recurrence })
     .recurrence;

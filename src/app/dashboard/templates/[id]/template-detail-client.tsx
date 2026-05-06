@@ -101,7 +101,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
     ]);
   };
 
-  const updateQuestion = (index: number, field: keyof Question, value: any) => {
+  const updateQuestion = (index: number, field: keyof Question, value: string | boolean) => {
     const updated = [...editQuestions];
     updated[index] = { ...updated[index], [field]: value };
     setEditQuestions(updated);
@@ -316,7 +316,7 @@ export function TemplateDetailClient({ template, reviewCount }: TemplateDetailCl
             <p className="text-center text-muted-foreground py-4">No questions defined</p>
           ) : (
             <div className="space-y-3">
-              {questions.map((question: any, index: number) => (
+              {questions.map((question, index) => (
                 <div
                   key={question.id || index}
                   className="flex items-start gap-4 p-4 bg-muted/40 rounded-lg"

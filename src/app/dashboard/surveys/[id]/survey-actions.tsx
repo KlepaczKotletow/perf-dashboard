@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Bell, XCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -23,10 +23,7 @@ export function SurveyActions({ surveyId, workspaceId }: { surveyId: string; wor
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [closeError, setCloseError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   async function sendReminder() {
     setLoading("remind");
@@ -39,8 +36,8 @@ export function SurveyActions({ surveyId, workspaceId }: { surveyId: string; wor
       if (error) throw error;
       setReminderSuccess(true);
       setTimeout(() => setReminderSuccess(false), 4000);
-    } catch (e: any) {
-      setReminderError(e.message || "Failed to send reminders");
+    } catch (e: unknown) {
+      setReminderError((e instanceof Error ? e.message : "") || "Failed to send reminders");
     } finally {
       setLoading(null);
     }
@@ -57,8 +54,8 @@ export function SurveyActions({ surveyId, workspaceId }: { surveyId: string; wor
         .eq("workspace_id", workspaceId);
       if (error) throw error;
       router.refresh();
-    } catch (e: any) {
-      setCloseError(e.message || "Failed to close survey");
+    } catch (e: unknown) {
+      setCloseError((e instanceof Error ? e.message : "") || "Failed to close survey");
     } finally {
       setLoading(null);
     }

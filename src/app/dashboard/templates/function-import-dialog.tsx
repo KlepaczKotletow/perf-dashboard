@@ -42,7 +42,9 @@ interface FunctionImportDialogProps {
     id: string;
     name: string;
     description: string | null;
-    content: any;
+    // Content shape varies across template types — accept any object that may
+    // carry the function-shaped fields. The UI guards on missing fields.
+    content: Partial<FunctionTemplateContent> | Record<string, unknown> | null | undefined;
   };
   workspaceId: string;
   open: boolean;
@@ -114,7 +116,7 @@ export function FunctionImportDialog({
       const hasDuplicate = (existing?.length ?? 0) > 0;
       setIsDuplicate(hasDuplicate);
       setChecked(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error checking duplicates:", err);
       setError("Failed to check for existing functions. Please try again.");
     } finally {
@@ -269,10 +271,10 @@ export function FunctionImportDialog({
       onOpenChange(false);
       router.push("/dashboard/admin/functions");
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating function:", err);
       setError(
-        err?.message || "Failed to create function. Please try again."
+        (err instanceof Error ? err.message : "") || "Failed to create function. Please try again."
       );
     } finally {
       setImporting(false);

@@ -32,7 +32,7 @@ interface CycleImportDialogProps {
     id: string;
     name: string;
     description: string | null;
-    content: any;
+    content: CycleProfileContent | null | undefined;
   };
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -112,9 +112,9 @@ export function CycleImportDialog({
       onOpenChange(false);
       router.push(`/dashboard/cycles/${cycle.id}`);
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error creating cycle:", err);
-      setError(err?.message || "Failed to create cycle. Please try again.");
+      setError((err instanceof Error ? err.message : "") || "Failed to create cycle. Please try again.");
     } finally {
       setCreating(false);
     }

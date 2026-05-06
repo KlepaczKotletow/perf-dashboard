@@ -20,9 +20,9 @@ interface TeamUser {
   role: string | null;
   start_date?: string | null;
   employee_status?: string | null;
-  is_department_head?: boolean;
-  manager: { slack_name: string } | null;
-  level: { name: string; grade: string | null; job_family: { name: string } | null } | null;
+  is_department_head?: boolean | null;
+  manager?: { slack_name: string | null } | null;
+  level?: { name: string | null; grade: string | null; job_family?: { name: string } | { name: string }[] | null } | null;
 }
 
 interface TeamListProps {
@@ -35,6 +35,13 @@ interface TeamListProps {
 
 type SortKey = "name" | "department" | "job_title" | "manager" | "start_date" | "role";
 type SortDir = "asc" | "desc";
+
+// Module-scope component (per react-hooks/static-components) — element type is
+// stable across renders.
+function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
+  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
+  return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+}
 
 function formatTenure(startDate: string | null | undefined): string {
   if (!startDate) return "—";
@@ -133,11 +140,6 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
-    return sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
-  };
-
   const colHeaderClass = "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
 
   return (
@@ -156,19 +158,19 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
           <div className="w-9 shrink-0" /> {/* Avatar spacer */}
           <div className="flex-1 min-w-0 grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
             <button onClick={() => handleSort("name")} className={colHeaderClass}>
-              Name <SortIcon col="name" />
+              Name <SortIcon active={sortKey === "name"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("department")} className={`${colHeaderClass} hidden md:flex`}>
-              Department <SortIcon col="department" />
+              Department <SortIcon active={sortKey === "department"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("manager")} className={`${colHeaderClass} hidden lg:flex`}>
-              Manager <SortIcon col="manager" />
+              Manager <SortIcon active={sortKey === "manager"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("start_date")} className={`${colHeaderClass} hidden lg:flex`}>
-              Start Date <SortIcon col="start_date" />
+              Start Date <SortIcon active={sortKey === "start_date"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("role")} className={`${colHeaderClass} hidden sm:flex`}>
-              Role <SortIcon col="role" />
+              Role <SortIcon active={sortKey === "role"} dir={sortDir} />
             </button>
             <div className="w-8 shrink-0" /> {/* Action spacer */}
           </div>
@@ -232,11 +234,15 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               {/* Department + Competency bracket */}
               <div className="min-w-0 hidden md:block">
                 <p className="text-xs text-muted-foreground truncate">{user.department || "—"}</p>
-                {user.level ? (
-                  <p className="text-[10px] text-primary/50 truncate" title={`${user.level.job_family?.name ? user.level.job_family.name + " · " : ""}${user.level.name}`}>
-                    {user.level.job_family?.name ? `${user.level.job_family.name} · ` : ""}{user.level.name}
-                  </p>
-                ) : (
+                {user.level ? (() => {
+                  const jf = Array.isArray(user.level.job_family) ? user.level.job_family[0] : user.level.job_family;
+                  const familyPart = jf?.name ? `${jf.name} · ` : "";
+                  return (
+                    <p className="text-[10px] text-primary/50 truncate" title={`${familyPart}${user.level.name}`}>
+                      {familyPart}{user.level.name}
+                    </p>
+                  );
+                })() : (
                   <p className="text-[10px] text-amber-500/70 italic truncate">No competency bracket</p>
                 )}
               </div>

@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UserPlus, Loader2, Search } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 interface User {
   id: string;
@@ -29,10 +29,7 @@ export function AddEmployeesForm({ cycleId, allUsers, existingEmployeeIds }: Add
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   // Filter out already added employees and apply search
   const availableUsers = allUsers.filter((user) => {
@@ -81,9 +78,9 @@ export function AddEmployeesForm({ cycleId, allUsers, existingEmployeeIds }: Add
 
       setSelectedIds([]);
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error adding employees:", err);
-      setError(err?.message || "Failed to add employees. Please try again.");
+      setError((err instanceof Error ? err.message : "") || "Failed to add employees. Please try again.");
     } finally {
       setLoading(false);
     }
