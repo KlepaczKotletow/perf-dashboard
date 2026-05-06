@@ -4,11 +4,50 @@ import { useState, useMemo } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
 import Link from "next/link";
 import { RoleSelector } from "./role-selector";
 import { BulkActions } from "./bulk-actions";
-import { ArrowUpDown, ArrowUp, ArrowDown, ArrowRight, Users, Plus } from "lucide-react";
+import {
+  ArrowUpDown, ArrowUp, ArrowDown, ArrowRight, Users, Plus,
+  Search, ChevronDown, X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+// Status values from the users.employee_status check constraint.
+// "Deactivated" is unchecked by default — directories typically hide
+// terminated employees, and the seat-sync logic already excludes them
+// from billable counts (see src/app/api/internal/seat-sync/route.ts).
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "onboarding", label: "Onboarding" },
+  { value: "inactive", label: "Inactive" },
+  { value: "deactivated", label: "Deactivated" },
+] as const;
+const DEFAULT_STATUS = new Set(["active", "onboarding", "inactive"]);
+
+// Roles from src/lib/roles.ts. "manager" is a legacy DB value still
+// stored on some rows but no longer assignable; surface it grouped with
+// "user" under the Employee label so legacy rows remain filterable.
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "hr", label: "HR" },
+  { value: "user", label: "Employee" },
+  { value: "manager", label: "Employee (legacy)" },
+] as const;
+const DEFAULT_ROLES = new Set(["admin", "hr", "user", "manager"]);
+
+// Sentinel for users with no department set, so the dropdown can offer
+// a checkbox for them. Empty string keeps the filter map keyed cleanly.
+const NO_DEPT = "";
 
 interface TeamUser {
   id: string;
@@ -43,6 +82,61 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
+interface FilterDropdownProps {
+  label: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  selected: Set<string>;
+  defaultSelected: Set<string>;
+  onToggle: (value: string) => void;
+}
+
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of a) if (!b.has(v)) return false;
+  return true;
+}
+
+function FilterDropdown({ label, options, selected, defaultSelected, onToggle }: FilterDropdownProps) {
+  const isActive = !setsEqual(selected, defaultSelected);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className={`h-9 text-xs gap-1.5 ${isActive ? "border-primary/50 bg-primary/[0.04]" : ""}`}
+        >
+          {label}
+          {isActive && (
+            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+              {selected.size}
+            </span>
+          )}
+          <ChevronDown className="h-3 w-3 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+          Filter by {label.toLowerCase()}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {options.map((opt) => (
+          <DropdownMenuCheckboxItem
+            key={opt.value || "__none__"}
+            checked={selected.has(opt.value)}
+            // Keep the menu open while the user toggles multiple checkboxes.
+            onSelect={(e) => e.preventDefault()}
+            onCheckedChange={() => onToggle(opt.value)}
+          >
+            {opt.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function formatTenure(startDate: string | null | undefined): string {
   if (!startDate) return "—";
   const start = new Date(startDate);
@@ -68,7 +162,69 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  const displayUsers = filterUnassigned ? users.filter(u => !u.level) : users;
+  // Department options are derived from the current user list. Users with
+  // no department appear in a "(No department)" group so they remain
+  // filterable rather than always-on or always-off.
+  const departmentOptions = useMemo(() => {
+    const named = [...new Set(users.map((u) => u.department).filter(Boolean) as string[])].sort();
+    const hasNone = users.some((u) => !u.department);
+    return [
+      ...named.map((d) => ({ value: d, label: d })),
+      ...(hasNone ? [{ value: NO_DEPT, label: "(No department)" }] : []),
+    ];
+  }, [users]);
+
+  // Defaults: every option is selected, except deactivated under Status.
+  const defaultDeptFilter = useMemo(
+    () => new Set(departmentOptions.map((o) => o.value)),
+    [departmentOptions],
+  );
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(() => new Set(DEFAULT_STATUS));
+  const [departmentFilter, setDepartmentFilter] = useState<Set<string>>(() => new Set(defaultDeptFilter));
+  const [roleFilter, setRoleFilter] = useState<Set<string>>(() => new Set(DEFAULT_ROLES));
+
+  function toggleInSet(setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) {
+    setter((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter(new Set(DEFAULT_STATUS));
+    setDepartmentFilter(new Set(defaultDeptFilter));
+    setRoleFilter(new Set(DEFAULT_ROLES));
+  }
+
+  const isFiltered =
+    search.trim().length > 0 ||
+    !setsEqual(statusFilter, DEFAULT_STATUS) ||
+    !setsEqual(departmentFilter, defaultDeptFilter) ||
+    !setsEqual(roleFilter, DEFAULT_ROLES);
+
+  const displayUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (filterUnassigned && u.level) return false;
+      const status = u.employee_status || "active";
+      if (!statusFilter.has(status)) return false;
+      if (!departmentFilter.has(u.department || NO_DEPT)) return false;
+      if (!roleFilter.has(u.role || "user")) return false;
+      if (q) {
+        const haystack = [u.slack_name, u.slack_email, u.job_title, u.department, u.manager?.slack_name]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [users, filterUnassigned, search, statusFilter, departmentFilter, roleFilter]);
 
   const sortedUsers = useMemo(() => {
     const sorted = [...displayUsers].sort((a, b) => {
@@ -144,6 +300,62 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
 
   return (
     <>
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search by name, email, or title…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 h-9 text-sm"
+            aria-label="Search directory"
+          />
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <FilterDropdown
+            label="Status"
+            options={STATUS_OPTIONS}
+            selected={statusFilter}
+            defaultSelected={DEFAULT_STATUS}
+            onToggle={(v) => toggleInSet(setStatusFilter, v)}
+          />
+          {departmentOptions.length > 0 && (
+            <FilterDropdown
+              label="Department"
+              options={departmentOptions}
+              selected={departmentFilter}
+              defaultSelected={defaultDeptFilter}
+              onToggle={(v) => toggleInSet(setDepartmentFilter, v)}
+            />
+          )}
+          <FilterDropdown
+            label="Role"
+            options={ROLE_OPTIONS}
+            selected={roleFilter}
+            defaultSelected={DEFAULT_ROLES}
+            onToggle={(v) => toggleInSet(setRoleFilter, v)}
+          />
+          {isFiltered && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="h-9 text-xs gap-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" /> Clear
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Result count when any filter (URL or in-page) is active */}
+      {(isFiltered || filterUnassigned) && (
+        <p className="text-xs text-muted-foreground -mt-1 mb-2">
+          Showing <span className="font-medium text-foreground">{displayUsers.length}</span> of {users.length} member{users.length !== 1 ? "s" : ""}
+        </p>
+      )}
+
       <div className="space-y-0">
         {/* Table header */}
         <div className="flex items-center gap-4 px-3 py-2 border-b border-border/60">
@@ -292,16 +504,31 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
             <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
               <Users className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-foreground mb-1">No team members yet</p>
-            <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-              Import your team from Slack to get started.
-            </p>
-            <Link href="/dashboard/team/import">
-              <Button size="sm" className="mt-5 gap-1.5">
-                <Plus className="h-3.5 w-3.5" />
-                Import from Slack
-              </Button>
-            </Link>
+            {isFiltered || filterUnassigned ? (
+              <>
+                <p className="text-sm font-medium text-foreground mb-1">No matches</p>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  No directory members match the current filters.
+                </p>
+                <Button size="sm" variant="outline" onClick={clearFilters} className="mt-5 gap-1.5">
+                  <X className="h-3.5 w-3.5" />
+                  Clear filters
+                </Button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-foreground mb-1">No team members yet</p>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  Import your team from Slack to get started.
+                </p>
+                <Link href="/dashboard/team/import">
+                  <Button size="sm" className="mt-5 gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
+                    Import from Slack
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
