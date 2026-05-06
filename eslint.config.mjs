@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code workspace: skill scripts and isolated worktrees aren't part
+    // of the app and pull in unrelated lint errors when scanned by `next lint`.
+    ".claude/**",
+    // Supabase Edge Functions are Deno code, not Node/Next.js. Lint them with
+    // Deno's tooling rather than next lint's TypeScript ESLint stack.
+    "supabase/**",
   ]),
 ]);
 
