@@ -28,7 +28,7 @@ function AuthErrorContent() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-            Please try signing in again. Make sure your workspace has the 360 Feedback app installed.
+            Please try signing in again. Make sure your workspace has the Nami app installed.
           </p>
           <div className="pt-4 space-y-2">
             <Button asChild className="w-full bg-[#4A154B] hover:bg-[#5A1F5C]">

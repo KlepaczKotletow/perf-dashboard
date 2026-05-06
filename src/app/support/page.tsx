@@ -12,7 +12,7 @@ export default function SupportPage() {
             Support & Help
           </h1>
           <p className="text-xl text-slate-600 dark:text-slate-400">
-            Get help with 360 Feedback for Slack
+            Get help with Nami
           </p>
         </div>
 
@@ -21,7 +21,7 @@ export default function SupportPage() {
             <CardHeader>
               <MessageSquare className="h-8 w-8 text-blue-600 mb-2" />
               <CardTitle>Getting Started</CardTitle>
-              <CardDescription>Learn how to use 360 Feedback</CardDescription>
+              <CardDescription>Learn how to use Nami</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
