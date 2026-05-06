@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +29,7 @@ interface DepartmentsClientProps {
 export function DepartmentsClient({ departments: initialDepartments, memberCounts: initialCounts, workspaceId }: DepartmentsClientProps) {
   const router = useRouter();
   const supabase = useMemo(
-    () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
+    () => createClient(),
     []
   );
 
@@ -61,8 +61,8 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
       setAddValue("");
       setShowAdd(false);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to add department");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : "") ?? "Failed to add department");
     } finally {
       setAddLoading(false);
     }
@@ -94,8 +94,8 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
 
       setRenamingId(null);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to rename department");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : "") ?? "Failed to rename department");
     }
   }
 
@@ -115,8 +115,8 @@ export function DepartmentsClient({ departments: initialDepartments, memberCount
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to archive department");
+    } catch (e: unknown) {
+      setError((e instanceof Error ? e.message : "") ?? "Failed to archive department");
     } finally {
       setDeleteLoading(false);
       setDeleteTarget(null);

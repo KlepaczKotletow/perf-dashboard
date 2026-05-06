@@ -1,6 +1,7 @@
+import type React from "react";
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { notFound } from "next/navigation";
-import { isHROrAbove, isManagerOrAbove } from "@/lib/roles";
+import { isManagerOrAbove } from "@/lib/roles";
 import GoalDetailClient from "./goal-detail-client";
 
 export default async function GoalDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -67,19 +68,21 @@ export default async function GoalDetailPage({ params }: { params: Promise<{ id:
         .limit(100),
     ]);
 
+    type GoalDetailGoal = React.ComponentProps<typeof GoalDetailClient>["goal"];
+    type GoalDetailHistory = NonNullable<React.ComponentProps<typeof GoalDetailClient>["history"]>;
     return (
       <GoalDetailClient
-        goal={goal as any}
-        childGoals={childGoals || []}
+        goal={goal as unknown as GoalDetailGoal}
+        childGoals={(childGoals || []) as unknown as React.ComponentProps<typeof GoalDetailClient>["childGoals"]}
         canEdit={canEdit}
         cycles={cycles || []}
-        employees={employees || []}
+        employees={(employees || []) as unknown as React.ComponentProps<typeof GoalDetailClient>["employees"]}
         workspaceId={workspace.workspaceId}
-        history={(historyRaw || []) as any}
+        history={(historyRaw || []) as unknown as GoalDetailHistory}
       />
     );
-  } catch (err: any) {
-    console.error("[goal-detail] UNCAUGHT ERROR:", err?.message, err?.stack);
+  } catch (err: unknown) {
+    console.error("[goal-detail] UNCAUGHT ERROR:", (err instanceof Error ? err.message : ""), (err instanceof Error ? err.stack : ""));
     throw err;
   }
 }

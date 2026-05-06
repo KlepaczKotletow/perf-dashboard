@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,13 +84,7 @@ export function ReviewDetailClient({
   maxRating = 5,
 }: ReviewDetailClientProps) {
   const router = useRouter();
-  const supabase = useMemo(
-    () => createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ),
-    []
-  );
+  const supabase = useMemo(() => createClient(), []);
 
   const [ratings, setRatings] = useState<Record<string, { rating: number | null; comment: string }>>(
     () =>
@@ -194,9 +188,9 @@ export function ReviewDetailClient({
       setSaved(true);
       setIsDirty(false);
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Save error:", err);
-      setSaveError(err?.message || "Failed to save. Please check your connection and try again.");
+      setSaveError((err instanceof Error ? err.message : "") || "Failed to save. Please check your connection and try again.");
     } finally {
       setSaving(false);
     }

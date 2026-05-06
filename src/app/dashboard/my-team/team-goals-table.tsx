@@ -32,6 +32,29 @@ interface TeamGoalsTableProps {
 
 type SortKey = "title" | "owner" | "progress" | "weight" | "cycle";
 
+// Component declared at module scope (per react-hooks/static-components) so the
+// element type is stable across re-renders.
+function SortHeader({
+  label,
+  k,
+  className,
+  onSort,
+}: {
+  label: string;
+  k: SortKey;
+  className?: string;
+  onSort: (k: SortKey) => void;
+}) {
+  return (
+    <TableHead className={className}>
+      <button onClick={() => onSort(k)} className="flex items-center gap-1 text-xs hover:text-foreground">
+        {label}
+        <ArrowUpDown className="h-3 w-3 opacity-40" />
+      </button>
+    </TableHead>
+  );
+}
+
 export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTableProps) {
   const [search, setSearch] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("all");
@@ -99,7 +122,6 @@ export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTa
   const activeGoals = normalized.filter((g) => g.status === "active");
   const onTrack = activeGoals.filter((g) => g.tracking_status === "on_track" || g.tracking_status === "achieved").length;
   const atRisk = activeGoals.filter((g) => g.tracking_status === "at_risk").length;
-  const delayed = activeGoals.filter((g) => g.tracking_status === "delayed").length;
   const weightedProgress = activeGoals.length > 0
     ? Math.round(
         activeGoals.reduce((sum, g) => sum + (g.progress || 0) * (g.weight || 1), 0) /
@@ -115,19 +137,10 @@ export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTa
   function toggleExpand(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
-
-  const SortHeader = ({ label, k, className }: { label: string; k: SortKey; className?: string }) => (
-    <TableHead className={className}>
-      <button onClick={() => toggleSort(k)} className="flex items-center gap-1 text-xs hover:text-foreground">
-        {label}
-        <ArrowUpDown className="h-3 w-3 opacity-40" />
-      </button>
-    </TableHead>
-  );
 
   return (
     <div className="space-y-3">
@@ -203,13 +216,13 @@ export default function TeamGoalsTable({ goals, cycles, employees }: TeamGoalsTa
             <Table>
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <SortHeader label="Goal" k="title" className="pl-5 min-w-[180px]" />
-                  <SortHeader label="Owner" k="owner" className="w-[120px]" />
-                  <SortHeader label="Cycle" k="cycle" className="w-[100px]" />
+                  <SortHeader label="Goal" k="title" className="pl-5 min-w-[180px]" onSort={toggleSort} />
+                  <SortHeader label="Owner" k="owner" className="w-[120px]" onSort={toggleSort} />
+                  <SortHeader label="Cycle" k="cycle" className="w-[100px]" onSort={toggleSort} />
                   <TableHead className="w-[80px]">Status</TableHead>
-                  <SortHeader label="Weight" k="weight" className="w-[60px] text-center" />
+                  <SortHeader label="Weight" k="weight" className="w-[60px] text-center" onSort={toggleSort} />
                   <TableHead className="w-[160px]">Metric</TableHead>
-                  <SortHeader label="Progress" k="progress" className="w-[140px]" />
+                  <SortHeader label="Progress" k="progress" className="w-[140px]" onSort={toggleSort} />
                   <TableHead className="w-[90px] pr-5">Health</TableHead>
                 </TableRow>
               </TableHeader>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,10 +56,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
   const [isDeptHead, setIsDeptHead] = useState(false);
   const [callerRole, setCallerRole] = useState<string>("user");
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   useEffect(() => {
     async function load() {
@@ -115,12 +112,13 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
         setAllUsers(usersData || []);
         setJobFamilies(familiesData || []);
 
-        const mappedLevels = (levelsData || []).map((l: any) => ({
+        type LevelRowFromDb = { id: string; name: string; grade: string | null; job_family_id: string | null; job_family?: { name: string } | { name: string }[] | null };
+        const mappedLevels = ((levelsData || []) as unknown as LevelRowFromDb[]).map((l) => ({
           id: l.id,
           name: l.name,
           grade: l.grade,
-          job_family_id: l.job_family_id,
-          job_family_name: l.job_family?.name || "",
+          job_family_id: l.job_family_id ?? "",
+          job_family_name: (Array.isArray(l.job_family) ? l.job_family[0]?.name : l.job_family?.name) || "",
         }));
         setLevels(mappedLevels);
 
@@ -156,7 +154,7 @@ export default function EditEmployeePage({ params }: { params: Promise<{ id: str
 
       // Only admins can change roles — HR can edit other fields but not role
       const callerIsAdmin = callerUser?.role === "admin";
-      const updatePayload: Record<string, any> = {
+      const updatePayload: Record<string, unknown> = {
         job_title: jobTitle || null,
         department: department || null,
         manager_id: managerId === "__none__" ? null : managerId || null,

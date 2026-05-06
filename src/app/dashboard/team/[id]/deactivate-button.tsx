@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { UserX, UserCheck, Loader2 } from "lucide-react";
 
@@ -17,13 +17,7 @@ export function DeactivateButton({ userId, workspaceId, isDeactivated }: Props) 
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const supabase = useMemo(
-    () => createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ),
-    []
-  );
+  const supabase = useMemo(() => createClient(), []);
 
   async function handleAction() {
     if (!confirming) {

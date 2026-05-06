@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,15 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+// Helper to extract a message from an unknown thrown value, falling back to a default.
+function getErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err && typeof (err as { message: unknown }).message === "string") {
+    return (err as { message: string }).message;
+  }
+  return fallback;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -221,7 +230,7 @@ export function FunctionsClient({
 }: FunctionsClientProps) {
   const router = useRouter();
   const supabase = useMemo(
-    () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
+    () => createClient(),
     []
   );
 
@@ -397,8 +406,8 @@ export function FunctionsClient({
       setShowAddFunction(false);
       setSelectedId(data.id);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to create function");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to create function"));
     } finally {
       setAddFunctionLoading(false);
     }
@@ -415,8 +424,8 @@ export function FunctionsClient({
       if (err) throw err;
       onDone();
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to rename");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to rename"));
       onDone();
     }
   }
@@ -431,8 +440,8 @@ export function FunctionsClient({
       if (err) throw err;
       setEditingFunctionDesc(false);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to update description");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to update description"));
     }
   }
 
@@ -453,8 +462,8 @@ export function FunctionsClient({
       if (err) throw err;
       if (selectedId === id) setSelectedId(initialFunctions.find(f => f.id !== id)?.id ?? null);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to archive function");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to archive function"));
     }
   }
 
@@ -477,8 +486,8 @@ export function FunctionsClient({
       setNewLevelName("");
       setShowAddLevel(false);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to add level");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to add level"));
     }
   }
 
@@ -493,8 +502,8 @@ export function FunctionsClient({
       if (err) throw err;
       setRenamingLevelId(null);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to rename level");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to rename level"));
     }
   }
 
@@ -517,8 +526,8 @@ export function FunctionsClient({
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to archive level");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to archive level"));
     }
   }
 
@@ -565,10 +574,10 @@ export function FunctionsClient({
         })
       );
       router.refresh();
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Roll back optimistic update on error
       setLevels(originalLevels);
-      setError(e.message ?? "Failed to reorder levels");
+      setError(getErrorMessage(e, "Failed to reorder levels"));
     }
   }
 
@@ -591,8 +600,8 @@ export function FunctionsClient({
       setNewSkillDesc("");
       setShowAddSkill(false);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to add skill");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to add skill"));
     } finally {
       setAddSkillLoading(false);
     }
@@ -608,8 +617,8 @@ export function FunctionsClient({
       const { error: err } = await supabase.from("competencies").delete().eq("id", competencyId).eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to remove skill");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to remove skill"));
     }
   }
 
@@ -634,8 +643,8 @@ export function FunctionsClient({
       setNewCoreSkillDesc("");
       setShowAddCoreSkill(false);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to add core skill");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to add core skill"));
     } finally {
       setAddCoreSkillLoading(false);
     }
@@ -652,8 +661,8 @@ export function FunctionsClient({
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to rename core skill");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to rename core skill"));
     } finally {
       onDone();
     }
@@ -669,8 +678,8 @@ export function FunctionsClient({
       if (err) throw err;
       setEditingCoreDescId(null);
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to update description");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to update description"));
     }
   }
 
@@ -693,8 +702,8 @@ export function FunctionsClient({
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to remove core skill");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to remove core skill"));
     }
   }
 
@@ -714,8 +723,8 @@ export function FunctionsClient({
         .eq("workspace_id", workspaceId);
       if (err) throw err;
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to toggle core status");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to toggle core status"));
     }
   }
 
@@ -748,8 +757,8 @@ export function FunctionsClient({
         if (err) throw err;
       }
       router.refresh();
-    } catch (e: any) {
-      setError(e.message ?? "Failed to update score");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Failed to update score"));
     }
   }
 
@@ -1044,7 +1053,7 @@ export function FunctionsClient({
               {functionLevels.length === 0 && functionSkills.length === 0 && coreSkills.length === 0 ? (
                 <div className="border border-dashed rounded-xl py-12 text-center">
                   <p className="text-sm font-medium text-foreground mb-1">Nothing configured yet</p>
-                  <p className="text-xs text-muted-foreground">Add levels and skills to build this function's scorecard</p>
+                  <p className="text-xs text-muted-foreground">Add levels and skills to build this function&apos;s scorecard</p>
                 </div>
               ) : (
                 <div className="rounded-xl border border-border/60 overflow-x-auto">

@@ -51,7 +51,7 @@ export function csvStreamResponse<TRow>({
         controller.enqueue(encoder.encode(csvRow(header) + "\n"));
 
         let offset = 0;
-        // eslint-disable-next-line no-constant-condition
+         
         while (true) {
           const page = await fetchPage(offset, pageSize);
           if (page.length === 0) break;

@@ -7,7 +7,19 @@ import { format } from "date-fns";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 import { PageHeader } from "@/components/page-header";
 
-async function getSurveys(workspaceId: string) {
+type SurveyRow = {
+  id: string;
+  type: string;
+  name: string;
+  status: string;
+  config: { recurrence?: string; recurrence_day?: string; last_recurrence_at?: string } | null;
+  closes_at: string | null;
+  created_at: string | null;
+};
+
+type SurveyWithStats = SurveyRow & { totalParticipants: number; completedParticipants: number };
+
+async function getSurveys(workspaceId: string): Promise<SurveyWithStats[]> {
   const supabase = await createServerSupabaseClient();
 
   // Query surveys and participant counts separately to avoid nested-embed RLS issues.
@@ -36,7 +48,7 @@ async function getSurveys(workspaceId: string) {
     statsMap.set(p.survey_id, entry);
   }
 
-  return (surveys || []).map((s: any) => {
+  return ((surveys || []) as unknown as SurveyRow[]).map((s) => {
     const stats = statsMap.get(s.id) || { total: 0, completed: 0 };
     return { ...s, totalParticipants: stats.total, completedParticipants: stats.completed };
   });
@@ -73,8 +85,8 @@ export default async function SurveysPage() {
   const isAdminOrHR = isHROrAbove(workspace?.role);
 
   // Split out recurring from one-off for clearer mental model
-  const recurringSurveys = surveys.filter((s: any) => s.config?.recurrence);
-  const oneOffSurveys = surveys.filter((s: any) => !s.config?.recurrence);
+  const recurringSurveys = surveys.filter((s) => s.config?.recurrence);
+  const oneOffSurveys = surveys.filter((s) => !s.config?.recurrence);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

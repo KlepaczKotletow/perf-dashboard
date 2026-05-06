@@ -16,8 +16,11 @@ export function SidebarWrapper({ children, workspaceName, workspaceLogoUrl }: Si
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
 
-  // Auto-close on navigation (e.g. after clicking a nav link on mobile)
+  // Auto-close on navigation (e.g. after clicking a nav link on mobile).
+  // Using a `key={pathname}` would force a remount of the entire sidebar
+  // tree on every navigation — too expensive. Keep the effect-based reset.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsOpen(false);
   }, [pathname]);
 

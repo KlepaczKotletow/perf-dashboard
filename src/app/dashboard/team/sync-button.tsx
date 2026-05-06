@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Check } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 export function SyncButton({ workspaceId }: { workspaceId?: string }) {
   const router = useRouter();
@@ -19,10 +19,7 @@ export function SyncButton({ workspaceId }: { workspaceId?: string }) {
     setSyncError(null);
 
     try {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      const supabase = createClient();
       const { data, error } = await supabase.functions.invoke("sync-members", {
         body: { workspace_id: workspaceId },
       });

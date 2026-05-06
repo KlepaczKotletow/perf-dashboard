@@ -43,12 +43,19 @@ export default async function ProfilePage() {
       .limit(3),
   ]);
 
+  type GoalSummary = { id: string; status: string; progress: number | null };
+  type ReviewSummary = {
+    id: string;
+    status: string;
+    final_grade: string | null;
+    cycle?: { id: string; name: string; grades_released?: boolean } | { id: string; name: string; grades_released?: boolean }[] | null;
+  };
   const userData = userRes.data;
-  const activeGoals = (goalsRes.data || []).filter((g: any) => g.status === "active");
+  const activeGoals = ((goalsRes.data || []) as GoalSummary[]).filter((g) => g.status === "active");
   const avgProgress = activeGoals.length > 0
-    ? Math.round(activeGoals.reduce((sum: number, g: any) => sum + (g.progress || 0), 0) / activeGoals.length)
+    ? Math.round(activeGoals.reduce((sum, g) => sum + (g.progress || 0), 0) / activeGoals.length)
     : 0;
-  const recentReviews = assignmentsRes.data || [];
+  const recentReviews = (assignmentsRes.data || []) as unknown as ReviewSummary[];
 
   const manager = Array.isArray(userData?.manager) ? userData.manager[0] : userData?.manager;
   const level = Array.isArray(userData?.level) ? userData.level[0] : userData?.level;
@@ -143,20 +150,23 @@ export default async function ProfilePage() {
           </div>
           <Card className="border-border/60">
             <CardContent className="divide-y divide-border/60 p-0">
-              {recentReviews.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">{r.cycle?.name || "Unknown"}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{r.status?.replace("_", " ")}</p>
+              {recentReviews.map((r) => {
+                const cycle = Array.isArray(r.cycle) ? r.cycle[0] : r.cycle;
+                return (
+                  <div key={r.id} className="flex items-center justify-between px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      <ClipboardCheck className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium">{cycle?.name || "Unknown"}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{r.status?.replace("_", " ")}</p>
+                      </div>
                     </div>
+                    {cycle?.grades_released && r.final_grade && (
+                      <Badge variant="outline" className="text-xs">{r.final_grade}</Badge>
+                    )}
                   </div>
-                  {r.cycle?.grades_released && r.final_grade && (
-                    <Badge variant="outline" className="text-xs">{r.final_grade}</Badge>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </div>

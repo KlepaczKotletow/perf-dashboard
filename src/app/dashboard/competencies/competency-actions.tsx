@@ -38,7 +38,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MoreHorizontal, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 const CATEGORY_OPTIONS = [
   { value: "Core", label: "Core" },
@@ -72,10 +72,7 @@ export function CompetencyActions({ competency, workspaceId }: CompetencyActions
   const [editCategory, setEditCategory] = useState(competency.category || "");
   const [editIsCore, setEditIsCore] = useState(competency.is_core);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   async function handleUpdate() {
     setLoading(true);
@@ -96,9 +93,9 @@ export function CompetencyActions({ competency, workspaceId }: CompetencyActions
       if (error) throw error;
       router.refresh();
       setShowEditDialog(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error updating competency:", err);
-      setUpdateError(err?.message || "Failed to save changes. Please try again.");
+      setUpdateError((err instanceof Error ? err.message : "") || "Failed to save changes. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -116,9 +113,9 @@ export function CompetencyActions({ competency, workspaceId }: CompetencyActions
 
       if (error) throw error;
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error deleting competency:", err);
-      setActionError(err?.message || "Failed to delete competency. Please try again.");
+      setActionError((err instanceof Error ? err.message : "") || "Failed to delete competency. Please try again.");
     } finally {
       setLoading(false);
       setShowDeleteDialog(false);

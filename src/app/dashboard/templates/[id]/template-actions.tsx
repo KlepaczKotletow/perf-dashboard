@@ -28,7 +28,7 @@ interface TemplateActionsProps {
   isSystem: boolean;
   templateName: string;
   templateDescription: string | null;
-  templateQuestions: any[];
+  templateQuestions: Array<Record<string, unknown>>;
 }
 
 export function TemplateActions({

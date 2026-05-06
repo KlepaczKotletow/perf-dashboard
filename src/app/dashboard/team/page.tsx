@@ -9,7 +9,22 @@ import { Users, Upload, List, Network } from "lucide-react";
 import { OrgChart } from "./org-chart";
 import { PageHeader } from "@/components/page-header";
 
-async function getUsers(workspaceId: string) {
+type TeamUserRow = {
+  id: string;
+  slack_name: string | null;
+  slack_email: string | null;
+  job_title: string | null;
+  department: string | null;
+  role: string | null;
+  manager_id: string | null;
+  is_department_head?: boolean | null;
+  employee_status?: string | null;
+  level_id?: string | null;
+  level?: { name: string | null; grade: string | null; job_family?: { name: string } | { name: string }[] | null } | null;
+  manager?: { slack_name: string | null } | null;
+};
+
+async function getUsers(workspaceId: string): Promise<TeamUserRow[]> {
   const supabase = await createServerSupabaseClient();
 
   // Fetch users with level info (avoid self-join which causes PostgREST 400)
@@ -32,9 +47,9 @@ async function getUsers(workspaceId: string) {
       .eq("workspace_id", workspaceId)
       .order("department", { ascending: true })
       .order("slack_name", { ascending: true });
-    const users = simple || [];
-    const userMap = new Map(users.map((u: any) => [u.id, u]));
-    return users.map((u: any) => ({
+    const users = (simple || []) as unknown as TeamUserRow[];
+    const userMap = new Map<string, TeamUserRow>(users.map((u) => [u.id, u]));
+    return users.map((u) => ({
       ...u,
       manager: u.manager_id ? { slack_name: userMap.get(u.manager_id)?.slack_name || null } : null,
       level: null,
@@ -42,8 +57,9 @@ async function getUsers(workspaceId: string) {
   }
 
   // Resolve manager names from the same user array (avoids PostgREST self-join)
-  const userMap = new Map((data || []).map((u: any) => [u.id, u]));
-  return (data || []).map((u: any) => ({
+  const typedData = (data || []) as unknown as TeamUserRow[];
+  const userMap = new Map<string, TeamUserRow>(typedData.map((u) => [u.id, u]));
+  return typedData.map((u) => ({
     ...u,
     manager: u.manager_id ? { slack_name: userMap.get(u.manager_id)?.slack_name || null } : null,
   }));
@@ -84,9 +100,9 @@ export default async function TeamPage({
   const seatUsed = users.length;
   const seatPercent = Math.min(Math.round((seatUsed / seatLimit) * 100), 100);
 
-  const unassignedCount = users.filter((u: any) => !u.level).length;
+  const unassignedCount = users.filter((u) => !u.level).length;
 
-  const departments = [...new Set(users.map((u: any) => u.department).filter(Boolean))].sort();
+  const departments = [...new Set(users.map((u) => u.department).filter(Boolean))].sort() as string[];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">

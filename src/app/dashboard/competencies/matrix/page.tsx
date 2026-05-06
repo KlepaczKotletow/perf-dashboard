@@ -7,6 +7,29 @@ import { ArrowLeft, Lock } from "lucide-react";
 import { isManagerOrAbove, isHROrAbove } from "@/lib/roles";
 import { EditableCell } from "./editable-cell";
 
+type MatrixLevelRow = {
+  id: string;
+  name: string;
+  grade: string | null;
+  sort_order: number;
+  job_family_id: string | null;
+  job_family?: { name: string | null } | { name: string | null }[] | null;
+};
+type MatrixCompetencyRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  is_core: boolean;
+};
+type MatrixLevelCompetencyRow = {
+  id: string;
+  level_id: string;
+  competency_id: string;
+  expected_level: number;
+  behavioral_indicators: string[] | null;
+};
+
 async function getMatrixData(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
@@ -17,10 +40,16 @@ async function getMatrixData(workspaceId: string) {
   ]);
 
   return {
-    levels: levels || [],
-    competencies: competencies || [],
-    levelCompetencies: levelCompetencies || [],
+    levels: (levels || []) as unknown as MatrixLevelRow[],
+    competencies: (competencies || []) as MatrixCompetencyRow[],
+    levelCompetencies: (levelCompetencies || []) as MatrixLevelCompetencyRow[],
   };
+}
+
+function familyName(l: MatrixLevelRow): string | null {
+  const jf = l.job_family;
+  if (Array.isArray(jf)) return jf[0]?.name ?? null;
+  return jf?.name ?? null;
 }
 
 const proficiencyColors: Record<number, string> = {
@@ -69,7 +98,7 @@ export default async function CompetencyMatrixPage() {
 
   // Build a lookup: levelId-competencyId -> { expected_level, id, behavioral_indicators }
   const matrixLookup: Record<string, { expected_level: number; id: string; behavioral_indicators: string[] }> = {};
-  levelCompetencies.forEach((lc: any) => {
+  levelCompetencies.forEach((lc) => {
     const raw = lc.behavioral_indicators;
     matrixLookup[`${lc.level_id}-${lc.competency_id}`] = {
       expected_level: lc.expected_level,
@@ -79,7 +108,7 @@ export default async function CompetencyMatrixPage() {
   });
 
   // Group competencies by category
-  const categories = [...new Set(competencies.map((c: any) => c.category || "Uncategorized"))];
+  const categories = [...new Set(competencies.map((c) => c.category || "Uncategorized"))];
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -135,7 +164,7 @@ export default async function CompetencyMatrixPage() {
           </div>
 
           {categories.map((category) => {
-            const catCompetencies = competencies.filter((c: any) => (c.category || "Uncategorized") === category);
+            const catCompetencies = competencies.filter((c) => (c.category || "Uncategorized") === category);
             return (
               <Card key={category}>
                 <CardHeader>
@@ -148,9 +177,9 @@ export default async function CompetencyMatrixPage() {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left py-2 pr-4 font-medium min-w-[160px]">Competency</th>
-                          {levels.map((level: any) => (
+                          {levels.map((level) => (
                             <th key={level.id} className="text-center py-2 px-2 font-medium min-w-[80px]">
-                              <div className="text-xs">{(level.job_family as any)?.name}</div>
+                              <div className="text-xs">{familyName(level)}</div>
                               <div>{level.name}</div>
                               {level.grade && <div className="text-xs text-muted-foreground">{level.grade}</div>}
                             </th>
@@ -158,13 +187,13 @@ export default async function CompetencyMatrixPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {catCompetencies.map((comp: any) => (
+                        {catCompetencies.map((comp) => (
                           <tr key={comp.id} className="border-b last:border-0">
                             <td className="py-2 pr-4">
                               <span className="font-medium">{comp.name}</span>
                               {comp.is_core && <Badge variant="outline" className="ml-2 text-xs">Core</Badge>}
                             </td>
-                            {levels.map((level: any) => {
+                            {levels.map((level) => {
                               const entry = matrixLookup[`${level.id}-${comp.id}`];
                               return (
                                 <td key={level.id} className="text-center py-2 px-2">
@@ -176,7 +205,7 @@ export default async function CompetencyMatrixPage() {
                                     existingId={entry?.id || null}
                                     initialBehaviors={entry?.behavioral_indicators || []}
                                     competencyName={comp.name}
-                                    levelLabel={`${(level.job_family as any)?.name ?? ""} · ${level.name}`}
+                                    levelLabel={`${familyName(level) ?? ""} · ${level.name}`}
                                     canEdit={canEdit}
                                   />
                                 </td>

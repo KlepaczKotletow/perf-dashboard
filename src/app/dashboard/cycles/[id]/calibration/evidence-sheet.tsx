@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getEmployeeEvidence, EmployeeEvidence } from "./evidence-data";
 
 interface AssignmentLite {
@@ -45,17 +45,18 @@ export function EvidenceSheet({ assignmentId, open, onClose, workspaceId, cycleI
   const [error, setError] = useState<string | null>(null);
   const assignment = assignmentId ? assignments.find((a) => a.id === assignmentId) : null;
 
+  // Reset loading/error and clear data before fetching — fetch-on-id-change pattern.
   useEffect(() => {
     if (!assignmentId || !assignment?.employee?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setData(null);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    const supabase = createClient();
     getEmployeeEvidence(supabase, workspaceId, cycleId, assignmentId, assignment.employee.id)
       .then(setData)
       .catch((err) => setError(err?.message ?? "Failed to load evidence"))

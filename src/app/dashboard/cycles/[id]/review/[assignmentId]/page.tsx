@@ -14,8 +14,8 @@
 
 import { useState, useEffect, useRef, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createBrowserClient } from "@supabase/ssr";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { createClient } from "@/lib/supabase";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Loader2, Send, Star, MessageSquare, Target, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Loader2, Send, Star, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
 import { formatDistanceToNow } from "date-fns";
@@ -66,12 +66,34 @@ export default function ReviewFormPage({
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [assignment, setAssignment] = useState<any>(null);
-  const [employee, setEmployee] = useState<any>(null);
+  type AssignmentState = {
+    id: string;
+    employee_id: string;
+    manager_id: string | null;
+    reviewer_id: string | null;
+    assignment_type: string | null;
+    status: string;
+    cycle_id: string;
+    overall_rating: number | null;
+    cycle?: { id: string; name: string; status: string; review_deadline: string | null } | null;
+  };
+  type EmployeeState = {
+    id: string;
+    slack_name: string | null;
+    job_title: string | null;
+    department: string | null;
+    avatar_url: string | null;
+    level_id: string | null;
+    level?: { id: string; name: string; grade: string | null; job_family?: { name: string } | { name: string }[] | null } | null;
+  };
+  type CurrentUserState = { id: string; workspace_id: string | null; role: string | null; slack_name: string | null };
+
+  const [assignment, setAssignment] = useState<AssignmentState | null>(null);
+  const [employee, setEmployee] = useState<EmployeeState | null>(null);
   const [competencies, setCompetencies] = useState<CompetencyRating[]>([]);
   const [textResponses, setTextResponses] = useState<TextResponse[]>([]);
   const [overallComment, setOverallComment] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUserState | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [hasCycleQuestions, setHasCycleQuestions] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -79,10 +101,7 @@ export default function ReviewFormPage({
   const [maxRating, setMaxRating] = useState(5);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   useEffect(() => {
     async function load() {
@@ -130,8 +149,9 @@ export default function ReviewFormPage({
           return;
         }
 
-        setAssignment(assignmentData);
-        setEmployee(assignmentData.employee);
+        const empData = (Array.isArray(assignmentData.employee) ? assignmentData.employee[0] : assignmentData.employee) as EmployeeState | undefined;
+        setAssignment(assignmentData as unknown as AssignmentState);
+        setEmployee(empData ?? null);
 
         // Verify assignment belongs to current workspace
         if (wsId) {
@@ -148,7 +168,7 @@ export default function ReviewFormPage({
         }
 
         // Block submission if cycle is no longer active
-        const cycleStatus = (assignmentData as any).cycle?.status;
+        const cycleStatus = (Array.isArray(assignmentData.cycle) ? assignmentData.cycle[0]?.status : (assignmentData as { cycle?: { status?: string } }).cycle?.status);
         if (cycleStatus && cycleStatus !== "active") {
           setError(`This review cycle is ${cycleStatus} and no longer accepting submissions.`);
           setLoading(false);
@@ -225,9 +245,9 @@ export default function ReviewFormPage({
           const txtResponses: TextResponse[] = [];
 
           // If employee has a level, fetch expected_levels and behavioral_indicators for enrichment
-          const levelId = assignmentData.employee?.level_id;
-          let expectedMap: Record<string, number> = {};
-          let behaviorsMap: Record<string, string[]> = {};
+          const levelId = empData?.level_id;
+          const expectedMap: Record<string, number> = {};
+          const behaviorsMap: Record<string, string[]> = {};
           if (levelId) {
             const { data: levelComps } = await supabase
               .from("level_competencies")
@@ -244,9 +264,11 @@ export default function ReviewFormPage({
             }
           }
 
-          for (const q of cycleQs) {
+          type CycleQ = { id: string; question_type: string; prompt: string | null; required: boolean | null; competency: { id: string; name: string; category: string | null; description: string | null } | { id: string; name: string; category: string | null; description: string | null }[] | null };
+          for (const q of (cycleQs as CycleQ[])) {
             if (q.question_type === "competency" && q.competency) {
-              const comp = q.competency as any;
+              const comp = Array.isArray(q.competency) ? q.competency[0] : q.competency;
+              if (!comp) continue;
               compRatings.push({
                 competency_id: comp.id,
                 name: comp.name,
@@ -261,7 +283,7 @@ export default function ReviewFormPage({
               txtResponses.push({
                 questionId: q.id,
                 prompt: q.prompt || "Additional comments",
-                required: q.required,
+                required: q.required ?? false,
                 response: "",
               });
             }
@@ -274,9 +296,11 @@ export default function ReviewFormPage({
             const saved = localStorage.getItem(`review-draft-${assignmentId}-${appUserId}`);
             if (saved) {
               const draft = JSON.parse(saved);
+              type DraftComp = { competency_id: string; rating?: number | null; comment?: string };
+              type DraftText = { questionId: string; response?: string };
               if (draft.competencies) {
                 for (const comp of compRatings) {
-                  const savedComp = draft.competencies.find((d: any) => d.competency_id === comp.competency_id);
+                  const savedComp = (draft.competencies as DraftComp[]).find((d) => d.competency_id === comp.competency_id);
                   if (savedComp) {
                     comp.rating = savedComp.rating ?? comp.rating;
                     comp.comment = savedComp.comment ?? comp.comment;
@@ -285,7 +309,7 @@ export default function ReviewFormPage({
               }
               if (draft.textResponses) {
                 for (const tq of txtResponses) {
-                  const savedTq = draft.textResponses.find((d: any) => d.questionId === tq.questionId);
+                  const savedTq = (draft.textResponses as DraftText[]).find((d) => d.questionId === tq.questionId);
                   if (savedTq) tq.response = savedTq.response ?? tq.response;
                 }
               }
@@ -303,8 +327,14 @@ export default function ReviewFormPage({
           // Load from level_competencies or all competencies
           // ==========================================
           setHasCycleQuestions(false);
-          const levelId = assignmentData.employee?.level_id;
+          const levelId = empData?.level_id;
           let competencyData: CompetencyRating[] = [];
+
+          type LevelCompFallback = {
+            expected_level: number;
+            behavioral_indicators: string[] | null;
+            competency: { id: string; name: string; category: string | null; description: string | null } | { id: string; name: string; category: string | null; description: string | null }[] | null;
+          };
 
           if (levelId) {
             const { data: levelComps } = await supabase
@@ -317,16 +347,19 @@ export default function ReviewFormPage({
               .eq("workspace_id", wsId);
 
             if (levelComps && levelComps.length > 0) {
-              competencyData = levelComps.map((lc: any) => ({
-                competency_id: lc.competency.id,
-                name: lc.competency.name,
-                description: lc.competency.description || null,
-                category: lc.competency.category,
-                expected_level: lc.expected_level,
-                behaviors: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
-                rating: null,
-                comment: "",
-              }));
+              competencyData = (levelComps as unknown as LevelCompFallback[]).map((lc) => {
+                const comp = Array.isArray(lc.competency) ? lc.competency[0] : lc.competency;
+                return {
+                  competency_id: comp?.id ?? "",
+                  name: comp?.name ?? "",
+                  description: comp?.description || null,
+                  category: comp?.category ?? null,
+                  expected_level: lc.expected_level,
+                  behaviors: Array.isArray(lc.behavioral_indicators) ? lc.behavioral_indicators : [],
+                  rating: null,
+                  comment: "",
+                };
+              });
             }
           }
 
@@ -337,7 +370,8 @@ export default function ReviewFormPage({
               .eq("workspace_id", wsId)
               .order("category, name");
 
-            competencyData = (allComps || []).map((c: any) => ({
+            type CompetencyOnly = { id: string; name: string; category: string | null; description: string | null };
+            competencyData = ((allComps || []) as CompetencyOnly[]).map((c) => ({
               competency_id: c.id,
               name: c.name,
               description: c.description || null,
@@ -354,9 +388,10 @@ export default function ReviewFormPage({
             const saved = localStorage.getItem(`review-draft-${assignmentId}-${appUserId}`);
             if (saved) {
               const draft = JSON.parse(saved);
+              type DraftComp = { competency_id: string; rating?: number | null; comment?: string };
               if (draft.competencies) {
                 for (const comp of competencyData) {
-                  const savedComp = draft.competencies.find((d: any) => d.competency_id === comp.competency_id);
+                  const savedComp = (draft.competencies as DraftComp[]).find((d) => d.competency_id === comp.competency_id);
                   if (savedComp) {
                     comp.rating = savedComp.rating ?? comp.rating;
                     comp.comment = savedComp.comment ?? comp.comment;
@@ -371,13 +406,17 @@ export default function ReviewFormPage({
 
           setCompetencies(competencyData);
         }
-      } catch (err) {
+      } catch {
         setError("Failed to load review data");
       } finally {
         setLoading(false);
       }
     }
     load();
+    // supabase is intentionally omitted — it's recreated on every render and
+    // including it would re-run the loader on every render. The data only
+    // depends on the URL params.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assignmentId, cycleId]);
 
   // Autosave to localStorage whenever form data changes
@@ -477,7 +516,15 @@ export default function ReviewFormPage({
 
     try {
       const reviewerRole = getReviewerRole();
-      const responses: any[] = [];
+      type ResponseInsert = {
+        assignment_id: string;
+        reviewer_id: string;
+        reviewer_role: string;
+        competency_id: string | null;
+        rating: number | null;
+        comment: string | null;
+      };
+      const responses: ResponseInsert[] = [];
 
       // Competency responses
       for (const c of competencies) {
@@ -596,7 +643,7 @@ export default function ReviewFormPage({
         router.push(`/dashboard/performance`);
       }
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("Failed to submit review");
     } finally {
       setSubmitting(false);
@@ -688,7 +735,7 @@ export default function ReviewFormPage({
       )}
 
       {/* ── Competencies ─────────────────────────────────────────────── */}
-      {competencies.length > 0 && categories.map((category, catIdx) => (
+      {competencies.length > 0 && categories.map((category) => (
         <Card key={category} className="border-border/60">
           {/* Category label only when there are multiple categories */}
           {categories.length > 1 && (

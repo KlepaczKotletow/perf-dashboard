@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle2, Loader2, Save, Star, Filter, ChevronDown, ChevronRight } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { canCalibrateDepartment, isHROrAbove } from "@/lib/roles";
 
 const GRADE_OPTIONS = [
@@ -79,10 +79,7 @@ export function CalibrationView({
   const [filterDept, setFilterDept] = useState<string>("all");
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(["all"]));
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   // Get all departments from assignments
   const departments = useMemo(() => {

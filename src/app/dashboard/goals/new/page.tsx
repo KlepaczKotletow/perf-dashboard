@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { PageHeader } from "@/components/page-header";
 
@@ -29,10 +29,27 @@ export default function NewGoalPage() {
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [cycles, setCycles] = useState<any[]>([]);
-  const [existingGoals, setExistingGoals] = useState<any[]>([]);
-  const [workspaceGoalTemplates, setWorkspaceGoalTemplates] = useState<any[]>([]);
+  type EmployeeOpt = { id: string; slack_name: string | null };
+  type CycleOpt = { id: string; name: string };
+  type GoalOpt = { id: string; title: string };
+  type GoalTemplateContent = {
+    title?: string;
+    scope?: string;
+    metric_start?: number | string;
+    metric_target?: number | string;
+    metric_unit?: string;
+  };
+  type GoalTemplate = {
+    id: string;
+    name: string;
+    description: string | null;
+    content: GoalTemplateContent | null;
+    is_system: boolean;
+  };
+  const [employees, setEmployees] = useState<EmployeeOpt[]>([]);
+  const [cycles, setCycles] = useState<CycleOpt[]>([]);
+  const [existingGoals, setExistingGoals] = useState<GoalOpt[]>([]);
+  const [workspaceGoalTemplates, setWorkspaceGoalTemplates] = useState<GoalTemplate[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [cycleId, setCycleId] = useState("");
   const [parentId, setParentId] = useState("");
@@ -48,10 +65,7 @@ export default function NewGoalPage() {
   const [metricTarget, setMetricTarget] = useState("");
   const [metricUnit, setMetricUnit] = useState("");
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   useEffect(() => {
     async function load() {
@@ -71,10 +85,10 @@ export default function NewGoalPage() {
           .order("is_system", { ascending: false })
           .order("name"),
       ]);
-      setEmployees(users || []);
-      setCycles(perfCycles || []);
-      setExistingGoals(goals || []);
-      setWorkspaceGoalTemplates(goalTpls || []);
+      setEmployees((users || []) as EmployeeOpt[]);
+      setCycles((perfCycles || []) as CycleOpt[]);
+      setExistingGoals((goals || []) as GoalOpt[]);
+      setWorkspaceGoalTemplates((goalTpls || []) as unknown as GoalTemplate[]);
 
       const paramCycle = searchParams.get("cycle_id");
       const paramEmployee = searchParams.get("employee_id");
@@ -86,7 +100,7 @@ export default function NewGoalPage() {
       // ── Auto-apply goal template if ?templateId=<id> ──
       const templateId = searchParams.get("templateId");
       if (templateId && goalTpls && goalTpls.length > 0) {
-        const tpl = (goalTpls as any[]).find((t) => t.id === templateId);
+        const tpl = ((goalTpls as unknown as GoalTemplate[])).find((t) => t.id === templateId);
         if (tpl) {
           const content = tpl.content || {};
           if (content.title) setTitle(content.title);
@@ -99,6 +113,11 @@ export default function NewGoalPage() {
       }
     }
     load();
+    // searchParams and supabase are intentionally omitted — searchParams is
+    // stable for the page render, and supabase is recreated each render but
+    // its identity does not affect correctness here. Refetching whenever
+    // either changes would re-pull the dropdown lists unnecessarily.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyTemplate(tpl: typeof GOAL_TEMPLATES[0]) {
@@ -110,7 +129,7 @@ export default function NewGoalPage() {
     setTimeout(() => titleInputRef.current?.focus(), 0);
   }
 
-  function applyWorkspaceTemplate(tpl: any) {
+  function applyWorkspaceTemplate(tpl: GoalTemplate) {
     const content = tpl.content || {};
     if (content.title) setTitle(content.title);
     if (content.scope) setScope(content.scope);

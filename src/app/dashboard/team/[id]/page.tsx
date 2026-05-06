@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
-import { ArrowLeft, Mail, Pencil, Users } from "lucide-react";
+import { ArrowLeft, Mail, Pencil } from "lucide-react";
 import { gradeColor, getQuarterLabel } from "@/lib/status";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { isHROrAbove, isManagerOrAbove, isAdmin } from "@/lib/roles";
@@ -69,16 +69,35 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
       .order("created_at", { ascending: false }),
   ]);
 
-  const reviewAssignments = reviewRes.data || [];
+  type CycleJoin = { id: string; name: string; status: string; start_date: string | null; end_date: string | null; grades_released?: boolean; workspace_id?: string | null };
+  type ReviewAssignmentRow = {
+    id: string;
+    status: string;
+    overall_rating: number | null;
+    final_grade: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+    cycle?: CycleJoin | null;
+    manager?: { slack_name: string | null } | null;
+  };
+  type ReviewResponseRow = {
+    id: string;
+    rating: number | null;
+    comment: string | null;
+    reviewer_role: string | null;
+    competency: { name: string | null; category: string | null } | { name: string | null; category: string | null }[] | null;
+  };
 
-  const assignmentIds = reviewAssignments.map((a: any) => a.id);
-  let reviewResponses: any[] = [];
+  const reviewAssignments = (reviewRes.data || []) as unknown as ReviewAssignmentRow[];
+
+  const assignmentIds = reviewAssignments.map((a) => a.id);
+  let reviewResponses: ReviewResponseRow[] = [];
   if (assignmentIds.length > 0) {
     const { data } = await supabase
       .from("review_responses")
       .select(`id, rating, comment, reviewer_role, competency:competencies!review_responses_competency_id_fkey(name, category)`)
       .in("assignment_id", assignmentIds);
-    reviewResponses = data || [];
+    reviewResponses = (data || []) as ReviewResponseRow[];
   }
 
   let feedbackQuery = supabase
@@ -94,11 +113,12 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
   const { data: continuousFeedback } = await feedbackQuery;
 
   const ratingsBySkill: Record<string, { name: string; category: string | null; ratings: number[] }> = {};
-  reviewResponses.forEach((r: any) => {
-    if (r.rating && r.competency?.name) {
-      const key = r.competency.name;
+  reviewResponses.forEach((r) => {
+    const comp = Array.isArray(r.competency) ? r.competency[0] : r.competency;
+    if (r.rating && comp?.name) {
+      const key = comp.name;
       if (!ratingsBySkill[key]) {
-        ratingsBySkill[key] = { name: r.competency.name, category: r.competency.category, ratings: [] };
+        ratingsBySkill[key] = { name: comp.name, category: comp.category, ratings: [] };
       }
       ratingsBySkill[key].ratings.push(r.rating);
     }
@@ -112,7 +132,7 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
     }))
     .sort((a, b) => parseFloat(b.avg) - parseFloat(a.avg));
 
-  const allRatings = reviewResponses.filter((r: any) => r.rating).map((r: any) => r.rating as number);
+  const allRatings = reviewResponses.filter((r) => r.rating).map((r) => r.rating as number);
   const overallAvg = allRatings.length > 0
     ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1)
     : null;
@@ -151,8 +171,9 @@ export default async function EmployeeProfilePage({
 
   const { user, manager, reviewAssignments, continuousFeedback, directReports, goals, skillAverages, overallAvg } = data;
 
-  const activeGoals = goals.filter((g: any) => g.status !== "completed" && g.status !== "cancelled");
-  const gradesReleasedForAny = reviewAssignments.some((a: any) => a.cycle?.grades_released);
+  type GoalRow = { id: string; title: string; description: string | null; status: string; progress: number | null; weight: number | null; metric_start: number | null; metric_current: number | null; metric_target: number | null; metric_unit: string | null; tracking_status: string | null; scope: string; due_date: string | null };
+  const activeGoals = (goals as GoalRow[]).filter((g) => g.status !== "completed" && g.status !== "cancelled");
+  const gradesReleasedForAny = reviewAssignments.some((a) => a.cycle?.grades_released);
   const showRating = canSeeAllRatings || (isViewingOwnProfile && gradesReleasedForAny);
 
   return (
@@ -265,7 +286,7 @@ export default async function EmployeeProfilePage({
               <span className="text-right">Status</span>
             </div>
             {/* Rows */}
-            {reviewAssignments.map((a: any) => {
+            {reviewAssignments.map((a) => {
               const config = getAssignmentStatus(a.status);
               const canSeeThis = canSeeAllRatings || a.cycle?.grades_released;
               const dateRange = a.cycle?.start_date && a.cycle?.end_date
@@ -310,8 +331,8 @@ export default async function EmployeeProfilePage({
             <p className="text-sm text-muted-foreground py-4">No goals assigned yet.</p>
           ) : (
             <div className="space-y-2">
-              {goals.map((goal: any) => {
-                const tracking = GOAL_TRACKING_STATUS[goal.tracking_status] || GOAL_TRACKING_STATUS.on_track;
+              {(goals as GoalRow[]).map((goal) => {
+                const tracking = GOAL_TRACKING_STATUS[goal.tracking_status as keyof typeof GOAL_TRACKING_STATUS] || GOAL_TRACKING_STATUS.on_track;
                 const progress = goal.progress || 0;
                 const isCompleted = goal.status === "completed";
                 return (
@@ -387,19 +408,22 @@ export default async function EmployeeProfilePage({
             </p>
           ) : (
             <div className="space-y-2">
-              {continuousFeedback.map((f: any) => (
+              {(continuousFeedback as Array<{ id: string; message: string; is_anonymous: boolean | null; created_at: string; from_user: { slack_name: string | null } | { slack_name: string | null }[] | null }>).map((f) => {
+                const fromUser = Array.isArray(f.from_user) ? f.from_user[0] : f.from_user;
+                return (
                 <div key={f.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg border border-border/30 hover:border-border/60 transition-colors">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="text-xs font-semibold text-foreground">
-                        {f.is_anonymous ? "Anonymous" : f.from_user?.slack_name || "Unknown"}
+                        {f.is_anonymous ? "Anonymous" : fromUser?.slack_name || "Unknown"}
                       </span>
                       <span className="text-[10px] text-muted-foreground">{format(new Date(f.created_at), "MMM d, yyyy")}</span>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed">{f.message}</p>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
@@ -412,7 +436,7 @@ export default async function EmployeeProfilePage({
             Direct Reports ({directReports.length})
           </h2>
           <div className="flex flex-wrap gap-2">
-            {directReports.map((report: any) => (
+            {(directReports as Array<{ id: string; slack_name: string | null; job_title: string | null; avatar_url: string | null }>).map((report) => (
               <Link
                 key={report.id}
                 href={`/dashboard/team/${report.id}`}

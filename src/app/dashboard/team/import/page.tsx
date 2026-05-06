@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Papa from "papaparse";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -123,13 +123,15 @@ export default function ImportPage() {
   const [dragOver, setDragOver] = useState(false);
 
   // DB refs
-  const [dbUsers, setDbUsers] = useState<any[]>([]);
+  type DbUserRef = {
+    id: string;
+    slack_email: string | null;
+    slack_name: string | null;
+  };
+  const [dbUsers, setDbUsers] = useState<DbUserRef[]>([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   // Load DB data once
   useEffect(() => {
@@ -144,7 +146,7 @@ export default function ImportPage() {
         .from("users")
         .select("id, slack_email, slack_name")
         .eq("workspace_id", wsId);
-      setDbUsers(users || []);
+      setDbUsers((users || []) as DbUserRef[]);
     }
     load();
   }, []);
@@ -265,7 +267,7 @@ export default function ImportPage() {
     }));
 
     // Build email -> user map from DB
-    const emailToUser = new Map<string, any>();
+    const emailToUser = new Map<string, DbUserRef>();
     dbUsers.forEach((u) => {
       if (u.slack_email) emailToUser.set(u.slack_email.toLowerCase(), u);
     });

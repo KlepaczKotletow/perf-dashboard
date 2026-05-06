@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Loader2, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 interface Phase {
   id: string;
@@ -36,17 +36,18 @@ export function PhaseDeadlineEditor({ phase, canEdit, cycleId, onUpdated }: Prop
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sync the draft date when the parent passes a new end_date (e.g. after a
+  // server refresh). Using a key would force a remount of the popover and
+  // close it mid-edit. Keep the effect-based reset.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftDate(new Date(phase.end_date));
   }, [phase.end_date]);
 
   async function save() {
     setSaving(true);
     setError(null);
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    const supabase = createClient();
     const { data, error: rpcErr } = await supabase.rpc("update_cycle_phase_dates", {
       p_cycle_id: cycleId,
       p_phase_dates: [{

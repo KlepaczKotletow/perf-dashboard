@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MoreHorizontal, Play, CheckCircle, Archive, Trash2, Loader2, Medal, Bell, BellOff, AlertCircle } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 interface CycleActionsProps {
   cycle: {
@@ -52,10 +52,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
 
   const isHR = userRole === "hr" || userRole === "admin";
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   async function updateStatus(newStatus: string) {
     setLoading(true);
@@ -141,7 +138,7 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       if (empError) throw empError;
 
       // 2. Fetch manager_id + name for each employee
-      const employeeIds = (cycleEmployees || []).map((e: any) => e.employee_id);
+      const employeeIds = ((cycleEmployees || []) as { employee_id: string }[]).map((e) => e.employee_id);
       const { data: users, error: usersError } = await supabase
         .from("users")
         .select("id, slack_name, manager_id")
@@ -150,9 +147,11 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
 
       if (usersError) throw usersError;
 
+      type UserRow = { id: string; slack_name: string | null; manager_id: string | null };
+      const usersTyped = (users || []) as UserRow[];
       // 2b. Validate all enrolled employees still exist
-      const foundIds = new Set((users || []).map((u: any) => u.id));
-      const missingIds = employeeIds.filter((id: string) => !foundIds.has(id));
+      const foundIds = new Set(usersTyped.map((u) => u.id));
+      const missingIds = employeeIds.filter((id) => !foundIds.has(id));
       if (missingIds.length > 0) {
         await supabase
           .from("performance_cycle_employees")
@@ -168,9 +167,9 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       //    have a manager_id. The launch_cycle RPC will enforce this at the DB
       //    level (23514) but catching it here lets us show a better message
       //    with specific names and avoids a round-trip.
-      const missingMgr = (users || []).filter((u: any) => !u.manager_id);
+      const missingMgr = usersTyped.filter((u) => !u.manager_id);
       if (missingMgr.length > 0) {
-        const names = missingMgr.slice(0, 5).map((u: any) => u.slack_name || "someone").join(", ");
+        const names = missingMgr.slice(0, 5).map((u) => u.slack_name || "someone").join(", ");
         const tail = missingMgr.length > 5 ? ` and ${missingMgr.length - 5} more` : "";
         throw new Error(
           `Can't launch: ${missingMgr.length} employee(s) have no manager — ${names}${tail}. ` +
@@ -181,9 +180,9 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       // 3. Build all assignments in memory first — so if anything is wrong with the
       //    data we catch it before touching the DB. Delete old rows only after we
       //    know the new set is ready to insert.
-      const enrolledIds = new Set((users || []).map((u: any) => u.id));
+      const enrolledIds = new Set(usersTyped.map((u) => u.id));
 
-      const standardAssignments = (users || []).map((u: any) => ({
+      const standardAssignments = usersTyped.map((u) => ({
         cycle_id: cycle.id,
         employee_id: u.id,
         manager_id: u.manager_id || null,
@@ -191,9 +190,9 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         status: "pending",
       }));
 
-      const upwardAssignments = (users || [])
-        .filter((u: any) => u.manager_id && enrolledIds.has(u.manager_id))
-        .map((u: any) => ({
+      const upwardAssignments = usersTyped
+        .filter((u) => u.manager_id && enrolledIds.has(u.manager_id))
+        .map((u) => ({
           cycle_id: cycle.id,
           employee_id: u.manager_id,  // manager being reviewed
           reviewer_id: u.id,           // direct report doing the review
@@ -230,16 +229,17 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
       await sendNotifications();
 
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       failed = true;
       console.error("Error launching cycle:", err);
       // Surface the validation message when the server or pre-check
       // produced a specific one — avoid swallowing it into "try again".
+      const errMsg = err instanceof Error ? err.message : (typeof err === "object" && err !== null && "message" in err && typeof (err as { message: unknown }).message === "string" ? (err as { message: string }).message : "");
       setActionError(
-        typeof err?.message === "string" && err.message.startsWith("Can't launch:")
-          ? err.message
-          : typeof err?.message === "string" && err.message.startsWith("Cannot launch:")
-          ? err.message
+        typeof errMsg === "string" && errMsg.startsWith("Can't launch:")
+          ? errMsg
+          : typeof errMsg === "string" && errMsg.startsWith("Cannot launch:")
+          ? errMsg
           : "Failed to launch cycle. Please try again."
       );
     } finally {

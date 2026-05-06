@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -73,10 +73,7 @@ export default function RoadmapPage() {
   const [suggestSuccess, setSuggestSuccess] = useState(false);
   const [justVotedId, setJustVotedId] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   useEffect(() => {
     async function load() {
@@ -86,7 +83,7 @@ export default function RoadmapPage() {
         supabase.from("roadmap_votes").select("item_id").eq("fingerprint", fp),
       ]);
       setItems(itemsData || []);
-      setVotedIds(new Set((votesData || []).map((v: any) => v.item_id)));
+      setVotedIds(new Set(((votesData || []) as { item_id: string }[]).map((v) => v.item_id)));
     }
     load();
   // eslint-disable-next-line react-hooks/exhaustive-deps

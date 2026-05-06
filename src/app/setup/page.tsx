@@ -1,22 +1,15 @@
 import { redirect } from "next/navigation";
 import type Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
 import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
 import { signOAuthState } from "@/lib/oauth-state";
 import { signSeatSync } from "@/lib/seat-sync";
-import { getUserWorkspace } from "@/lib/supabase-server";
+import { createServiceRoleClient, getUserWorkspace } from "@/lib/supabase-server";
+import { env } from "@/lib/env";
 import { isAdmin } from "@/lib/roles";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-}
 
 interface SetupPageProps {
   searchParams: Promise<{ session_id?: string }>;
@@ -31,7 +24,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   }
 
   const stripe = getStripe();
-  const supabase = getSupabase();
+  const supabase = createServiceRoleClient();
 
   // Retrieve the Stripe checkout session
   let session: Stripe.Checkout.Session;
@@ -182,7 +175,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   // Build the Add to Slack URL with HMAC-signed state. We embed the
   // setup_token inside the signed payload so the slack-oauth callback can
   // still link the new install to the pre-paid Stripe subscription.
-  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL!).trim().replace(/\/+$/, '');
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL.trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   const scopes =

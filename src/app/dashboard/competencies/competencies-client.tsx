@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ import {
   Wand2,
   Check,
 } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { CompetencyActions } from "./competency-actions";
 import { EditableCell } from "./matrix/editable-cell";
@@ -66,10 +67,35 @@ const proficiencyLabels: Record<number, string> = {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+type CompetencyRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  is_core: boolean;
+  workspace_id?: string | null;
+};
+
+type LevelRow = {
+  id: string;
+  name: string;
+  grade?: string | null;
+  job_family_id?: string | null;
+  job_family?: { id?: string; name: string | null } | { id?: string; name: string | null }[] | null;
+};
+
+type LevelCompetencyRow = {
+  id: string;
+  level_id: string;
+  competency_id: string;
+  expected_level: number;
+  behavioral_indicators?: string[] | null;
+};
+
 interface CompetenciesClientProps {
-  competencies: any[];
-  levels: any[];
-  levelCompetencies: any[];
+  competencies: CompetencyRow[];
+  levels: LevelRow[];
+  levelCompetencies: LevelCompetencyRow[];
   canEdit: boolean;
   workspaceId: string;
 }
@@ -146,21 +172,25 @@ export function CompetenciesClient({
   const [bulkSuccess, setBulkSuccess] = useState<string | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
+  // Helper: pick out a single job_family from possibly-array shapes returned by Supabase
+  const familyName = (l: LevelRow): string | null => {
+    const jf = l.job_family;
+    if (Array.isArray(jf)) return jf[0]?.name ?? null;
+    return jf?.name ?? null;
+  };
+
   const categories = [
     ...new Set(
-      competencies.map((c: any) => c.category || "Uncategorized")
+      competencies.map((c) => c.category || "Uncategorized")
     ),
   ].sort();
 
   // Filtered competencies (shared between list + matrix)
-  const filtered = competencies.filter((c: any) => {
+  const filtered = competencies.filter((c) => {
     const matchesSearch =
       !search ||
       c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -175,23 +205,21 @@ export function CompetenciesClient({
   const jobFamilies = [
     ...new Set(
       levels
-        .map((l: any) => (l.job_family as any)?.name)
-        .filter(Boolean)
+        .map((l) => familyName(l))
+        .filter((n): n is string => Boolean(n))
     ),
-  ].sort() as string[];
+  ].sort();
 
   // Filtered levels by job family
   const filteredLevels =
     jobFamilyFilter === "all"
       ? levels
-      : levels.filter(
-          (l: any) => (l.job_family as any)?.name === jobFamilyFilter
-        );
+      : levels.filter((l) => familyName(l) === jobFamilyFilter);
 
   // Matrix lookup
   const matrixLookup: Record<string, { expected_level: number; id: string; behavioral_indicators: string[] }> =
     {};
-  levelCompetencies.forEach((lc: any) => {
+  levelCompetencies.forEach((lc) => {
     matrixLookup[`${lc.level_id}-${lc.competency_id}`] = {
       expected_level: lc.expected_level,
       id: lc.id,
@@ -201,16 +229,16 @@ export function CompetenciesClient({
 
   // Categories present in filtered competencies
   const matrixCategories = [
-    ...new Set(filtered.map((c: any) => c.category || "Uncategorized")),
+    ...new Set(filtered.map((c) => c.category || "Uncategorized")),
   ].sort();
 
   // Coverage stats
   const totalCells = filtered.length * filteredLevels.length;
-  const filledCells = filtered.reduce((count: number, c: any) => {
+  const filledCells = filtered.reduce((count, c) => {
     return (
       count +
       filteredLevels.filter(
-        (l: any) => matrixLookup[`${l.id}-${c.id}`]
+        (l) => matrixLookup[`${l.id}-${c.id}`]
       ).length
     );
   }, 0);
@@ -218,10 +246,10 @@ export function CompetenciesClient({
 
   // Per-level coverage
   const levelCoverageMap: Record<string, { filled: number; total: number }> = {};
-  filteredLevels.forEach((level: any) => {
+  filteredLevels.forEach((level) => {
     const total = filtered.length;
     const filled = filtered.filter(
-      (c: any) => matrixLookup[`${level.id}-${c.id}`]
+      (c) => matrixLookup[`${level.id}-${c.id}`]
     ).length;
     levelCoverageMap[level.id] = { filled, total };
   });
@@ -387,7 +415,7 @@ export function CompetenciesClient({
     let count = 0;
 
     try {
-      const coreComps = filtered.filter((c: any) => c.is_core);
+      const coreComps = filtered.filter((c) => c.is_core);
       for (const comp of coreComps) {
         for (const level of filteredLevels) {
           const key = `${level.id}-${comp.id}`;
@@ -425,7 +453,7 @@ export function CompetenciesClient({
 
   const hasActiveFilters = search || categoryFilter !== "all";
   const hasMatrixFilters = hasActiveFilters || jobFamilyFilter !== "all";
-  const coreCount = filtered.filter((c: any) => c.is_core).length;
+  const coreCount = filtered.filter((c) => c.is_core).length;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -667,10 +695,10 @@ export function CompetenciesClient({
                       className="gap-1.5"
                       asChild
                     >
-                      <a href="/dashboard/templates">
+                      <Link href="/dashboard/templates">
                         <Sparkles className="h-3.5 w-3.5" />
                         Import Framework
-                      </a>
+                      </Link>
                     </Button>
                     <Button
                       size="sm"
@@ -692,16 +720,16 @@ export function CompetenciesClient({
             </div>
           ) : (
             <div className="space-y-3">
-              {[...new Set(filtered.map((c: any) => c.category || "Uncategorized"))].sort().map((cat) => {
-                const catComps = filtered.filter((c: any) => (c.category || "Uncategorized") === cat);
-                const colorClass = categoryColors[cat as string] || categoryColors.Uncategorized;
+              {[...new Set(filtered.map((c) => c.category || "Uncategorized"))].sort().map((cat) => {
+                const catComps = filtered.filter((c) => (c.category || "Uncategorized") === cat);
+                const colorClass = categoryColors[cat] || categoryColors.Uncategorized;
                 return (
-                  <div key={cat as string} className="rounded-xl border border-border/60 overflow-hidden">
+                  <div key={cat} className="rounded-xl border border-border/60 overflow-hidden">
                     {/* Category header */}
                     <div className="flex items-center justify-between px-4 py-2.5 bg-muted/25 border-b border-border/40">
                       <div className="flex items-center gap-2.5">
                         <Badge className={`text-[10px] px-2 py-0.5 font-semibold border ${colorClass}`}>
-                          {cat as string}
+                          {cat}
                         </Badge>
                         <span className="text-[11px] text-muted-foreground font-medium">
                           {catComps.length} competenc{catComps.length !== 1 ? "ies" : "y"}
@@ -711,9 +739,9 @@ export function CompetenciesClient({
 
                     {/* Competency rows */}
                     <div className="divide-y divide-border/30">
-                      {catComps.map((comp: any) => {
+                      {catComps.map((comp) => {
                         const assignedCount = levels.filter(
-                          (l: any) => matrixLookup[`${l.id}-${comp.id}`]
+                          (l) => matrixLookup[`${l.id}-${comp.id}`]
                         ).length;
                         return (
                           <div
@@ -862,9 +890,9 @@ export function CompetenciesClient({
                 </div>
               ) : (() => {
                 // Group levels by job family for colspan header
-                const familyMap: Record<string, any[]> = {};
-                filteredLevels.forEach((l: any) => {
-                  const fam = (l.job_family as any)?.name || "Uncategorized";
+                const familyMap: Record<string, LevelRow[]> = {};
+                filteredLevels.forEach((l) => {
+                  const fam = familyName(l) || "Uncategorized";
                   if (!familyMap[fam]) familyMap[fam] = [];
                   familyMap[fam].push(l);
                 });
@@ -880,7 +908,7 @@ export function CompetenciesClient({
                             Competency
                           </th>
                           {familyGroups.map(([fam, lvls]) => (
-                            <th key={fam} colSpan={(lvls as any[]).length}
+                            <th key={fam} colSpan={lvls.length}
                               className="text-center py-2 px-3 text-xs font-medium text-muted-foreground border-r border-border/30 last:border-0">
                               {fam}
                             </th>
@@ -888,9 +916,9 @@ export function CompetenciesClient({
                         </tr>
                         {/* Row 2 — level names */}
                         <tr className="bg-muted/10 border-b border-border/60">
-                          {filteredLevels.map((level: any, i: number) => {
+                          {filteredLevels.map((level) => {
                             const isLastInFamily = (() => {
-                              const fam = (level.job_family as any)?.name || "Uncategorized";
+                              const fam = familyName(level) || "Uncategorized";
                               const famLvls = familyMap[fam];
                               return famLvls[famLvls.length - 1].id === level.id;
                             })();
@@ -922,7 +950,7 @@ export function CompetenciesClient({
                       </thead>
                       <tbody>
                         {matrixCategories.map((category) => {
-                          const catComps = filtered.filter((c: any) => (c.category || "Uncategorized") === category);
+                          const catComps = filtered.filter((c) => (c.category || "Uncategorized") === category);
                           if (catComps.length === 0) return null;
                           const colorClass = categoryColors[category] || categoryColors.Uncategorized;
                           return (
@@ -936,7 +964,7 @@ export function CompetenciesClient({
                                   </div>
                                 </td>
                               </tr>
-                              {catComps.map((comp: any) => (
+                              {catComps.map((comp) => (
                                 <tr key={comp.id} className="border-b border-border/30 last:border-0 hover:bg-muted/20 transition-colors group/row">
                                   <td className="py-2.5 px-4 border-r border-border/30">
                                     <div className="flex items-center gap-1.5">
@@ -970,9 +998,9 @@ export function CompetenciesClient({
                                       )}
                                     </div>
                                   </td>
-                                  {filteredLevels.map((level: any) => {
+                                  {filteredLevels.map((level) => {
                                     const isLastInFamily = (() => {
-                                      const fam = (level.job_family as any)?.name || "Uncategorized";
+                                      const fam = familyName(level) || "Uncategorized";
                                       const famLvls = familyMap[fam];
                                       return famLvls[famLvls.length - 1].id === level.id;
                                     })();
@@ -987,7 +1015,7 @@ export function CompetenciesClient({
                                           existingId={entry?.id || null}
                                           initialBehaviors={entry?.behavioral_indicators || []}
                                           competencyName={comp.name}
-                                          levelLabel={`${(level.job_family as any)?.name ?? ""} · ${level.name}`}
+                                          levelLabel={`${familyName(level) ?? ""} · ${level.name}`}
                                           canEdit={canEdit}
                                         />
                                       </td>

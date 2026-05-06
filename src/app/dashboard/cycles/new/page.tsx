@@ -13,11 +13,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ArrowLeft, ArrowRight, AlertTriangle, Loader2, Plus, X, Target, MessageSquare,
-  Users, CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot, Sparkles,
+  CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot, Sparkles,
   FileText,
 } from "lucide-react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
@@ -30,18 +30,6 @@ const CYCLE_TYPES = [
   { value: "quarterly", label: "Quarterly Review" },
   { value: "probation", label: "Probation Review" },
   { value: "custom", label: "Custom" },
-];
-
-// Kept in sync with src/lib/cycle-phases.ts DEFAULT_PHASES. Only used by the
-// (currently unrendered) PhaseTimelinePreview helper below; the live wizard
-// timeline reads from the helper module directly via EditablePhaseTimeline.
-const DEFAULT_PHASES = [
-  { phase_type: "goal_setting",    name: "Goal Check-in",         proportion: 1 / 12 },
-  { phase_type: "self_assessment", name: "Self Assessment",        proportion: 2 / 12 },
-  { phase_type: "peer_review",     name: "Peer Review",            proportion: 3 / 12 },
-  { phase_type: "manager_review",  name: "Manager Review",         proportion: 2 / 12 },
-  { phase_type: "calibration",     name: "Calibration",            proportion: 2 / 12 },
-  { phase_type: "communication",   name: "Results Communication",  proportion: 2 / 12 },
 ];
 
 const SUGGESTED_QUESTIONS = [
@@ -165,46 +153,6 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
   );
 }
 
-// ── Phase timeline preview ───────────────────────────────────────────────────
-function PhaseTimelinePreview({ startDate, endDate }: { startDate?: Date; endDate?: Date }) {
-  if (!startDate || !endDate) return null;
-
-  const isInvalid = endDate <= startDate;
-  const colors = [
-    "bg-blue-400", "bg-indigo-400", "bg-purple-400",
-    "bg-pink-400", "bg-amber-400", "bg-emerald-400",
-  ];
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm font-medium">Phase Timeline Preview</Label>
-      {isInvalid ? (
-        <div className="flex h-10 rounded-lg items-center justify-center border border-dashed border-amber-300 bg-amber-50/50 dark:border-amber-400/30 dark:bg-amber-400/5">
-          <span className="text-xs text-amber-600 dark:text-amber-400">End date must be after the start date</span>
-        </div>
-      ) : (
-        <div className="flex h-10 rounded-lg overflow-hidden border border-border/60">
-          {DEFAULT_PHASES.map((phase, idx) => (
-            <div
-              key={phase.phase_type}
-              className={`${colors[idx]} flex items-center justify-center`}
-              style={{ width: `${phase.proportion * 100}%` }}
-              title={phase.name}
-            >
-              <span className="text-[11px] text-white font-semibold truncate px-1">
-                {phase.name.split(" ")[0]}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{format(startDate, "MMM d")}</span>
-        <span>{format(endDate, "MMM d, yyyy")}</span>
-      </div>
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function NewCyclePage() {
   const router = useRouter();
@@ -258,10 +206,7 @@ export default function NewCyclePage() {
   const [loading, setLoading] = useState<false | "draft" | "launch">(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   // Load users + competencies on mount, and restore draft if ?draft=<id> is present
   useEffect(() => {
@@ -312,15 +257,26 @@ export default function NewCyclePage() {
               .eq("cycle_id", draft.id)
               .eq("is_user_customized", true);
             if (customPhases?.length) {
-              setPhaseOverrides(customPhases.map((p: any) => ({
-                phase_type: p.phase_type,
+              type CustomPhaseRow = { phase_type: string; end_date: string; is_user_customized: boolean };
+              setPhaseOverrides((customPhases as CustomPhaseRow[]).map((p) => ({
+                phase_type: p.phase_type as PhaseOverride["phase_type"],
                 end_date: new Date(p.end_date),
               })));
             }
           }
 
           // Restore wizard-specific state from wizard_metadata
-          const meta = draft.wizard_metadata as Record<string, any> | null;
+          type WizardMeta = {
+            step?: number;
+            cycleType?: string;
+            selectedPeopleIds?: string[];
+            selectedCompIds?: string[];
+            textQuestions?: TextQuestion[];
+            namiScheduleMode?: "now" | "schedule";
+            namiScheduleDate?: string;
+            skipNami?: boolean;
+          };
+          const meta = draft.wizard_metadata as WizardMeta | null;
           if (meta) {
             if (meta.step && meta.step >= 1 && meta.step <= 5) setStep(meta.step as 1 | 2 | 3 | 4 | 5);
             if (meta.cycleType) setCycleType(meta.cycleType);
@@ -366,8 +322,9 @@ export default function NewCyclePage() {
         const loadedTemplates = (tplData || []) as Template[];
         const tpl = loadedTemplates.find((t) => t.id === reviewTemplateId);
         if (tpl) {
-          const mapped: TextQuestion[] = (tpl.questions || []).map((q: any) => ({
-            prompt: q.prompt || q.text,
+          type TplQuestion = { prompt?: string; text?: string; required?: boolean };
+          const mapped: TextQuestion[] = ((tpl.questions || []) as TplQuestion[]).map((q) => ({
+            prompt: q.prompt || q.text || "",
             required: q.required !== false,
           }));
           setTextQuestions(mapped);
@@ -567,7 +524,15 @@ export default function NewCyclePage() {
     }
 
     // Create review questions
-    const questions: any[] = [];
+    type CycleQuestionInsert = {
+      cycle_id: string;
+      question_type: "competency" | "text";
+      competency_id?: string;
+      prompt?: string;
+      sort_order: number;
+      required: boolean;
+    };
+    const questions: CycleQuestionInsert[] = [];
     let sortOrder = 0;
     for (const compId of selectedCompIds) {
       questions.push({ cycle_id: cycleId, question_type: "competency", competency_id: compId, sort_order: sortOrder++, required: true });
@@ -596,8 +561,8 @@ export default function NewCyclePage() {
       const { cycleId } = await createCycleBase("draft");
       router.push(`/dashboard/cycles/${cycleId}`);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "Failed to create cycle");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to create cycle");
       setLoading(false);
     }
   }
@@ -628,7 +593,7 @@ export default function NewCyclePage() {
     setLoading("launch");
     setError(null);
     try {
-      const { cycleId, workspaceId } = await createCycleBase("active");
+      const { cycleId } = await createCycleBase("active");
 
       // Enroll employees
       await supabase.from("performance_cycle_employees").insert(
@@ -693,8 +658,8 @@ export default function NewCyclePage() {
 
       router.push(`/dashboard/cycles/${cycleId}`);
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || "Failed to launch cycle");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to launch cycle");
       setLoading(false);
     }
   }
@@ -716,7 +681,7 @@ export default function NewCyclePage() {
   function toggleCompetency(id: string) {
     setSelectedCompIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }

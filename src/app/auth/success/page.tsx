@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, ArrowRight, Users, Settings, BarChart3, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 function AuthSuccessContent() {
   const searchParams = useSearchParams();
@@ -16,10 +16,7 @@ function AuthSuccessContent() {
   // sign out any stale session to prevent cross-workspace data leakage.
   useEffect(() => {
     if (needsSignin) {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
+      const supabase = createClient();
       supabase.auth.signOut();
     }
   }, [needsSignin]);

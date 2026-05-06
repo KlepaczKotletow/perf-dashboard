@@ -102,37 +102,48 @@ export async function getEmployeeEvidence(
       .maybeSingle(),
   ]);
 
+  type CompetencyJoin = { name: string | null } | { name: string | null }[] | null;
+  type SenderJoin = { slack_name: string | null } | { slack_name: string | null }[] | null;
+  type CycleJoin = { name: string | null; end_date: string | null; status?: string } | { name: string | null; end_date: string | null; status?: string }[] | null;
+
+  type ManagerResponseRow = { competency: CompetencyJoin; rating: number | null; comment: string | null };
+  type CommentRow = { comment: string | null; created_at: string };
+  type KudosRow = { is_anonymous: boolean | null; sender: SenderJoin; message: string | null; created_at: string };
+  type PriorGradeRow = { cycle: CycleJoin; final_grade: string | null };
+
+  const priorData = priorR.data as PriorGradeRow | null;
+
   return {
-    managerResponses: (managerR.data ?? []).map((r: any) => ({
+    managerResponses: ((managerR.data ?? []) as ManagerResponseRow[]).map((r) => ({
       competency: Array.isArray(r.competency) ? r.competency[0]?.name ?? null : r.competency?.name ?? null,
       rating: r.rating,
       comment: r.comment,
     })),
-    peerComments: (peerR.data ?? []).map((r: any) => ({
-      comment: r.comment,
+    peerComments: ((peerR.data ?? []) as CommentRow[]).map((r) => ({
+      comment: r.comment ?? "",
       created_at: r.created_at,
     })),
-    upwardComments: (upwardR.data ?? []).map((r: any) => ({
-      comment: r.comment,
+    upwardComments: ((upwardR.data ?? []) as CommentRow[]).map((r) => ({
+      comment: r.comment ?? "",
       created_at: r.created_at,
     })),
-    recentKudos: (kudosR.data ?? []).map((k: any) => ({
+    recentKudos: ((kudosR.data ?? []) as KudosRow[]).map((k) => ({
       sender_name: k.is_anonymous
         ? null
         : (Array.isArray(k.sender) ? k.sender[0]?.slack_name : k.sender?.slack_name) ?? null,
-      message: k.message,
+      message: k.message ?? "",
       created_at: k.created_at,
       anonymous: !!k.is_anonymous,
     })),
-    priorGrade: priorR.data
+    priorGrade: priorData
       ? {
-          cycle_name: Array.isArray((priorR.data as any).cycle)
-            ? (priorR.data as any).cycle[0]?.name ?? "Unknown"
-            : (priorR.data as any).cycle?.name ?? "Unknown",
-          final_grade: (priorR.data as any).final_grade ?? null,
-          cycle_end: Array.isArray((priorR.data as any).cycle)
-            ? (priorR.data as any).cycle[0]?.end_date ?? ""
-            : (priorR.data as any).cycle?.end_date ?? "",
+          cycle_name: Array.isArray(priorData.cycle)
+            ? priorData.cycle[0]?.name ?? "Unknown"
+            : priorData.cycle?.name ?? "Unknown",
+          final_grade: priorData.final_grade ?? null,
+          cycle_end: Array.isArray(priorData.cycle)
+            ? priorData.cycle[0]?.end_date ?? ""
+            : priorData.cycle?.end_date ?? "",
         }
       : null,
   };

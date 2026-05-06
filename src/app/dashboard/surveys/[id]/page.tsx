@@ -50,15 +50,22 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   const [survey, responses] = await Promise.all([getSurvey(id, workspace!.workspaceId), getSurveyResponses(id, workspace!.workspaceId)]);
   if (!survey) notFound();
 
-  const participants = (survey.survey_participants || []) as any[];
+  type ParticipantRow = {
+    id: string;
+    role: "self" | "subject" | "rater";
+    status: string;
+    user_id: string;
+    subject_user_id: string;
+  };
+  const participants = ((survey.survey_participants || []) as unknown as ParticipantRow[]);
 
   // Fetch subject display names for 360
   const subjectUserIds = [
     ...new Set(
       participants
         .filter(p => p.role === "subject")
-        .map((p: any) => p.subject_user_id)
-        .filter(Boolean)
+        .map((p) => p.subject_user_id)
+        .filter((s): s is string => Boolean(s))
     ),
   ];
   let subjectNames: Record<string, string> = {};
@@ -69,7 +76,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
       .select("id, slack_name")
       .in("id", subjectUserIds)
       .eq("workspace_id", workspace!.workspaceId);
-    subjectNames = Object.fromEntries((subjectUsers || []).map((u: any) => [u.id, u.slack_name || u.id]));
+    subjectNames = Object.fromEntries(((subjectUsers || []) as { id: string; slack_name: string | null }[]).map((u) => [u.id, u.slack_name || u.id]));
   }
 
   const respondents = participants.filter((p) => p.role !== "subject");
@@ -79,7 +86,8 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   const canManage = isHROrAbove(workspace?.role);
 
   // Recurrence — compute next-send estimate if set
-  const config = (survey as any).config || {};
+  type SurveyConfigShape = { recurrence?: string; recurrence_day?: string; last_recurrence_at?: string };
+  const config = ((survey as { config?: SurveyConfigShape }).config) || {};
   const recurrence: string | undefined = config.recurrence;
   const recurrenceDay: string | undefined = config.recurrence_day;
   const lastRecurrenceAt: string | undefined = config.last_recurrence_at;

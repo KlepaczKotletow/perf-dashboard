@@ -9,7 +9,7 @@ export interface Workspace {
   bot_token: string
   bot_user_id: string | null
   logo_url: string | null
-  rating_scale: any
+  rating_scale: { min: number; max: number; labels?: Record<string, string> } | null
   onboarding_completed: boolean
   installed_at: string | null
   updated_at: string | null

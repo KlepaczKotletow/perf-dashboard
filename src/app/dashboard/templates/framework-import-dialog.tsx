@@ -37,7 +37,7 @@ interface FrameworkCompetency {
 }
 
 interface FrameworkContent {
-  competencies: FrameworkCompetency[];
+  competencies?: FrameworkCompetency[];
 }
 
 interface FrameworkImportDialogProps {
@@ -45,7 +45,9 @@ interface FrameworkImportDialogProps {
     id: string;
     name: string;
     description: string;
-    content: any;
+    // Content shape varies across template types; we only consume the
+    // `competencies` array. Accept any object shape that may carry it.
+    content: { competencies?: FrameworkCompetency[] } | null | undefined;
   };
   workspaceId: string;
   open: boolean;
@@ -169,7 +171,7 @@ export function FrameworkImportDialog({
   const [checked, setChecked] = useState(false);
   const [importAll, setImportAll] = useState(false);
 
-  const content = template.content as FrameworkContent | undefined;
+  const content = template.content;
   const competencies = content?.competencies ?? [];
 
   // ── Duplicate check ───────────────────────────────────────────────────────
@@ -190,10 +192,10 @@ export function FrameworkImportDialog({
 
       if (fetchError) throw fetchError;
 
-      const existingNames = (existing || []).map((c: any) => c.name);
+      const existingNames = ((existing || []) as { name: string }[]).map((c) => c.name);
       setDuplicates(existingNames);
       setChecked(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error checking duplicates:", err);
       setError("Failed to check for existing competencies. Please try again.");
     }
@@ -253,11 +255,18 @@ export function FrameworkImportDialog({
           .order("sort_order");
 
         if (wsLevels && wsLevels.length > 0) {
-          const levelCompInserts: any[] = [];
+          type LevelCompInsert = {
+            level_id: string;
+            competency_id: string;
+            expected_level: number;
+            workspace_id: string;
+            behavioral_indicators: string[];
+          };
+          const levelCompInserts: LevelCompInsert[] = [];
 
           for (const comp of importedCompetencies) {
             // Find the original template competency data to get levels
-            const templateComp = allComps.find((c: any) => c.name === comp.name);
+            const templateComp = allComps.find((c) => c.name === comp.name);
             if (!templateComp?.levels) continue;
 
             for (const [levelNum, levelData] of Object.entries(templateComp.levels)) {
@@ -269,7 +278,7 @@ export function FrameworkImportDialog({
                   competency_id: comp.id,
                   expected_level: parseInt(levelNum),
                   workspace_id: wsId,
-                  behavioral_indicators: (levelData as any).indicators || [],
+                  behavioral_indicators: (levelData as { indicators?: string[] }).indicators || [],
                 });
               }
             }
@@ -290,9 +299,9 @@ export function FrameworkImportDialog({
       onOpenChange(false);
       router.push("/dashboard/competencies");
       router.refresh();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error importing competencies:", err);
-      setError(err?.message || "Failed to import competencies. Please try again.");
+      setError((err instanceof Error ? err.message : "") || "Failed to import competencies. Please try again.");
     } finally {
       setImporting(false);
     }

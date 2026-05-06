@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+// Mock the browser supabase helper so the component imports without env vars.
+vi.mock("@/lib/supabase", () => ({
+  createClient: vi.fn(() => ({})),
+}));
+
 import { PhaseDeadlineEditor } from "../phase-deadline-editor";
 
 afterEach(() => cleanup());

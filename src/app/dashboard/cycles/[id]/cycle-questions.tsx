@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Target, MessageSquare, Plus, X, Loader2, Edit3, Save } from "lucide-react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 
 interface CycleQuestion {
   id: string;
@@ -52,10 +52,7 @@ export function CycleQuestions({ cycleId, isDraft, questions, allCompetencies }:
   );
   const [newPrompt, setNewPrompt] = useState("");
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   const compQuestions = questions.filter((q) => q.question_type === "competency");
   const txtQuestions = questions.filter((q) => q.question_type === "text");
@@ -95,7 +92,15 @@ export function CycleQuestions({ cycleId, isDraft, questions, allCompetencies }:
       await supabase.from("cycle_questions").delete().eq("cycle_id", cycleId);
 
       // Insert new ones
-      const rows: any[] = [];
+      type QuestionInsert = {
+        cycle_id: string;
+        question_type: "competency" | "text";
+        competency_id?: string;
+        prompt?: string;
+        sort_order: number;
+        required: boolean;
+      };
+      const rows: QuestionInsert[] = [];
       let sortOrder = 0;
 
       for (const compId of selectedCompIds) {
@@ -125,8 +130,8 @@ export function CycleQuestions({ cycleId, isDraft, questions, allCompetencies }:
 
       setEditing(false);
       router.refresh();
-    } catch (err: any) {
-      setError(err?.message || "Failed to save");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "") || "Failed to save");
     } finally {
       setSaving(false);
     }
@@ -196,7 +201,7 @@ export function CycleQuestions({ cycleId, isDraft, questions, allCompetencies }:
         {questions.length === 0 && isDraft && (
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Click "Edit" to configure which competencies and text questions will be asked during reviews.
+              Click &quot;Edit&quot; to configure which competencies and text questions will be asked during reviews.
             </p>
           </CardContent>
         )}

@@ -22,12 +22,44 @@ import { FrameworkImportDialog } from "./framework-import-dialog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type TemplateQuestion = {
+  type?: string;
+  text?: string;
+  prompt?: string;
+  required?: boolean;
+};
+
+type TemplateLevel = { name: string };
+
+type TemplateCompetency = {
+  name: string;
+  description?: string;
+  category?: string;
+  expected_scores?: number[];
+  score_descriptors?: Record<string, string>;
+};
+
+type TemplateContent = {
+  levels?: TemplateLevel[];
+  competencies?: TemplateCompetency[];
+  cycle_type?: string;
+  review_template_name?: string;
+  suggested_competency_categories?: string[];
+  suggested_description?: string;
+  title?: string;
+  scope?: string;
+  metric_unit?: string;
+  metric_start?: number;
+  metric_target?: number;
+  goal_direction?: string;
+};
+
 interface Template {
   id: string;
   name: string;
   description: string | null;
-  questions: any[] | null;
-  content: any | null;
+  questions: TemplateQuestion[] | null;
+  content: TemplateContent | null;
   template_type: string | null;
   is_system: boolean;
   is_default: boolean;
@@ -75,22 +107,22 @@ function TemplateRow({
 
   function getStats(): string {
     if (templateType === "function_template") {
-      const c = template.content as any;
+      const c = template.content;
       return `${c?.levels?.length || 0} levels · ${c?.competencies?.length || 0} competencies`;
     }
     if (templateType === "review") {
       return `${Array.isArray(template.questions) ? template.questions.length : 0} questions`;
     }
     if (templateType === "competency_framework") {
-      const c = template.content as any;
+      const c = template.content;
       return `${c?.competencies?.length || 0} competencies`;
     }
     if (templateType === "cycle_profile") {
-      const c = template.content as any;
+      const c = template.content;
       return (c?.cycle_type || "custom").replace("_", " ");
     }
     if (templateType === "goal_template") {
-      const c = template.content as any;
+      const c = template.content;
       return c?.scope || "individual";
     }
     return "";
@@ -203,11 +235,11 @@ function TemplateRow({
 
   function renderExpanded() {
     if (templateType === "function_template") {
-      const c = template.content as any;
+      const c = template.content;
       const levels = c?.levels || [];
       const competencies = c?.competencies || [];
       const hasDescriptors = competencies.some(
-        (comp: any) => comp.score_descriptors && Object.keys(comp.score_descriptors).length > 0
+        (comp) => comp.score_descriptors && Object.keys(comp.score_descriptors).length > 0
       );
       return (
         <div className="space-y-4">
@@ -216,13 +248,13 @@ function TemplateRow({
               <thead>
                 <tr className="border-b border-border/30">
                   <th className="text-left py-2 pr-4 font-medium text-muted-foreground min-w-[180px]">Competency</th>
-                  {levels.map((l: any) => (
+                  {levels.map((l) => (
                     <th key={l.name} className="text-center py-2 px-2 font-medium text-foreground min-w-[64px]">{l.name}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {competencies.map((comp: any) => (
+                {competencies.map((comp) => (
                   <tr key={comp.name} className="border-b border-border/20 last:border-0">
                     <td className="py-2 pr-4">
                       <span className="font-medium text-foreground">{comp.name}</span>
@@ -246,7 +278,7 @@ function TemplateRow({
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Score Descriptors</p>
               <div className="space-y-3">
-                {competencies.filter((comp: any) => comp.score_descriptors).map((comp: any) => (
+                {competencies.filter((comp) => comp.score_descriptors).map((comp) => (
                   <div key={`sd-${comp.name}`}>
                     <p className="text-xs font-medium text-foreground mb-1.5">{comp.name}</p>
                     <div className="grid gap-1">
@@ -274,7 +306,7 @@ function TemplateRow({
       const questions = template.questions || [];
       return (
         <div className="space-y-1.5">
-          {questions.map((q: any, i: number) => (
+          {questions.map((q, i) => (
             <div key={i} className="flex items-start gap-2 text-xs">
               <Badge variant="outline" className="text-[9px] shrink-0 mt-0.5">
                 {q.type === "rating" ? "Rating" : "Text"}
@@ -288,9 +320,9 @@ function TemplateRow({
     }
 
     if (templateType === "competency_framework") {
-      const c = template.content as any;
+      const c = template.content;
       const competencies = c?.competencies || [];
-      const categories = [...new Set(competencies.map((comp: any) => comp.category))] as string[];
+      const categories = [...new Set(competencies.map((comp) => comp.category).filter((c): c is string => Boolean(c)))];
       return (
         <div className="space-y-3">
           {categories.map((cat) => (
@@ -298,8 +330,8 @@ function TemplateRow({
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{cat}</p>
               <div className="space-y-1">
                 {competencies
-                  .filter((comp: any) => comp.category === cat)
-                  .map((comp: any) => (
+                  .filter((comp) => comp.category === cat)
+                  .map((comp) => (
                     <div key={comp.name} className="flex items-start gap-2 text-xs">
                       <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
                       <div>
@@ -318,7 +350,7 @@ function TemplateRow({
     }
 
     if (templateType === "cycle_profile") {
-      const c = template.content as any;
+      const c = template.content;
       return (
         <div className="grid grid-cols-2 gap-3 text-xs">
           <div>
@@ -331,10 +363,10 @@ function TemplateRow({
               <span className="font-medium text-foreground">{c.review_template_name}</span>
             </div>
           )}
-          {c?.suggested_competency_categories?.length > 0 && (
+          {(c?.suggested_competency_categories?.length ?? 0) > 0 && (
             <div className="col-span-2">
               <span className="text-muted-foreground">Focus areas:</span>{" "}
-              <span className="font-medium text-foreground">{c.suggested_competency_categories.join(", ")}</span>
+              <span className="font-medium text-foreground">{c?.suggested_competency_categories?.join(", ")}</span>
             </div>
           )}
           {c?.suggested_description && (
@@ -348,7 +380,7 @@ function TemplateRow({
     }
 
     if (templateType === "goal_template") {
-      const c = template.content as any;
+      const c = template.content;
       return (
         <div className="grid grid-cols-2 gap-3 text-xs">
           {c?.title && (

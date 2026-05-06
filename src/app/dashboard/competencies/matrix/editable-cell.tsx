@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { createBrowserClient } from "@supabase/ssr";
+import { createClient } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,10 +57,7 @@ function EditableCellInner({
   const [savingBehaviors, setSavingBehaviors] = useState(false);
   const [behaviorSaveError, setBehaviorSaveError] = useState<string | null>(null);
 
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createClient();
 
   async function handleSelect(newValue: number | null) {
     if (!canEdit) return;

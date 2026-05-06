@@ -3,7 +3,6 @@ import { getUserWorkspace } from "@/lib/supabase-server";
 import { isManagerOrAbove } from "@/lib/roles";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft, User2, Calendar, Layers, TriangleAlert, Lock } from "lucide-react";
@@ -50,7 +49,7 @@ export default async function ReviewDetailPage({
   const currentUserId = workspace.appUserId;
   const isAssignmentManager = assignment.manager_id === currentUserId;
   const isAssignmentEmployee = assignment.employee_id === currentUserId;
-  const isWorkspaceManager = isManagerOrAbove(workspace.role as any) || !!workspace.hasDirectReports;
+  const isWorkspaceManager = isManagerOrAbove(workspace.role) || !!workspace.hasDirectReports;
   const isUpwardReviewer =
     assignment.assignment_type === "upward" &&
     assignment.reviewer_id === currentUserId;
@@ -69,7 +68,43 @@ export default async function ReviewDetailPage({
       ? "self"
       : "manager";
 
-  const employee = assignment.employee as any;
+  type LevelJoin = { id: string; name: string; grade: string | null; job_family?: { name: string } | { name: string }[] | null };
+  type EmployeeRow = {
+    id: string;
+    slack_name: string | null;
+    job_title: string | null;
+    department: string | null;
+    avatar_url: string | null;
+    level_id: string | null;
+    level: LevelJoin | LevelJoin[] | null;
+  };
+  type CycleJoin = { id: string; name: string; status: string; start_date: string | null; end_date: string | null };
+  type ManagerJoin = { id: string; slack_name: string | null };
+  type LevelCompRow = {
+    id: string;
+    expected_level: number;
+    behavioral_indicators: string[] | null;
+    competency: { id: string; name: string; description: string | null; category: string | null; is_core: boolean } | { id: string; name: string; description: string | null; category: string | null; is_core: boolean }[] | null;
+  };
+  type CycleQuestionRow = {
+    id: string;
+    question_type: string;
+    competency_id: string | null;
+    prompt: string | null;
+    sort_order: number;
+    required: boolean | null;
+    competency: { id: string; name: string; description: string | null; category: string | null } | { id: string; name: string; description: string | null; category: string | null }[] | null;
+  };
+  type ResponseRow = {
+    id: string;
+    competency_id: string | null;
+    rating: number | null;
+    comment: string | null;
+    reviewer_id: string;
+    reviewer_role: string;
+  };
+
+  const employee = assignment.employee as unknown as EmployeeRow;
   const levelId = employee?.level_id;
 
   // Fetch competencies from level OR cycle questions, plus existing responses
@@ -102,9 +137,9 @@ export default async function ReviewDetailPage({
       .eq("assignment_id", id),
   ]);
 
-  const levelComps = levelCompsResult.data || [];
-  const cycleQuestions = cycleQuestionsResult.data || [];
-  const existingResponses = existingResponsesResult.data || [];
+  const levelComps = (levelCompsResult.data || []) as unknown as LevelCompRow[];
+  const cycleQuestions = (cycleQuestionsResult.data || []) as unknown as CycleQuestionRow[];
+  const existingResponses = (existingResponsesResult.data || []) as ResponseRow[];
 
   // Build competency ratings — prefer level competencies, fall back to cycle questions
   let competencyRatings: CompetencyRating[];
@@ -112,11 +147,11 @@ export default async function ReviewDetailPage({
   if (levelComps.length > 0) {
     // Use level competencies (existing behavior)
     competencyRatings = levelComps
-      .filter((lc: any) => lc.competency)
-      .map((lc: any) => {
-        const comp = lc.competency;
+      .filter((lc) => lc.competency)
+      .map((lc) => {
+        const comp = Array.isArray(lc.competency) ? lc.competency[0] : lc.competency!;
         const existing = existingResponses.find(
-          (r: any) => r.competency_id === comp.id
+          (r) => r.competency_id === comp.id
         );
         return {
           competencyId: comp.id,
@@ -133,15 +168,15 @@ export default async function ReviewDetailPage({
   } else {
     // Fallback: use cycle questions with competencies
     const compQuestions = cycleQuestions.filter(
-      (q: any) => q.question_type === "competency" && q.competency
+      (q) => q.question_type === "competency" && q.competency
     );
-    competencyRatings = compQuestions.map((q: any) => {
+    competencyRatings = compQuestions.map((q) => {
       const comp = Array.isArray(q.competency) ? q.competency[0] : q.competency;
       const existing = existingResponses.find(
-        (r: any) => r.competency_id === comp?.id
+        (r) => r.competency_id === (comp?.id ?? null)
       );
       return {
-        competencyId: comp?.id || q.competency_id,
+        competencyId: comp?.id || q.competency_id || "",
         competencyName: comp?.name || "Unknown",
         competencyDescription: comp?.description || q.prompt || null,
         category: comp?.category || null,
@@ -154,9 +189,9 @@ export default async function ReviewDetailPage({
     });
   }
 
-  const level = employee?.level as any;
-  const cycle = assignment.cycle as any;
-  const manager = assignment.manager as any;
+  const level = (Array.isArray(employee?.level) ? employee?.level[0] : employee?.level) as LevelJoin | undefined;
+  const cycle = assignment.cycle as unknown as CycleJoin | null;
+  const manager = assignment.manager as unknown as ManagerJoin | null;
   const statusCfg = getAssignmentStatus(assignment.status);
 
   return (
@@ -195,7 +230,7 @@ export default async function ReviewDetailPage({
               {level && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Layers className="h-3 w-3" />
-                  {level.job_family?.name} · {level.name}
+                  {(Array.isArray(level.job_family) ? level.job_family[0]?.name : level.job_family?.name)} · {level.name}
                   {level.grade && ` (${level.grade})`}
                 </span>
               )}

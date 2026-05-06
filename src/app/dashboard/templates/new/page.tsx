@@ -88,7 +88,16 @@ export default function NewTemplatePage() {
         return;
       }
 
-      let insertData: any = {
+      type TemplateInsert = {
+        name: string;
+        description: string | null;
+        workspace_id: string;
+        is_default: boolean;
+        template_type: string | null;
+        questions?: unknown;
+        content?: Record<string, unknown>;
+      };
+      const insertData: TemplateInsert = {
         name,
         description: description || null,
         workspace_id: identity.workspaceId,
@@ -129,9 +138,9 @@ export default function NewTemplatePage() {
       if (error) throw error;
       router.push("/dashboard/templates");
       router.refresh();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating template:", error);
-      setSubmitError(error?.message || "Failed to create template. Please try again.");
+      setSubmitError((error instanceof Error ? error.message : "") || "Failed to create template. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -164,7 +173,7 @@ export default function NewTemplatePage() {
             <button
               key={opt.value}
               type="button"
-              onClick={() => setTemplateType(opt.value as any)}
+              onClick={() => setTemplateType(opt.value as typeof templateType)}
               className={`flex items-center gap-3 p-3 rounded-lg border transition-colors text-left ${
                 templateType === opt.value
                   ? "border-primary bg-primary/5"

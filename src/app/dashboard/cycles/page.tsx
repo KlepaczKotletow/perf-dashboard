@@ -9,6 +9,26 @@ import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
 import { MissingReviewsPopover } from "./missing-reviews-popover";
 import { PageHeader } from "@/components/page-header";
 
+type CycleListAssignment = {
+  status: string;
+  assignment_type: string | null;
+  manager_id: string | null;
+  employee?: { slack_name: string | null } | null;
+  manager?: { slack_name: string | null } | null;
+};
+
+type CycleListRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+  start_date: string | null;
+  end_date: string | null;
+  review_deadline: string | null;
+  employees?: { count: number }[] | null;
+  assignments?: CycleListAssignment[] | null;
+};
+
 async function getPerformanceCycles(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -22,7 +42,7 @@ async function getPerformanceCycles(workspaceId: string) {
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
   if (error) console.error("Failed to fetch performance cycles:", error.message);
-  const sorted = (data || []).sort((a: any, b: any) => {
+  const sorted = ((data || []) as unknown as CycleListRow[]).sort((a, b) => {
     const aOverdue = isCycleOverdue(a) ? 0 : 1;
     const bOverdue = isCycleOverdue(b) ? 0 : 1;
     if (aOverdue !== bOverdue) return aOverdue - bOverdue;
@@ -103,15 +123,15 @@ export default async function CyclesPage() {
             <span />
           </div>
 
-          {cycles.map((cycle: any) => {
+          {cycles.map((cycle) => {
             const config = getCycleDisplayStatus(cycle);
             const employeeCount = cycle.employees?.[0]?.count || 0;
 
-            const allAssignments: any[] = cycle.assignments || [];
-            const standardAssignments = allAssignments.filter((a: any) => a.assignment_type !== "upward");
+            const allAssignments: CycleListAssignment[] = cycle.assignments || [];
+            const standardAssignments = allAssignments.filter((a) => a.assignment_type !== "upward");
             const totalPeople = standardAssignments.length;
-            const selfDone = standardAssignments.filter((a: any) => a.status === "in_progress" || a.status === "completed").length;
-            const mgrDone = standardAssignments.filter((a: any) => a.status === "completed").length;
+            const selfDone = standardAssignments.filter((a) => a.status === "in_progress" || a.status === "completed").length;
+            const mgrDone = standardAssignments.filter((a) => a.status === "completed").length;
             const selfPct = totalPeople > 0 ? Math.round((selfDone / totalPeople) * 100) : null;
             const mgrPct = totalPeople > 0 ? Math.round((mgrDone / totalPeople) * 100) : null;
 
@@ -190,11 +210,11 @@ export default async function CyclesPage() {
                   )}
                   {isCycleOverdue(cycle) && totalPeople > 0 && (() => {
                     const selfMissingList = standardAssignments
-                      .filter((a: any) => a.status === "pending")
-                      .map((a: any) => ({ name: a.employee?.slack_name || "Unknown", status: a.status }));
+                      .filter((a) => a.status === "pending")
+                      .map((a) => ({ name: a.employee?.slack_name || "Unknown", status: a.status }));
                     const managerMissingList = standardAssignments
-                      .filter((a: any) => a.status !== "completed" && a.manager_id)
-                      .map((a: any) => ({
+                      .filter((a) => a.status !== "completed" && a.manager_id)
+                      .map((a) => ({
                         name: a.employee?.slack_name || "Unknown",
                         managerName: a.manager?.slack_name || "Unknown",
                         status: a.status,
