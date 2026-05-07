@@ -1,8 +1,6 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
-import { ReviewsFilter } from "./reviews-filter";
 import { ReviewsContent } from "./reviews-content";
 import { ReviewsExportButton } from "./reviews-export-button";
-import { Suspense } from "react";
 import { isHROrAbove } from "@/lib/roles";
 import { PageHeader } from "@/components/page-header";
 
@@ -21,7 +19,7 @@ type ReviewAssignmentItem = {
   cycle?: CycleRef | null;
 };
 
-async function getReviewAssignments(workspaceId: string, status?: string, search?: string) {
+async function getReviewAssignments(workspaceId: string) {
   const supabase = await createServerSupabaseClient();
 
   // Get cycle IDs belonging to this workspace first
@@ -33,7 +31,10 @@ async function getReviewAssignments(workspaceId: string, status?: string, search
   const cycleIds = ((cycles || []) as { id: string }[]).map((c) => c.id);
   if (cycleIds.length === 0) return [];
 
-  let query = supabase
+  // Search and status filtering moved to the client (single filter bar
+  // owns both URL-derivable and ad-hoc filters). The server returns the
+  // full slice; the client tables filter and sort interactively.
+  const { data, error: assignmentsErr } = await supabase
     .from("review_assignments")
     .select(`
       id, status, overall_rating, created_at, updated_at, assignment_type,
@@ -44,38 +45,20 @@ async function getReviewAssignments(workspaceId: string, status?: string, search
     `)
     .in("cycle_id", cycleIds)
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
 
-  if (status && status !== "all") {
-    query = query.eq("status", status);
-  }
-
-  const { data, error: assignmentsErr } = await query;
   if (assignmentsErr) console.error("Failed to fetch review assignments:", assignmentsErr.message);
-  let results = (data || []) as unknown as ReviewAssignmentItem[];
-
-  if (search) {
-    const s = search.toLowerCase();
-    results = results.filter((r) =>
-      r.employee?.slack_name?.toLowerCase().includes(s) ||
-      r.manager?.slack_name?.toLowerCase().includes(s) ||
-      r.cycle?.name?.toLowerCase().includes(s)
-    );
-  }
-
-  return results;
+  return (data || []) as unknown as ReviewAssignmentItem[];
 }
 
-export default async function ReviewsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string; search?: string }>;
-}) {
-  const params = await searchParams;
+export default async function ReviewsPage() {
   const workspace = await getUserWorkspace();
-  const assignments = await getReviewAssignments(workspace!.workspaceId, params.status, params.search);
+  const assignments = await getReviewAssignments(workspace!.workspaceId);
 
-  // Group by cycle, then by assignment_type within each cycle
+  // Group by cycle, then by assignment_type within each cycle. The client
+  // flattens this back into rows for the table — keeping the grouped shape
+  // here avoids changing the existing component prop contract while we
+  // make the redesign.
   const cycleMap = new Map<string, { cycle: CycleRef | null; standard: ReviewAssignmentItem[]; upward: ReviewAssignmentItem[] }>();
   for (const a of assignments) {
     const cycle = a.cycle ?? null;
@@ -94,13 +77,9 @@ export default async function ReviewsPage({
       <PageHeader
         hat="my-team"
         title="Team Reviews"
-        subtitle="All performance review assignments grouped by cycle"
+        subtitle="All performance review assignments"
         actions={isHROrAbove(workspace?.role) ? <ReviewsExportButton /> : undefined}
       />
-
-      <Suspense fallback={<div>Loading filters...</div>}>
-        <ReviewsFilter />
-      </Suspense>
 
       <ReviewsContent cycles={cycles} />
     </div>
