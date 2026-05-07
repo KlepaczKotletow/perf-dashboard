@@ -12,7 +12,11 @@ export default async function SettingsPage() {
 
   const { data: wsData } = await supabase
     .from("workspaces")
-    .select("id, team_name, team_id, logo_url, rating_scale, installed_at")
+    .select(
+      `id, team_name, team_id, logo_url, rating_scale, installed_at,
+       self_review_required, peer_review_anonymous,
+       share_ratings_with_employees, manager_sees_individual_upward`,
+    )
     .eq("id", workspace.workspaceId)
     .single();
 
@@ -31,6 +35,14 @@ export default async function SettingsPage() {
         logoUrl: wsData?.logo_url || null,
         ratingScale: wsData?.rating_scale || { min: 1, max: 5, labels: { "1": "Needs improvement", "2": "Below expectations", "3": "Meets expectations", "4": "Exceeds expectations", "5": "Exceptional" } },
         installedAt: wsData?.installed_at || null,
+        // Review process & visibility — defaults match the migration's column
+        // defaults so a partial fetch (or a workspace that pre-dates the
+        // migration) renders the canonical configuration rather than every
+        // toggle off.
+        selfReviewRequired: wsData?.self_review_required ?? true,
+        peerReviewAnonymous: wsData?.peer_review_anonymous ?? true,
+        shareRatingsWithEmployees: wsData?.share_ratings_with_employees ?? true,
+        managerSeesIndividualUpward: wsData?.manager_sees_individual_upward ?? false,
       }}
       tenureBuckets={tenureBuckets || []}
     />

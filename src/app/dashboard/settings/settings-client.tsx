@@ -52,6 +52,10 @@ interface Props {
     logoUrl: string | null;
     ratingScale: { min: number; max: number; labels: Record<string, string> };
     installedAt: string | null;
+    selfReviewRequired: boolean;
+    peerReviewAnonymous: boolean;
+    shareRatingsWithEmployees: boolean;
+    managerSeesIndividualUpward: boolean;
   };
   tenureBuckets: TenureBucket[];
 }
@@ -64,13 +68,15 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
   const [buckets, setBuckets] = useState<TenureBucket[]>(initialBuckets);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Review visibility & process settings (stored locally for now, DB migration later)
-  const [peerAnonymity, setPeerAnonymity] = useState(true);
-  const [selfReviewRequired, setSelfReviewRequired] = useState(true);
-  const [managerCanSeeUpward, setManagerCanSeeUpward] = useState(false);
-  const [shareRatingsWithEmployee, setShareRatingsWithEmployee] = useState(true);
+  // Review visibility & process settings — persisted on the workspaces row via
+  // the update_workspace_review_settings RPC (admin/hr-only, SECURITY DEFINER).
+  const [selfReviewRequired, setSelfReviewRequired] = useState(workspace.selfReviewRequired);
+  const [peerReviewAnonymous, setPeerReviewAnonymous] = useState(workspace.peerReviewAnonymous);
+  const [shareRatingsWithEmployees, setShareRatingsWithEmployees] = useState(workspace.shareRatingsWithEmployees);
+  const [managerSeesIndividualUpward, setManagerSeesIndividualUpward] = useState(workspace.managerSeesIndividualUpward);
 
   const updateLabel = (key: string, value: string) => {
     setRatingScale((prev) => ({
@@ -110,6 +116,7 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
     try {
       // Clamp scale: min >= 1, max <= 7 (Slack button limit)
       const clampedScale = {
@@ -130,7 +137,19 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
       });
       if (scaleErr) throw scaleErr;
 
-      await supabase
+      // Review-process toggles persist via a SECURITY DEFINER RPC that
+      // checks role membership server-side — direct UPDATE on workspaces
+      // would be blocked by RLS for non-owner contexts and is also wider
+      // surface area than necessary.
+      const { error: reviewErr } = await supabase.rpc("update_workspace_review_settings", {
+        p_self_review_required: selfReviewRequired,
+        p_peer_review_anonymous: peerReviewAnonymous,
+        p_share_ratings_with_employees: shareRatingsWithEmployees,
+        p_manager_sees_individual_upward: managerSeesIndividualUpward,
+      });
+      if (reviewErr) throw reviewErr;
+
+      const { error: workspaceErr } = await supabase
         .from("workspaces")
         .update({
           team_name: teamName,
@@ -138,14 +157,16 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
           updated_at: new Date().toISOString(),
         })
         .eq("id", workspace.id);
+      if (workspaceErr) throw workspaceErr;
 
       // Save tenure buckets: delete all then re-insert
-      await supabase
+      const { error: deleteErr } = await supabase
         .from("tenure_buckets")
         .delete()
         .eq("workspace_id", workspace.id);
+      if (deleteErr) throw deleteErr;
       if (buckets.length > 0) {
-        await supabase.from("tenure_buckets").insert(
+        const { error: insertErr } = await supabase.from("tenure_buckets").insert(
           buckets.map((b, i) => ({
             workspace_id: workspace.id,
             label: b.label,
@@ -154,11 +175,15 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
             sort_order: i,
           }))
         );
+        if (insertErr) throw insertErr;
       }
 
       setRatingScale(clampedScale);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save settings";
+      setSaveError(message);
     } finally {
       setSaving(false);
     }
@@ -177,6 +202,12 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
           </Button>
         }
       />
+
+      {saveError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-400">
+          <strong className="font-medium">Couldn&apos;t save:</strong> {saveError}
+        </div>
+      )}
 
       {/* Organisation */}
       <Card className="border-border/60">
@@ -440,20 +471,20 @@ export function SettingsClient({ workspace, tenureBuckets: initialBuckets }: Pro
               {
                 label: "Anonymous peer reviews",
                 description: "Hide reviewer names when sharing peer feedback with employees.",
-                checked: peerAnonymity,
-                onChange: setPeerAnonymity,
+                checked: peerReviewAnonymous,
+                onChange: setPeerReviewAnonymous,
               },
               {
                 label: "Share ratings with employees",
                 description: "Allow employees to see their numerical ratings after review completion.",
-                checked: shareRatingsWithEmployee,
-                onChange: setShareRatingsWithEmployee,
+                checked: shareRatingsWithEmployees,
+                onChange: setShareRatingsWithEmployees,
               },
               {
                 label: "Manager sees individual upward reviews",
                 description: "Let managers see individual upward feedback (not just aggregated).",
-                checked: managerCanSeeUpward,
-                onChange: setManagerCanSeeUpward,
+                checked: managerSeesIndividualUpward,
+                onChange: setManagerSeesIndividualUpward,
               },
             ].map((row) => (
               <div
