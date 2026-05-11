@@ -358,7 +358,7 @@ export default async function Home() {
           </ScrollReveal>
 
           {/* Featured: Dashboard — gets the most real-estate */}
-          <ScrollReveal className="mb-6 lg:mb-8">
+          <ScrollReveal className="mb-16 lg:mb-24">
             <figure className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/[0.04] bg-white">
               <div className="bg-muted/80 border-b border-border/60 px-4 py-2 flex items-center gap-3">
                 <div className="flex gap-1.5">
@@ -379,64 +379,75 @@ export default async function Home() {
                 loop
                 muted
                 playsInline
-                preload="metadata"
+                preload="auto"
                 poster="/demo/01-dashboard.jpg"
                 className="w-full h-auto block bg-[#fafaf9]"
               >
-                <source src="/demo/01-dashboard.webm" type="video/webm" />
+                {/* MP4 first so iOS Safari picks it up (it ignores some WebM variants). */}
                 <source src="/demo/01-dashboard.mp4" type="video/mp4" />
+                <source src="/demo/01-dashboard.webm" type="video/webm" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/demo/01-dashboard.gif" alt="Dashboard walk-through" />
               </video>
             </figure>
           </ScrollReveal>
 
-          {/* Supporting tiles — 2×2 grid on lg, stack on mobile */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+          {/*
+            Supporting demos — full-width alternating "video on one side, copy
+            on the other" rows (Stripe / Linear pattern). This buys each video
+            ~60% of the section width, which keeps the dashboard text inside
+            the recording legible. The 2×2 grid we had before squeezed each
+            clip to ~600 px wide and the in-video text became too small.
+          */}
+          <div className="space-y-16 lg:space-y-24">
             {[
               {
                 slug: "02-directory",
-                title: "Team directory",
-                blurb: "Search 28 people across 4 departments. Filter by status, department, or role — instantly.",
+                title: "Your whole team, instantly filterable.",
+                blurb: "28 people across 4 departments. Search by name, email or title; filter by status, department, or role. No paginated table to thumb through — every employee one keystroke away.",
               },
               {
                 slug: "03-reviews",
-                title: "Reviews hub",
-                blurb: "Every cycle, every employee in one table. Standard and upward reviews grouped per quarter.",
+                title: "Every review, every cycle, in one place.",
+                blurb: "Standard and upward reviews grouped per cycle, sorted by status. Pending reviews bubble to the top so managers know exactly where the bottleneck is.",
               },
               {
                 slug: "04-cycles",
-                title: "Performance cycles",
-                blurb: "Q1 completed, Q2 mid-flight. Live self- and manager-completion bars on every cycle row.",
+                title: "Quarterly cycles without the spreadsheet.",
+                blurb: "Q1 completed, Q2 mid-flight. Self- and manager-completion bars on every cycle row tell you what's done and what's still waiting on someone.",
               },
               {
                 slug: "05-audit",
-                title: "Audit log",
-                blurb: "Read-only history of every sensitive action — calibrations, role changes, settings, releases.",
+                title: "Every sensitive change, on the record.",
+                blurb: "Read-only history of calibrations, role changes, cycle launches, grade releases. Filter by action, actor, or date range when you need to answer \"who changed what, and when?\"",
               },
-            ].map((demo) => (
+            ].map((demo, i) => (
               <ScrollReveal key={demo.slug}>
-                <figure className="rounded-2xl border border-border/60 overflow-hidden shadow-sm bg-white h-full flex flex-col">
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                  <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="metadata"
-                    poster={`/demo/${demo.slug}.jpg`}
-                    className="w-full h-auto block bg-[#fafaf9]"
-                  >
-                    <source src={`/demo/${demo.slug}.webm`} type="video/webm" />
-                    <source src={`/demo/${demo.slug}.mp4`} type="video/mp4" />
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/demo/${demo.slug}.gif`} alt={`${demo.title} walk-through`} />
-                  </video>
-                  <figcaption className="px-5 py-4 border-t border-border/40">
-                    <p className="text-sm font-semibold text-foreground">{demo.title}</p>
-                    <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{demo.blurb}</p>
-                  </figcaption>
-                </figure>
+                <div className={`grid lg:grid-cols-12 items-center gap-8 lg:gap-12 ${i % 2 === 1 ? "lg:[&>:first-child]:order-2" : ""}`}>
+                  {/* Video tile — 7/12 width on lg */}
+                  <figure className="lg:col-span-7 rounded-2xl border border-border/60 overflow-hidden shadow-sm bg-white">
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <video
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      preload="auto"
+                      poster={`/demo/${demo.slug}.jpg`}
+                      className="w-full h-auto block bg-[#fafaf9]"
+                    >
+                      <source src={`/demo/${demo.slug}.mp4`} type="video/mp4" />
+                      <source src={`/demo/${demo.slug}.webm`} type="video/webm" />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={`/demo/${demo.slug}.gif`} alt={`${demo.title} walk-through`} />
+                    </video>
+                  </figure>
+                  {/* Caption — 5/12 width on lg */}
+                  <div className="lg:col-span-5">
+                    <h3 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground mb-3">{demo.title}</h3>
+                    <p className="text-base lg:text-lg text-muted-foreground leading-relaxed">{demo.blurb}</p>
+                  </div>
+                </div>
               </ScrollReveal>
             ))}
           </div>
