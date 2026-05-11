@@ -386,7 +386,10 @@ async function getChartData(workspaceId: string | undefined): Promise<DashboardC
   let completionDelta: number | null = null;
   let previousCycleName: string | null = null;
   if (previousCycle) {
-    previousCycleName = previousCycle.name ?? null;
+    // Strip the trailing "Performance Review" / "Review" suffix so the comparison
+    // badge ("-44% vs Q1 2026 Performance Review") fits on a single line. The
+    // chart-card also enforces a max-w + truncate as a safety net.
+    previousCycleName = (previousCycle.name ?? null)?.replace(/\s+(Performance\s+)?Review\s*$/i, "") || null;
     const prevAssignments = assignments.filter((a) => a.cycle_id === previousCycle.id);
     const prevTotal = prevAssignments.length;
     const prevCompleted = prevAssignments.filter((a) => a.status === "completed").length;

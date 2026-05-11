@@ -44,13 +44,18 @@ export function ChartCard({ title, subtitle, delta, children, className = "" }: 
             )}
           </div>
           {delta && deltaIcon && (
-            <Badge className={`text-[10px] font-medium gap-1 ${deltaColor}`}>
+            <Badge
+              className={`text-[10px] font-medium gap-1 max-w-[180px] shrink-0 whitespace-nowrap overflow-hidden ${deltaColor}`}
+              title={`${delta.value > 0 ? "+" : ""}${delta.value}% vs ${delta.label}`}
+            >
               {(() => {
                 const Icon = deltaIcon;
-                return <Icon className="h-3 w-3" />;
+                return <Icon className="h-3 w-3 shrink-0" />;
               })()}
-              {delta.value > 0 ? "+" : ""}
-              {delta.value}% {delta.label}
+              <span className="truncate">
+                {delta.value > 0 ? "+" : ""}
+                {delta.value}% vs {delta.label}
+              </span>
             </Badge>
           )}
         </div>
