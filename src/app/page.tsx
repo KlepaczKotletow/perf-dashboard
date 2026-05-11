@@ -100,11 +100,10 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* Right card — light with dashboard mockup */}
+            {/* Right card — live product walk-through (video replaces previous static mockup) */}
             <div className="relative rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] overflow-hidden flex items-stretch">
-              {/* Dashboard mockup — fills the whole card */}
               <div className="w-full m-3 rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white flex flex-col">
-                {/* Browser chrome */}
+                {/* Browser chrome — keeps the "real product in your browser" framing */}
                 <div className="bg-muted/80 border-b border-border/60 px-4 py-2 flex items-center gap-3 shrink-0">
                   <div className="flex gap-1.5">
                     <div className="h-2.5 w-2.5 rounded-full bg-foreground/20" />
@@ -112,203 +111,27 @@ export default async function Home() {
                     <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
                   </div>
                   <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                    app.nami.team/dashboard/analytics
+                    app.nami.team/dashboard
                   </div>
                 </div>
 
-                <div className="flex flex-1 overflow-hidden">
-                  {/* Sidebar — matches real app */}
-                  <div className="hidden sm:flex w-[140px] border-r border-border/60 flex-col bg-muted/20 p-2.5 gap-0.5 shrink-0 overflow-hidden">
-                    {/* Logo */}
-                    <div className="px-2 py-1.5 mb-1">
-                      <span className="text-[11px] font-bold text-foreground">Nami</span>
-                      <span className="block text-[7px] text-muted-foreground/50 italic" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
-                    </div>
-                    {/* Nav items — matching real sidebar */}
-                    {[
-                      { label: "Home", active: false },
-                      { label: "Performance", active: false },
-                      { label: "Goals", active: false },
-                      { label: "Kudos", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
-                    ))}
-                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Team</p>
-                    {[
-                      { label: "My Team", active: false },
-                      { label: "Reviews", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
-                    ))}
-                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Admin</p>
-                    {[
-                      { label: "Cycles", active: false },
-                      { label: "Directory", active: false },
-                      { label: "Surveys", active: false },
-                      { label: "Templates", active: false },
-                      { label: "Analytics", active: true },
-                      { label: "Settings", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className={`px-2 py-1 rounded-md text-[10px] ${item.active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"}`}>{item.label}</div>
-                    ))}
-                  </div>
-
-                  {/* Analytics content — matches real dashboard */}
-                  <div className="flex-1 p-4 overflow-hidden bg-[#fafaf9]">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Analytics</p>
-                        <p className="text-[9px] text-muted-foreground">Performance insights for Acme Corp</p>
-                      </div>
-                      <div className="px-2 py-1 rounded-md bg-muted/60 text-[9px] text-muted-foreground border border-border/40">Export</div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="flex gap-3 mb-3 border-b border-border/40 pb-1.5">
-                      {["Overview", "Heatmap", "Cycles"].map((tab, i) => (
-                        <span key={tab} className={`text-[9px] font-medium pb-1 ${i === 0 ? "text-primary border-b border-primary" : "text-muted-foreground"}`}>{tab}</span>
-                      ))}
-                    </div>
-
-                    {/* Filters */}
-                    <div className="flex gap-1.5 mb-3">
-                      {["All Cycles", "All Functions", "All Depts"].map((f) => (
-                        <div key={f} className="px-2 py-0.5 rounded-md bg-white border border-border/50 text-[8px] text-muted-foreground">{f}</div>
-                      ))}
-                    </div>
-
-                    {/* 5 KPI cards — matches real app layout */}
-                    <div className="grid grid-cols-5 gap-1.5 mb-3">
-                      {[
-                        { icon: "★", label: "Overall Rating", value: "4.2/5", color: "text-amber-500", iconBg: "bg-amber-50" },
-                        { icon: "↗", label: "Completion", value: "91%", color: "text-emerald-600", iconBg: "bg-emerald-50" },
-                        { icon: "▊", label: "Total Ratings", value: "312", color: "text-primary", iconBg: "bg-primary/10" },
-                        { icon: "◉", label: "Participants", value: "47", color: "text-purple-600", iconBg: "bg-purple-50" },
-                        { icon: "⊞", label: "Active Cycles", value: "2", color: "text-orange-500", iconBg: "bg-orange-50" },
-                      ].map((kpi) => (
-                        <div key={kpi.label} className="bg-white rounded-lg p-2 border border-border/40">
-                          <div className={`h-4 w-4 rounded-md ${kpi.iconBg} flex items-center justify-center text-[8px] mb-1`}>{kpi.icon}</div>
-                          <p className={`text-sm font-bold ${kpi.color}`}>{kpi.value}</p>
-                          <p className="text-[7px] text-muted-foreground mt-0.5 leading-tight">{kpi.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Rating Distribution + Competency Ratings side by side */}
-                    <div className="grid grid-cols-2 gap-1.5 mb-3">
-                      {/* Rating Distribution */}
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Rating Distribution</p>
-                        <div className="flex items-end gap-1 h-12">
-                          {[
-                            { score: "1", pct: 3, color: "bg-red-400" },
-                            { score: "2", pct: 8, color: "bg-orange-400" },
-                            { score: "3", pct: 28, color: "bg-yellow-400" },
-                            { score: "4", pct: 42, color: "bg-green-400" },
-                            { score: "5", pct: 19, color: "bg-emerald-500" },
-                          ].map((bar) => (
-                            <div key={bar.score} className="flex-1 flex flex-col items-center gap-0.5">
-                              <div className={`w-full ${bar.color} rounded-t-sm`} style={{ height: `${bar.pct * 1.1}px` }} />
-                              <span className="text-[7px] text-muted-foreground">{bar.score}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Competency Ratings */}
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Competency Ratings</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Collaboration", score: 4.4 },
-                            { name: "Leadership", score: 4.3 },
-                            { name: "Execution", score: 3.9 },
-                            { name: "Communication", score: 3.7 },
-                          ].map((c) => (
-                            <div key={c.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[70px] shrink-0 truncate">{c.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${(c.score / 5) * 100}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{c.score}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Performance Ranking table */}
-                    <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                      <div className="flex items-center gap-1 mb-2">
-                        <span className="text-[9px]">⭐</span>
-                        <p className="text-[9px] font-semibold text-foreground">Performance Ranking</p>
-                      </div>
-                      <div className="space-y-1">
-                        {[
-                          { rank: 1, name: "Alex Johnson", fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
-                          { rank: 2, name: "Maria Garcia", fn: "Product", rating: 4.2, tier: "Strong", tierColor: "text-green-700 bg-green-50" },
-                          { rank: 3, name: "Chris Lee", fn: "Design", rating: 3.6, tier: "Solid", tierColor: "text-sky-700 bg-sky-50" },
-                          { rank: 4, name: "Priya Nair", fn: "Engineering", rating: 2.8, tier: "Needs Dev", tierColor: "text-amber-700 bg-amber-50" },
-                        ].map((emp) => (
-                          <div key={emp.name} className="flex items-center gap-2 py-0.5">
-                            <span className="text-[8px] text-muted-foreground w-3 shrink-0 font-mono">{emp.rank}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[9px] font-medium text-foreground truncate">{emp.name}</p>
-                            </div>
-                            <span className="text-[8px] text-muted-foreground shrink-0">{emp.fn}</span>
-                            <div className="w-10 h-1 bg-muted rounded-full overflow-hidden shrink-0">
-                              <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
-                            </div>
-                            <span className="text-[8px] font-semibold text-foreground tabular-nums shrink-0">{emp.rating}</span>
-                            <span className={`px-1 py-0.5 rounded text-[7px] font-semibold shrink-0 ${emp.tierColor}`}>{emp.tier}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Completion by Department + Avg Rating by Department */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Completion by Dept</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Engineering", pct: 96 },
-                            { name: "Product", pct: 88 },
-                            { name: "Design", pct: 100 },
-                            { name: "Marketing", pct: 75 },
-                          ].map((d) => (
-                            <div key={d.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${d.pct}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-6 text-right tabular-nums">{d.pct}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Avg Rating by Dept</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Engineering", rating: 4.3 },
-                            { name: "Product", rating: 4.1 },
-                            { name: "Design", rating: 3.8 },
-                            { name: "Marketing", rating: 3.5 },
-                          ].map((d) => (
-                            <div key={d.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${(d.rating / 5) * 100}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{d.rating}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                {/* Live dashboard walk-through (autoplay loop). Falls back to the
+                    GIF for browsers that ignore inline autoplay (RSS, email previews). */}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster="/demo/01-dashboard.jpg"
+                  className="w-full h-auto block bg-[#fafaf9]"
+                >
+                  <source src="/demo/01-dashboard.webm" type="video/webm" />
+                  <source src="/demo/01-dashboard.mp4" type="video/mp4" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/demo/01-dashboard.gif" alt="Nami dashboard walk-through" />
+                </video>
               </div>
             </div>
 
