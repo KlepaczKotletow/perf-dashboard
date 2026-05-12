@@ -2,8 +2,22 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Nami",
-  description: "Privacy Policy for Nami. Learn how we collect, use, protect, and handle your data.",
+  title: "Privacy Policy",
+  description:
+    "Privacy Policy for Nami. How we collect, use, protect, and handle your data — including data residency, retention, and your rights under GDPR.",
+  alternates: { canonical: "/privacy" },
+  openGraph: {
+    title: "Privacy Policy — Nami",
+    description:
+      "How Nami collects, uses, protects, and handles your data — including retention, residency, and your GDPR rights.",
+    url: "/privacy",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy — Nami",
+    description: "How Nami collects, uses, protects, and handles your data.",
+  },
 };
 
 export default function PrivacyPolicyPage() {

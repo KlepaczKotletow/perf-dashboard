@@ -13,6 +13,130 @@ import { signOAuthState } from "@/lib/oauth-state";
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+
+// Single source of truth for the FAQ — rendered as <details> in the section
+// below AND emitted as FAQPage JSON-LD for search engines and answer engines.
+const FAQ_ITEMS = [
+  {
+    q: "Where is my data stored and who can see it?",
+    a: "Nami runs on Supabase (Postgres + authenticated APIs). Your workspace data is isolated per tenant and enforced at the database layer via row-level security. Only people inside your workspace see your data — we don't share or sell it. EU-region data residency is available on request.",
+  },
+  {
+    q: "What if some of my team doesn't check Slack often?",
+    a: "Everything Nami does in Slack also works on the web dashboard (app.nami.team). Reviews, goals, and surveys can be completed either way — you can even mix modes within a single cycle. For people who genuinely don't use Slack, managers can run reviews entirely in the dashboard.",
+  },
+  {
+    q: "Can we migrate from Lattice, Leapsome, or 15Five?",
+    a: "Yes. We import teams via CSV (or directly from Slack), and competency frameworks can be imported from our library or pasted in from your existing ladder. For Partner Programme customers we'll help with the migration hands-on.",
+  },
+  {
+    q: "How do you handle 360° and upward feedback privately?",
+    a: "Strict visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see results after HR releases grades. Survey responses are anonymous and aggregated — names are never attached to answers.",
+  },
+  {
+    q: "Can I customise the review templates and competency frameworks?",
+    a: "Yes. All 8 career frameworks ship fully editable — rename competencies, tweak level descriptors, adjust rating scales (2–5, 1–5, 1–7, anything you want). Review templates work the same way. You can also build your own from scratch.",
+  },
+  {
+    q: "What if we cancel — what happens to our data?",
+    a: "You can export everything at any time — reviews, goals, ratings, survey responses — as CSV. On cancellation your data is retained for 30 days in case you come back, then permanently deleted. Audit logs stay available during that window.",
+  },
+  {
+    q: "Do you support multiple Slack workspaces?",
+    a: "One Nami workspace corresponds to one Slack workspace. If your company has multiple Slack workspaces (e.g. one per region or business unit), contact us — we support org-level structures for Partner Programme customers.",
+  },
+  {
+    q: "Is there a free trial?",
+    a: "Yes — 14 days, no credit card. For teams of 10 or fewer, Nami is free indefinitely.",
+  },
+];
+
+// Structured data for crawlers and answer engines (ChatGPT, Claude, Perplexity,
+// Google AI Overviews). Grouped into a single @graph so the entities cross-
+// reference each other cleanly.
+const siteJsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "Nami",
+      url: SITE_URL,
+      logo: `${SITE_URL}/nami-logo.svg`,
+      email: "hello@namihr.com",
+      description:
+        "Performance management for teams that live in Slack. 360° reviews, OKRs, pulse surveys, and continuous feedback — without leaving Slack.",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: "Nami",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      inLanguage: "en-US",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#software`,
+      name: "Nami",
+      description:
+        "Performance management for teams that live in Slack. 360° reviews, OKR tracking, pulse surveys, competency frameworks, 9-box calibration, and analytics — all inside Slack, with a web dashboard for managers and HR.",
+      applicationCategory: "BusinessApplication",
+      applicationSubCategory: "Performance Management",
+      operatingSystem: "Web, Slack",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      offers: [
+        {
+          "@type": "Offer",
+          name: "Pro",
+          price: "5.00",
+          priceCurrency: "USD",
+          priceSpecification: {
+            "@type": "UnitPriceSpecification",
+            price: "5.00",
+            priceCurrency: "USD",
+            unitText: "user/month",
+          },
+          availability: "https://schema.org/InStock",
+          url: `${SITE_URL}/pricing`,
+        },
+        {
+          "@type": "Offer",
+          name: "Free for small teams",
+          price: "0.00",
+          priceCurrency: "USD",
+          description: "Free indefinitely for teams of 10 or fewer.",
+          availability: "https://schema.org/InStock",
+          url: `${SITE_URL}/pricing`,
+        },
+      ],
+      featureList: [
+        "360° performance reviews via Slack",
+        "Goal & OKR tracking with quarterly check-ins",
+        "Pulse surveys & eNPS",
+        "8 pre-built competency frameworks",
+        "9-box calibration",
+        "Performance analytics, rankings, and heatmaps",
+        "Audit log",
+        "Smart Slack reminders",
+        "CSV team import",
+      ],
+    },
+  ],
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: FAQ_ITEMS.map((item) => ({
+    "@type": "Question",
+    name: item.q,
+    acceptedAnswer: { "@type": "Answer", text: item.a },
+  })),
+};
+
 export default async function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
@@ -24,6 +148,19 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+
+      {/* JSON-LD for crawlers and AI answer engines. Server-rendered, no
+          client-side cost. */}
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
 
       {/* ── Header + Hero (seamless) ── */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5]">
@@ -840,40 +977,7 @@ export default async function Home() {
 
           <ScrollReveal>
             <div className="space-y-3">
-              {[
-                {
-                  q: "Where is my data stored and who can see it?",
-                  a: "Nami runs on Supabase (Postgres + authenticated APIs). Your workspace data is isolated per tenant and enforced at the database layer via row-level security. Only people inside your workspace see your data — we don't share or sell it. EU-region data residency is available on request.",
-                },
-                {
-                  q: "What if some of my team doesn't check Slack often?",
-                  a: "Everything Nami does in Slack also works on the web dashboard (app.nami.team). Reviews, goals, and surveys can be completed either way — you can even mix modes within a single cycle. For people who genuinely don't use Slack, managers can run reviews entirely in the dashboard.",
-                },
-                {
-                  q: "Can we migrate from Lattice, Leapsome, or 15Five?",
-                  a: "Yes. We import teams via CSV (or directly from Slack), and competency frameworks can be imported from our library or pasted in from your existing ladder. For Partner Programme customers we'll help with the migration hands-on.",
-                },
-                {
-                  q: "How do you handle 360° and upward feedback privately?",
-                  a: "Strict visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see results after HR releases grades. Survey responses are anonymous and aggregated — names are never attached to answers.",
-                },
-                {
-                  q: "Can I customise the review templates and competency frameworks?",
-                  a: "Yes. All 8 career frameworks ship fully editable — rename competencies, tweak level descriptors, adjust rating scales (2–5, 1–5, 1–7, anything you want). Review templates work the same way. You can also build your own from scratch.",
-                },
-                {
-                  q: "What if we cancel — what happens to our data?",
-                  a: "You can export everything at any time — reviews, goals, ratings, survey responses — as CSV. On cancellation your data is retained for 30 days in case you come back, then permanently deleted. Audit logs stay available during that window.",
-                },
-                {
-                  q: "Do you support multiple Slack workspaces?",
-                  a: "One Nami workspace corresponds to one Slack workspace. If your company has multiple Slack workspaces (e.g. one per region or business unit), contact us — we support org-level structures for Partner Programme customers.",
-                },
-                {
-                  q: "Is there a free trial?",
-                  a: "Yes — 14 days, no credit card. For teams of 10 or fewer, Nami is free indefinitely.",
-                },
-              ].map((item) => (
+              {FAQ_ITEMS.map((item) => (
                 <details
                   key={item.q}
                   className="group rounded-xl border border-border/60 bg-white overflow-hidden"

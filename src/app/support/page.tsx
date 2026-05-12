@@ -2,6 +2,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Book, Mail, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Support",
+  description:
+    "Get help with Nami — your Slack-native performance management tool. Quick-start commands, common questions, and direct email support at hello@namihr.com.",
+  alternates: { canonical: "/support" },
+  openGraph: {
+    title: "Support — Nami",
+    description:
+      "Get help with Nami — quick-start commands, common questions, and direct email support.",
+    url: "/support",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Support — Nami",
+    description: "Get help with Nami — your Slack-native performance management tool.",
+  },
+};
 
 export default function SupportPage() {
   return (
