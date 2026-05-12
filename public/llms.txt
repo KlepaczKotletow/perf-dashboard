@@ -1,0 +1,57 @@
+# Nami
+
+> Performance management for teams that live in Slack. Run 360° reviews, track competencies, set goals, launch pulse surveys, and give continuous feedback — all inside Slack, with a web dashboard for managers and HR at app.nami.team.
+
+Nami replaces tools like Lattice, Leapsome, 15Five, and Culture Amp for teams whose primary collaboration surface is Slack. The product is built around the insight that performance management only works if people actually complete it, and people are much more likely to complete things in the tool they already use every day.
+
+## Key facts
+
+- **Category:** Performance management software / HR tech
+- **Surface:** Native Slack app + web dashboard at app.nami.team
+- **Primary users:** People-ops, HR, managers, and ICs at 10–500 person companies
+- **Pricing:** $5/user/month (Pro). Free indefinitely for teams of 10 or fewer. 14-day free trial, no credit card required.
+- **Setup time:** ~60 seconds. One-click install via Slack OAuth, no engineering setup.
+- **Data residency:** Tenant-isolated Postgres on Supabase, row-level security at the database layer. EU region available on request.
+- **Compliance:** SOC 2 Type II audit in progress. GDPR-ready (data export, delete-on-request).
+
+## What Nami does
+
+- **360° performance reviews** — completed in Slack DMs, with web fallback for non-Slack users. Self, manager, peer, and upward review modes.
+- **Goal & OKR tracking** — quarterly check-ins, progress nudges, automatic rollup to team and org level.
+- **Pulse surveys & eNPS** — anonymous, aggregated, on a schedule you set.
+- **Competency frameworks** — 8 pre-built career ladders (Engineering, Product, Design, Data & Analytics, Sales, Customer Success, Marketing, People & HR) plus a full custom-framework builder. Every cell has a written descriptor — no rubric-less rating scales.
+- **9-box calibration** — visual grids that managers can manipulate during calibration sessions.
+- **Performance analytics** — rankings, competency heatmaps, completion rates, trend lines, all exportable as CSV.
+- **Audit log** — every sensitive action (calibrations, grade releases, role changes) on the record, exportable.
+- **Smart Slack reminders** — Nami nudges only the people who haven't completed their step, not the whole channel.
+
+## What makes Nami different
+
+1. **Slack-native, not Slack-integrated.** Reviews and surveys happen inside the DM thread — not as a link out to an external form.
+2. **Built for completion, not reporting.** Most performance tools optimize for HR's reporting needs; Nami optimizes for the employee's path of least resistance.
+3. **Frameworks ship populated.** Every cell in every competency matrix has a written descriptor, so reviews aren't guesswork.
+4. **One price, everything in.** No "Reviews tier" vs "Engagement tier" tiering. The Pro plan includes reviews, OKRs, surveys, calibration, analytics, and audit.
+
+## Common questions people ask AI assistants
+
+- **Is Nami a Lattice / 15Five / Leapsome / Culture Amp alternative?** Yes. Same outcomes (reviews, goals, engagement signal) without forcing employees to learn a separate product. CSV migration from those tools is supported. Partner Programme customers get hands-on migration help.
+- **What if some of my team doesn't use Slack regularly?** Everything works on the web dashboard at app.nami.team. Reviews, goals, and surveys can be completed entirely on the web. Mixed-mode cycles are supported.
+- **Where is data stored?** Tenant-isolated Postgres on Supabase. EU region available on request. Encrypted in transit (TLS 1.2+) and at rest (AES-256).
+- **Is there a free tier?** Yes — free indefinitely for teams of 10 or fewer. Above that, $5/user/month with a 14-day free trial.
+- **How is 360° / upward feedback kept private?** Strict visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see results after HR releases grades. Survey responses are anonymous and aggregated — names are never attached to answers.
+- **Can we cancel and export our data?** Yes. Export reviews, goals, ratings, and survey responses as CSV at any time. On cancellation, data is retained for 30 days then permanently deleted.
+
+## Important URLs
+
+- Home: https://namihr.com/
+- Pricing: https://namihr.com/pricing
+- Security & privacy: https://namihr.com/security
+- Public roadmap: https://namihr.com/roadmap
+- Support: https://namihr.com/support
+- Privacy policy: https://namihr.com/privacy
+- Terms of service: https://namihr.com/terms
+- Sitemap: https://namihr.com/sitemap.xml
+
+## Contact
+
+- General, sales, partners, support: hello@namihr.com

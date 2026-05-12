@@ -2,9 +2,23 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Security — Nami",
+  title: "Security",
   description:
     "How Nami protects your data: infrastructure, encryption, access control, tenant isolation, audit logging, subprocessors, and our compliance roadmap.",
+  alternates: { canonical: "/security" },
+  openGraph: {
+    title: "Security — Nami",
+    description:
+      "How Nami protects your data: encryption, access control, tenant isolation, audit logging, subprocessors, and compliance roadmap.",
+    url: "/security",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Security — Nami",
+    description:
+      "How Nami protects your data: encryption, access control, tenant isolation, audit logging.",
+  },
 };
 
 export default function SecurityPage() {
