@@ -874,7 +874,7 @@ export default async function Home() {
                   <div className="flex items-center gap-2 mb-2">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider border border-amber-200">
                       <Star className="h-3 w-3" />
-                      Invite-only
+                      Applications open
                     </span>
                     <span className="text-[11px] text-muted-foreground">Limited spots</span>
                   </div>
