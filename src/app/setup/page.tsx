@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type Stripe from "stripe";
+import type { Metadata } from "next";
 import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
 import { signOAuthState } from "@/lib/oauth-state";
@@ -10,6 +11,10 @@ import { isAdmin } from "@/lib/roles";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 interface SetupPageProps {
   searchParams: Promise<{ session_id?: string }>;

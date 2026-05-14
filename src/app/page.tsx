@@ -524,7 +524,10 @@ export default async function Home() {
                 <source src="/demo/01-dashboard.mp4" type="video/mp4" />
                 <source src="/demo/01-dashboard.webm" type="video/webm" />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/demo/01-dashboard.gif" alt="Dashboard walk-through" />
+                <img
+                  src="/demo/01-dashboard.gif"
+                  alt="Animated walk-through of the Nami dashboard at app.nami.team showing workspace health, review completion, and team activity at a glance."
+                />
               </video>
             </figure>
           </ScrollReveal>
@@ -542,21 +545,25 @@ export default async function Home() {
                 slug: "02-directory",
                 title: "Your whole team, instantly filterable.",
                 blurb: "28 people across 4 departments. Search by name, email or title; filter by status, department, or role. No paginated table to thumb through — every employee one keystroke away.",
+                alt: "Nami directory view: filtering 28 employees across 4 departments by status, department, and role with instant search results.",
               },
               {
                 slug: "03-reviews",
                 title: "Every review, every cycle, in one place.",
                 blurb: "Standard and upward reviews grouped per cycle, sorted by status. Pending reviews bubble to the top so managers know exactly where the bottleneck is.",
+                alt: "Nami performance reviews screen: standard and upward 360° reviews grouped per cycle, with pending reviews surfaced at the top of the list.",
               },
               {
                 slug: "04-cycles",
                 title: "Quarterly cycles without the spreadsheet.",
                 blurb: "Q1 completed, Q2 mid-flight. Self- and manager-completion bars on every cycle row tell you what's done and what's still waiting on someone.",
+                alt: "Nami review-cycles screen: Q1 cycle completed, Q2 mid-flight, with self- and manager-completion progress bars on every cycle row.",
               },
               {
                 slug: "05-audit",
                 title: "Every sensitive change, on the record.",
                 blurb: "Read-only history of calibrations, role changes, cycle launches, grade releases. Filter by action, actor, or date range when you need to answer \"who changed what, and when?\"",
+                alt: "Nami audit log: read-only history of calibrations, role changes, cycle launches, and grade releases, filterable by action, actor, and date range.",
               },
             ].map((demo, i) => (
               <ScrollReveal key={demo.slug}>
@@ -576,7 +583,7 @@ export default async function Home() {
                       <source src={`/demo/${demo.slug}.mp4`} type="video/mp4" />
                       <source src={`/demo/${demo.slug}.webm`} type="video/webm" />
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={`/demo/${demo.slug}.gif`} alt={`${demo.title} walk-through`} />
+                      <img src={`/demo/${demo.slug}.gif`} alt={demo.alt} />
                     </video>
                   </figure>
                   {/* Caption — 5/12 width on lg */}

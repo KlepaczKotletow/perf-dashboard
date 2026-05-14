@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
   LayoutDashboard,
@@ -27,6 +28,13 @@ import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
 import { RoleWatcher } from "./role-watcher";
 import { WidgetErrorBoundary } from "@/components/widget-error-boundary";
+
+// Belt-and-braces: robots.txt already Disallows /dashboard/, but a noindex
+// directive on the response is the only way to keep an externally-linked
+// dashboard URL out of the index.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true },
+};
 
 interface NavSection {
   label: string;

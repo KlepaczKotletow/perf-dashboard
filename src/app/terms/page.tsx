@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
@@ -20,11 +22,25 @@ export const metadata: Metadata = {
   },
 };
 
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+    { "@type": "ListItem", position: 2, name: "Terms of Service", item: `${SITE_URL}/terms` },
+  ],
+};
+
 export default function TermsPage() {
   const effectiveDate = "March 27, 2026";
 
   return (
     <div className="min-h-screen bg-background py-16">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <div className="max-w-3xl mx-auto px-6">
         <div className="mb-6">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">

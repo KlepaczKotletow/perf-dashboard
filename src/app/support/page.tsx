@@ -4,6 +4,8 @@ import { MessageSquare, Book, Mail, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+
 export const metadata: Metadata = {
   title: "Support",
   description:
@@ -23,9 +25,82 @@ export const metadata: Metadata = {
   },
 };
 
+const breadcrumbJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
+    { "@type": "ListItem", position: 2, name: "Support", item: `${SITE_URL}/support` },
+  ],
+};
+
+// Mirrors the visible FAQ below so AI search engines and Google can surface
+// these answers directly in SERPs.
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How do I start a 360 review?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Nami bot will message you directly in Slack when a review cycle begins. Follow the guided conversation to rate competencies and answer questions. You can also check your pending reviews in the Nami app Home Tab.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can feedback be anonymous?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Yes. When giving feedback you can choose to make it anonymous. The recipient will see the feedback but not who sent it.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Who can see the feedback and reviews?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "By default, managers and admins can see all feedback. Regular employees can only see feedback they have received or given. You can customise these permissions in your workspace settings.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How do I access the dashboard?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Click 'Sign in with Slack' on our homepage. You'll be authenticated through your Slack account and redirected to your workspace dashboard.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can I create custom review templates?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text:
+          "Yes. Managers and admins can create custom templates with different questions, rating scales, and required fields. Go to Templates in your dashboard to create and manage templates.",
+      },
+    },
+  ],
+};
+
 export default function SupportPage() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-16">
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+      />
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-50 mb-4">
