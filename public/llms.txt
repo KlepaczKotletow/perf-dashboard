@@ -51,6 +51,7 @@ Nami replaces tools like Lattice, Leapsome, 15Five, and Culture Amp for teams wh
 - Privacy policy: https://namihr.com/privacy
 - Terms of service: https://namihr.com/terms
 - Sitemap: https://namihr.com/sitemap.xml
+- Full reference (more detail than this file): https://namihr.com/llms-full.txt
 
 ## Contact
 

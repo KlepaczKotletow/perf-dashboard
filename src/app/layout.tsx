@@ -6,7 +6,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const manrope = Manrope({
-  variable: "--font-geist-sans",
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+
+// Optional verification tokens — set in Vercel env to claim the property in
+// Search Console / Bing Webmaster. Empty strings are filtered out so we never
+// emit a hollow `<meta>` tag.
+const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined;
+const BING_SITE_VERIFICATION = process.env.BING_SITE_VERIFICATION?.trim() || undefined;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -49,6 +55,23 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Nami",
+  },
+  formatDetection: {
+    telephone: false,
+    email: false,
+    address: false,
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -75,6 +98,14 @@ export const metadata: Metadata = {
       "max-video-preview": -1,
     },
   },
+  ...(GOOGLE_SITE_VERIFICATION || BING_SITE_VERIFICATION
+    ? {
+        verification: {
+          ...(GOOGLE_SITE_VERIFICATION ? { google: GOOGLE_SITE_VERIFICATION } : {}),
+          ...(BING_SITE_VERIFICATION ? { other: { "msvalidate.01": BING_SITE_VERIFICATION } } : {}),
+        },
+      }
+    : {}),
   category: "Business Software",
 };
 
