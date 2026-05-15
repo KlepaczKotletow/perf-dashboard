@@ -12,16 +12,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ArrowLeft, ArrowRight, AlertTriangle, Loader2, Plus, X, Target, MessageSquare,
   CalendarIcon, ChevronDown, ChevronRight, Play, Search, Check, Bot, Sparkles,
   FileText,
@@ -215,16 +205,6 @@ export default function NewCyclePage() {
   // UI
   const [loading, setLoading] = useState<false | "draft" | "launch">(false);
   const [error, setError] = useState<string | null>(null);
-  // Missing-manager confirmation: when the admin clicks Launch and some enrolled
-  // employees have no manager set, we hold the launch and surface a confirmation
-  // dialog instead of a red error banner. The dialog lets them either go back
-  // and assign managers in Team Settings, or drop those employees from this
-  // cycle and launch with the rest.
-  const [missingMgrPrompt, setMissingMgrPrompt] = useState<{
-    ids: string[];
-    names: string[];
-    total: number;
-  } | null>(null);
 
   const supabase = createClient();
 
@@ -588,50 +568,34 @@ export default function NewCyclePage() {
   }
 
   // ── Launch Cycle ───────────────────────────────────────────────────────────
-  async function handleCreateAndLaunch(opts?: { enrollIds?: string[] }) {
-    // When called via the confirmation dialog, the admin has explicitly chosen
-    // to drop employees who have no manager. Use the filtered enrollIds for
-    // both the missing-mgr check (which becomes a no-op) and the actual enrolment.
-    const idsToEnroll = opts?.enrollIds ?? selectedPeopleIds;
-
+  async function handleCreateAndLaunch() {
     // Final validation
-    if (!name.trim() || !startDate || !endDate || idsToEnroll.length === 0) {
+    if (!name.trim() || !startDate || !endDate || selectedPeopleIds.length === 0) {
       setError("Please complete all required fields before launching");
       return;
     }
 
-    // Pre-launch: every enrolled employee needs a manager assigned (otherwise
-    // the manager_review phase opens but has no reviewer, and the cycle can't
-    // complete). Match the server-side 23514 guard in launch_cycle RPC.
-    // We don't block on this — instead we surface a confirmation dialog so the
-    // admin can either go back to Team Settings or proceed by dropping those
-    // employees from the cycle.
-    const missingMgr = users
-      .filter((u) => idsToEnroll.includes(u.id) && !u.manager_id);
-    if (missingMgr.length > 0) {
-      const names = missingMgr.map((u) => u.slack_name || u.slack_email || "Someone");
-      setMissingMgrPrompt({
-        ids: missingMgr.map((u) => u.id),
-        names,
-        total: missingMgr.length,
-      });
-      return;
-    }
+    // Employees without a manager are NOT excluded. Their standard assignment
+    // is created with manager_id=NULL — they still submit self-review, give
+    // peer reviews, and receive peer reviews. The manager-review portion of
+    // their assignment simply has no reviewer (no one will fill it in), which
+    // is the expected outcome for org-top roles (founders, CEOs) or new hires
+    // whose reporting line isn't set yet. The server-side launch_cycle RPC
+    // accepts NULL manager_id; see migration 20260515_01.
 
     setLoading("launch");
     setError(null);
-    setMissingMgrPrompt(null);
     try {
       const { cycleId } = await createCycleBase("active");
 
       // Enroll employees
       await supabase.from("performance_cycle_employees").insert(
-        idsToEnroll.map((id) => ({ performance_cycle_id: cycleId, employee_id: id, status: "pending" }))
+        selectedPeopleIds.map((id) => ({ performance_cycle_id: cycleId, employee_id: id, status: "pending" }))
       );
 
       // Build assignments
-      const enrolledIds = new Set(idsToEnroll);
-      const enrolledUsers = users.filter((u) => idsToEnroll.includes(u.id));
+      const enrolledIds = new Set(selectedPeopleIds);
+      const enrolledUsers = users.filter((u) => selectedPeopleIds.includes(u.id));
 
       // Check if assignments already exist (idempotent — handles retry after partial launch)
       const { data: existingAssignments } = await supabase
@@ -1409,7 +1373,7 @@ export default function NewCyclePage() {
               Next <ArrowRight className="h-4 w-4 ml-1.5" />
             </Button>
           ) : (
-            <Button onClick={() => handleCreateAndLaunch()} disabled={!!loading}>
+            <Button onClick={handleCreateAndLaunch} disabled={!!loading}>
               {loading === "launch"
                 ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 : <Play className="h-4 w-4 mr-2" />}
@@ -1418,67 +1382,6 @@ export default function NewCyclePage() {
           )}
         </div>
       </div>
-
-      {/* Missing-manager confirmation: opens when the admin clicks Launch and
-          at least one enrolled employee has no manager. The DB constraint
-          (23514) would reject the launch_cycle RPC; rather than surface that
-          as a red error, we ask the admin to drop those employees from the
-          cycle or pause and assign managers in Team Settings first. */}
-      <AlertDialog
-        open={!!missingMgrPrompt}
-        onOpenChange={(open) => { if (!open) setMissingMgrPrompt(null); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {(missingMgrPrompt?.total ?? 0) === 1
-                ? "1 employee has no manager set"
-                : `${missingMgrPrompt?.total ?? 0} employees have no manager set`}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  Manager reviews can&apos;t be created for employees without a manager.
-                  You can either set their managers in Team Settings first, or launch the
-                  cycle without them.
-                </p>
-                {missingMgrPrompt && missingMgrPrompt.names.length > 0 && (
-                  <div className="rounded-md bg-muted/50 px-3 py-2 text-sm">
-                    <p className="font-medium text-foreground mb-1">No manager set</p>
-                    <p className="text-muted-foreground">
-                      {missingMgrPrompt.names.slice(0, 8).join(", ")}
-                      {missingMgrPrompt.names.length > 8 && ` + ${missingMgrPrompt.names.length - 8} more`}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={!!loading}>Go back & assign managers</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={
-                !!loading ||
-                !missingMgrPrompt ||
-                // Would-leave-zero-people guard. The wizard already enforces
-                // "at least one employee" earlier, but dropping all of them
-                // here would silently re-trigger that error.
-                selectedPeopleIds.filter((id) => !new Set(missingMgrPrompt.ids).has(id)).length === 0
-              }
-              onClick={() => {
-                if (!missingMgrPrompt) return;
-                const drop = new Set(missingMgrPrompt.ids);
-                const remaining = selectedPeopleIds.filter((id) => !drop.has(id));
-                setMissingMgrPrompt(null);
-                void handleCreateAndLaunch({ enrollIds: remaining });
-              }}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Launch without them
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

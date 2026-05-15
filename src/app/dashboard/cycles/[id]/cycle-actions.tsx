@@ -163,19 +163,12 @@ export function CycleActions({ cycle, employeeCount, submittedCount, pendingMana
         }
       }
 
-      // 2c. Pre-check: manager_review phase needs every enrolled employee to
-      //    have a manager_id. The launch_cycle RPC will enforce this at the DB
-      //    level (23514) but catching it here lets us show a better message
-      //    with specific names and avoids a round-trip.
-      const missingMgr = usersTyped.filter((u) => !u.manager_id);
-      if (missingMgr.length > 0) {
-        const names = missingMgr.slice(0, 5).map((u) => u.slack_name || "someone").join(", ");
-        const tail = missingMgr.length > 5 ? ` and ${missingMgr.length - 5} more` : "";
-        throw new Error(
-          `Can't launch: ${missingMgr.length} employee(s) have no manager — ${names}${tail}. ` +
-          `Set their managers in Team Settings first, or remove them from the cycle.`
-        );
-      }
+      // Employees without a manager are NOT excluded from the cycle. Their
+      // standard assignment is created with manager_id=NULL so they still do
+      // self-review and peer-review and receive peer/upward feedback. The
+      // manager-review portion of their assignment simply has no reviewer.
+      // Server-side launch_cycle RPC accepts NULL manager_id; see migration
+      // 20260515_01_launch_cycle_allow_no_manager.
 
       // 3. Build all assignments in memory first — so if anything is wrong with the
       //    data we catch it before touching the DB. Delete old rows only after we
