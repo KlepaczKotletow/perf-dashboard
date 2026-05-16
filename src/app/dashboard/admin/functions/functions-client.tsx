@@ -765,7 +765,7 @@ export function FunctionsClient({
   // ── Render ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-4rem)] -m-6">
+    <div className="max-w-6xl mx-auto flex min-h-[calc(100vh-8rem)] rounded-lg border border-border/60 overflow-hidden">
       {/* ── Left Sidebar ──────────────────────────────────────────────── */}
       <div className="w-56 shrink-0 border-r border-border/60 bg-muted/20 flex flex-col">
         {/* Sidebar header */}

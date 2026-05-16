@@ -877,7 +877,7 @@ export default async function AnalyticsPage({
     : "Performance insights across your workspace";
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="manage"
         title="Analytics"

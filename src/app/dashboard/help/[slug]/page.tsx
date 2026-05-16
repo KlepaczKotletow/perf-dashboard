@@ -34,7 +34,7 @@ export default async function HelpArticlePage({
   });
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1 text-xs text-muted-foreground/60 mb-6">
         <span>Help Center</span>
