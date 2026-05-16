@@ -197,7 +197,7 @@ export default async function DashboardLayout({
                   <p className="font-medium text-amber-900 dark:text-amber-100">Slack connection expired</p>
                   <p className="text-xs text-amber-800 dark:text-amber-200/80 mt-0.5">
                     Nami can&apos;t send messages to your team until an admin reinstalls.{" "}
-                    <a href="/setup" className="underline font-medium">Reinstall now &rarr;</a>
+                    <a href="/reinstall" className="underline font-medium">Reinstall now &rarr;</a>
                   </p>
                 </div>
               </div>
