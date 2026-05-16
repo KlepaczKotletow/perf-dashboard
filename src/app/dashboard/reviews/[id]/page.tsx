@@ -215,7 +215,7 @@ export default async function ReviewDetailPage({
       : "Back to reviews";
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Back link sits above the page header so the header itself stays clean */}
       <Link
         href={backHref}

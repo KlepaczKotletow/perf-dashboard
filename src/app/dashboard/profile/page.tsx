@@ -74,7 +74,7 @@ export default async function ProfilePage() {
   ];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="my-work"
         title="Profile"

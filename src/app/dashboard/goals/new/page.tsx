@@ -190,7 +190,7 @@ export default function NewGoalPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
         hat="my-work"
         title="New goal"

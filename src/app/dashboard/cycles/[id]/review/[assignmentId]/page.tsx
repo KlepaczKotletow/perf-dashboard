@@ -688,7 +688,7 @@ export default function ReviewFormPage({
     reviewerRole === "upward" ? "Upward feedback" : "Peer review";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5 pb-10">
+    <div className="max-w-6xl mx-auto space-y-5 pb-10">
 
       {/* ── Page header ──────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 pt-1">

@@ -147,7 +147,7 @@ export default function NewTemplatePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       <PageHeader
         hat="manage"
         title="New template"
