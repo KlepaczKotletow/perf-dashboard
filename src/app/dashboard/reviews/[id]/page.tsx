@@ -194,61 +194,43 @@ export default async function ReviewDetailPage({
   const manager = assignment.manager as unknown as ManagerJoin | null;
   const statusCfg = getAssignmentStatus(assignment.status);
 
+  const familyName = level
+    ? (Array.isArray(level.job_family) ? level.job_family[0]?.name : level.job_family?.name)
+    : null;
+  const levelLabel = level
+    ? `${familyName ? `${familyName} · ` : ""}${level.name}${level.grade ? ` (${level.grade})` : ""}`
+    : null;
+  const showDepartment = employee?.department && employee.department !== familyName;
+  const backHref =
+    from === "cycle" && cycleId
+      ? `/dashboard/cycles/${cycleId}`
+      : isAssignmentEmployee
+      ? "/dashboard/performance"
+      : "/dashboard/reviews";
+  const backLabel =
+    from === "cycle" && cycleId
+      ? "Back to cycle"
+      : isAssignmentEmployee
+      ? "Back to Performance"
+      : "Back to reviews";
+
   return (
     <div className="space-y-6">
+      {/* Back link sits above the page header so the header itself stays clean */}
+      <Link
+        href={backHref}
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {backLabel}
+      </Link>
+
       <PageHeader
         hat="my-team"
         title={employee?.slack_name || "Unknown employee"}
         subtitle={cycle?.name}
-      />
-      {/* Back + header */}
-      <div>
-        <Link
-          href={
-            from === "cycle" && cycleId
-              ? `/dashboard/cycles/${cycleId}`
-              : isAssignmentEmployee
-              ? "/dashboard/performance"
-              : "/dashboard/reviews"
-          }
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          {from === "cycle" && cycleId
-            ? "Back to cycle"
-            : isAssignmentEmployee
-            ? "Back to Performance"
-            : "Back to reviews"}
-        </Link>
-
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {employee?.slack_name || "Unknown employee"}
-            </h2>
-            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-              {level && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Layers className="h-3 w-3" />
-                  {(Array.isArray(level.job_family) ? level.job_family[0]?.name : level.job_family?.name)} · {level.name}
-                  {level.grade && ` (${level.grade})`}
-                </span>
-              )}
-              {employee?.department && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <User2 className="h-3 w-3" />
-                  {employee.department}
-                </span>
-              )}
-              {cycle && (
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  {cycle.name}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
+        actions={
+          <div className="flex items-center gap-2">
             <Badge className={`text-xs font-medium ${statusCfg.badge}`}>
               {statusCfg.label}
             </Badge>
@@ -258,23 +240,38 @@ export default async function ReviewDetailPage({
               </Badge>
             )}
           </div>
-        </div>
+        }
+      />
 
-        {/* Meta strip */}
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground border-t border-border/60 pt-3">
-          <span>Reviewer: <span className="font-medium text-foreground">{manager?.slack_name || "—"}</span></span>
-          {cycle?.start_date && (
-            <span>
-              Cycle: {format(new Date(cycle.start_date), "MMM d")}
-              {cycle.end_date && ` → ${format(new Date(cycle.end_date), "MMM d, yyyy")}`}
-            </span>
-          )}
-          {!levelId && competencyRatings.length === 0 && (
-            <span className="text-muted-foreground">
-              No competencies configured for this cycle
-            </span>
-          )}
-        </div>
+      {/* One-row meta: function · reviewer · cycle dates. Sits just below the
+          PageHeader so the cycle name in the subtitle isn't repeated below. */}
+      <div className="-mt-2 flex items-center gap-x-4 gap-y-1 text-xs text-muted-foreground flex-wrap">
+        {levelLabel && (
+          <span className="flex items-center gap-1">
+            <Layers className="h-3 w-3" />
+            {levelLabel}
+          </span>
+        )}
+        {showDepartment && (
+          <span className="flex items-center gap-1">
+            <User2 className="h-3 w-3" />
+            {employee?.department}
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <User2 className="h-3 w-3" />
+          Reviewer: <span className="font-medium text-foreground">{manager?.slack_name || "—"}</span>
+        </span>
+        {cycle?.start_date && (
+          <span className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            {format(new Date(cycle.start_date), "MMM d")}
+            {cycle.end_date && ` → ${format(new Date(cycle.end_date), "MMM d, yyyy")}`}
+          </span>
+        )}
+        {!levelId && competencyRatings.length === 0 && (
+          <span>No competencies configured</span>
+        )}
       </div>
 
       {/* Overdue cycle warning */}
