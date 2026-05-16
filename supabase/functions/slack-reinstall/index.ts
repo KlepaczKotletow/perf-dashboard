@@ -16,8 +16,24 @@ const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "")
   .trim()
   .replace(/\/+$/, "");
 
-const SCOPES =
-  "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
+// Must be a superset of REQUIRED_BOT_SCOPES in slack-oauth/index.ts. That
+// validator runs after Slack grants the token and rejects the install if any
+// required scope is missing — so anything we forget here means a
+// missing_scopes error on the callback. Kept alphabetised so drift against
+// the validator list is obvious in a diff.
+const SCOPES = [
+  "app_mentions:read",
+  "channels:read",
+  "chat:write",
+  "commands",
+  "im:history",
+  "im:read",
+  "im:write",
+  "reactions:read",
+  "team:read",
+  "users:read",
+  "users:read.email",
+].join(",");
 const USER_SCOPES = "identity.basic,identity.email";
 
 Deno.serve(async (req: Request) => {
