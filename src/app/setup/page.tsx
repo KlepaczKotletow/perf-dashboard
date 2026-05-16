@@ -8,6 +8,7 @@ import { signSeatSync } from "@/lib/seat-sync";
 import { createServiceRoleClient, getUserWorkspace } from "@/lib/supabase-server";
 import { env } from "@/lib/env";
 import { isAdmin } from "@/lib/roles";
+import { SLACK_BOT_SCOPE_STRING, SLACK_USER_SCOPES } from "@/lib/slack-scopes";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
@@ -183,11 +184,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL.trim().replace(/\/+$/, '');
   const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  const scopes =
-    "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
-
   const oauthState = await signOAuthState({ purpose: "setup", setup_token: setupToken });
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${scopes}&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${SLACK_BOT_SCOPE_STRING}&user_scope=${SLACK_USER_SCOPES}&redirect_uri=${encodeURIComponent(
     slackRedirectUri
   )}&state=${encodeURIComponent(oauthState)}`;
 

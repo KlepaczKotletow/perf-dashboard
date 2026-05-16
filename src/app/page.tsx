@@ -9,6 +9,7 @@ import { MobileNav } from "@/components/landing/mobile-nav";
 import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { FeatureTabs } from "@/components/landing/feature-tabs";
 import { signOAuthState } from "@/lib/oauth-state";
+import { SLACK_BOT_SCOPE_STRING, SLACK_USER_SCOPES } from "@/lib/slack-scopes";
 
 // signOAuthState produces a per-request token; never cache this page.
 export const dynamic = "force-dynamic";
@@ -143,7 +144,7 @@ export default async function Home() {
   const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
   // CSRF: HMAC-signed state, verified server-side in slack-oauth.
   const oauthState = await signOAuthState({ purpose: "landing" });
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email&user_scope=identity.basic,identity.email&redirect_uri=${encodeURIComponent(slackRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
+  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${SLACK_BOT_SCOPE_STRING}&user_scope=${SLACK_USER_SCOPES}&redirect_uri=${encodeURIComponent(slackRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
 
   return (
