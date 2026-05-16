@@ -223,17 +223,13 @@ export function ReviewDetailClient({
 
   return (
     <div className="space-y-6">
-      {/* Self-reviews are completed via Slack — explain why the form is read-only
-          for the employee viewing their own assignment. */}
+      {/* Self-reviews are completed via Slack — one-line read-only hint. */}
       {!canEdit && reviewerRole === "self" && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/30 p-3 flex items-start gap-3">
-          <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium text-foreground">Complete your self-review in Slack</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Self-reviews happen as a guided chat with <span className="font-medium">Nami</span> in your Slack DMs. This page is read-only — open Slack and reply to Nami&apos;s message to fill it out.
-            </p>
-          </div>
+        <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/30 px-3 py-2 flex items-center gap-2 text-xs">
+          <Info className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
+          <span className="text-foreground">
+            Self-reviews happen in Slack — reply to <span className="font-medium">Nami</span>&apos;s DM to fill this out.
+          </span>
         </div>
       )}
 
@@ -299,43 +295,68 @@ export function ReviewDetailClient({
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 space-y-3">
-                    {/* Rating buttons 1-5 */}
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-2 font-medium uppercase tracking-wide">
-                        Rating
-                      </p>
-                      <div className="flex gap-1.5">
-                        {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
-                          <button
-                            key={v}
-                            disabled={!canEdit}
-                            onClick={() => setRating(comp.competencyId, rating === v ? null : v)}
-                            className={`flex-1 h-9 rounded-md text-xs font-semibold border transition-all ${
-                              rating === v
-                                ? (selectedRatingColors[v] || "bg-primary text-white border-primary")
-                                : `${ratingColors[v] || "bg-muted text-foreground border-border hover:bg-muted/80"} ${!canEdit ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`
-                            }`}
-                            title={`${v}${PROFICIENCY_LABELS[v] ? ` · ${PROFICIENCY_LABELS[v]}` : ""}`}
-                          >
-                            {v}
-                          </button>
-                        ))}
-                      </div>
-                      {rating !== null && (
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {rating} · {PROFICIENCY_LABELS[rating]}
-                          {comp.expectedLevel && rating < comp.expectedLevel && (
-                            <span className="text-amber-600 ml-1">— below expected</span>
-                          )}
-                          {comp.expectedLevel && rating === comp.expectedLevel && (
-                            <span className="text-primary ml-1">— meets expectation</span>
-                          )}
-                          {comp.expectedLevel && rating > comp.expectedLevel && (
-                            <span className="text-emerald-600 ml-1">— exceeds expectation</span>
-                          )}
+                    {/* Rating — full 1-5 picker when editable, quiet single chip when read-only */}
+                    {canEdit ? (
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-2 font-medium uppercase tracking-wide">
+                          Rating
                         </p>
-                      )}
-                    </div>
+                        <div className="flex gap-1.5">
+                          {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
+                            <button
+                              key={v}
+                              onClick={() => setRating(comp.competencyId, rating === v ? null : v)}
+                              className={`flex-1 h-9 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
+                                rating === v
+                                  ? (selectedRatingColors[v] || "bg-primary text-white border-primary")
+                                  : (ratingColors[v] || "bg-muted text-foreground border-border hover:bg-muted/80")
+                              }`}
+                              title={`${v}${PROFICIENCY_LABELS[v] ? ` · ${PROFICIENCY_LABELS[v]}` : ""}`}
+                            >
+                              {v}
+                            </button>
+                          ))}
+                        </div>
+                        {rating !== null && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {rating} · {PROFICIENCY_LABELS[rating]}
+                            {comp.expectedLevel && rating < comp.expectedLevel && (
+                              <span className="text-amber-600 ml-1">— below expected</span>
+                            )}
+                            {comp.expectedLevel && rating === comp.expectedLevel && (
+                              <span className="text-primary ml-1">— meets expectation</span>
+                            )}
+                            {comp.expectedLevel && rating > comp.expectedLevel && (
+                              <span className="text-emerald-600 ml-1">— exceeds expectation</span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    ) : rating === null ? (
+                      <p className="text-xs text-muted-foreground italic">Not yet rated</p>
+                    ) : (
+                      <div className="flex items-center gap-2 text-xs">
+                        <span
+                          className={`inline-flex items-center justify-center h-6 w-6 rounded-md text-xs font-semibold ${
+                            selectedRatingColors[rating] || "bg-primary text-white"
+                          }`}
+                        >
+                          {rating}
+                        </span>
+                        <span className="text-foreground font-medium">
+                          {PROFICIENCY_LABELS[rating]}
+                        </span>
+                        {comp.expectedLevel && rating < comp.expectedLevel && (
+                          <span className="text-amber-600 text-[11px]">— below expected</span>
+                        )}
+                        {comp.expectedLevel && rating === comp.expectedLevel && (
+                          <span className="text-primary text-[11px]">— meets expectation</span>
+                        )}
+                        {comp.expectedLevel && rating > comp.expectedLevel && (
+                          <span className="text-emerald-600 text-[11px]">— exceeds expectation</span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Comment */}
                     {canEdit && (
