@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { signOAuthState } from "@/lib/oauth-state";
 import {
   createServerSupabaseClient,
   getUserWorkspace,
@@ -8,7 +7,7 @@ import {
 import { env } from "@/lib/env";
 import { isAdmin } from "@/lib/roles";
 
-// signOAuthState produces a per-request token; never cache this page.
+// Per-request: must not be cached, must not be statically rendered.
 export const dynamic = "force-dynamic";
 
 // Reinstall flow for an existing workspace whose Slack tokens are gone
@@ -16,6 +15,13 @@ export const dynamic = "force-dynamic";
 // banner at src/app/dashboard/layout.tsx points here. /setup is the wrong
 // destination — that page is for the post-Stripe-checkout install and bounces
 // to /pricing when there is no session_id.
+//
+// The OAuth state itself is signed by the slack-reinstall Supabase edge
+// function (not here). Vercel and Supabase do not share the same
+// OAUTH_STATE_SECRET in this project, so signing on Vercel and verifying on
+// Supabase would fail with invalid_state — which is exactly what an earlier
+// version of this page did. Sign-and-verify both happen on Supabase to keep
+// the cross-side dependency at zero.
 export default async function ReinstallPage() {
   const workspace = await getUserWorkspace();
   if (!workspace?.workspaceId) {
@@ -46,10 +52,9 @@ export default async function ReinstallPage() {
     );
   }
 
-  // Pin the install to this workspace's Slack team so the admin doesn't have
-  // to pick from a dropdown (and can't accidentally install into the wrong
-  // workspace). slack-oauth upserts on team_id, so this also keeps tenant
-  // routing tight on the callback.
+  // Look up team_id (RLS-scoped to this admin's workspace) so slack-reinstall
+  // can pin the install to the right Slack workspace and the admin doesn't
+  // have to pick from a dropdown.
   const supabase = await createServerSupabaseClient();
   const { data: ws } = await supabase
     .from("workspaces")
@@ -59,23 +64,8 @@ export default async function ReinstallPage() {
   const teamId = ws?.team_id ?? null;
 
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL.trim().replace(/\/+$/, "");
-  const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
-  const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  // Match the scope list /setup uses for new installs. The slack-oauth
-  // callback validates a superset and will surface any missing-scope error
-  // at install time.
-  const scopes =
-    "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
-
-  const oauthState = await signOAuthState({ purpose: "reinstall" });
-  const params = new URLSearchParams({
-    client_id: slackClientId,
-    scope: scopes,
-    user_scope: "identity.basic,identity.email",
-    redirect_uri: slackRedirectUri,
-    state: oauthState,
-  });
-  if (teamId) params.set("team", teamId);
-
-  redirect(`https://slack.com/oauth/v2/authorize?${params.toString()}`);
+  const target = teamId
+    ? `${supabaseUrl}/functions/v1/slack-reinstall?team=${encodeURIComponent(teamId)}`
+    : `${supabaseUrl}/functions/v1/slack-reinstall`;
+  redirect(target);
 }
