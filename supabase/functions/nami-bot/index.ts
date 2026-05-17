@@ -1633,26 +1633,34 @@ async function handleManualReminder(params: {
   targetUserId: string;
   role: "self" | "manager" | "upward";
   callerWorkspaceId: string;
-}): Promise<{ ok: boolean; sent?: boolean; error?: string; status?: number }> {
+}): Promise<{ ok: boolean; sent?: boolean; error?: string }> {
   const { cycleId, assignmentId, targetUserId, role, callerWorkspaceId } = params;
+  const tag = `[manual-reminder] cycle=${cycleId} assignment=${assignmentId} user=${targetUserId} role=${role}`;
+  console.log(`${tag} start`);
 
   // 1. Load cycle, scoped to caller's workspace
-  const { data: cycle } = await supabase
+  const { data: cycle, error: cycleErr } = await supabase
     .from("performance_cycles")
     .select("id, name, workspace_id")
     .eq("id", cycleId)
     .eq("workspace_id", callerWorkspaceId)
     .single();
-  if (!cycle) return { ok: false, error: "Cycle not found", status: 404 };
+  if (!cycle) {
+    console.warn(`${tag} cycle-not-found`, cycleErr?.message);
+    return { ok: false, error: "Cycle not found in your workspace" };
+  }
 
   // 2. Load the assignment, verify it belongs to this cycle
-  const { data: assignment } = await supabase
+  const { data: assignment, error: aErr } = await supabase
     .from("review_assignments")
     .select("id, cycle_id, status, assignment_type, employee_id, manager_id, reviewer_id")
     .eq("id", assignmentId)
     .eq("cycle_id", cycleId)
     .single();
-  if (!assignment) return { ok: false, error: "Assignment not found", status: 404 };
+  if (!assignment) {
+    console.warn(`${tag} assignment-not-found`, aErr?.message);
+    return { ok: false, error: "Review assignment not found for this cycle" };
+  }
 
   // 3. Cross-check role <-> user_id. Prevents an HR caller from re-targeting
   //    a manual reminder to someone unrelated to the assignment.
@@ -1661,7 +1669,8 @@ async function handleManualReminder(params: {
     role === "manager" ? assignment.manager_id :
     /* upward */ assignment.reviewer_id;
   if (expectedUserId !== targetUserId) {
-    return { ok: false, error: "User does not match the assignment role", status: 400 };
+    console.warn(`${tag} user-role-mismatch expected=${expectedUserId}`);
+    return { ok: false, error: "This user doesn't match the assignment's role" };
   }
 
   // 4. Don't send for already-completed work
@@ -1670,19 +1679,24 @@ async function handleManualReminder(params: {
     (role === "manager" && assignment.status === "completed") ||
     (role === "upward" && assignment.status === "completed")
   ) {
-    return { ok: false, error: "Review already submitted — nothing to remind about", status: 409 };
+    console.warn(`${tag} already-submitted status=${assignment.status}`);
+    return { ok: false, error: "Review already submitted — nothing to remind about" };
   }
 
   // 5. Load the target user (scoped to the same workspace)
-  const { data: target } = await supabase
+  const { data: target, error: tErr } = await supabase
     .from("users")
     .select("id, slack_user_id, slack_name, workspace_id")
     .eq("id", targetUserId)
     .eq("workspace_id", callerWorkspaceId)
     .single();
-  if (!target) return { ok: false, error: "Target user not in this workspace", status: 404 };
+  if (!target) {
+    console.warn(`${tag} target-not-found`, tErr?.message);
+    return { ok: false, error: "Target user not in your workspace" };
+  }
   if (!target.slack_user_id) {
-    return { ok: false, error: "User hasn't connected Slack — can't DM them", status: 422 };
+    console.warn(`${tag} target-no-slack-id`);
+    return { ok: false, error: "User hasn't connected Slack — can't DM them" };
   }
 
   // 6. Honor notification prefs (snooze / digest). Manual reminders are
@@ -1690,14 +1704,16 @@ async function handleManualReminder(params: {
   //    rather than overriding it.
   const allowed = await isAllowedByPrefs(target.id, "normal");
   if (!allowed) {
-    return { ok: false, error: "Recipient has notifications snoozed or in digest mode", status: 409 };
+    console.warn(`${tag} blocked-by-prefs`);
+    return { ok: false, error: "Recipient has notifications snoozed or in digest mode" };
   }
 
   // 7. Workspace Slack token
   const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
   const botToken = tokens?.botToken;
   if (!botToken) {
-    return { ok: false, error: "Slack workspace not connected", status: 503 };
+    console.warn(`${tag} no-bot-token workspace=${cycle.workspace_id}`);
+    return { ok: false, error: "Slack workspace isn't connected — reinstall Nami in Slack" };
   }
 
   // 8. Subject name for the reminder text
@@ -1764,7 +1780,8 @@ async function handleManualReminder(params: {
     referenceId,
   );
   if (!claimed) {
-    return { ok: false, error: "Could not record the reminder — try again", status: 500 };
+    console.warn(`${tag} log-claim-failed ref=${referenceId}`);
+    return { ok: false, error: "Could not record the reminder — try again" };
   }
 
   const sent = await sendSlackBlocks(
@@ -1775,10 +1792,12 @@ async function handleManualReminder(params: {
   );
 
   if (!sent) {
+    console.warn(`${tag} slack-send-failed slack_user_id=${target.slack_user_id}`);
     await rollbackNotification(cycle.workspace_id, target.id, eventType, referenceId);
-    return { ok: false, error: "Slack rejected the DM — they may have left the workspace", status: 502 };
+    return { ok: false, error: "Slack rejected the DM — they may have left the workspace" };
   }
 
+  console.log(`${tag} sent ref=${referenceId}`);
   return { ok: true, sent: true };
 }
 
@@ -2536,9 +2555,11 @@ Deno.serve(async (req) => {
         role: role as "self" | "manager" | "upward",
         callerWorkspaceId: callerWorkspaceId!,
       });
-      const status = result.ok ? 200 : (result.status ?? 400);
+      // Always 200 with { ok, error? } in the body so supabase-js exposes the
+      // exact reason. Auth/role rejections above still use 401/403 so a
+      // misconfigured caller can't masquerade as success.
       return new Response(JSON.stringify(result), {
-        status,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
