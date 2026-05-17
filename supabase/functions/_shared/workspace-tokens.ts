@@ -111,9 +111,38 @@ export async function refreshSlackToken(
     expires_in?: number;
   } | null;
   if (!data?.ok || !data.access_token) {
+    const slackError = data?.error ?? "unknown";
     console.error(
-      `[workspace-tokens] refresh rejected for ${workspaceId}: ${data?.error ?? "unknown"}`,
+      `[workspace-tokens] refresh rejected for ${workspaceId}: ${slackError}`,
     );
+    // Terminal refresh errors mean reinstall is the only fix. Flip the
+    // dashboard banner so the admin sees it instead of every DM silently
+    // failing. We don't fail this call's caller — they get null and decide
+    // how to surface it.
+    const isTerminal =
+      slackError === "invalid_auth" ||
+      slackError === "token_revoked" ||
+      slackError === "invalid_refresh_token" ||
+      slackError === "account_inactive";
+    if (isTerminal) {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/workspaces?id=eq.${workspaceId}`, {
+          method: "PATCH",
+          headers: {
+            apikey: SERVICE_ROLE,
+            Authorization: `Bearer ${SERVICE_ROLE}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            requires_reinstall: true,
+            requires_reinstall_at: new Date().toISOString(),
+          }),
+        });
+      } catch (flagErr) {
+        console.error(`[workspace-tokens] requires_reinstall flag write failed for ${workspaceId}:`, flagErr);
+      }
+    }
     return null;
   }
   const newExpiresAt = data.expires_in
