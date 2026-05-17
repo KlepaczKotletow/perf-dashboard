@@ -70,9 +70,31 @@ export function NamiStatusTable({ cycleId, rows, canSendManualReminder }: NamiSt
         },
       });
 
+      // Happy path: the function now always returns 200 with { ok, error? }
+      // for handled outcomes. data is the parsed body.
       const result = data as { ok?: boolean; error?: string } | null;
+
+      // If supabase-js wrapped a non-2xx response, the body lives on
+      // error.context (a Response). Surface the real reason from there
+      // before falling back to the generic supabase-js message.
+      let httpErrorMessage: string | undefined;
+      if (error && (error as { context?: Response }).context) {
+        try {
+          const ctx = (error as { context: Response }).context;
+          const body = await ctx.clone().json().catch(() => null);
+          if (body && typeof body.error === "string") {
+            httpErrorMessage = body.error;
+          }
+        } catch {
+          /* ignore — fall through to generic message */
+        }
+      }
+
       if (error || !result?.ok) {
-        const message = result?.error || (error?.message ?? "Couldn't send reminder");
+        const message =
+          result?.error ||
+          httpErrorMessage ||
+          (error?.message ?? "Couldn't send reminder");
         setRowStates((s) => ({ ...s, [key]: { kind: "error", message } }));
         return;
       }
