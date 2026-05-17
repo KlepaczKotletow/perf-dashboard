@@ -1734,15 +1734,31 @@ async function handleManualReminder(params: {
     subjectName = subject?.slack_name ?? null;
   }
 
-  // 9. Phase-aware deadline (same resolver the cron uses)
-  let daysLeft = 999;
+  // 9. Resolve a deadline so the DM copy can be specific. Try, in order:
+  //      a. The cron's phase-aware resolver (respects the workspace flag).
+  //      b. cycle.review_deadline (might be null on this cycle).
+  //      c. cycle.end_date as last resort — for manual reminders only,
+  //         since HR explicitly asked for this send.
+  //    If all three are null, daysLeft stays null and the message says
+  //    "still pending" rather than leaking a placeholder number (the old
+  //    "due in 999 days" bug).
+  let daysLeft: number | null = null;
   try {
-    const deadlineDate = await getDeadlineForCycle(supabase, cycleId, cycle.workspace_id);
+    let deadlineDate = await getDeadlineForCycle(supabase, cycleId, cycle.workspace_id);
+    if (!deadlineDate) {
+      const { data: cycleDates } = await supabase
+        .from("performance_cycles")
+        .select("review_deadline, end_date")
+        .eq("id", cycleId)
+        .single();
+      const fallback = cycleDates?.review_deadline || cycleDates?.end_date;
+      if (fallback) deadlineDate = new Date(fallback);
+    }
     if (deadlineDate) {
       daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     }
   } catch (err) {
-    console.warn("[handleManualReminder] deadline lookup failed; falling back to generic copy:", err);
+    console.warn(`${tag} deadline-lookup-failed; using deadline-less copy:`, err);
   }
 
   const itemName =
@@ -1763,9 +1779,10 @@ async function handleManualReminder(params: {
     actionValue,
     "nami_start_review",
   );
-  const fallbackText = `Reminder: ${itemName} — ${
-    daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`
-  }`;
+  const fallbackText =
+    daysLeft === null
+      ? `Reminder: ${itemName} is still pending`
+      : `Reminder: ${itemName} — ${daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`}`;
 
   // 11. Log + send. Use a unique reference_id per click (no cooldown by design)
   //     and a dedicated event_type so this never collides with cron's tiered
