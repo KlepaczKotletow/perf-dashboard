@@ -2375,14 +2375,61 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        // Check if already submitted (via web or Slack)
+        // Check if already submitted (via web or Slack).
+        //
+        // HR may send multiple reminders for the same review (cron escalation
+        // + manual /Remind nudges). Each lands as a separate DM with its own
+        // "Let's do it" button. Once the review is done, every remaining DM
+        // still LOOKS clickable. Without this branch, clicking a stale one
+        // would re-open the modal, the user would fill it again, and the
+        // submit handler would slap them with "already submitted" — bad UX.
+        //
+        // Best UX: rewrite the clicked DM in place via response_url to
+        // replace the button with a clean "✅ Done" state. Each stale DM
+        // cleans itself up on touch.
         const safeRoleFilter = encodeURIComponent(reviewRole);
         const existingResp = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeUserId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (existingResp && existingResp.length > 0 && !existingResp.error) {
-          await slackApi(botToken, "chat.postMessage", {
-            channel: slackUserId,
-            text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
-          });
+          const employeeName = (assignment as any)?.performance_cycles?.name
+            ? `for *${(assignment as any).performance_cycles.name}*`
+            : "";
+          const doneBlocks = [
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `:white_check_mark: *Review already submitted* ${employeeName}\n_You can view or edit it on the dashboard._`,
+              },
+            },
+          ];
+          if (responseUrlForRecovery) {
+            // Rewrite the clicked DM in place — the stale button is gone,
+            // user sees a clean "done" state.
+            try {
+              await fetch(responseUrlForRecovery, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  replace_original: true,
+                  text: ":white_check_mark: Review already submitted",
+                  blocks: doneBlocks,
+                }),
+              });
+            } catch (e) {
+              console.error("[nami_start_review] response_url update failed", e);
+              // Fall back to a DM so the user still gets feedback
+              await slackApi(botToken, "chat.postMessage", {
+                channel: slackUserId,
+                text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
+              });
+            }
+          } else {
+            // No response_url (e.g. App Home click) — fall back to a DM.
+            await slackApi(botToken, "chat.postMessage", {
+              channel: slackUserId,
+              text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
+            });
+          }
           return json({});
         }
 
