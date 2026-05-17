@@ -14,6 +14,9 @@ if (!DASHBOARD_URL) {
 }
 
 Deno.serve(async (req) => {
+  // Captured before any throw could happen so the outer catch can surface
+  // a user-visible "something went wrong" instead of silent silence.
+  let responseUrlForRecovery: string | undefined;
   try {
     const body = await req.text();
 
@@ -68,6 +71,13 @@ Deno.serve(async (req) => {
     const payloadStr = p.get("payload");
     if (!payloadStr) return new Response("No payload", { status: 400 });
     const payload = JSON.parse(payloadStr);
+
+    // Stash response_url early so the outer catch can apologise to the user
+    // if anything below throws. block_actions and view_submission payloads
+    // both carry response_url for the channel the user interacted in.
+    if (typeof payload?.response_url === "string") {
+      responseUrlForRecovery = payload.response_url;
+    }
 
     // ----------------------------------------------------------------
     // DB helpers
@@ -1037,10 +1047,24 @@ Deno.serve(async (req) => {
                   blocks: tqBlocks,
                 });
               } else {
-                // Show summary
+                // Show summary. Signature is
+                // buildReviewSummary(empName, compNames[], ratings[],
+                //                    textQuestions[], textResponses[],
+                //                    convId, ratingScale?). The previous
+                // call passed compIds and ratings (object) into the wrong
+                // slots — .map() on a ratings object would throw at runtime
+                // and silently kill the comment-submit flow.
                 const { buildReviewSummary } = await import("../_shared/nami-blocks.ts");
-                const namiScaleMax = convRatingScale?.max || 5;
-                const summaryBlocks = buildReviewSummary(conv.employee_name, compIds, compNames, ratings, safeConvId, conv.assignment_id, namiScaleMax);
+                const ratingValues: number[] = compIds.map((id: string) => (ratings as Record<string, { rating?: number }>)[id]?.rating ?? 0);
+                const summaryBlocks = buildReviewSummary(
+                  conv.employee_name,
+                  compNames,
+                  ratingValues,
+                  [],
+                  [],
+                  safeConvId,
+                  convRatingScale,
+                );
                 await slackApi(botToken, "chat.postMessage", {
                   channel: payload.user.id,
                   text: `Review summary for ${conv.employee_name}`,
@@ -1587,8 +1611,57 @@ Deno.serve(async (req) => {
           await sendManagerContext(payload.user.id, assignment.employee_id, assignment.cycle_id);
         }
 
-        const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
-        await slackApi(botToken, "views.open", { trigger_id: payload.trigger_id, view });
+        // Placeholder-then-update pattern: trigger_id only lasts 3s, and
+        // buildReviewForm + sendManagerContext above can easily eat that.
+        const placeholderView = {
+          type: "modal" as const,
+          callback_id: "review_loading_placeholder",
+          title: { type: "plain_text" as const, text: "Loading…" },
+          close: { type: "plain_text" as const, text: "Close" },
+          blocks: [{ type: "section", text: { type: "mrkdwn", text: "_Loading your review…_" } }],
+        };
+        const openResult = await slackApi(botToken, "views.open", {
+          trigger_id: payload.trigger_id,
+          view: placeholderView,
+        });
+        if (!openResult?.ok) {
+          console.warn(`[open_cycle_review] placeholder views.open failed (${openResult?.error ?? "unknown"})`);
+          const reviewUrl = await buildAuthedDashboardUrl(
+            SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL!, user.id,
+            `/dashboard/reviews/${safeAssignmentId}`,
+          );
+          await slackApi(botToken, "chat.postEphemeral", {
+            channel: payload.channel?.id || payload.user.id,
+            user: payload.user.id,
+            text: "Couldn't open the review modal here.",
+            blocks: [
+              { type: "section", text: { type: "mrkdwn", text: `Couldn't open the review modal. <${reviewUrl}|Open it on the dashboard>.` } },
+            ],
+          });
+          return json({});
+        }
+        const viewId = openResult.view?.id;
+        try {
+          const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
+          const updRes = await slackApi(botToken, "views.update", { view_id: viewId, view });
+          if (!updRes?.ok) throw new Error(`views.update failed: ${updRes?.error}`);
+        } catch (e: any) {
+          console.error(`[open_cycle_review] form build/update failed:`, e?.message ?? e);
+          const reviewUrl = await buildAuthedDashboardUrl(
+            SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DASHBOARD_URL!, user.id,
+            `/dashboard/reviews/${safeAssignmentId}`,
+          );
+          await slackApi(botToken, "views.update", {
+            view_id: viewId,
+            view: {
+              type: "modal",
+              callback_id: "review_load_failed",
+              title: { type: "plain_text", text: "Couldn't load" },
+              close: { type: "plain_text", text: "Close" },
+              blocks: [{ type: "section", text: { type: "mrkdwn", text: `Couldn't load this review in Slack. <${reviewUrl}|Open it on the dashboard> to continue.` } }],
+            },
+          });
+        }
       }
 
       // -- Remind me later --
@@ -2031,7 +2104,19 @@ Deno.serve(async (req) => {
           ],
         };
 
-        await slackApi(botToken, "views.open", { trigger_id: payload.trigger_id, view });
+        const openSurveyResult = await slackApi(botToken, "views.open", { trigger_id: payload.trigger_id, view });
+        if (!openSurveyResult?.ok) {
+          // Surveys don't have a direct dashboard deeplink the same way reviews do,
+          // so fall back to an ephemeral so the user isn't left with silence.
+          console.warn(`[open_survey_modal] views.open failed (${openSurveyResult?.error ?? "unknown"})`);
+          await slackApi(botToken, "chat.postEphemeral", {
+            channel: payload.channel?.id || payload.user.id,
+            user: payload.user.id,
+            text: openSurveyResult?.error === "expired_trigger_id"
+              ? "The button took a moment too long — please click it again."
+              : "Couldn't open the survey here. Please try again.",
+          });
+        }
         return json({});
       }
 
@@ -2149,26 +2234,39 @@ Deno.serve(async (req) => {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
         }
 
-        // Open review as a Slack modal (prevents duplicate clicks, cleaner UX).
-        // If Slack rejects the modal (most often trigger_id_expired because the
-        // user clicked an older DM, or a transient API error), fall back to
-        // posting a deeplink so the user is never left with silent silence.
-        const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
+        // Slack trigger_id expires in 3 seconds. Heavy DB work in
+        // buildReviewForm (cycle_questions, level_competencies, competencies,
+        // levels lookups) can blow that budget under load. Open a placeholder
+        // modal IMMEDIATELY so the trigger is consumed cleanly, then use
+        // views.update to render the real form when we have it. This is
+        // Slack's recommended pattern for slow modals.
+        const placeholderView = {
+          type: "modal" as const,
+          callback_id: "review_loading_placeholder",
+          title: { type: "plain_text" as const, text: "Loading…" },
+          close: { type: "plain_text" as const, text: "Close" },
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: "_Loading your review…_" } },
+          ],
+        };
         const openResult = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
-          view,
+          view: placeholderView,
         });
+
         if (!openResult?.ok) {
-          console.warn(`[nami_start_review] views.open failed (${openResult?.error ?? "unknown"}); sending dashboard fallback DM to ${slackUserId} for assignment ${safeAssignmentId}`);
+          // The trigger itself was rejected — fall back to a DM with a deeplink.
+          console.warn(`[nami_start_review] placeholder views.open failed (${openResult?.error ?? "unknown"}); sending dashboard fallback DM to ${slackUserId} for assignment ${safeAssignmentId}`);
           const reviewUrl = await buildAuthedDashboardUrl(
+            SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY,
             DASHBOARD_URL!,
-            wsId,
-            slackUserId,
+            user.id,
             `/dashboard/reviews/${safeAssignmentId}`,
           );
           const friendly =
             openResult?.error === "expired_trigger_id"
-              ? "The button took too long to respond. Open your review on the dashboard instead:"
+              ? "The button took a moment too long. Open your review on the dashboard instead:"
               : openResult?.error === "trigger_id_already_used"
                 ? "Looks like you've already opened this review elsewhere. You can continue on the dashboard:"
                 : "Couldn't open the review modal in Slack. Open it on the dashboard:";
@@ -2182,6 +2280,64 @@ Deno.serve(async (req) => {
               },
             ],
           });
+          return json({});
+        }
+
+        // Placeholder is open. Build the real form and swap it in.
+        const viewId = openResult.view?.id;
+        try {
+          const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
+          const updateResult = await slackApi(botToken, "views.update", { view_id: viewId, view });
+          if (!updateResult?.ok) {
+            // Update failed after placeholder showed — swap to a deeplink view.
+            console.warn(`[nami_start_review] views.update failed (${updateResult?.error ?? "unknown"}) for assignment ${safeAssignmentId}`);
+            const reviewUrl = await buildAuthedDashboardUrl(
+              SUPABASE_URL,
+              SUPABASE_SERVICE_ROLE_KEY,
+              DASHBOARD_URL!,
+              user.id,
+              `/dashboard/reviews/${safeAssignmentId}`,
+            );
+            await slackApi(botToken, "views.update", {
+              view_id: viewId,
+              view: {
+                type: "modal",
+                callback_id: "review_load_failed",
+                title: { type: "plain_text", text: "Couldn't load" },
+                close: { type: "plain_text", text: "Close" },
+                blocks: [
+                  { type: "section", text: { type: "mrkdwn", text: `We couldn't load this review in Slack right now. <${reviewUrl}|Open it on the dashboard> to continue.` } },
+                ],
+              },
+            });
+          }
+        } catch (buildErr: any) {
+          console.error(`[nami_start_review] buildReviewForm or update threw:`, buildErr?.message ?? buildErr);
+          // Best-effort swap to a deeplink view so the modal isn't stuck on "Loading…"
+          try {
+            const reviewUrl = await buildAuthedDashboardUrl(
+              SUPABASE_URL,
+              SUPABASE_SERVICE_ROLE_KEY,
+              DASHBOARD_URL!,
+              user.id,
+              `/dashboard/reviews/${safeAssignmentId}`,
+            );
+            await slackApi(botToken, "views.update", {
+              view_id: viewId,
+              view: {
+                type: "modal",
+                callback_id: "review_load_failed",
+                title: { type: "plain_text", text: "Couldn't load" },
+                close: { type: "plain_text", text: "Close" },
+                blocks: [
+                  { type: "section", text: { type: "mrkdwn", text: `We couldn't load this review in Slack. <${reviewUrl}|Open it on the dashboard> to continue.` } },
+                ],
+              },
+            });
+          } catch {
+            // If even the recovery update fails, the user sees the spinner
+            // but the outer catch will still log the original error.
+          }
         }
         return json({});
       }
@@ -2226,19 +2382,28 @@ Deno.serve(async (req) => {
           status: "pending", overall_rating: null, updated_at: new Date().toISOString(),
         });
 
-        // Re-open the review modal. Same fallback as nami_start_review:
-        // if Slack rejects (expired trigger_id, etc.) we DM a dashboard link.
-        const view = await buildReviewForm(safeAssignmentId, reviewRole || "manager", employeeId, wsId);
+        // Same placeholder-then-update pattern as nami_start_review to
+        // dodge trigger_id expiry on heavy DB work.
+        const placeholderView = {
+          type: "modal" as const,
+          callback_id: "review_loading_placeholder",
+          title: { type: "plain_text" as const, text: "Loading…" },
+          close: { type: "plain_text" as const, text: "Close" },
+          blocks: [
+            { type: "section", text: { type: "mrkdwn", text: "_Loading your review…_" } },
+          ],
+        };
         const editOpenResult = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
-          view,
+          view: placeholderView,
         });
         if (!editOpenResult?.ok) {
-          console.warn(`[nami_edit_submitted_review] views.open failed (${editOpenResult?.error ?? "unknown"}); sending dashboard fallback DM to ${payload.user.id} for assignment ${safeAssignmentId}`);
+          console.warn(`[nami_edit_submitted_review] placeholder views.open failed (${editOpenResult?.error ?? "unknown"}) for assignment ${safeAssignmentId}`);
           const reviewUrl = await buildAuthedDashboardUrl(
+            SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY,
             DASHBOARD_URL!,
-            wsId,
-            payload.user.id,
+            user.id,
             `/dashboard/reviews/${safeAssignmentId}`,
           );
           await slackApi(botToken, "chat.postMessage", {
@@ -2251,6 +2416,37 @@ Deno.serve(async (req) => {
               },
             ],
           });
+          return json({});
+        }
+
+        const viewId = editOpenResult.view?.id;
+        try {
+          const view = await buildReviewForm(safeAssignmentId, reviewRole || "manager", employeeId, wsId);
+          const updateResult = await slackApi(botToken, "views.update", { view_id: viewId, view });
+          if (!updateResult?.ok) {
+            console.warn(`[nami_edit_submitted_review] views.update failed (${updateResult?.error ?? "unknown"}) for assignment ${safeAssignmentId}`);
+            const reviewUrl = await buildAuthedDashboardUrl(
+              SUPABASE_URL,
+              SUPABASE_SERVICE_ROLE_KEY,
+              DASHBOARD_URL!,
+              user.id,
+              `/dashboard/reviews/${safeAssignmentId}`,
+            );
+            await slackApi(botToken, "views.update", {
+              view_id: viewId,
+              view: {
+                type: "modal",
+                callback_id: "review_load_failed",
+                title: { type: "plain_text", text: "Couldn't load" },
+                close: { type: "plain_text", text: "Close" },
+                blocks: [
+                  { type: "section", text: { type: "mrkdwn", text: `We couldn't reload this review in Slack. <${reviewUrl}|Open it on the dashboard> to continue.` } },
+                ],
+              },
+            });
+          }
+        } catch (buildErr: any) {
+          console.error(`[nami_edit_submitted_review] buildReviewForm or update threw:`, buildErr?.message ?? buildErr);
         }
         return json({});
       }
@@ -2372,7 +2568,7 @@ Deno.serve(async (req) => {
           return json({});
         }
 
-        await slackApi(botToken, "views.open", {
+        const commentOpenRes = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view: {
             type: "modal",
@@ -2400,6 +2596,16 @@ Deno.serve(async (req) => {
             ],
           },
         });
+        if (!commentOpenRes?.ok) {
+          // No deeplink fallback here — the comment is part of an in-flight
+          // Slack conversation. Tell the user they can just type the
+          // comment as a regular message instead.
+          console.warn(`[nami_open_comment_modal] views.open failed (${commentOpenRes?.error ?? "unknown"})`);
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: `Couldn't open the comment modal — please type your comment on *${compName}* as a regular message in this conversation.`,
+          });
+        }
         return json({});
       }
 
@@ -3219,7 +3425,32 @@ Deno.serve(async (req) => {
 
     return json({});
   } catch (err: any) {
-    console.error("[interactivity] unhandled error:", err?.message || err);
+    // Surface the full stack so production logs show WHERE the error
+    // happened — bare "unhandled error: <message>" without a stack made it
+    // impossible to debug silent failures.
+    const stack = err?.stack ?? "(no stack)";
+    const message = err?.message ?? String(err);
+    console.error(`[interactivity] unhandled error: ${message}\n${stack}`);
+
+    // Best-effort: tell the user something went wrong rather than silently
+    // returning an empty 200. response_url is captured before any throw so
+    // we can still apologise even when the failure was at a DB query during
+    // workspace resolution.
+    if (responseUrlForRecovery) {
+      try {
+        await fetch(responseUrlForRecovery, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            response_type: "ephemeral",
+            replace_original: false,
+            text: "Something went wrong on Nami's side opening this. We've logged it — please try again, or open the dashboard from namihr.com.",
+          }),
+        });
+      } catch (postErr) {
+        console.error("[interactivity] response_url fallback also failed:", postErr);
+      }
+    }
     return json({});
   }
 });

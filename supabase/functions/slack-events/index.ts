@@ -325,6 +325,21 @@ async function buildHomeBlocks(appUser: { id: string; role: string; workspace_id
 }
 
 Deno.serve(async (req) => {
+  try {
+    return await handleEvent(req);
+  } catch (err: any) {
+    // Slack retries any non-2xx three times with backoff. A 500 here means
+    // an uncaught throw — surface it with full stack and return 200 so the
+    // retry storm stops. Better to risk dropping one event than to hammer
+    // the function until it dies.
+    console.error(
+      `[slack-events] unhandled error: ${err?.message ?? String(err)}\n${err?.stack ?? "(no stack)"}`,
+    );
+    return new Response("OK", { status: 200 });
+  }
+});
+
+async function handleEvent(req: Request): Promise<Response> {
   const body = await req.text();
 
   // Verify Slack signature
@@ -1000,4 +1015,4 @@ Deno.serve(async (req) => {
   }
 
   return new Response("OK", { status: 200 });
-});
+}
