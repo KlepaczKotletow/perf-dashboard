@@ -134,7 +134,15 @@ Deno.serve(async (req) => {
       return res;
     }
     async function slackApi(token: string, method: string, data: any) {
-      return callSlackApi(token, method, data);
+      const res = await callSlackApi(token, method, data);
+      // Surface ALL non-ok responses to function logs. Silent failures here
+      // were the cause of "I clicked the button and nothing happened" reports.
+      // Callers can still inspect res.ok themselves to decide on user-facing
+      // recovery (e.g. fallback DM with a dashboard link).
+      if (res && res.ok === false) {
+        console.warn(`[slackApi] ${method} returned not-ok: ${res.error}${res.response_metadata?.messages ? " — " + JSON.stringify(res.response_metadata.messages) : ""}`);
+      }
+      return res;
     }
 
     // Token refresh
@@ -2141,12 +2149,40 @@ Deno.serve(async (req) => {
           await sendManagerContext(slackUserId, assignment.employee_id, assignment.cycle_id);
         }
 
-        // Open review as a Slack modal (prevents duplicate clicks, cleaner UX)
+        // Open review as a Slack modal (prevents duplicate clicks, cleaner UX).
+        // If Slack rejects the modal (most often trigger_id_expired because the
+        // user clicked an older DM, or a transient API error), fall back to
+        // posting a deeplink so the user is never left with silent silence.
         const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
-        await slackApi(botToken, "views.open", {
+        const openResult = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view,
         });
+        if (!openResult?.ok) {
+          console.warn(`[nami_start_review] views.open failed (${openResult?.error ?? "unknown"}); sending dashboard fallback DM to ${slackUserId} for assignment ${safeAssignmentId}`);
+          const reviewUrl = await buildAuthedDashboardUrl(
+            DASHBOARD_URL!,
+            wsId,
+            slackUserId,
+            `/dashboard/reviews/${safeAssignmentId}`,
+          );
+          const friendly =
+            openResult?.error === "expired_trigger_id"
+              ? "The button took too long to respond. Open your review on the dashboard instead:"
+              : openResult?.error === "trigger_id_already_used"
+                ? "Looks like you've already opened this review elsewhere. You can continue on the dashboard:"
+                : "Couldn't open the review modal in Slack. Open it on the dashboard:";
+          await slackApi(botToken, "chat.postMessage", {
+            channel: slackUserId,
+            text: friendly,
+            blocks: [
+              {
+                type: "section",
+                text: { type: "mrkdwn", text: `${friendly}\n<${reviewUrl}|Open your review>` },
+              },
+            ],
+          });
+        }
         return json({});
       }
 
@@ -2190,12 +2226,32 @@ Deno.serve(async (req) => {
           status: "pending", overall_rating: null, updated_at: new Date().toISOString(),
         });
 
-        // Re-open the review modal
+        // Re-open the review modal. Same fallback as nami_start_review:
+        // if Slack rejects (expired trigger_id, etc.) we DM a dashboard link.
         const view = await buildReviewForm(safeAssignmentId, reviewRole || "manager", employeeId, wsId);
-        await slackApi(botToken, "views.open", {
+        const editOpenResult = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view,
         });
+        if (!editOpenResult?.ok) {
+          console.warn(`[nami_edit_submitted_review] views.open failed (${editOpenResult?.error ?? "unknown"}); sending dashboard fallback DM to ${payload.user.id} for assignment ${safeAssignmentId}`);
+          const reviewUrl = await buildAuthedDashboardUrl(
+            DASHBOARD_URL!,
+            wsId,
+            payload.user.id,
+            `/dashboard/reviews/${safeAssignmentId}`,
+          );
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: "Couldn't reopen the review modal — continue on the dashboard:",
+            blocks: [
+              {
+                type: "section",
+                text: { type: "mrkdwn", text: `Couldn't reopen the review modal in Slack. <${reviewUrl}|Open your review on the dashboard>` },
+              },
+            ],
+          });
+        }
         return json({});
       }
 
