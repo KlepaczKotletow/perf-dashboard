@@ -1555,6 +1555,7 @@ Deno.serve(async (req) => {
     // ================================================================
     if (payload.type === "block_actions") {
       const action = payload.actions?.[0];
+      console.log(`[block_actions] action_id=${action?.action_id ?? "<none>"} value=${typeof action?.value === "string" ? action.value.slice(0, 80) : "<none>"} hasResponseUrl=${!!responseUrlForRecovery}`);
 
       // -- Open cycle review modal --
       if (action?.action_id === "open_cycle_review") {
@@ -2181,28 +2182,84 @@ Deno.serve(async (req) => {
       //  NAMI: Start review — opens a modal form (no inline buttons)
       // ================================================================
       if (action?.action_id === "nami_start_review") {
+        console.log(`[nami_start_review] received action.value=${action.value} user=${payload.user.id}`);
         const raw = action.value || "";
         // Value format: "self_<assignmentId>" | "mgr_<assignmentId>" | "upward_<assignmentId>"
         const underscoreIdx = raw.indexOf("_");
         const rolePrefix = raw.slice(0, underscoreIdx);
         const assignmentId = raw.slice(underscoreIdx + 1);
-        if (!assignmentId) return json({});
+        if (!assignmentId) {
+          console.warn(`[nami_start_review] empty assignmentId`);
+          return json({});
+        }
         const safeAssignmentId = asUuid(assignmentId);
         if (!safeAssignmentId) {
           console.error("[nami_start_review] invalid assignmentId rejected:", assignmentId);
           return json({});
         }
-        if (!await validateAssignmentWorkspace(safeAssignmentId)) return json({});
+        if (!await validateAssignmentWorkspace(safeAssignmentId)) {
+          console.warn(`[nami_start_review] validateAssignmentWorkspace failed for ${safeAssignmentId} in ws ${wsId}`);
+          // The button is wired to an assignment from a different workspace.
+          // Most likely the user is clicking an old DM after a workspace
+          // reset or assignment delete. Apologise via the response_url so
+          // they don't just see silence.
+          if (responseUrlForRecovery) {
+            try {
+              await fetch(responseUrlForRecovery, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  response_type: "ephemeral",
+                  replace_original: false,
+                  text: "This review isn't available anymore — the cycle may have been removed or recreated. Please check the dashboard.",
+                }),
+              });
+            } catch (e) { console.error("[nami_start_review] response_url notify failed", e); }
+          }
+          return json({});
+        }
 
         const slackUserId = payload.user.id;
         const user = await getOrCreateUser(wsId, slackUserId, botToken);
-        if (!user) return json({});
+        if (!user) {
+          console.warn(`[nami_start_review] getOrCreateUser returned null for slackUser ${slackUserId} ws ${wsId}`);
+          if (responseUrlForRecovery) {
+            try {
+              await fetch(responseUrlForRecovery, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  response_type: "ephemeral",
+                  replace_original: false,
+                  text: "We couldn't find your Nami account in this workspace. Ask your admin to add you, or sign in on the dashboard.",
+                }),
+              });
+            } catch (e) { console.error("[nami_start_review] response_url notify failed", e); }
+          }
+          return json({});
+        }
         const safeUserId = asUuid(user.id);
         if (!safeUserId) return json({});
 
         const assignments = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=id,employee_id,manager_id,status,cycle_id,assignment_type,reviewer_id,performance_cycles(name)`);
         const assignment = assignments?.[0];
-        if (!assignment) return json({});
+        if (!assignment) {
+          console.warn(`[nami_start_review] assignment ${safeAssignmentId} not found in DB`);
+          if (responseUrlForRecovery) {
+            try {
+              await fetch(responseUrlForRecovery, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  response_type: "ephemeral",
+                  replace_original: false,
+                  text: "This review no longer exists — it may have been deleted by your admin.",
+                }),
+              });
+            } catch (e) { console.error("[nami_start_review] response_url notify failed", e); }
+          }
+          return json({});
+        }
 
         let reviewRole = "manager";
         if (rolePrefix === "self" || user.id === assignment.employee_id) reviewRole = "self";
