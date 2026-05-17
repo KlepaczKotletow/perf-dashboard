@@ -1784,17 +1784,49 @@ async function handleManualReminder(params: {
     return { ok: false, error: "Could not record the reminder — try again" };
   }
 
-  const sent = await sendSlackBlocks(
-    botToken,
-    target.slack_user_id,
-    fallbackText,
-    blocks,
-  );
+  // Call chat.postMessage directly so we can surface Slack's specific
+  // `error` field — generic "rejected the DM" is too vague for HR to act on
+  // (e.g. "user_not_found" vs "channel_not_found" vs "missing_scope" all
+  // mean different fixes).
+  let slackError: string | undefined;
+  let sent = false;
+  try {
+    const data = await callSlackApi(botToken, "chat.postMessage", {
+      channel: target.slack_user_id,
+      text: fallbackText,
+      blocks,
+    });
+    sent = data?.ok === true;
+    if (!sent) {
+      slackError = typeof data?.error === "string" ? data.error : "unknown_error";
+      console.warn(`${tag} slack-rejected error=${slackError} slack_user_id=${target.slack_user_id}`);
+    }
+  } catch (err) {
+    slackError = err instanceof Error ? err.message : String(err);
+    console.warn(`${tag} slack-call-threw err=${slackError} slack_user_id=${target.slack_user_id}`);
+  }
 
   if (!sent) {
-    console.warn(`${tag} slack-send-failed slack_user_id=${target.slack_user_id}`);
     await rollbackNotification(cycle.workspace_id, target.id, eventType, referenceId);
-    return { ok: false, error: "Slack rejected the DM — they may have left the workspace" };
+    // Translate the most common Slack error codes into human guidance.
+    // Anything we don't recognise we surface verbatim so it shows up in the
+    // dashboard chip (the HR operator can paste it to me for diagnosis).
+    const hint: Record<string, string> = {
+      user_not_found: "Slack can't find this user in your workspace — their Slack ID in Nami may be stale.",
+      channel_not_found: "Slack can't open a DM with this user — they may have been deactivated.",
+      cannot_dm_bot: "This user is a bot — can't DM them.",
+      not_in_channel: "Nami isn't a member of this conversation.",
+      missing_scope: "Nami is missing a Slack scope — reinstall Nami in Slack.",
+      not_authed: "Slack token is invalid — reinstall Nami in Slack.",
+      invalid_auth: "Slack token is invalid — reinstall Nami in Slack.",
+      token_revoked: "Slack token has been revoked — reinstall Nami in Slack.",
+      account_inactive: "User's Slack account is deactivated.",
+      restricted_action: "Slack workspace policy blocked this DM.",
+    };
+    const friendly = slackError && hint[slackError]
+      ? `${hint[slackError]} (slack: ${slackError})`
+      : `Slack rejected the DM (${slackError ?? "unknown"})`;
+    return { ok: false, error: friendly };
   }
 
   console.log(`${tag} sent ref=${referenceId}`);
