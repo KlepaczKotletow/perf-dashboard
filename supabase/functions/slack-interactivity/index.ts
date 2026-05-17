@@ -1191,7 +1191,17 @@ Deno.serve(async (req) => {
         // Check if already submitted (avoid duplicates)
         const alreadySubmitted = await dbQuery("review_responses", `assignment_id=eq.${safeAssignmentId}&reviewer_id=eq.${safeReviewerId}&reviewer_role=eq.${safeRoleFilter}&select=id&limit=1`);
         if (alreadySubmitted && alreadySubmitted.length > 0 && !alreadySubmitted.error) {
-          return json({ response_action: "errors", errors: { comment_block: "This review has already been submitted." } });
+          // Close the modal cleanly instead of trying to display the error
+          // on a block_id that may not exist in this modal shape
+          // (self-review modals have `comp_<id>` / `text_<id>` block_ids
+          // but no `comment_block`; Slack silently drops the error and
+          // shows the generic "trouble connecting" banner instead).
+          // Confirm via a DM so the user knows what happened.
+          await slackApi(botToken, "chat.postMessage", {
+            channel: payload.user.id,
+            text: "✅ This review has already been submitted. You can view or edit it on the dashboard.",
+          });
+          return json({ response_action: "clear" });
         }
 
         const ratings: { competencyId: string; rating: number }[] = [];
