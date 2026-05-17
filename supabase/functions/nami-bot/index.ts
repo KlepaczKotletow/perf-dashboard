@@ -81,17 +81,64 @@ async function sendSlackBlocks(
   text: string,
   blocks: any[],
 ): Promise<boolean> {
+  const res = await sendSlackBlocksReturningTs(botToken, slackUserId, text, blocks);
+  return res.ok;
+}
+
+// Same as sendSlackBlocks but exposes the Slack message_ts so the caller
+// can persist it on notification_log. Required for the stale-DM sweep:
+// when a review is submitted we update every reminder DM in place to
+// "✅ Done", which needs (channel, ts) for each chat.update call.
+async function sendSlackBlocksReturningTs(
+  botToken: string,
+  slackUserId: string,
+  text: string,
+  blocks: any[],
+): Promise<{ ok: boolean; ts?: string; channel?: string }> {
   try {
     const data = await callSlackApi(botToken, "chat.postMessage", {
       channel: slackUserId, text, blocks,
     });
     if (!data.ok) {
       console.error("Slack API error:", data.error, { channel: slackUserId });
+      return { ok: false };
     }
-    return data.ok === true;
+    return {
+      ok: true,
+      ts: typeof data.ts === "string" ? data.ts : undefined,
+      // chat.postMessage echoes the resolved IM channel ID (different from
+      // the user ID we passed in); we want that for subsequent chat.update.
+      channel: typeof data.channel === "string" ? data.channel : slackUserId,
+    };
   } catch (err) {
-    console.error("sendSlackBlocks fetch error:", err);
-    return false;
+    console.error("sendSlackBlocksReturningTs fetch error:", err);
+    return { ok: false };
+  }
+}
+
+// After a Slack DM lands and we have its message_ts, stamp it onto the
+// matching notification_log row so the slack-interactivity submit handler
+// can sweep + update every stale reminder DM when the review completes.
+async function attachSlackTsToLog(
+  workspaceId: string,
+  userId: string,
+  eventType: string,
+  referenceId: string,
+  ts: string | undefined,
+  channel: string | undefined,
+): Promise<void> {
+  if (!ts || !channel) return;
+  const { error } = await supabase
+    .from("notification_log")
+    .update({ slack_message_ts: ts, slack_channel: channel })
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .eq("event_type", eventType)
+    .eq("reference_id", referenceId);
+  if (error) {
+    console.warn(
+      `[attachSlackTsToLog] update failed for ${eventType}/${referenceId}: ${error.message}`,
+    );
   }
 }
 
@@ -1374,13 +1421,23 @@ async function processAssignmentReminder(
     );
     const fallbackText = `Reminder: ${itemName} — ${daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`}`;
 
-    const ok = await sendSlackBlocks(
+    const sendRes = await sendSlackBlocksReturningTs(
       botToken,
       targetUser.slack_user_id,
       fallbackText,
       blocks,
     );
-    if (ok) {
+    if (sendRes.ok) {
+      // Stamp the Slack ts so the submit handler can sweep + update this
+      // reminder DM to "✅ Done" when the review is completed.
+      await attachSlackTsToLog(
+        workspaceId,
+        targetUser.id,
+        eventType,
+        refPrefix,
+        sendRes.ts,
+        sendRes.channel,
+      );
       sent++;
     } else {
       await rollbackNotification(
@@ -1812,6 +1869,8 @@ async function handleManualReminder(params: {
   // and retry. Any other error bubbles up to the hint dictionary below.
   let slackError: string | undefined;
   let sent = false;
+  let sentTs: string | undefined;
+  let sentChannel: string | undefined;
   let activeToken = botToken;
 
   async function postOnce(token: string) {
@@ -1833,7 +1892,12 @@ async function handleManualReminder(params: {
       }
     }
     sent = data?.ok === true;
-    if (!sent) {
+    if (sent) {
+      // Capture ts + channel so the submit handler can chat.update this
+      // reminder DM to "✅ Done" once the review is completed.
+      if (typeof data.ts === "string") sentTs = data.ts;
+      sentChannel = typeof data.channel === "string" ? data.channel : target.slack_user_id;
+    } else {
       slackError = typeof data?.error === "string" ? data.error : "unknown_error";
       console.warn(`${tag} slack-rejected error=${slackError} slack_user_id=${target.slack_user_id}`);
     }
@@ -1867,7 +1931,18 @@ async function handleManualReminder(params: {
     return { ok: false, error: friendly };
   }
 
-  console.log(`${tag} sent ref=${referenceId}`);
+  // Stamp the Slack ts onto the notification_log row so the submit
+  // handler can find this DM and update it to "✅ Done".
+  await attachSlackTsToLog(
+    cycle.workspace_id,
+    target.id,
+    eventType,
+    referenceId,
+    sentTs,
+    sentChannel,
+  );
+
+  console.log(`${tag} sent ref=${referenceId} ts=${sentTs ?? "?"}`);
   return { ok: true, sent: true };
 }
 
@@ -2015,6 +2090,18 @@ async function sendCycleLaunchDm(
     blocks,
   );
   if (sendResult.ok) {
+    // Stamp Slack ts on the notification_log row so the submit handler
+    // can chat.update this launch DM to "✅ Done" when the review lands.
+    // sendSlackBlocksWithTs doesn't expose `channel`, fall back to the
+    // recipient slack user id which is the IM channel for bot DMs.
+    await attachSlackTsToLog(
+      p.workspace_id,
+      p.recipient_app_user_id,
+      eventType,
+      refId,
+      sendResult.ts,
+      p.recipient_slack_user_id,
+    );
     return { ok: true, ts: sendResult.ts };
   }
   if (sendResult.knownRejected) {

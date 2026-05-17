@@ -406,6 +406,75 @@ Deno.serve(async (req) => {
     }
 
     // ================================================================
+    //  Sweep stale reminder DMs after a review submits successfully.
+    //
+    //  HR can send multiple reminders for the same review (cron 7d/3d/1d
+    //  escalation + manual /Remind nudges). Each arrives as a separate
+    //  Slack DM with its own "Let's do it" button. Once the user
+    //  completes the review, every remaining DM still LOOKS clickable.
+    //
+    //  notification_log now stores (slack_message_ts, slack_channel) for
+    //  every DM we send. On submit we fetch every such row for this
+    //  user+assignment+role and chat.update each in parallel to a clean
+    //  "✅ Done" state. Fire-and-forget — the response to Slack returns
+    //  before we await, so this doesn't impact the 3-second budget.
+    // ================================================================
+    async function rewriteStaleReminderDms(
+      assignmentId: string,
+      reviewerAppUserId: string,
+      reviewerRole: string,
+      cycleName: string,
+    ) {
+      try {
+        const safeAssignmentId = asUuid(assignmentId);
+        const safeReviewerId = asUuid(reviewerAppUserId);
+        if (!safeAssignmentId || !safeReviewerId) return;
+        const refRole = reviewerRole === "manager" ? "mgr" : reviewerRole;
+        // Match the cycle-launch / cron-reminder shape (`self_<id>`,
+        // `mgr_<id>`, `upward_<id>`) AND the manual-reminder shape
+        // (`manual_<role>_<id>_<timestamp>`). PostgREST .or() filter:
+        const orFilter = encodeURIComponent(
+          `reference_id.eq.${refRole}_${safeAssignmentId},reference_id.like.manual_${refRole}_${safeAssignmentId}_*`,
+        );
+        const rows = await dbQuery(
+          "notification_log",
+          `user_id=eq.${safeReviewerId}&event_type=like.nami_%25&or=(${orFilter})&slack_message_ts=not.is.null&select=slack_message_ts,slack_channel,event_type,reference_id`,
+        );
+        if (!Array.isArray(rows) || rows.length === 0) return;
+
+        console.log(`[rewriteStaleReminderDms] updating ${rows.length} stale DM(s) for assignment ${safeAssignmentId}`);
+
+        const doneBlocks = [
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `:white_check_mark: *Review submitted${cycleName ? ` — ${cycleName}` : ""}.* Thanks!`,
+            },
+          },
+        ];
+
+        // Parallel — chat.update is independent per message.
+        await Promise.all(
+          rows.map((row: any) =>
+            slackApi(botToken, "chat.update", {
+              channel: row.slack_channel,
+              ts: row.slack_message_ts,
+              text: ":white_check_mark: Review submitted",
+              blocks: doneBlocks,
+            }).catch((e: any) => {
+              console.warn(
+                `[rewriteStaleReminderDms] update failed (event=${row.event_type} ref=${row.reference_id}): ${e?.message ?? e}`,
+              );
+            }),
+          ),
+        );
+      } catch (err) {
+        console.error("[rewriteStaleReminderDms] sweep failed:", err);
+      }
+    }
+
+    // ================================================================
     //  WS5: Check and notify on milestone completions
     // ================================================================
     async function checkAndNotifyCompletion(assignmentId: string, cycleId: string, wsId: string) {
@@ -1288,7 +1357,7 @@ Deno.serve(async (req) => {
         }
 
         // Look up employee name for confirmation
-        const empData = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=employee:users!review_assignments_employee_id_fkey(slack_name),cycle_id`);
+        const empData = await dbQuery("review_assignments", `id=eq.${safeAssignmentId}&select=employee:users!review_assignments_employee_id_fkey(slack_name),cycle_id,cycle:performance_cycles(name)`);
         const empName = empData?.[0]?.employee?.slack_name || "your team member";
         const cId = empData?.[0]?.cycle_id;
 
@@ -1344,6 +1413,16 @@ Deno.serve(async (req) => {
 
         // WS4: Update original notification message
         updateOriginalNotification(safeAssignmentId).catch(console.error);
+
+        // Sweep every stale reminder DM for this user+role+assignment and
+        // rewrite them in place to "✅ Done" so the user isn't left with
+        // a Slack inbox full of clickable buttons that go nowhere.
+        rewriteStaleReminderDms(
+          safeAssignmentId,
+          safeReviewerId,
+          reviewRole || "manager",
+          empData?.[0]?.cycle?.name || "",
+        ).catch(console.error);
 
         // WS5: Check for completion milestones
         if (cId) {
@@ -2061,6 +2140,13 @@ Deno.serve(async (req) => {
 
         // WS4 + WS5: Update notification & check completions
         updateOriginalNotification(safeConvAssignmentId).catch(console.error);
+        // Rewrite all stale reminder DMs to "✅ Done".
+        rewriteStaleReminderDms(
+          safeConvAssignmentId,
+          safeConvUserId,
+          reviewRole,
+          conv.cycle_name || "",
+        ).catch(console.error);
         const aData = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=cycle_id`);
         if (aData?.[0]?.cycle_id) {
           const safeAssignCycleId = asUuid(aData[0].cycle_id);
@@ -3092,6 +3178,13 @@ Deno.serve(async (req) => {
 
         // WS4 + WS5: Update notification & check completions
         updateOriginalNotification(safeConvAssignmentId).catch(console.error);
+        // Rewrite all stale reminder DMs to "✅ Done".
+        rewriteStaleReminderDms(
+          safeConvAssignmentId,
+          safeConvUserId,
+          conv.review_role || "manager",
+          conv.cycle_name || "",
+        ).catch(console.error);
         const aData = await dbQuery("review_assignments", `id=eq.${safeConvAssignmentId}&select=cycle_id`);
         if (aData?.[0]?.cycle_id) {
           const safeAssignCycleId = asUuid(aData[0].cycle_id);
