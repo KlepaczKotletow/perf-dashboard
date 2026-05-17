@@ -1208,10 +1208,21 @@ Deno.serve(async (req) => {
 
         const overallComment = vals.comment_block?.comment?.value || "";
 
+        // Build all rows for review_responses up front and do a SINGLE
+        // bulk insert. The previous per-row loop took ~110ms per insert,
+        // adding up to ~2s for a 13-competency cycle — pushing the total
+        // function runtime past Slack's 3-second view_submission timeout
+        // and surfacing "We had some trouble connecting" to the user even
+        // though the writes succeeded server-side.
+        const responseRows: Record<string, unknown>[] = [];
+
         for (const r of ratings) {
-          await dbInsert("review_responses", {
-            assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
-            reviewer_role: reviewRole || "manager", competency_id: r.competencyId, rating: r.rating,
+          responseRows.push({
+            assignment_id: safeAssignmentId,
+            reviewer_id: safeReviewerId,
+            reviewer_role: reviewRole || "manager",
+            competency_id: r.competencyId,
+            rating: r.rating,
           });
         }
 
@@ -1220,26 +1231,35 @@ Deno.serve(async (req) => {
           const tqIds = textResponses
             .map(t => asUuid(t.questionId))
             .filter((v: string | null): v is string => v !== null);
+          let promptMap: Record<string, string> = {};
           if (tqIds.length > 0) {
             const cycleQs = await dbQuery("cycle_questions", `id=in.(${tqIds.join(",")})&select=id,prompt`);
-            const promptMap: Record<string, string> = {};
             if (cycleQs && !cycleQs.error) {
               for (const q of cycleQs) promptMap[q.id] = q.prompt || "";
             }
-            for (const tr of textResponses) {
-              await dbInsert("review_responses", {
-                assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
-                reviewer_role: reviewRole || "manager", comment: `[${promptMap[tr.questionId] || ""}] ${tr.answer}`,
-              });
-            }
+          }
+          for (const tr of textResponses) {
+            responseRows.push({
+              assignment_id: safeAssignmentId,
+              reviewer_id: safeReviewerId,
+              reviewer_role: reviewRole || "manager",
+              comment: `[${promptMap[tr.questionId] || ""}] ${tr.answer}`,
+            });
           }
         }
 
         if (overallComment) {
-          await dbInsert("review_responses", {
-            assignment_id: safeAssignmentId, reviewer_id: safeReviewerId,
-            reviewer_role: reviewRole || "manager", comment: overallComment,
+          responseRows.push({
+            assignment_id: safeAssignmentId,
+            reviewer_id: safeReviewerId,
+            reviewer_role: reviewRole || "manager",
+            comment: overallComment,
           });
+        }
+
+        if (responseRows.length > 0) {
+          // PostgREST accepts an array body for bulk insert.
+          await dbInsert("review_responses", responseRows);
         }
 
         // Update assignment status
