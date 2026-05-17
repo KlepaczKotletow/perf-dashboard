@@ -107,6 +107,17 @@ The app expects to be running on the URL set in `NEXT_PUBLIC_SITE_URL`.
 
 Hosted on Vercel. The repo includes [`vercel.json`](vercel.json) for cron registration. Required production env vars are the same as `.env.local.example`. The Stripe webhook endpoint should target `/api/webhooks/stripe` and use the `pro_monthly` price lookup key.
 
+### Slack post-deploy smoke test
+
+After every `supabase functions deploy`, run the Slack smoke test:
+
+```bash
+SLACK_SIGNING_SECRET=<from Supabase secrets> \
+  ./scripts/slack-smoke-test.sh
+```
+
+It signs a fake request to each of `slack-events`, `slack-interactivity`, and `slack-commands` and asserts a 200 response. A 403 means signature verification regressed; a 401 means the Supabase API gateway is rejecting (`verify_jwt` flipped back on); a 5xx means an uncaught throw inside the handler. This is the test that would have caught the May 2026 outage in under 60 seconds.
+
 ## Security
 
 - All workspace tables enforce Row Level Security; tenant isolation is covered by [`supabase/migrations/20260317_fix_workspace_isolation.sql`](supabase/migrations/) and follow-ups.

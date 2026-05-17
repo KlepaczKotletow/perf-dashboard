@@ -10,6 +10,8 @@ import { callSlackApi } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 import { asSlackTeamId, asUuid } from "../_shared/postgrest-safe.ts";
 import { validateFormFields } from "../_shared/form-config-schema.ts";
+import { verifySlackSignature as verifySlackSig } from "../_shared/slack-signature.ts";
+import { alertAdmin } from "../_shared/alerting.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -21,40 +23,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 async function verifySlackSignature(req: Request, body: string): Promise<boolean> {
   if (!SLACK_SIGNING_SECRET) return false;
-  const timestamp = req.headers.get("x-slack-request-timestamp") || "";
-  const slackSig = req.headers.get("x-slack-signature") || "";
-  const parsedTs = parseInt(timestamp);
-  const nowSec = Date.now() / 1000;
-  // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
-  if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
-    console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
-    return false;
-  }
-  const baseString = `v0:${timestamp}:${body}`;
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(SLACK_SIGNING_SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(baseString));
-  const hex = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  // Timing-safe comparison to prevent timing attacks.
-  // Deno's edge runtime does NOT expose crypto.subtle.timingSafeEqual (a
-  // Node-only extension) — using it throws and silently crashes the whole
-  // handler. Manual XOR-accumulator gives the same security guarantee.
-  const computed = encoder.encode(`v0=${hex}`);
-  const received = encoder.encode(slackSig);
-  if (computed.byteLength !== received.byteLength) return false;
-  let diff = 0;
-  for (let i = 0; i < computed.byteLength; i++) {
-    diff |= computed[i] ^ received[i];
-  }
-  return diff === 0;
+  return verifySlackSig({
+    signingSecret: SLACK_SIGNING_SECRET,
+    timestampHeader: req.headers.get("x-slack-request-timestamp"),
+    signatureHeader: req.headers.get("x-slack-signature"),
+    body,
+  });
 }
 
 async function dbQuery(table: string, query: string): Promise<any> {
@@ -397,6 +371,11 @@ Deno.serve(async (req) => {
   );
  } catch (err: any) {
   console.error("[slack-commands] unhandled error:", err?.message || err);
+  // Fire-and-forget admin DM — self-deduped, internal try/catch.
+  alertAdmin(err, {
+    fnName: "slack-commands",
+    details: { method: req.method, url: req.url },
+  });
   // Slack-visible ephemeral so the user knows something failed (rather than
   // an unhelpful "dispatch_failed" surface from Slack on a 500).
   return new Response(

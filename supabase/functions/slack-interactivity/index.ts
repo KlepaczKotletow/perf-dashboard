@@ -2,6 +2,8 @@ import { buildCompetencyPrompt, buildCommentPrompt, buildTextQuestionPrompt, bui
 import { callSlackApi, buildAuthedDashboardUrl } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens, setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 import { asUuid, asSlackTeamId, asSlackUserId } from "../_shared/postgrest-safe.ts";
+import { verifySlackSignature } from "../_shared/slack-signature.ts";
+import { alertAdmin } from "../_shared/alerting.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -20,48 +22,23 @@ Deno.serve(async (req) => {
   try {
     const body = await req.text();
 
-    // Slack signature verification — always required
+    // Slack signature verification — always required.
+    // Implementation lives in _shared/slack-signature.ts so the logic has
+    // a single source of truth (was duplicated across 3 functions; that
+    // duplication is what let crypto.subtle.timingSafeEqual ship and
+    // silently break every click for an unknown duration — PR #32).
     if (!SLACK_SIGNING_SECRET) {
       console.error("SLACK_SIGNING_SECRET not set — rejecting request for security");
       return new Response("Server misconfiguration", { status: 500 });
     }
     {
-      const timestamp = req.headers.get("x-slack-request-timestamp") || "";
-      const slackSig = req.headers.get("x-slack-signature") || "";
-      const parsedTs = parseInt(timestamp);
-      const nowSec = Date.now() / 1000;
-      // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
-      if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
-        console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
-        return new Response("Request too old", { status: 403 });
-      }
-      const baseString = `v0:${timestamp}:${body}`;
-      const encoder = new TextEncoder();
-      const key = await crypto.subtle.importKey(
-        "raw", encoder.encode(SLACK_SIGNING_SECRET),
-        { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-      );
-      const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(baseString));
-      const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-      // Timing-safe comparison to prevent timing attacks
-      const computed = encoder.encode(`v0=${hex}`);
-      const received = encoder.encode(slackSig);
-      // Constant-time byte comparison. Deno's edge runtime does NOT expose
-      // crypto.subtle.timingSafeEqual (a Node-only extension) — using it
-      // throws `TypeError: ... is not a function` and silently crashes the
-      // whole handler. Manual XOR-accumulator gives the same security
-      // guarantee with portable primitives.
-      let sigMatch = computed.byteLength === received.byteLength;
-      if (sigMatch) {
-        let diff = 0;
-        for (let i = 0; i < computed.byteLength; i++) {
-          diff |= computed[i] ^ received[i];
-        }
-        sigMatch = diff === 0;
-      }
-      if (!sigMatch) {
-        return new Response("Invalid signature", { status: 403 });
-      }
+      const ok = await verifySlackSignature({
+        signingSecret: SLACK_SIGNING_SECRET,
+        timestampHeader: req.headers.get("x-slack-request-timestamp"),
+        signatureHeader: req.headers.get("x-slack-signature"),
+        body,
+      });
+      if (!ok) return new Response("Invalid signature", { status: 403 });
     }
 
     // Log retry header so we can see in debug table whether this is a fresh
@@ -3734,6 +3711,18 @@ Deno.serve(async (req) => {
     const stack = err?.stack ?? "(no stack)";
     const message = err?.message ?? String(err);
     console.error(`[interactivity] unhandled error: ${message}\n${stack}`);
+
+    // Fire-and-forget admin DM — alertAdmin self-dedupes (5 min) so a tight
+    // error loop can't spam the admin. Internal try/catch means a failing
+    // alert can't break this response path.
+    alertAdmin(err, {
+      fnName: "slack-interactivity",
+      details: {
+        method: req.method,
+        url: req.url,
+        hasResponseUrlRecovery: Boolean(responseUrlForRecovery),
+      },
+    });
 
     // Best-effort: tell the user something went wrong rather than silently
     // returning an empty 200. response_url is captured before any throw so

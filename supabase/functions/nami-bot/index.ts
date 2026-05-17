@@ -30,6 +30,7 @@ import {
   isDueForDigest,
   type Priority,
 } from "../_shared/notification-rules.ts";
+import { alertAdmin } from "../_shared/alerting.ts";
 
 // Throttle between bulk message sends to avoid hitting Slack rate limits
 const BULK_SEND_DELAY_MS = 1000;
@@ -2746,6 +2747,13 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("nami-bot error:", err);
+    // Fire-and-forget admin DM. nami-bot is mostly cron-driven, so this is
+    // the only signal that a tick failed — without it cron failures stay
+    // silent in the logs until someone notices a missing DM downstream.
+    alertAdmin(err, {
+      fnName: "nami-bot",
+      details: { action, cycle_id, survey_id, mode, role, hasCronAuth, hasJwtAuth },
+    });
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

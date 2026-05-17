@@ -9,6 +9,8 @@ import {
 import { callSlackApi, sendSlackMessage as sendSlackMessageWithRetry } from "../_shared/slack-api.ts";
 import { getWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 import { asUuid } from "../_shared/postgrest-safe.ts";
+import { verifySlackSignature as verifySlackSig } from "../_shared/slack-signature.ts";
+import { alertAdmin } from "../_shared/alerting.ts";
 
 const SLACK_SIGNING_SECRET = Deno.env.get("SLACK_SIGNING_SECRET") || "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -26,35 +28,12 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
     console.error("SLACK_SIGNING_SECRET not set — rejecting request for security");
     return false;
   }
-  const timestamp = req.headers.get("x-slack-request-timestamp") || "";
-  const slackSig = req.headers.get("x-slack-signature") || "";
-  const parsedTs = parseInt(timestamp);
-  const nowSec = Date.now() / 1000;
-  // Reject if missing, in the future (more than 5s clock skew), or older than 5 min.
-  if (isNaN(parsedTs) || parsedTs > nowSec + 5 || nowSec - parsedTs > 300) {
-    console.warn(`[slack-sig] timestamp out of range: ts=${parsedTs} now=${nowSec}`);
-    return false;
-  }
-  const baseString = `v0:${timestamp}:${body}`;
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw", encoder.encode(SLACK_SIGNING_SECRET),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(baseString));
-  const hex = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
-  // Timing-safe comparison to prevent timing attacks.
-  // Deno's edge runtime does NOT expose crypto.subtle.timingSafeEqual (a
-  // Node-only extension) — using it throws and silently crashes the whole
-  // handler. Manual XOR-accumulator gives the same security guarantee.
-  const computed = encoder.encode(`v0=${hex}`);
-  const received = encoder.encode(slackSig);
-  if (computed.byteLength !== received.byteLength) return false;
-  let diff = 0;
-  for (let i = 0; i < computed.byteLength; i++) {
-    diff |= computed[i] ^ received[i];
-  }
-  return diff === 0;
+  return verifySlackSig({
+    signingSecret: SLACK_SIGNING_SECRET,
+    timestampHeader: req.headers.get("x-slack-request-timestamp"),
+    signatureHeader: req.headers.get("x-slack-signature"),
+    body,
+  });
 }
 
 async function publishHomeTab(botToken: string, slackUserId: string, blocks: unknown[]) {
@@ -342,6 +321,17 @@ Deno.serve(async (req) => {
     console.error(
       `[slack-events] unhandled error: ${err?.message ?? String(err)}\n${err?.stack ?? "(no stack)"}`,
     );
+    // Fire-and-forget admin DM. NEVER await on the critical-path return —
+    // alertAdmin has its own internal try/catch and 5-min dedupe.
+    alertAdmin(err, {
+      fnName: "slack-events",
+      details: {
+        method: req.method,
+        url: req.url,
+        retryNum: req.headers.get("x-slack-retry-num"),
+        retryReason: req.headers.get("x-slack-retry-reason"),
+      },
+    });
     return new Response("OK", { status: 200 });
   }
 });
