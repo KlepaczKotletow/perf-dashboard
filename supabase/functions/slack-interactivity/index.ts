@@ -46,25 +46,37 @@ Deno.serve(async (req) => {
       // Timing-safe comparison to prevent timing attacks
       const computed = encoder.encode(`v0=${hex}`);
       const received = encoder.encode(slackSig);
-      if (computed.byteLength !== received.byteLength || !crypto.subtle.timingSafeEqual(computed, received)) {
+      // Constant-time byte comparison. Deno's edge runtime does NOT expose
+      // crypto.subtle.timingSafeEqual (a Node-only extension) — using it
+      // throws `TypeError: ... is not a function` and silently crashes the
+      // whole handler. Manual XOR-accumulator gives the same security
+      // guarantee with portable primitives.
+      let sigMatch = computed.byteLength === received.byteLength;
+      if (sigMatch) {
+        let diff = 0;
+        for (let i = 0; i < computed.byteLength; i++) {
+          diff |= computed[i] ^ received[i];
+        }
+        sigMatch = diff === 0;
+      }
+      if (!sigMatch) {
         return new Response("Invalid signature", { status: 403 });
       }
     }
 
-    // Slack retried because we were slow. With Task 2's event_id dedup, the
-    // inbox catches event-callback retries; this is the catch-all for the
-    // other endpoints (commands, interactivity) that don't have an event_id.
-    // Either we already finished and Slack didn't get our 200 — doing it again
-    // risks side-effects firing twice. Or we're still processing the original.
-    // Either way, acknowledge fast so Slack stops retrying.
+    // Log retry header so we can see in debug table whether this is a fresh
+    // click or Slack's retry. PREVIOUSLY: returned 200 immediately on retry,
+    // which silently swallowed every click if Slack incorrectly flagged it
+    // as a retry. We now ALWAYS run the handler — Slack interactivity
+    // payloads are not events; duplicate runs are safe (each call's side
+    // effect — opening a modal or sending a message — is naturally
+    // idempotent at this layer because we don't claim notification_log).
     const retryNum = req.headers.get("x-slack-retry-num");
+    const retryReason = req.headers.get("x-slack-retry-reason");
     if (retryNum) {
       console.warn(
-        `[slack-interactivity] retry #${retryNum} (reason=${
-          req.headers.get("x-slack-retry-reason") ?? "?"
-        }), short-circuiting to 200`,
+        `[slack-interactivity] retry #${retryNum} (reason=${retryReason ?? "?"}); processing anyway`,
       );
-      return new Response("OK", { status: 200 });
     }
 
     const p = new URLSearchParams(body);
@@ -78,6 +90,39 @@ Deno.serve(async (req) => {
     if (typeof payload?.response_url === "string") {
       responseUrlForRecovery = payload.response_url;
     }
+
+    // Top-of-handler diagnostic: write every interactivity request to the
+    // debug table. AWAITED so the isolate doesn't terminate before the
+    // write completes — fire-and-forget fetches were getting killed on
+    // function return.
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/slack_interactivity_debug`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          action_id: payload?.actions?.[0]?.action_id ?? null,
+          user_slack_id: payload?.user?.id ?? null,
+          team_id: payload?.team?.id ?? null,
+          workspace_id: null,
+          stage: "request_received",
+          detail: {
+            payload_type: payload?.type ?? null,
+            callback_id: payload?.view?.callback_id ?? null,
+            actions_count: Array.isArray(payload?.actions) ? payload.actions.length : null,
+            action_value: typeof payload?.actions?.[0]?.value === "string" ? String(payload.actions[0].value).slice(0, 200) : null,
+            has_response_url: typeof payload?.response_url === "string",
+            retry_num: retryNum,
+            retry_reason: retryReason,
+            fn_version: "v72-no-retry-shortcircuit",
+          },
+        }),
+      });
+    } catch (_e) { /* never block on diagnostic */ }
 
     // ----------------------------------------------------------------
     // DB helpers
@@ -1557,6 +1602,30 @@ Deno.serve(async (req) => {
       const action = payload.actions?.[0];
       console.log(`[block_actions] action_id=${action?.action_id ?? "<none>"} value=${typeof action?.value === "string" ? action.value.slice(0, 80) : "<none>"} hasResponseUrl=${!!responseUrlForRecovery}`);
 
+      // Debug log every block_actions click into a DB table so we can
+      // SQL-query the trail when the user reports "nothing happened".
+      // Fire-and-forget, no await — must not block the interactivity path.
+      const debugLog = (stage: string, detail?: Record<string, unknown>) => {
+        fetch(`${SUPABASE_URL}/rest/v1/slack_interactivity_debug`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            action_id: action?.action_id ?? null,
+            user_slack_id: payload.user?.id ?? null,
+            team_id: payload.team?.id ?? null,
+            workspace_id: wsId ?? null,
+            stage,
+            detail: detail ?? null,
+          }),
+        }).catch(() => {});
+      };
+      debugLog("block_actions_received");
+
       // -- Open cycle review modal --
       if (action?.action_id === "open_cycle_review") {
         const assignmentId = action.value;
@@ -2182,6 +2251,7 @@ Deno.serve(async (req) => {
       //  NAMI: Start review — opens a modal form (no inline buttons)
       // ================================================================
       if (action?.action_id === "nami_start_review") {
+        debugLog("nami_start_review_enter", { value: action.value });
         console.log(`[nami_start_review] received action.value=${action.value} user=${payload.user.id}`);
         const raw = action.value || "";
         // Value format: "self_<assignmentId>" | "mgr_<assignmentId>" | "upward_<assignmentId>"
@@ -2306,10 +2376,12 @@ Deno.serve(async (req) => {
             { type: "section", text: { type: "mrkdwn", text: "_Loading your review…_" } },
           ],
         };
+        debugLog("nami_start_review_before_placeholder_open", { assignmentId: safeAssignmentId, reviewRole });
         const openResult = await slackApi(botToken, "views.open", {
           trigger_id: payload.trigger_id,
           view: placeholderView,
         });
+        debugLog("nami_start_review_placeholder_open_result", { ok: openResult?.ok ?? false, error: openResult?.error ?? null, viewId: openResult?.view?.id ?? null });
 
         if (!openResult?.ok) {
           // The trigger itself was rejected — fall back to a DM with a deeplink.
@@ -2343,8 +2415,11 @@ Deno.serve(async (req) => {
         // Placeholder is open. Build the real form and swap it in.
         const viewId = openResult.view?.id;
         try {
+          debugLog("nami_start_review_before_buildReviewForm");
           const view = await buildReviewForm(safeAssignmentId, reviewRole, assignment.employee_id, wsId);
+          debugLog("nami_start_review_form_built", { blocksCount: Array.isArray((view as any)?.blocks) ? (view as any).blocks.length : null });
           const updateResult = await slackApi(botToken, "views.update", { view_id: viewId, view });
+          debugLog("nami_start_review_views_update_result", { ok: updateResult?.ok ?? false, error: updateResult?.error ?? null });
           if (!updateResult?.ok) {
             // Update failed after placeholder showed — swap to a deeplink view.
             console.warn(`[nami_start_review] views.update failed (${updateResult?.error ?? "unknown"}) for assignment ${safeAssignmentId}`);
@@ -2369,6 +2444,7 @@ Deno.serve(async (req) => {
             });
           }
         } catch (buildErr: any) {
+          debugLog("nami_start_review_build_threw", { message: buildErr?.message ?? String(buildErr), stack: (buildErr?.stack ?? "").slice(0, 1000) });
           console.error(`[nami_start_review] buildReviewForm or update threw:`, buildErr?.message ?? buildErr);
           // Best-effort swap to a deeplink view so the modal isn't stuck on "Loading…"
           try {

@@ -43,11 +43,18 @@ async function verifySlackSignature(req: Request, body: string): Promise<boolean
   const hex = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  // Timing-safe comparison to prevent timing attacks
+  // Timing-safe comparison to prevent timing attacks.
+  // Deno's edge runtime does NOT expose crypto.subtle.timingSafeEqual (a
+  // Node-only extension) — using it throws and silently crashes the whole
+  // handler. Manual XOR-accumulator gives the same security guarantee.
   const computed = encoder.encode(`v0=${hex}`);
   const received = encoder.encode(slackSig);
   if (computed.byteLength !== received.byteLength) return false;
-  return crypto.subtle.timingSafeEqual(computed, received);
+  let diff = 0;
+  for (let i = 0; i < computed.byteLength; i++) {
+    diff |= computed[i] ^ received[i];
+  }
+  return diff === 0;
 }
 
 async function dbQuery(table: string, query: string): Promise<any> {
