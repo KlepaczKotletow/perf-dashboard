@@ -650,19 +650,31 @@ export function buildFinalWarning(
 export function buildDeadlineReminder(
   userName: string,
   itemName: string,
-  daysLeft: number,
+  daysLeft: number | null,
   actionValue: string,
   actionId: string,
 ) {
+  // daysLeft === null means the cycle has no deadline set (no
+  // review_deadline, no active phase end_date, no cycle end_date). Used by
+  // the manual-reminder path so HR can still ping someone on a deadline-less
+  // cycle without leaking a placeholder number into the copy.
   const urgency =
-    daysLeft <= 1
-      ? ":rotating_light: Last call!"
-      : daysLeft <= 3
-        ? ":hourglass_flowing_sand: Getting close!"
-        : ":wave: Heads up!";
+    daysLeft === null
+      ? ":wave: Heads up!"
+      : daysLeft <= 1
+        ? ":rotating_light: Last call!"
+        : daysLeft <= 3
+          ? ":hourglass_flowing_sand: Getting close!"
+          : ":wave: Heads up!";
 
-  const dueText = daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`;
-  const buttonText = daysLeft <= 1 ? "Complete now :zap:" : "Let's do it :muscle:";
+  const dueText =
+    daysLeft === null
+      ? "still pending"
+      : daysLeft <= 1
+        ? "due tomorrow"
+        : `due in ${daysLeft} days`;
+  const buttonText =
+    daysLeft !== null && daysLeft <= 1 ? "Complete now :zap:" : "Let's do it :muscle:";
 
   return [
     {
