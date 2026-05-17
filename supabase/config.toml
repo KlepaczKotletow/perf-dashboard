@@ -1,0 +1,37 @@
+# Supabase project configuration — applied on `supabase functions deploy`.
+#
+# Slack and Stripe webhook surfaces MUST run with verify_jwt = false because
+# the external service POSTs without a Supabase JWT. Each function performs
+# its own signature verification against the provider's signing secret, which
+# is the correct trust boundary for these endpoints.
+#
+# Regression note: in May 2026 every Slack button click and slash command was
+# failing with 401 because these functions had been redeployed without
+# --no-verify-jwt and there was no config.toml to remember the setting. This
+# file is the durable fix.
+
+project_id = "zhfvxfvmdlpdfgxrwtdn"
+
+[functions.slack-events]
+verify_jwt = false
+
+[functions.slack-interactivity]
+verify_jwt = false
+
+[functions.slack-commands]
+verify_jwt = false
+
+[functions.slack-oauth]
+verify_jwt = false
+
+[functions.slack-reinstall]
+verify_jwt = false
+
+[functions.dashboard-auth]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.oauth-state-probe]
+verify_jwt = false
