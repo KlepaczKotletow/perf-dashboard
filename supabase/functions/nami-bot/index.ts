@@ -1618,9 +1618,173 @@ async function handleReleaseGrades(cycleId: string) {
   return { queued: pending ?? jobs.length };
 }
 
+// =============================================================================
+//  handleManualReminder — HR/Admin one-off reminder to a single user
+//
+//  Triggered from the cycle's Nami Status table. Bypasses the cron's
+//  deadline-tier dedup (7d/3d/1d) by using a dedicated event_type
+//  (`nami_manual_reminder`) and a unique reference_id (timestamp suffix).
+//  Notification prefs are still honored — a manual nudge for someone in
+//  digest/snooze mode is held back so we don't override their settings.
+// =============================================================================
+async function handleManualReminder(params: {
+  cycleId: string;
+  assignmentId: string;
+  targetUserId: string;
+  role: "self" | "manager" | "upward";
+  callerWorkspaceId: string;
+}): Promise<{ ok: boolean; sent?: boolean; error?: string; status?: number }> {
+  const { cycleId, assignmentId, targetUserId, role, callerWorkspaceId } = params;
+
+  // 1. Load cycle, scoped to caller's workspace
+  const { data: cycle } = await supabase
+    .from("performance_cycles")
+    .select("id, name, workspace_id")
+    .eq("id", cycleId)
+    .eq("workspace_id", callerWorkspaceId)
+    .single();
+  if (!cycle) return { ok: false, error: "Cycle not found", status: 404 };
+
+  // 2. Load the assignment, verify it belongs to this cycle
+  const { data: assignment } = await supabase
+    .from("review_assignments")
+    .select("id, cycle_id, status, assignment_type, employee_id, manager_id, reviewer_id")
+    .eq("id", assignmentId)
+    .eq("cycle_id", cycleId)
+    .single();
+  if (!assignment) return { ok: false, error: "Assignment not found", status: 404 };
+
+  // 3. Cross-check role <-> user_id. Prevents an HR caller from re-targeting
+  //    a manual reminder to someone unrelated to the assignment.
+  const expectedUserId =
+    role === "self" ? assignment.employee_id :
+    role === "manager" ? assignment.manager_id :
+    /* upward */ assignment.reviewer_id;
+  if (expectedUserId !== targetUserId) {
+    return { ok: false, error: "User does not match the assignment role", status: 400 };
+  }
+
+  // 4. Don't send for already-completed work
+  if (
+    (role === "self" && (assignment.status === "in_progress" || assignment.status === "completed")) ||
+    (role === "manager" && assignment.status === "completed") ||
+    (role === "upward" && assignment.status === "completed")
+  ) {
+    return { ok: false, error: "Review already submitted — nothing to remind about", status: 409 };
+  }
+
+  // 5. Load the target user (scoped to the same workspace)
+  const { data: target } = await supabase
+    .from("users")
+    .select("id, slack_user_id, slack_name, workspace_id")
+    .eq("id", targetUserId)
+    .eq("workspace_id", callerWorkspaceId)
+    .single();
+  if (!target) return { ok: false, error: "Target user not in this workspace", status: 404 };
+  if (!target.slack_user_id) {
+    return { ok: false, error: "User hasn't connected Slack — can't DM them", status: 422 };
+  }
+
+  // 6. Honor notification prefs (snooze / digest). Manual reminders are
+  //    "normal" priority — if the recipient is paused, defer to their setting
+  //    rather than overriding it.
+  const allowed = await isAllowedByPrefs(target.id, "normal");
+  if (!allowed) {
+    return { ok: false, error: "Recipient has notifications snoozed or in digest mode", status: 409 };
+  }
+
+  // 7. Workspace Slack token
+  const tokens = await getWorkspaceSlackTokens(cycle.workspace_id);
+  const botToken = tokens?.botToken;
+  if (!botToken) {
+    return { ok: false, error: "Slack workspace not connected", status: 503 };
+  }
+
+  // 8. Subject name for the reminder text
+  let subjectName: string | null = null;
+  if (role === "manager" && assignment.employee_id) {
+    const { data: emp } = await supabase
+      .from("users")
+      .select("slack_name")
+      .eq("id", assignment.employee_id)
+      .single();
+    subjectName = emp?.slack_name ?? null;
+  } else if (role === "upward" && assignment.employee_id) {
+    const { data: subject } = await supabase
+      .from("users")
+      .select("slack_name")
+      .eq("id", assignment.employee_id)
+      .single();
+    subjectName = subject?.slack_name ?? null;
+  }
+
+  // 9. Phase-aware deadline (same resolver the cron uses)
+  let daysLeft = 999;
+  try {
+    const deadlineDate = await getDeadlineForCycle(supabase, cycleId, cycle.workspace_id);
+    if (deadlineDate) {
+      daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    }
+  } catch (err) {
+    console.warn("[handleManualReminder] deadline lookup failed; falling back to generic copy:", err);
+  }
+
+  const itemName =
+    role === "self"
+      ? `self-review for ${cycle.name}`
+      : role === "manager"
+        ? `manager review of ${subjectName || "your team member"} for ${cycle.name}`
+        : `upward feedback on ${subjectName || "your manager"} for ${cycle.name}`;
+
+  const refRole = role === "manager" ? "mgr" : role;
+  const actionValue = `${refRole}_${assignment.id}`;
+
+  // 10. Build + send
+  const blocks = buildDeadlineReminder(
+    target.slack_name || "there",
+    itemName,
+    daysLeft,
+    actionValue,
+    "nami_start_review",
+  );
+  const fallbackText = `Reminder: ${itemName} — ${
+    daysLeft <= 1 ? "due tomorrow" : `due in ${daysLeft} days`
+  }`;
+
+  // 11. Log + send. Use a unique reference_id per click (no cooldown by design)
+  //     and a dedicated event_type so this never collides with cron's tiered
+  //     dedup (nami_reminder_7d/3d/1d) or the initial DM (nami_initial).
+  const referenceId = `manual_${refRole}_${assignment.id}_${Date.now()}`;
+  const eventType = "nami_manual_reminder";
+
+  const claimed = await logNotification(
+    cycle.workspace_id,
+    target.id,
+    eventType,
+    referenceId,
+  );
+  if (!claimed) {
+    return { ok: false, error: "Could not record the reminder — try again", status: 500 };
+  }
+
+  const sent = await sendSlackBlocks(
+    botToken,
+    target.slack_user_id,
+    fallbackText,
+    blocks,
+  );
+
+  if (!sent) {
+    await rollbackNotification(cycle.workspace_id, target.id, eventType, referenceId);
+    return { ok: false, error: "Slack rejected the DM — they may have left the workspace", status: 502 };
+  }
+
+  return { ok: true, sent: true };
+}
+
 async function resolveCallerWorkspace(
   token: string,
-): Promise<{ workspaceId: string } | null> {
+): Promise<{ workspaceId: string; userId: string; role: string | null } | null> {
   const authClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const {
     data: { user },
@@ -1630,11 +1794,13 @@ async function resolveCallerWorkspace(
 
   const { data: dbUser } = await supabase
     .from("users")
-    .select("workspace_id")
+    .select("id, workspace_id, role")
     .eq("slack_email", user.email)
     .single();
 
-  return dbUser ? { workspaceId: dbUser.workspace_id } : null;
+  return dbUser
+    ? { workspaceId: dbUser.workspace_id, userId: dbUser.id, role: dbUser.role ?? null }
+    : null;
 }
 
 /**
@@ -2183,6 +2349,7 @@ Deno.serve(async (req) => {
 
   // For JWT auth: extract the token and cryptographically verify it
   let callerWorkspaceId: string | null = null;
+  let callerRole: string | null = null;
   let hasJwtAuth = false;
 
   if (!hasCronAuth && authHeader.startsWith("Bearer ")) {
@@ -2190,6 +2357,7 @@ Deno.serve(async (req) => {
     const resolved = await resolveCallerWorkspace(token);
     if (resolved) {
       callerWorkspaceId = resolved.workspaceId;
+      callerRole = resolved.role;
       hasJwtAuth = true;
     }
   }
@@ -2208,11 +2376,14 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  const { action, cycle_id, survey_id, mode } = body as {
+  const { action, cycle_id, survey_id, mode, assignment_id, user_id, role } = body as {
     action?: string;
     cycle_id?: string;
     survey_id?: string;
     mode?: string;
+    assignment_id?: string;
+    user_id?: string;
+    role?: string;
   };
 
   const ACTIONS_WITHOUT_AUTH = new Set<string>([]); // empty — every action requires auth
@@ -2316,6 +2487,58 @@ Deno.serve(async (req) => {
       }
       const result = await handleReleaseGrades(cycle_id);
       return new Response(JSON.stringify({ ok: true, ...result }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    //  send_manual_reminder: HR/Admin re-pings one user for one assignment.
+    //  Per-row trigger from the cycle's Nami Status table — no cooldown by
+    //  design (the operator sees their own click).
+    //
+    //  Body: { action, cycle_id, assignment_id, user_id, role }
+    //  Role: "self" | "manager" | "upward"
+    //
+    //  Auth: requires a valid JWT, and the caller must be hr/admin in the
+    //  cycle's workspace. CRON_SECRET is intentionally rejected — this is a
+    //  human-triggered action and should never come from automation.
+    // -----------------------------------------------------------------------
+    if (action === "send_manual_reminder") {
+      if (!hasJwtAuth) {
+        return new Response(
+          JSON.stringify({ error: "send_manual_reminder requires user auth" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (callerRole !== "hr" && callerRole !== "admin") {
+        return new Response(
+          JSON.stringify({ error: "Forbidden: HR or admin role required" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (!cycle_id || !assignment_id || !user_id || !role) {
+        return new Response(
+          JSON.stringify({ error: "Missing cycle_id, assignment_id, user_id, or role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      if (role !== "self" && role !== "manager" && role !== "upward") {
+        return new Response(
+          JSON.stringify({ error: "Invalid role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      const result = await handleManualReminder({
+        cycleId: cycle_id,
+        assignmentId: assignment_id,
+        targetUserId: user_id,
+        role: role as "self" | "manager" | "upward",
+        callerWorkspaceId: callerWorkspaceId!,
+      });
+      const status = result.ok ? 200 : (result.status ?? 400);
+      return new Response(JSON.stringify(result), {
+        status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
