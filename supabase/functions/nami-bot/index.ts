@@ -22,7 +22,7 @@ import {
   SlackRateLimitError,
   sendSlackBlocksWithTs,
 } from "../_shared/slack-api.ts";
-import { getWorkspaceSlackTokens, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
+import { getWorkspaceSlackTokens, refreshSlackToken, type WorkspaceTokens } from "../_shared/workspace-tokens.ts";
 import { getDeadlineForCycle } from "../_shared/deadline-resolver.ts";
 import {
   shouldDeliverNow,
@@ -1788,14 +1788,33 @@ async function handleManualReminder(params: {
   // `error` field — generic "rejected the DM" is too vague for HR to act on
   // (e.g. "user_not_found" vs "channel_not_found" vs "missing_scope" all
   // mean different fixes).
+  //
+  // Defence-in-depth on token_expired: getWorkspaceSlackTokens already
+  // proactively refreshes when close to expiry, but if Slack still rejects
+  // with token_expired (clock skew, mid-flight rotation) we refresh once
+  // and retry. Any other error bubbles up to the hint dictionary below.
   let slackError: string | undefined;
   let sent = false;
-  try {
-    const data = await callSlackApi(botToken, "chat.postMessage", {
-      channel: target.slack_user_id,
+  let activeToken = botToken;
+
+  async function postOnce(token: string) {
+    return await callSlackApi(token, "chat.postMessage", {
+      channel: target!.slack_user_id,
       text: fallbackText,
       blocks,
     });
+  }
+
+  try {
+    let data = await postOnce(activeToken);
+    if (data?.ok !== true && data?.error === "token_expired" && tokens?.refreshToken) {
+      console.warn(`${tag} slack-token-expired; refreshing and retrying`);
+      const refreshed = await refreshSlackToken(cycle.workspace_id, tokens.refreshToken);
+      if (refreshed?.botToken) {
+        activeToken = refreshed.botToken;
+        data = await postOnce(activeToken);
+      }
+    }
     sent = data?.ok === true;
     if (!sent) {
       slackError = typeof data?.error === "string" ? data.error : "unknown_error";
@@ -1820,6 +1839,8 @@ async function handleManualReminder(params: {
       not_authed: "Slack token is invalid — reinstall Nami in Slack.",
       invalid_auth: "Slack token is invalid — reinstall Nami in Slack.",
       token_revoked: "Slack token has been revoked — reinstall Nami in Slack.",
+      token_expired: "Slack token expired and refresh failed — reinstall Nami in Slack.",
+      invalid_refresh_token: "Slack refresh token is invalid — reinstall Nami in Slack.",
       account_inactive: "User's Slack account is deactivated.",
       restricted_action: "Slack workspace policy blocked this DM.",
     };
