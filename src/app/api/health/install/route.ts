@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { SLACK_BOT_SCOPES } from "@/lib/slack-scopes";
+import { SLACK_BOT_SCOPES, SLACK_USER_SCOPES } from "@/lib/slack-scopes";
 
 // Smoke test for the Slack install path. Wired to a Vercel cron in
 // vercel.json so a regression pages on the next tick instead of waiting
@@ -9,6 +9,8 @@ import { SLACK_BOT_SCOPES } from "@/lib/slack-scopes";
 // What it catches (the bugs that prompted this route):
 //   - Banner / setup link points somewhere that 302s away from Slack.
 //   - slack-reinstall is reachable but missing required scopes.
+//   - dashboard-auth's install-fallback path drifts from the scope SoT
+//     (the sign-in regression that motivated this check).
 //   - OAUTH_STATE_SECRET on Supabase is gone / rotated mid-deploy.
 //   - slack-reinstall stops producing a signed state.
 //
@@ -93,6 +95,74 @@ async function checkSlackReinstall(supabaseUrl: string): Promise<Check[]> {
   return checks;
 }
 
+async function checkDashboardAuthScopes(supabaseUrl: string): Promise<Check[]> {
+  const checks: Check[] = [];
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/functions/v1/dashboard-auth?probe=install_scopes`,
+      { cache: "no-store" },
+    );
+    if (res.status !== 200) {
+      checks.push({
+        name: "dashboard-auth scope probe responds 200",
+        ok: false,
+        detail: `got ${res.status}`,
+      });
+      return checks;
+    }
+    const body = (await res.json().catch(() => null)) as
+      | { ok?: boolean; bot_scope?: string; user_scope?: string }
+      | null;
+    if (!body?.ok || !body.bot_scope) {
+      checks.push({
+        name: "dashboard-auth scope probe returns ok body",
+        ok: false,
+        detail: JSON.stringify(body).slice(0, 120),
+      });
+      return checks;
+    }
+    checks.push({ name: "dashboard-auth scope probe responds 200", ok: true });
+
+    const requested = body.bot_scope
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const missing = SLACK_BOT_SCOPES.filter((s) => !requested.includes(s));
+    if (missing.length > 0) {
+      checks.push({
+        name: "dashboard-auth install-fallback requests all required bot scopes",
+        ok: false,
+        detail: `missing: ${missing.join(",")}`,
+      });
+    } else {
+      checks.push({
+        name: "dashboard-auth install-fallback requests all required bot scopes",
+        ok: true,
+      });
+    }
+
+    if (body.user_scope !== SLACK_USER_SCOPES) {
+      checks.push({
+        name: "dashboard-auth install-fallback user scopes match SoT",
+        ok: false,
+        detail: `got "${body.user_scope}"`,
+      });
+    } else {
+      checks.push({
+        name: "dashboard-auth install-fallback user scopes match SoT",
+        ok: true,
+      });
+    }
+  } catch (e) {
+    checks.push({
+      name: "dashboard-auth scope probe reachable",
+      ok: false,
+      detail: e instanceof Error ? e.message : String(e),
+    });
+  }
+  return checks;
+}
+
 async function checkOAuthStateProbe(supabaseUrl: string): Promise<Check[]> {
   try {
     const res = await fetch(`${supabaseUrl}/functions/v1/oauth-state-probe`, {
@@ -125,12 +195,13 @@ async function checkOAuthStateProbe(supabaseUrl: string): Promise<Check[]> {
 export async function GET() {
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL.trim().replace(/\/+$/, "");
 
-  const [reinstallChecks, probeChecks] = await Promise.all([
+  const [reinstallChecks, dashboardAuthChecks, probeChecks] = await Promise.all([
     checkSlackReinstall(supabaseUrl),
+    checkDashboardAuthScopes(supabaseUrl),
     checkOAuthStateProbe(supabaseUrl),
   ]);
 
-  const checks = [...reinstallChecks, ...probeChecks];
+  const checks = [...reinstallChecks, ...dashboardAuthChecks, ...probeChecks];
   const ok = checks.every((c) => c.ok);
 
   return NextResponse.json(

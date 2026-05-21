@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { signOAuthState } from "../_shared/oauth-state.ts";
+import {
+  SLACK_BOT_SCOPE_STRING,
+  SLACK_USER_SCOPES,
+} from "../_shared/slack-scopes.ts";
 
 // Co-locate state signing with slack-oauth's state verification: both functions
 // use the same OAUTH_STATE_SECRET on the Supabase side, so a Vercel/Supabase
@@ -15,26 +19,6 @@ const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "")
   .trim()
   .replace(/\/+$/, "");
-
-// Must be a superset of REQUIRED_BOT_SCOPES in slack-oauth/index.ts. That
-// validator runs after Slack grants the token and rejects the install if any
-// required scope is missing — so anything we forget here means a
-// missing_scopes error on the callback. Kept alphabetised so drift against
-// the validator list is obvious in a diff.
-const SCOPES = [
-  "app_mentions:read",
-  "channels:read",
-  "chat:write",
-  "commands",
-  "im:history",
-  "im:read",
-  "im:write",
-  "reactions:read",
-  "team:read",
-  "users:read",
-  "users:read.email",
-].join(",");
-const USER_SCOPES = "identity.basic,identity.email";
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "GET") {
@@ -52,8 +36,8 @@ Deno.serve(async (req: Request) => {
 
   const params = new URLSearchParams({
     client_id: SLACK_CLIENT_ID,
-    scope: SCOPES,
-    user_scope: USER_SCOPES,
+    scope: SLACK_BOT_SCOPE_STRING,
+    user_scope: SLACK_USER_SCOPES,
     redirect_uri: redirectUri,
     state,
   });

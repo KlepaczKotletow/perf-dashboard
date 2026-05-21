@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { setWorkspaceSlackTokens } from "../_shared/workspace-tokens.ts";
 import { verifyOAuthState } from "../_shared/oauth-state.ts";
+import { SLACK_BOT_SCOPES } from "../_shared/slack-scopes.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -192,23 +193,14 @@ Deno.serve(async (req: Request) => {
     // admin dropped one during reinstall (or Slack's scope-upgrade flow
     // didn't complete), fail loudly at install time instead of letting a
     // later slash-command / DM silently error out with "missing_scope".
-    const REQUIRED_BOT_SCOPES = [
-      "chat:write",
-      "commands",
-      "users:read",
-      "users:read.email",
-      "team:read",
-      "im:write",
-      "im:history",
-      "app_mentions:read",
-      "reactions:read",
-      "channels:read",
-    ];
+    // Scope list comes from the shared SoT (../_shared/slack-scopes.ts) so
+    // this validator can never drift from what the install-URL builders
+    // actually request.
     const grantedScopes = String(tokenData.scope ?? "")
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean);
-    const missingScopes = REQUIRED_BOT_SCOPES.filter(
+    const missingScopes = SLACK_BOT_SCOPES.filter(
       (s) => !grantedScopes.includes(s),
     );
     if (missingScopes.length > 0) {
