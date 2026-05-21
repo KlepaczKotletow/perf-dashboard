@@ -3,14 +3,13 @@ import type Stripe from "stripe";
 import type { Metadata } from "next";
 import { SetupClient } from "./setup-client";
 import { getStripe } from "@/lib/stripe";
-import { signOAuthState } from "@/lib/oauth-state";
 import { signSeatSync } from "@/lib/seat-sync";
 import { createServiceRoleClient, getUserWorkspace } from "@/lib/supabase-server";
 import { env } from "@/lib/env";
 import { isAdmin } from "@/lib/roles";
-import { SLACK_BOT_SCOPE_STRING, SLACK_USER_SCOPES } from "@/lib/slack-scopes";
 
-// signOAuthState produces a per-request token; never cache this page.
+// The Add to Slack URL is signed by slack-reinstall on Supabase; this page
+// stays dynamic so the link is always rebuilt per request.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -178,16 +177,14 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     }
   }
 
-  // Build the Add to Slack URL with HMAC-signed state. We embed the
-  // setup_token inside the signed payload so the slack-oauth callback can
-  // still link the new install to the pre-paid Stripe subscription.
+  // Build the Add to Slack URL via slack-reinstall on Supabase. The Supabase
+  // function signs the state with OAUTH_STATE_SECRET (which only exists on
+  // Supabase) and embeds the setup_token in the signed payload so the
+  // slack-oauth callback can still link the new install to the pre-paid
+  // Stripe subscription. Vercel never signs OAuth state — see the comment
+  // block at the top of supabase/functions/slack-reinstall.
   const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL.trim().replace(/\/+$/, '');
-  const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID || "";
-  const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  const oauthState = await signOAuthState({ purpose: "setup", setup_token: setupToken });
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${SLACK_BOT_SCOPE_STRING}&user_scope=${SLACK_USER_SCOPES}&redirect_uri=${encodeURIComponent(
-    slackRedirectUri
-  )}&state=${encodeURIComponent(oauthState)}`;
+  const addToSlackUrl = `${supabaseUrl}/functions/v1/slack-reinstall?purpose=setup&setup_token=${encodeURIComponent(setupToken)}`;
 
   return (
     <SetupClient

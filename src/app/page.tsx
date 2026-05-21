@@ -8,10 +8,10 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { MobileNav } from "@/components/landing/mobile-nav";
 import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { FeatureTabs } from "@/components/landing/feature-tabs";
-import { signOAuthState } from "@/lib/oauth-state";
-import { SLACK_BOT_SCOPE_STRING, SLACK_USER_SCOPES } from "@/lib/slack-scopes";
 
-// signOAuthState produces a per-request token; never cache this page.
+// addToSlackUrl points at a Supabase edge function that signs the OAuth
+// state and 302s to Slack — keep dynamic so the link is always served
+// from a request that can hit Supabase.
 export const dynamic = "force-dynamic";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
@@ -140,11 +140,12 @@ const faqJsonLd = {
 
 export default async function Home() {
   const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, '');
-  const slackClientId = process.env.NEXT_PUBLIC_SLACK_CLIENT_ID;
-  const slackRedirectUri = `${supabaseUrl}/functions/v1/slack-oauth`;
-  // CSRF: HMAC-signed state, verified server-side in slack-oauth.
-  const oauthState = await signOAuthState({ purpose: "landing" });
-  const addToSlackUrl = `https://slack.com/oauth/v2/authorize?client_id=${slackClientId}&scope=${SLACK_BOT_SCOPE_STRING}&user_scope=${SLACK_USER_SCOPES}&redirect_uri=${encodeURIComponent(slackRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
+  // The Add to Slack CTA goes through slack-reinstall on Supabase, which
+  // signs the OAuth state with Supabase's OAUTH_STATE_SECRET and 302s to
+  // slack.com/oauth/v2/authorize. Signing on Vercel would require a second
+  // copy of OAUTH_STATE_SECRET that drifts from Supabase's — see the
+  // comment block at the top of supabase/functions/slack-reinstall.
+  const addToSlackUrl = `${supabaseUrl}/functions/v1/slack-reinstall?purpose=landing`;
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
 
   return (

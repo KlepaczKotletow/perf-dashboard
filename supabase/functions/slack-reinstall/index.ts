@@ -5,20 +5,33 @@ import {
   SLACK_USER_SCOPES,
 } from "../_shared/slack-scopes.ts";
 
-// Co-locate state signing with slack-oauth's state verification: both functions
-// use the same OAUTH_STATE_SECRET on the Supabase side, so a Vercel/Supabase
-// secret drift can't break the reinstall round-trip. (The dashboard-auth
-// function uses the same trick for its install-fallback path.)
+// Universal install-URL redirect for every Nami install entry point: the
+// landing page "Add to Slack" CTA, the post-checkout /setup page, and the
+// existing-install /reinstall page. Each caller hits this function with a
+// `?purpose=` query and gets back a 302 to slack.com/oauth/v2/authorize with
+// an HMAC-signed state.
 //
-// Hit by the Vercel /reinstall page after it has confirmed the caller is an
-// admin of an existing workspace. Slack admin auth on the consent screen is
-// the actual gate — this function just produces a signed state and the OAuth
-// URL.
+// Why centralise here instead of signing on Vercel: Vercel and Supabase do
+// not share OAUTH_STATE_SECRET in this project. Vercel-signed states fail
+// verification on slack-oauth (Supabase) with invalid_state. PR #18 moved
+// the /reinstall flow off Vercel; this commit completes the migration so
+// every OAuth state in the system is signed and verified inside Supabase.
+// Drift between the two stores can no longer break install/sign-in.
+//
+// Backward compat: callers that pass no `?purpose=` get the legacy
+// "reinstall" tag, matching the original behaviour of this function.
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "")
   .trim()
   .replace(/\/+$/, "");
+
+const ALLOWED_PURPOSES = new Set([
+  "reinstall",
+  "landing",
+  "install",
+  "setup",
+]);
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "GET") {
@@ -26,13 +39,30 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url);
+
+  // Optional: pin install to a specific workspace so Slack skips the
+  // workspace-picker on the consent screen. Used by /reinstall.
   const team = (url.searchParams.get("team") || "").trim();
-  // Slack team IDs are short, ASCII, prefixed with T. Reject anything else
-  // outright rather than forwarding random query strings to slack.com.
   const safeTeam = /^T[A-Z0-9_-]{1,32}$/i.test(team) ? team : "";
 
+  // Optional: caller-supplied purpose tag. Pure diagnostics — slack-oauth
+  // does not gate on this. Whitelisted to keep the value bounded.
+  const purposeRaw = (url.searchParams.get("purpose") || "").trim();
+  const purpose = ALLOWED_PURPOSES.has(purposeRaw) ? purposeRaw : "reinstall";
+
+  // Optional: setup_token from /setup, embedded into the state extras so
+  // slack-oauth can link the eventual install to the pre-paid Stripe
+  // subscription. UUID format from crypto.randomUUID().
+  const setupTokenRaw = (url.searchParams.get("setup_token") || "").trim();
+  const safeSetupToken = /^[A-Za-z0-9_-]{1,64}$/.test(setupTokenRaw)
+    ? setupTokenRaw
+    : "";
+
   const redirectUri = `${SUPABASE_URL}/functions/v1/slack-oauth`;
-  const state = await signOAuthState({ purpose: "reinstall" });
+
+  const stateExtras: Record<string, unknown> = { purpose };
+  if (safeSetupToken) stateExtras.setup_token = safeSetupToken;
+  const state = await signOAuthState(stateExtras);
 
   const params = new URLSearchParams({
     client_id: SLACK_CLIENT_ID,
