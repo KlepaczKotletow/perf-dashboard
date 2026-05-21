@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { signOAuthState } from "../_shared/oauth-state.ts";
+import {
+  SLACK_BOT_SCOPE_STRING,
+  SLACK_USER_SCOPES,
+} from "../_shared/slack-scopes.ts";
 
 const SLACK_CLIENT_ID = Deno.env.get("SLACK_CLIENT_ID") || "";
 const SLACK_CLIENT_SECRET = Deno.env.get("SLACK_CLIENT_SECRET") || "";
@@ -38,6 +42,21 @@ Deno.serve(async (req) => {
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
   const returnedState = url.searchParams.get("state");
+
+  // Health-probe mode: return the bot/user scope strings this function
+  // would emit on the install-fallback path (line ~115 below). Used by
+  // /api/health/install to assert this deployed bundle's scopes match
+  // the SoT in _shared/slack-scopes.ts. Cheap and side-effect free.
+  if (url.searchParams.get("probe") === "install_scopes") {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        bot_scope: SLACK_BOT_SCOPE_STRING,
+        user_scope: SLACK_USER_SCOPES,
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
 
   if (error) {
     return Response.redirect(`${DASHBOARD_URL}/auth/error?message=${encodeURIComponent(error)}`, 302);
@@ -103,12 +122,14 @@ Deno.serve(async (req) => {
       .limit(1);
 
     if (!workspaces || workspaces.length === 0) {
-      // Workspace doesn't exist yet — redirect to install flow instead of dead-end error
-      const scopes = "app_mentions:read,chat:write,commands,im:history,im:read,im:write,users:read,users:read.email";
-      const userScopes = "identity.basic,identity.email";
+      // Workspace doesn't exist yet — redirect to install flow instead of
+      // dead-end error. Scopes come from the shared SoT
+      // (../_shared/slack-scopes.ts) so this stays in lockstep with the
+      // slack-oauth validator. A hardcoded subset here caused the
+      // missing_scopes regression that motivated the SoT consolidation.
       const installRedirectUri = `${SUPABASE_URL}/functions/v1/slack-oauth`;
       const oauthState = await signOAuthState({ purpose: "install" });
-      const installUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${scopes}&user_scope=${userScopes}&redirect_uri=${encodeURIComponent(installRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
+      const installUrl = `https://slack.com/oauth/v2/authorize?client_id=${SLACK_CLIENT_ID}&scope=${SLACK_BOT_SCOPE_STRING}&user_scope=${SLACK_USER_SCOPES}&redirect_uri=${encodeURIComponent(installRedirectUri)}&state=${encodeURIComponent(oauthState)}`;
       return Response.redirect(installUrl, 302);
     }
 
