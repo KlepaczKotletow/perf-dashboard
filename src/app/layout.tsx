@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+
+const GOOGLE_ADS_ID = "AW-18179782629";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -122,6 +125,18 @@ export default function RootLayout({
         {children}
         <SpeedInsights />
         <Analytics />
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GOOGLE_ADS_ID}');
+          `}
+        </Script>
       </body>
     </html>
   );
