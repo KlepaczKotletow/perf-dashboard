@@ -8,6 +8,7 @@ import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { MobileNav } from "@/components/landing/mobile-nav";
 import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { FeatureTabs } from "@/components/landing/feature-tabs";
+import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
 
 // addToSlackUrl points at a Supabase edge function that signs the OAuth
 // state and 302s to Slack — keep dynamic so the link is always served
@@ -181,10 +182,10 @@ export default async function Home() {
               <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
               <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
-                <a href={addToSlackUrl}>
+                <AddToSlackLink href={addToSlackUrl}>
                   <Slack className="h-4 w-4 mr-1.5" />
                   Add to Slack
-                </a>
+                </AddToSlackLink>
               </Button>
             </div>
             <MobileNav signInUrl={signInWithSlackUrl} addToSlackUrl={addToSlackUrl} />
@@ -219,10 +220,10 @@ export default async function Home() {
               <div className="relative mt-8">
                 <div className="flex flex-col sm:flex-row items-start gap-3">
                   <Button size="lg" className="h-12 px-7 text-sm font-semibold rounded-full btn-glow" asChild>
-                    <a href={addToSlackUrl}>
+                    <AddToSlackLink href={addToSlackUrl}>
                       <Slack className="h-4 w-4 mr-2" />
                       Add to Slack — free
-                    </a>
+                    </AddToSlackLink>
                   </Button>
                   <Button
                     size="lg"
@@ -1020,10 +1021,10 @@ export default async function Home() {
             </p>
             <div className="mt-10">
               <Button size="lg" className="h-13 px-8 text-base font-semibold btn-glow" asChild>
-                <a href={addToSlackUrl}>
+                <AddToSlackLink href={addToSlackUrl}>
                   <Slack className="h-5 w-5 mr-2" />
                   Add to Slack — it&apos;s free
-                </a>
+                </AddToSlackLink>
               </Button>
             </div>
             <p className="mt-6 text-xs text-muted-foreground/60">No credit card. No setup fee. Cancel anytime.</p>
