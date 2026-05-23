@@ -345,15 +345,27 @@ export default function RoadmapPage() {
               </div>
             )}
 
+            {/* Forward-looking statement */}
+            <div className="mt-10 rounded-xl border border-border/60 bg-muted/30 px-5 py-4">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                <strong className="text-foreground">A note on this roadmap.</strong> Items marked
+                &quot;planned&quot; or &quot;exploring&quot; reflect our current thinking and may
+                change. They are not commitments, are not part of any subscription agreement, and
+                you should not make purchasing decisions based on unreleased features. Estimated
+                timelines are intentionally not shown. For our security and compliance posture
+                today, see our <Link href="/security" className="text-primary underline">Security page</Link>.
+              </p>
+            </div>
+
             {/* Suggest a feature */}
-            <div className="mt-12 rounded-2xl border border-border/60 bg-gradient-to-br from-primary/[0.03] to-background p-6 sm:p-8">
+            <div className="mt-8 rounded-2xl border border-border/60 bg-gradient-to-br from-primary/[0.03] to-background p-6 sm:p-8">
               <div className="flex items-start gap-3 mb-4">
                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <Send className="h-5 w-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-foreground">Suggest a feature</h3>
-                  <p className="text-sm text-muted-foreground">Have an idea? We&apos;d love to hear it. Popular suggestions get added to the roadmap.</p>
+                  <p className="text-sm text-muted-foreground">Have an idea? We&apos;d love to hear it. Popular suggestions get added to the roadmap. By submitting, you grant us a license to use your suggestion under our <Link href="/terms" className="text-primary underline">Terms</Link>.</p>
                 </div>
               </div>
 

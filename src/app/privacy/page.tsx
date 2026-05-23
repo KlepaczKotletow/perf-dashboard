@@ -6,12 +6,12 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").repl
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Nami. How we collect, use, protect, and handle your data — including data residency, retention, and your rights under GDPR.",
+    "Privacy Policy for Nami, the Slack-native performance management platform. How we collect, use, protect, and handle your data — including data residency, retention, subprocessors, and your rights under GDPR, UK GDPR, CCPA/CPRA, and similar laws.",
   alternates: { canonical: "/privacy" },
   openGraph: {
     title: "Privacy Policy — Nami",
     description:
-      "How Nami collects, uses, protects, and handles your data — including retention, residency, and your GDPR rights.",
+      "How Nami collects, uses, protects, and handles your data — including retention, residency, subprocessors, and your GDPR / CCPA rights.",
     url: "/privacy",
     type: "website",
   },
@@ -22,25 +22,11 @@ export const metadata: Metadata = {
   },
 };
 
-const breadcrumbJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
-    { "@type": "ListItem", position: 2, name: "Privacy Policy", item: `${SITE_URL}/privacy` },
-  ],
-};
-
 export default function PrivacyPolicyPage() {
-  const effectiveDate = "March 27, 2026";
+  const effectiveDate = "May 23, 2026";
 
   return (
     <div className="min-h-screen bg-background py-16">
-      <script
-        type="application/ld+json"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-      />
       <div className="max-w-3xl mx-auto px-6">
         <div className="mb-6">
           <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -60,450 +46,688 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Introduction</h2>
             <p className="mb-3">
-              Nami (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is
-              committed to protecting the privacy and security of your information. This Privacy
-              Policy explains how we collect, use, disclose, and safeguard your information when you
-              use the Nami platform, including our web application, Slack integration, and all related
-              services (collectively, the &quot;Service&quot;).
+              Nami (&quot;Company,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is the
+              Slack-native performance management platform available at{" "}
+              <a href={SITE_URL} className="text-primary underline">namihr.com</a>. This Privacy Policy
+              explains how we collect, use, disclose, and safeguard information when you or your
+              organization use the Nami web application, our Slack integration, our public website,
+              and any related services (collectively, the &quot;Service&quot;).
             </p>
             <p className="mb-3">
               By using the Service, you consent to the data practices described in this Privacy
-              Policy. If you do not agree with the practices described herein, you should not use the
+              Policy. If you do not agree with the practices described herein, you must not use the
               Service.
             </p>
             <p>
-              This Privacy Policy should be read in conjunction with our{" "}
-              <Link href="/terms" className="text-primary underline">Terms of Service</Link>.
+              This Privacy Policy should be read together with our{" "}
+              <Link href="/terms" className="text-primary underline">Terms of Service</Link> and our{" "}
+              <Link href="/security" className="text-primary underline">Security overview</Link>.
             </p>
           </section>
 
           {/* ── 2 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">2. Information We Collect</h2>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">2.1 Information from Slack</h3>
-            <p className="mb-2">
-              When you install the Nami Slack application, we receive the following information from
-              your Slack workspace through the OAuth 2.0 authorization flow:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Slack workspace ID and workspace name</li>
-              <li>Slack user IDs, display names, and email addresses</li>
-              <li>Profile information such as job titles and avatar URLs</li>
-              <li>Bot access tokens necessary to send messages on behalf of the Nami bot</li>
-            </ul>
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              2. Controller, Processor, and Roles
+            </h2>
             <p className="mb-3">
-              We request the following Slack OAuth scopes:{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">app_mentions:read</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">chat:write</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">commands</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">im:history</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">im:read</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">im:write</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">users:read</code>,{" "}
-              <code className="text-xs bg-muted px-1 py-0.5 rounded">users:read.email</code>.
+              For data submitted to the Service through your Slack workspace (such as performance
+              reviews, feedback, goals, survey responses, and directory information), your
+              organization is the <strong>data controller</strong> and Nami acts as the{" "}
+              <strong>data processor</strong> processing that information solely on your
+              instructions and as described in this Privacy Policy and our Data Processing
+              Agreement.
+            </p>
+            <p className="mb-3">
+              Because performance reviews, ratings, calibration grades, and feedback messages relate
+              to employment, your organization (as the employer) is the controller responsible for
+              determining the lawful basis for processing, providing transparency to its employees,
+              and responding to employee data-subject requests in the first instance. Nami will
+              support you in fulfilling those obligations.
             </p>
             <p>
-              We do not read the content of your Slack channels, group messages, or direct messages
-              beyond those sent directly to the Nami bot as part of the review and feedback workflow.
+              For information collected directly by Nami in our role as a business — for example,
+              billing contact details, marketing-website analytics, or correspondence sent to{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>{" "}
+              — Nami acts as an independent controller.
             </p>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">2.2 Information You Provide</h3>
-            <p className="mb-2">
-              Through your use of the Service, you and your workspace members may submit:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li><strong>Performance review data:</strong> Competency ratings, written comments,
-                overall ratings, and calibration grades</li>
-              <li><strong>Survey responses:</strong> Answers to 360 surveys, pulse surveys, and eNPS
-                scores</li>
-              <li><strong>Feedback:</strong> Continuous peer-to-peer feedback messages, including
-                praise, constructive feedback, and anonymous feedback</li>
-              <li><strong>Goals and OKRs:</strong> Goal titles, descriptions, metrics, progress
-                updates, and tracking status</li>
-              <li><strong>Organizational data:</strong> Reporting structures, departments, job
-                families, career levels, and competency frameworks</li>
-              <li><strong>Workspace configuration:</strong> Company name, logo, rating scale
-                preferences, and template configurations</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">2.3 Information Collected Automatically</h3>
-            <p className="mb-2">
-              When you access the Service, we automatically collect limited technical information:
-            </p>
-            <ul className="list-disc pl-6 space-y-1">
-              <li><strong>Performance metrics:</strong> Page load times, Core Web Vitals, and
-                interaction timing via Vercel Speed Insights (anonymized, no personal data)</li>
-              <li><strong>Authentication data:</strong> Session tokens and cookies necessary to
-                maintain your authenticated session</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">2.4 Information We Do NOT Collect</h3>
-            <ul className="list-disc pl-6 space-y-1">
-              <li>We do not use tracking cookies, advertising pixels, or behavioral analytics tools
-                (no Google Analytics, no Meta Pixel, no ad trackers)</li>
-              <li>We do not collect IP addresses for profiling or tracking purposes</li>
-              <li>We do not access or read your general Slack messages, channels, or files</li>
-              <li>We do not collect biometric data, geolocation data, or device fingerprints</li>
-            </ul>
           </section>
 
           {/* ── 3 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">3. How We Use Your Information</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">3. Information We Collect</h2>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">3.1 Information from Slack</h3>
             <p className="mb-2">
-              We use the information we collect for the following purposes:
+              When you install the Nami Slack application or sign in with Slack, Slack provides us
+              with the following information through the OAuth 2.0 authorization flow:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>Slack workspace ID, name, and domain</li>
+              <li>Slack user IDs, display names, real names, and email addresses</li>
+              <li>Limited profile information such as job title, time zone, and avatar URL</li>
+              <li>Bot and user access tokens necessary to operate the Nami bot</li>
+              <li>Workspace channel list (channel ID, name, and visibility), so that admins can
+                pick channels for announcements or kudos</li>
+            </ul>
+            <p className="mb-2">
+              We request the following Slack OAuth scopes. We have aligned this list with the exact
+              scopes implemented in our codebase so it is accurate, not aspirational.
             </p>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">3.1 To Provide and Operate the Service</h3>
+            <h4 className="font-medium text-foreground mt-3 mb-2 text-[13px]">
+              Bot-token scopes
+            </h4>
             <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Authenticate users and manage workspace access via Slack OAuth</li>
-              <li>Store and display performance reviews, feedback, goals, and survey data</li>
-              <li>Generate analytics dashboards, competency heatmaps, and reports</li>
-              <li>Deliver review prompts, reminders, and notifications via Slack direct messages</li>
-              <li>Process subscription payments through Stripe</li>
-              <li>Enable data exports (CSV) for your reporting needs</li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">app_mentions:read</code> —
+                receive events when someone @-mentions the Nami bot
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">channels:read</code> — list
+                public channels so admins can pick one for announcements or kudos. We do not read
+                channel messages.
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">chat:write</code> — send
+                review prompts, survey questions, kudos posts, and reminders as the Nami bot
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">commands</code> — register
+                and handle Nami&apos;s slash commands (e.g.{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">/kudos</code>)
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">im:history</code> /{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">im:read</code> /{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">im:write</code> — open,
+                read, and send messages in direct-message conversations between the user and the
+                Nami bot. Used exclusively to deliver review/survey prompts and accept the
+                user&apos;s replies. We do not read DMs between two human users.
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">reactions:read</code> —
+                detect emoji reactions on Nami&apos;s own messages (used for one-tap survey
+                responses)
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">team:read</code> — retrieve
+                workspace name, icon, and domain so we can display them in the dashboard
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">users:read</code> /{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">users:read.email</code> —
+                read the directory of workspace members (name, email, title, avatar, deactivated
+                status) to build the org directory and assign reviews
+              </li>
             </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">3.2 To Maintain and Improve the Service</h3>
+            <h4 className="font-medium text-foreground mt-3 mb-2 text-[13px]">
+              User-token scopes (sign-in only)
+            </h4>
             <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Monitor performance and fix bugs</li>
-              <li>Analyze aggregated, anonymized usage patterns to improve features</li>
-              <li>Ensure the security and integrity of the platform</li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">identity.basic</code> —
+                confirm the signing-in user&apos;s Slack identity and workspace
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">identity.email</code> —
+                retrieve the signing-in user&apos;s email address to match them to a directory entry
+              </li>
+            </ul>
+            <p className="mb-3">
+              We do not request, read, or store the content of your workspace&apos;s public
+              channels, private channels, group messages, or direct messages between human users.
+              The only Slack messages we read are those sent to the Nami bot in a direct-message
+              conversation, as part of the review or feedback workflow.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">3.2 Information You Provide Through the Service</h3>
+            <p className="mb-2">
+              Through your use of the Service, you and your workspace members may submit the
+              following types of information, all of which constitute Customer Data:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li><strong>Performance review data:</strong> competency ratings, written comments,
+                overall ratings, calibration grades, and 9-box positions, including private
+                calibration notes visible only to HR and Admins</li>
+              <li><strong>Survey responses:</strong> answers to 360 surveys, pulse surveys, and
+                eNPS scores, including responses you choose to submit anonymously</li>
+              <li><strong>Continuous feedback:</strong> peer-to-peer kudos, private feedback, and
+                anonymous feedback messages</li>
+              <li><strong>Goals and OKRs:</strong> goal titles, descriptions, metrics, key results,
+                progress updates, status, and goal-level audit entries</li>
+              <li><strong>Organizational data:</strong> reporting structures, departments,
+                functions, job families, career levels, and competency frameworks</li>
+              <li><strong>Workspace configuration:</strong> company name, logo URL, rating scale
+                preferences, template configurations, and onboarding choices</li>
+              <li><strong>Audit-log entries:</strong> records of cycle status transitions,
+                calibration grade changes, grade releases, user role changes, and review assignment
+                changes</li>
+              <li><strong>Billing contact information:</strong> the admin email associated with
+                your Stripe subscription</li>
+              <li><strong>Roadmap voting and suggestions:</strong> if you use the public roadmap
+                page, we store a random browser identifier for vote deduplication, and any feature
+                suggestion text or optional email you submit</li>
+            </ul>
+            <p className="mb-3">
+              The Service is not intended to store special categories of data, including data
+              concerning health, racial or ethnic origin, political opinions, religious beliefs,
+              trade union membership, genetic data, biometric data, sex life, sexual orientation,
+              criminal convictions, government-issued identifiers, or financial account numbers. If
+              your users choose to type such information into free-text fields, you do so at your
+              own risk and assume responsibility under applicable law.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">3.3 Information Collected Automatically</h3>
+            <p className="mb-2">
+              When you access the Service we automatically collect limited technical information:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>
+                <strong>Authentication state:</strong> session tokens and cookies issued by Supabase
+                Auth to keep you signed in
+              </li>
+              <li>
+                <strong>Application logs:</strong> server-side request logs containing timestamps,
+                request paths, response status codes, error messages, workspace and user
+                identifiers, and minimal context needed to diagnose issues. Logs are retained for
+                up to 30 days unless required for security investigation.
+              </li>
+              <li>
+                <strong>Performance metrics:</strong> Core Web Vitals and page-load timing collected
+                by Vercel Speed Insights (no personal identifiers; sampled)
+              </li>
+              <li>
+                <strong>Site analytics:</strong> page-view counts and referrer information collected
+                by Vercel Analytics. Vercel Analytics is cookieless by design and does not build
+                cross-site profiles or track individual users.
+              </li>
+              <li>
+                <strong>Conversion tracking on marketing pages:</strong> our public marketing pages
+                (homepage, pricing, roadmap) load Google Ads gtag.js (account ID{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">AW-18179782629</code>) so we
+                can measure which advertising campaigns drive sign-ups. This loads on the marketing
+                surface only; it does not run on the authenticated dashboard. You can opt out of
+                Google&apos;s personalized advertising via{" "}
+                <a
+                  href="https://adssettings.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline"
+                >
+                  Google Ads Settings
+                </a>{" "}
+                or by using a browser tracking-protection setting.
+              </li>
             </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">3.3 To Communicate with You</h3>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Respond to support inquiries</li>
-              <li>Send important notices about your account or changes to our terms</li>
-              <li>Provide billing-related communications via Stripe</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">3.4 How We Do NOT Use Your Information</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">3.4 Information We Do Not Collect</h3>
             <ul className="list-disc pl-6 space-y-1">
-              <li>We never sell, rent, lease, or trade your personal information or Customer Data to
-                any third party, for any reason, under any circumstances</li>
-              <li>We never use your data for targeted advertising or marketing</li>
-              <li>We never share your identifiable data with other Nami customers</li>
-              <li>We never use your Customer Data to train artificial intelligence or machine learning
-                models without your explicit prior written consent</li>
-              <li>We never profile individual users for purposes unrelated to the Service</li>
+              <li>We do not use third-party behavioural analytics (no Meta Pixel, no TikTok pixel,
+                no LinkedIn Insight Tag, no Mixpanel, Amplitude, Segment, PostHog, FullStory, or
+                Hotjar)</li>
+              <li>We do not collect IP addresses for profiling or for building user-level
+                behavioural records</li>
+              <li>We do not collect biometric data, precise geolocation, or device fingerprints</li>
+              <li>We do not read messages from your Slack channels, private channels, or direct
+                messages between human users</li>
+              <li>We do not accept file uploads. Avatars are URLs supplied by Slack; CSV team
+                imports are parsed in your browser and only the parsed rows are submitted</li>
             </ul>
           </section>
 
           {/* ── 4 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">4. Data Sharing and Disclosure</h2>
-            <p className="mb-3">
-              We do not sell your personal information. We may share your information only in the
-              following limited circumstances:
-            </p>
+            <h2 className="text-lg font-semibold text-foreground mb-3">4. How We Use Information</h2>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">4.1 Service Providers</h3>
-            <p className="mb-2">
-              We share information with third-party service providers who perform services on our
-              behalf. These providers are contractually obligated to protect your information and may
-              only use it to provide their services to us:
-            </p>
-            <table className="w-full border-collapse text-sm mb-3">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 pr-4 font-medium text-foreground">Provider</th>
-                  <th className="text-left py-2 pr-4 font-medium text-foreground">Purpose</th>
-                  <th className="text-left py-2 font-medium text-foreground">Data Shared</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b">
-                  <td className="py-2 pr-4">Slack (Salesforce)</td>
-                  <td className="py-2 pr-4">Authentication, bot messaging</td>
-                  <td className="py-2">User IDs, bot tokens, DM content for reviews</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2 pr-4">Stripe</td>
-                  <td className="py-2 pr-4">Payment processing</td>
-                  <td className="py-2">Email address, subscription plan, payment status</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2 pr-4">Supabase (AWS)</td>
-                  <td className="py-2 pr-4">Database hosting, authentication</td>
-                  <td className="py-2">All Customer Data (encrypted at rest)</td>
-                </tr>
-                <tr className="border-b">
-                  <td className="py-2 pr-4">Vercel</td>
-                  <td className="py-2 pr-4">Application hosting, performance monitoring</td>
-                  <td className="py-2">Anonymized performance metrics only</td>
-                </tr>
-              </tbody>
-            </table>
+            <h3 className="font-medium text-foreground mt-4 mb-2">4.1 To Provide and Operate the Service</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>Authenticate users and manage workspace access via Slack OAuth</li>
+              <li>Store and display reviews, feedback, goals, and survey data</li>
+              <li>Generate analytics dashboards, competency heatmaps, and ranking reports</li>
+              <li>Deliver review prompts, survey questions, kudos posts, and reminders via Slack
+                direct messages and slash commands</li>
+              <li>Process subscription payments through Stripe</li>
+              <li>Enable CSV exports for reviews, goals, and analytics</li>
+              <li>Enforce role-based access control (Admin, HR, Manager, Employee)</li>
+            </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">4.2 Subprocessor Changes</h3>
-            <p className="mb-3">
-              We will maintain an up-to-date list of our subprocessors (third-party service providers
-              who process Customer Data on our behalf) in this Privacy Policy. If we add or replace a
-              subprocessor that processes Customer Data, we will notify workspace administrators via
-              email at least thirty (30) days before the new subprocessor begins processing Customer
-              Data. If you object to a new subprocessor, you may terminate your subscription before
-              the subprocessor begins processing your data.
-            </p>
+            <h3 className="font-medium text-foreground mt-4 mb-2">4.2 To Maintain, Secure, and Improve the Service</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>Monitor application health, performance, and error rates</li>
+              <li>Detect, investigate, and respond to abuse, fraud, or security incidents</li>
+              <li>Debug and fix issues reported by customers or surfaced by our logs</li>
+              <li>Analyze aggregated and de-identified usage patterns to improve features and
+                inform our product roadmap</li>
+            </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">4.3 Legal Requirements</h3>
-            <p className="mb-3">
-              We may disclose your information if required to do so by law or in good faith belief
-              that such action is necessary to: (a) comply with a legal obligation, court order, or
-              legal process; (b) protect and defend our rights or property; (c) prevent fraud or
-              abuse of the Service; or (d) protect the personal safety of users or the public.
-            </p>
+            <h3 className="font-medium text-foreground mt-4 mb-2">4.3 To Communicate With You</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>Respond to support, sales, billing, privacy, and security inquiries</li>
+              <li>Send transactional notices about your account, our terms, or material changes to
+                our subprocessor list</li>
+              <li>Send billing communications via Stripe</li>
+              <li>Reply to feature suggestions submitted through the public roadmap page</li>
+            </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">4.4 Business Transfers</h3>
-            <p>
-              In the event of a merger, acquisition, reorganization, bankruptcy, or sale of all or a
-              portion of our assets, your information may be transferred as part of that transaction.
-              We will notify you via email or a prominent notice on the Service before your
-              information becomes subject to a different privacy policy.
-            </p>
+            <h3 className="font-medium text-foreground mt-4 mb-2">4.4 To Meet Legal Obligations</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li>Comply with applicable laws, regulations, court orders, valid legal process, and
+                lawful requests from public authorities</li>
+              <li>Enforce our Terms of Service, prevent abuse, and protect the rights, property,
+                and safety of Nami, our customers, and third parties</li>
+            </ul>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">4.5 How We Do Not Use Your Information</h3>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>We never sell, rent, lease, or trade Customer Data or personal information to
+                any third party, for any reason, under any circumstances</li>
+              <li>We never use Customer Data for advertising, behavioral retargeting, or marketing
+                to your employees</li>
+              <li>We never share identifiable Customer Data with other Nami customers</li>
+              <li>We never use Customer Data to train artificial intelligence or machine-learning
+                models without the workspace administrator&apos;s explicit prior written consent.
+                The Service does not currently include any AI features that process Customer Data.</li>
+              <li>We never make employment decisions on your behalf. The Service is a tool that
+                presents information for your decision-makers to use</li>
+            </ul>
           </section>
 
           {/* ── 5 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">5. Data Security</h2>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">5.1 Technical Safeguards</h3>
-            <p className="mb-2">
-              We implement industry-standard security measures to protect your data:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li><strong>Encryption at rest:</strong> All data is encrypted using AES-256 encryption
-                via our infrastructure provider (AWS)</li>
-              <li><strong>Encryption in transit:</strong> All data transmission uses TLS 1.2 or higher</li>
-              <li><strong>Tenant isolation:</strong> Each workspace&apos;s data is isolated at the
-                database level using row-level security (RLS) policies and cross-tenant validation
-                triggers. Users from one workspace cannot access data belonging to another
-                workspace</li>
-              <li><strong>Authentication:</strong> Access is managed through Slack OAuth 2.0.
-                JWT-based session tokens are used for request authentication. We do not store
-                passwords</li>
-              <li><strong>Access controls:</strong> Role-based access control (Admin, HR, Manager,
-                Employee) limits data visibility within each workspace</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">5.2 Organizational Safeguards</h3>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Access to production systems is restricted to authorized personnel only</li>
-              <li>We follow the principle of least privilege for internal access</li>
-              <li>We conduct regular security reviews of our codebase and infrastructure</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">5.3 Limitations</h3>
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              5. Legal Bases for Processing (EEA, UK, Switzerland)
+            </h2>
             <p className="mb-3">
-              While we strive to protect your information, no method of electronic transmission or
-              storage is 100% secure. We cannot guarantee absolute security of your data. You
-              acknowledge that the nature of the data stored in the Service (workplace performance
-              assessments, feedback, and goals) does not include highly sensitive categories such as
-              financial account numbers, government IDs, health records, or biometric data.
+              Where the GDPR, UK GDPR, or Swiss FADP applies, we rely on the following legal bases:
             </p>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">5.4 Security Incident Response</h3>
-            <p className="mb-3">
-              In the event of a confirmed security incident that results in unauthorized access to,
-              or disclosure of, Customer Data, we will:
-            </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li>Promptly investigate the nature and scope of the incident</li>
-              <li>Take reasonable steps to contain and remediate the incident</li>
-              <li>Notify affected workspace administrators without undue delay and, where required by
-                GDPR, within seventy-two (72) hours of becoming aware of the incident</li>
-              <li>Provide a description of the nature of the incident, the categories and approximate
-                number of records affected, the likely consequences, and the measures taken or
-                proposed to address the incident</li>
-              <li>Notify relevant data protection authorities and other regulators as required by
-                applicable law</li>
-              <li>Cooperate with affected customers in their own notification and remediation efforts</li>
+            <ul className="list-disc pl-6 space-y-1">
+              <li><strong>Performance of a contract</strong> — to deliver the Service to your
+                organization under our Terms of Service</li>
+              <li><strong>Legitimate interests</strong> — to secure the Service, prevent fraud,
+                operate billing and support, communicate about the Service, and improve features
+                in ways consistent with users&apos; reasonable expectations</li>
+              <li><strong>Legal obligation</strong> — to comply with tax, accounting, and legal
+                requests</li>
+              <li><strong>Consent</strong> — where required, for example, for non-essential
+                cookies on our marketing pages where consent is mandatory; you can withdraw consent
+                at any time without affecting prior lawful processing</li>
             </ul>
-            <p>
-              A security incident does not include unsuccessful attempts such as port scans, denied
-              service attacks that do not result in a breach, unsuccessful login attempts, or similar
-              events that do not compromise the confidentiality, integrity, or availability of
-              Customer Data.
-            </p>
           </section>
 
           {/* ── 6 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">6. Data Retention</h2>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">6.1 Active Accounts</h3>
+            <h2 className="text-lg font-semibold text-foreground mb-3">6. Sharing and Disclosure</h2>
             <p className="mb-3">
-              We retain your Customer Data for as long as your account is active and you maintain an
-              active subscription. Data is stored and accessible throughout the duration of your
-              use of the Service.
+              We do not sell personal information. We share information only in the limited
+              circumstances described below.
             </p>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">6.2 After Termination</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">6.1 Subprocessors</h3>
+            <p className="mb-2">
+              We share information with the following third-party service providers
+              (&quot;subprocessors&quot;) who perform services on our behalf. Each is contractually
+              bound to protect your information and may only use it to provide their services to us.
+            </p>
+            <table className="w-full border-collapse text-sm mb-3">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 pr-4 font-medium text-foreground">Subprocessor</th>
+                  <th className="text-left py-2 pr-4 font-medium text-foreground">Purpose</th>
+                  <th className="text-left py-2 pr-4 font-medium text-foreground">Region</th>
+                  <th className="text-left py-2 font-medium text-foreground">Data shared</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b">
+                  <td className="py-2 pr-4">Supabase (on AWS)</td>
+                  <td className="py-2 pr-4">Database hosting, authentication, edge functions</td>
+                  <td className="py-2 pr-4">European Union (eu-west-1, Ireland)</td>
+                  <td className="py-2">All Customer Data (encrypted at rest)</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2 pr-4">Vercel</td>
+                  <td className="py-2 pr-4">Application hosting, edge delivery, web analytics,
+                    performance monitoring</td>
+                  <td className="py-2 pr-4">Global edge; control plane in the United States</td>
+                  <td className="py-2">Request metadata, anonymized analytics, server logs</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2 pr-4">Slack (Salesforce)</td>
+                  <td className="py-2 pr-4">OAuth, bot messaging, slash commands, modal delivery</td>
+                  <td className="py-2 pr-4">United States</td>
+                  <td className="py-2">Slack user IDs, bot tokens, DM content with the Nami bot,
+                    review/survey prompt text</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2 pr-4">Stripe</td>
+                  <td className="py-2 pr-4">Subscription billing, payment method storage, invoice
+                    delivery</td>
+                  <td className="py-2 pr-4">United States, with regional data centers</td>
+                  <td className="py-2">Billing email, subscription plan, seat count, payment
+                    status. We do not see or store card numbers.</td>
+                </tr>
+                <tr className="border-b">
+                  <td className="py-2 pr-4">Google (Google Ads)</td>
+                  <td className="py-2 pr-4">Advertising conversion measurement on marketing pages
+                    only (not on the authenticated dashboard)</td>
+                  <td className="py-2 pr-4">United States</td>
+                  <td className="py-2">Browser identifiers, page URL, IP address as required by
+                    Google&apos;s tag</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">6.2 Subprocessor Changes</h3>
             <p className="mb-3">
-              Upon cancellation or termination of your subscription, we retain your Customer Data for
-              thirty (30) days to allow you to request an export or reactivate your account. After
-              this 30-day grace period, your Customer Data will be permanently and irreversibly
-              deleted from our production systems.
+              We will maintain the subprocessor list above. If we add or replace a subprocessor
+              that processes Customer Data, we will notify workspace administrators at least
+              thirty (30) days before the new subprocessor begins processing Customer Data, via
+              email to the workspace admin and an update to this page. You may object to a
+              proposed subprocessor by terminating your subscription before that subprocessor
+              begins processing your data; no other remedy is available for subprocessor changes
+              unless agreed in a separate enterprise contract.
             </p>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">6.3 Backup Retention</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">6.3 Within Your Workspace</h3>
             <p className="mb-3">
-              Automated backups that may contain your data are retained for a limited period (up to
-              30 additional days) for disaster recovery purposes and are then permanently deleted.
+              By design, the Service shares information within your workspace according to role.
+              Admins and HR users can view org-wide review and calibration data; managers can view
+              their direct reports&apos; data; employees see what is shared with them. Anonymous
+              survey responses and anonymous feedback are aggregated; we do not surface the
+              identity of the anonymous author in the dashboard or audit log. You are responsible
+              for configuring roles appropriately and for the appropriateness of intra-workspace
+              data flows.
             </p>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">6.4 Legal Requirements</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">6.4 Legal and Safety Disclosures</h3>
+            <p className="mb-3">
+              We may disclose information if we believe in good faith that disclosure is required
+              by law or is necessary to: (a) comply with a legal obligation, court order, subpoena,
+              or other legal process; (b) protect and defend our rights, property, or operations;
+              (c) prevent or investigate fraud, abuse, or security incidents; (d) protect the
+              personal safety of users or the public; or (e) respond to a lawful government
+              request. Where permitted, we will use commercially reasonable efforts to notify the
+              affected workspace administrator before disclosing Customer Data in response to a
+              legal request.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">6.5 Business Transfers</h3>
             <p>
-              We may retain certain information for longer periods where required by law, regulation,
-              or legitimate business interests (such as resolving disputes or enforcing our
-              agreements).
+              In connection with a merger, acquisition, financing, reorganization, bankruptcy,
+              receivership, sale of all or substantially all of our assets, or transition of
+              service to another provider, information may be transferred to the acquirer or
+              successor. We will notify workspace administrators via email or a prominent in-app
+              notice before any such transfer that would change how personal information is
+              processed, and will require any acquirer to honor the commitments in this Privacy
+              Policy or seek your consent to changes.
             </p>
           </section>
 
           {/* ── 7 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">7. Cookies and Tracking</h2>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">7.1 Essential Cookies Only</h3>
+            <h2 className="text-lg font-semibold text-foreground mb-3">7. Data Security</h2>
             <p className="mb-3">
-              We use only strictly necessary cookies required for the Service to function. These
-              include authentication session cookies managed by Supabase. These cookies are essential
-              for maintaining your logged-in state and cannot be disabled while using the Service.
+              We implement administrative, technical, and organizational measures designed to
+              protect Customer Data. A more detailed description is available on our{" "}
+              <Link href="/security" className="text-primary underline">Security page</Link>. In
+              summary:
             </p>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">7.2 No Tracking Cookies</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li><strong>Encryption at rest:</strong> AES-256 at the storage layer for database
+                contents and automated backups</li>
+              <li><strong>Encryption in transit:</strong> TLS 1.2 or higher for all traffic; HTTP
+                is redirected to HTTPS</li>
+              <li><strong>Tenant isolation:</strong> PostgreSQL row-level security policies and
+                cross-tenant validation triggers enforced inside the database engine</li>
+              <li><strong>Authentication:</strong> Slack OAuth 2.0; no Nami-issued passwords; MFA
+                inherited from your Slack workspace</li>
+              <li><strong>Access controls:</strong> role-based access inside the workspace; least
+                privilege for internal access to production systems</li>
+              <li><strong>Audit log:</strong> sensitive state changes are recorded to an in-database
+                audit log scoped to your workspace</li>
+            </ul>
             <p>
-              We do not use advertising cookies, third-party tracking cookies, social media tracking
-              pixels, or any form of cross-site tracking. We do not participate in ad networks or
-              cookie-based retargeting. We do not build behavioral profiles of our users.
+              No method of electronic transmission or storage is one hundred percent secure. We
+              cannot guarantee absolute security. You are responsible for using strong Slack
+              workspace controls (MFA, SSO where available, session length, idle timeout) and for
+              promptly notifying us if you suspect compromise of your account.
             </p>
           </section>
 
           {/* ── 8 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">8. Your Rights</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">8. Data Retention</h2>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">8.1 Active Workspaces</h3>
             <p className="mb-3">
-              Depending on your location, you may have the following rights regarding your personal
-              information:
+              We retain Customer Data for as long as your workspace is active and you maintain a
+              subscription or free trial. Reviews, feedback, goals, surveys, and audit-log entries
+              are stored for the life of the workspace so historical performance information
+              remains available to authorized users.
             </p>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">8.1 General Rights (All Users)</h3>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li><strong>Access:</strong> Request a copy of the personal data we hold about you</li>
-              <li><strong>Correction:</strong> Request correction of inaccurate or incomplete personal
-                data</li>
-              <li><strong>Deletion:</strong> Request deletion of your personal data, subject to our
-                legal retention obligations</li>
-              <li><strong>Export:</strong> Export your data in a portable, machine-readable format
-                (CSV) through the Service dashboard</li>
-              <li><strong>Withdraw consent:</strong> Withdraw consent at any time by uninstalling the
-                Slack application. This will not affect the lawfulness of processing based on consent
-                before its withdrawal</li>
-            </ul>
-
-            <h3 className="font-medium text-foreground mt-4 mb-2">8.2 European Economic Area (EEA) and UK Residents</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">8.2 After Termination</h3>
             <p className="mb-3">
-              If you are a resident of the EEA or UK, you have additional rights under the General
-              Data Protection Regulation (GDPR) and UK GDPR, including:
+              Upon cancellation or termination, we retain Customer Data for thirty (30) days to
+              allow you to request an export or reactivate your subscription. After this thirty
+              (30) day grace period, Customer Data will be permanently and irreversibly deleted
+              from our production systems, except for the limited information described in
+              sections 8.4 and 8.5.
             </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li><strong>Legal basis for processing:</strong> We process your data on the basis of
-                contractual necessity (to provide the Service you subscribed to) and legitimate
-                interest (to maintain and improve the Service)</li>
-              <li><strong>Right to restrict processing:</strong> You may request we limit how we use
-                your data in certain circumstances</li>
-              <li><strong>Right to object:</strong> You may object to processing based on legitimate
-                interests</li>
-              <li><strong>Right to data portability:</strong> You may request your data in a
-                structured, commonly used, machine-readable format</li>
-              <li><strong>Right to lodge a complaint:</strong> You have the right to lodge a complaint
-                with your local data protection authority</li>
-            </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">8.3 California Residents (CCPA/CPRA)</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">8.3 Backups</h3>
             <p className="mb-3">
-              If you are a California resident, the California Consumer Privacy Act (CCPA) and
-              California Privacy Rights Act (CPRA) provide you with additional rights:
+              Automated backups taken for disaster recovery purposes are retained for up to thirty
+              (30) additional days from the date the backup was taken, then permanently deleted by
+              our infrastructure provider&apos;s rolling deletion schedule.
             </p>
-            <ul className="list-disc pl-6 space-y-1 mb-3">
-              <li><strong>Right to know:</strong> You have the right to know what personal information
-                we collect, use, and disclose</li>
-              <li><strong>Right to delete:</strong> You can request we delete your personal
-                information</li>
-              <li><strong>Right to non-discrimination:</strong> We will not discriminate against you
-                for exercising your privacy rights</li>
-              <li><strong>Sale of personal information:</strong> We do not sell your personal
-                information and have never sold personal information. We do not share personal
-                information for cross-context behavioral advertising</li>
-            </ul>
 
-            <h3 className="font-medium text-foreground mt-4 mb-2">8.4 Exercising Your Rights</h3>
+            <h3 className="font-medium text-foreground mt-4 mb-2">8.4 Application Logs</h3>
+            <p className="mb-3">
+              Server-side request and error logs that may incidentally contain identifiers
+              (workspace ID, user ID, request path) are retained for up to thirty (30) days for
+              operations and security purposes, then deleted on a rolling basis.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">8.5 Billing and Compliance Records</h3>
             <p>
-              To exercise any of these rights, contact us at{" "}
-              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
-              We will respond to your request within thirty (30) days. We may ask you to verify your
-              identity before processing your request. Workspace administrators may also exercise
-              rights on behalf of their organization&apos;s users.
+              We retain billing records, contracts, tax-related documents, and other records
+              required by applicable law (such as anti-fraud, tax, accounting, or anti-money
+              laundering laws) for the period required by those laws, typically up to seven (7)
+              years.
             </p>
           </section>
 
           {/* ── 9 ─────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">9. International Data Transfers</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              9. International Data Transfers
+            </h2>
             <p className="mb-3">
-              Your information may be transferred to and processed in countries other than your
-              country of residence, including the United States, where our infrastructure providers
-              operate. These countries may have data protection laws that differ from those in your
-              country.
+              Our primary database is hosted in the European Union (Ireland) on Supabase
+              infrastructure running on AWS. Some of our subprocessors — including Vercel, Slack,
+              Stripe, and Google — operate globally and may process limited categories of personal
+              information in the United States or other jurisdictions.
+            </p>
+            <p className="mb-3">
+              Where we transfer personal information of EEA, UK, or Swiss residents outside the
+              EEA, UK, or Switzerland, we rely on the European Commission&apos;s Standard
+              Contractual Clauses (and the UK International Data Transfer Addendum or Swiss
+              equivalents, where applicable) as the transfer mechanism. Copies of the relevant
+              clauses are available on request via{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
             </p>
             <p>
-              Where we transfer data outside the EEA or UK, we rely on appropriate safeguards such
-              as Standard Contractual Clauses (SCCs) approved by the European Commission, or other
-              legally recognized transfer mechanisms to ensure your data is protected in accordance
-              with applicable law.
+              Some destination countries may have data-protection laws that differ from those in
+              your country. We use Standard Contractual Clauses and supplementary technical
+              measures (such as encryption in transit and at rest) intended to provide a level of
+              protection essentially equivalent to that required under EU law.
             </p>
           </section>
 
           {/* ── 10 ────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">10. Children&apos;s Privacy</h2>
-            <p>
-              The Service is not directed to individuals under the age of 16, and we do not knowingly
-              collect personal information from children under 16. If we become aware that we have
-              collected personal information from a child under 16, we will take immediate steps to
-              delete that information. If you believe we have collected information from a child under
-              16, please contact us at{" "}
+            <h2 className="text-lg font-semibold text-foreground mb-3">
+              10. Your Rights
+            </h2>
+            <p className="mb-3">
+              Depending on where you live, you may have the rights described below regarding your
+              personal information. Because your organization is the controller of Customer Data
+              processed in the Service, we will typically forward employee-level requests to your
+              workspace administrator and support them in fulfilling the request.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">10.1 General Rights</h3>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li><strong>Access:</strong> request a copy of the personal information we hold
+                about you</li>
+              <li><strong>Correction:</strong> request correction of inaccurate or incomplete
+                personal information</li>
+              <li><strong>Deletion:</strong> request deletion, subject to our legal retention
+                obligations</li>
+              <li><strong>Export:</strong> export reviews, goals, and analytics data in CSV format
+                from the dashboard, or request a broader export via email</li>
+              <li><strong>Withdraw consent:</strong> withdraw consent at any time by uninstalling
+                the Nami Slack application or cancelling your subscription, without affecting the
+                lawfulness of processing carried out before withdrawal</li>
+            </ul>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">10.2 EEA, UK, and Swiss Residents</h3>
+            <p className="mb-3">
+              If you are in the EEA, UK, or Switzerland, you have additional rights under the GDPR,
+              UK GDPR, and Swiss FADP, including: the right to restrict processing, the right to
+              object to processing based on legitimate interests, the right to data portability,
+              the right not to be subject to a decision based solely on automated processing
+              (Nami does not make solely-automated decisions about individuals), and the right to
+              lodge a complaint with your local data protection authority.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">10.3 California Residents (CCPA / CPRA)</h3>
+            <p className="mb-2">
+              If you are a California resident, you have the following rights under the California
+              Consumer Privacy Act, as amended by the California Privacy Rights Act:
+            </p>
+            <ul className="list-disc pl-6 space-y-1 mb-3">
+              <li><strong>Right to know:</strong> what personal information we collect, the
+                sources, purposes, and categories of third parties with whom we share it</li>
+              <li><strong>Right to delete:</strong> request deletion of personal information,
+                subject to legal exceptions</li>
+              <li><strong>Right to correct:</strong> request correction of inaccurate personal
+                information</li>
+              <li><strong>Right to non-discrimination:</strong> we will not discriminate against
+                you for exercising your privacy rights</li>
+              <li><strong>Right to opt out of sale or sharing:</strong> we do not sell personal
+                information and have never sold personal information in the prior 12 months. We do
+                not &quot;share&quot; personal information for cross-context behavioral advertising
+                as that term is defined under the CPRA.</li>
+              <li><strong>Sensitive Personal Information (SPI):</strong> we do not knowingly
+                collect SPI from California residents. If your users voluntarily submit SPI into
+                free-text fields, we use it only as necessary to provide the Service and not for
+                inferring characteristics, and we do not use or disclose it for purposes other
+                than those permitted under Cal. Civ. Code § 1798.121(a).</li>
+            </ul>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">10.4 Other Jurisdictions</h3>
+            <p className="mb-3">
+              Residents of jurisdictions with comparable laws — including Brazil (LGPD), Canada
+              (PIPEDA and Quebec Law 25), Australia (Privacy Act), and certain U.S. states
+              including Virginia (VCDPA), Colorado (CPA), Connecticut (CTDPA), Utah (UCPA), and
+              Texas (TDPSA) — may exercise rights similar to those described above by contacting
+              us at{" "}
               <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">10.5 Exercising Your Rights</h3>
+            <p>
+              To exercise any of these rights, contact us at{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
+              We will respond within thirty (30) days, or within the period required by the
+              applicable law (we may extend this period where permitted, with notice). We may ask
+              you to verify your identity before processing your request. If you submit a request
+              about personal information that your employer controls, we may need to direct you to
+              your employer or coordinate with them. You may also designate an authorized agent
+              to act on your behalf as permitted by applicable law.
             </p>
           </section>
 
           {/* ── 11 ────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">11. Data Processing Agreement</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">11. Cookies and Tracking</h2>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">11.1 Strictly Necessary Cookies</h3>
+            <p className="mb-3">
+              The authenticated dashboard uses only strictly necessary cookies required for
+              sign-in, session management, and security. These cookies are essential to provide
+              the Service and cannot be disabled while using the dashboard.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">11.2 Marketing-Page Cookies</h3>
+            <p className="mb-3">
+              Our public marketing pages may set cookies associated with Vercel Analytics
+              (cookieless by design), Vercel Speed Insights, and Google Ads conversion tracking,
+              as described in section 3.3. Where required by law, we will collect consent before
+              loading non-essential cookies.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">11.3 Do Not Track</h3>
+            <p className="mb-3">
+              Our Service does not respond to Do Not Track (DNT) signals, because there is no
+              industry consensus on how DNT should be interpreted. We honor Global Privacy
+              Control (GPC) signals where required by applicable law.
+            </p>
+
+            <h3 className="font-medium text-foreground mt-4 mb-2">11.4 No Cross-Site Profiling</h3>
             <p>
-              For customers who require a Data Processing Agreement (DPA) for GDPR compliance or
-              other regulatory requirements, we offer a standard DPA that covers our obligations as a
-              data processor. To request a DPA, contact us at{" "}
-              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
-              Enterprise customers may negotiate custom data processing terms as part of their
-              Enterprise agreement.
+              We do not participate in advertising networks that build cross-site behavioral
+              profiles of our users. The only third-party tag we load is Google Ads conversion
+              tracking, and only on our public marketing pages.
             </p>
           </section>
 
           {/* ── 12 ────────────────────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">12. Changes to This Privacy Policy</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">12. Children&apos;s Privacy</h2>
+            <p>
+              The Service is intended for use by businesses and is not directed to children. We
+              do not knowingly collect personal information from individuals under sixteen (16)
+              years of age (or the higher age required by your local law). If you believe a child
+              has provided personal information to us, please contact{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
+              {" "}and we will take steps to delete it.
+            </p>
+          </section>
+
+          {/* ── 13 ────────────────────────────────────────────── */}
+          <section>
+            <h2 className="text-lg font-semibold text-foreground mb-3">13. Data Processing Agreement</h2>
+            <p>
+              For customers who require a Data Processing Agreement (DPA) — for GDPR, UK GDPR,
+              Swiss FADP, LGPD, or comparable requirements — we offer a standard DPA incorporating
+              the European Commission&apos;s Standard Contractual Clauses and the UK International
+              Data Transfer Addendum where relevant. To request a DPA, contact{" "}
+              <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>.
+              Enterprise customers may negotiate custom data processing terms as part of an
+              enterprise agreement.
+            </p>
+          </section>
+
+          {/* ── 14 ────────────────────────────────────────────── */}
+          <section>
+            <h2 className="text-lg font-semibold text-foreground mb-3">14. Changes to This Privacy Policy</h2>
             <p className="mb-3">
-              We may update this Privacy Policy from time to time to reflect changes in our practices,
-              technology, legal requirements, or other factors. If we make material changes, we will
-              notify you by email or through a prominent notice within the Service at least thirty
-              (30) days before the changes take effect.
+              We may update this Privacy Policy from time to time. If we make material changes —
+              for example, the addition of a new subprocessor that processes Customer Data, a new
+              category of data collected, or a new permitted use — we will notify workspace
+              administrators by email or through a prominent notice within the Service at least
+              thirty (30) days before the changes take effect. Non-material clarifications may be
+              made without advance notice.
             </p>
             <p>
               The &quot;Effective date&quot; at the top of this page indicates when this Privacy
-              Policy was last revised. Your continued use of the Service after any changes to this
-              Privacy Policy constitutes your acceptance of the updated policy.
+              Policy was last revised. Continued use of the Service after the effective date of
+              any changes constitutes acceptance of the revised Policy.
             </p>
           </section>
 
@@ -511,23 +735,27 @@ export default function PrivacyPolicyPage() {
           <section className="border-t pt-8">
             <h2 className="text-lg font-semibold text-foreground mb-3">Contact Us</h2>
             <p className="mb-3">
-              If you have any questions, concerns, or requests regarding this Privacy Policy or our
-              data practices, please contact us:
+              For privacy questions, data-subject requests, DPA requests, or to escalate a concern
+              that we have not addressed, please contact:
             </p>
             <ul className="space-y-1">
               <li>
-                Privacy inquiries:{" "}
-                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
-              </li>
-              <li>
-                Legal inquiries:{" "}
-                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
+                Privacy, security, and legal inquiries:{" "}
+                <a href="mailto:hello@namihr.com" className="text-primary underline">
+                  hello@namihr.com
+                </a>
               </li>
               <li>
                 General support:{" "}
-                <a href="mailto:hello@namihr.com" className="text-primary underline">hello@namihr.com</a>
+                <a href="mailto:hello@namihr.com" className="text-primary underline">
+                  hello@namihr.com
+                </a>
               </li>
             </ul>
+            <p className="mt-3">
+              If you are not satisfied with our response, you may have the right to lodge a
+              complaint with your local data protection authority.
+            </p>
           </section>
         </div>
       </div>

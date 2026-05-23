@@ -968,7 +968,7 @@ export default async function Home() {
               ))}
             </div>
             <p className="text-center mt-6 text-xs text-muted-foreground/80">
-              SOC 2 Type II audit in progress · Anonymous survey responses · Strict upward-feedback visibility rules
+              EU-hosted on SOC 2 attested infrastructure · Anonymous survey responses · Strict upward-feedback visibility rules
             </p>
           </ScrollReveal>
         </div>

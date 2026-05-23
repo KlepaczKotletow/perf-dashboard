@@ -55,7 +55,7 @@ All 28 database tables have RLS enabled. There are zero tables that allow cross-
 | **Data in transit** | TLS 1.2+ for all connections |
 | **Authentication** | Slack OAuth 2.0 with JWT session tokens |
 | **Backups** | Automated daily backups with encryption, retained for disaster recovery |
-| **Hosting** | Supabase (SOC 2 Type II certified) on AWS; application hosted on Vercel |
+| **Hosting** | Supabase (SOC 2 Type II attested) on AWS (`eu-west-1`, Ireland); application hosted on Vercel |
 
 ## Slack Integration Scope
 
@@ -68,6 +68,10 @@ When you sign in via Slack OAuth, Nami receives an access token scoped to only t
 | `im:read` / `im:write` / `im:history` | Handle direct message conversations with the Nami bot |
 | `commands` | Support slash commands (e.g., `/kudos`) |
 | `app_mentions:read` | Detect when the Nami bot is mentioned |
+| `channels:read` | List public channels so admins can pick one for announcements or kudos (we don't read messages) |
+| `reactions:read` | Detect emoji reactions on Nami's own messages (one-tap survey responses) |
+| `team:read` | Retrieve workspace name, icon, and domain for the dashboard |
+| `identity.basic` / `identity.email` | Confirm the signing-in user's Slack identity and email (sign-in only) |
 
 <Callout type="warning">
 Nami never reads your Slack channels, group messages, files, or general message history. The integration is limited to authentication, directory sync, and Nami bot direct messages.

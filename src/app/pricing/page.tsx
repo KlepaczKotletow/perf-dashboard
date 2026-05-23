@@ -195,7 +195,7 @@ export default function PricingPage() {
           <div className="grid sm:grid-cols-4 gap-8 text-center">
             {[
               { icon: Slack, label: "Slack-native", detail: "No context switching" },
-              { icon: Shield, label: "SOC 2 ready", detail: "Enterprise-grade security" },
+              { icon: Shield, label: "EU-hosted, encrypted", detail: "TLS in transit, AES-256 at rest" },
               { icon: Users, label: "Per-seat billing", detail: "Pay only for active users" },
               { icon: Zap, label: "5 min setup", detail: "Install and go" },
             ].map((item) => (
