@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Menu, X, Slack } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AddToSlackLink } from '@/components/landing/add-to-slack-link'
@@ -30,6 +31,8 @@ export function MobileNav({ signInUrl, addToSlackUrl }: MobileNavProps) {
             <a href="#goals" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Goals</a>
             <a href="#analytics" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Analytics</a>
             <a href="#pricing" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Pricing</a>
+            <Link href="/guides" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Guides</Link>
+            <Link href="/compare" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Compare</Link>
             <div className="border-t border-border/60 pt-3 mt-1 flex flex-col gap-2">
               <a href={signInUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Sign in with Slack</a>
               <Button size="sm" className="w-full" asChild>
