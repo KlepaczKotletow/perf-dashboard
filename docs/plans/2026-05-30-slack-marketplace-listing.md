@@ -6,9 +6,12 @@ intent discovery channel for a Slack-native product **and** the path to Slack's
 own app review — i.e. it serves both halves of the visibility goal. Review takes
 ~2–4 weeks, so submit early.
 
-**Prerequisite before you submit:** build `/nami pause` (NEW-8 — per-user DM
-opt-out). Slack routinely rejects HR bots that employees can't mute. Everything
-else below is ready.
+**Good news — the usual HR-bot blocker is already handled.** Slack routinely
+rejects HR bots employees can't mute. Nami already ships this: snooze buttons
+(4h / 24h / until-done) on every reminder DM (`slack-interactivity` ~3622–3683),
+plus an App Home panel with digest / critical-only modes and a clear-snooze
+control (`slack-events` ~257–325) — all honored by the send path. A literal
+`/nami pause` slash command is **optional, not a prerequisite.**
 
 Submit at https://api.slack.com/apps → your app → **Manage Distribution →
 Slack Marketplace**.
@@ -55,12 +58,16 @@ Slack Marketplace**.
 
 ## OAuth scopes + justification (Slack requires a reason per scope)
 
-These are the scopes the app currently requests (from `llms-full.txt` /
-`slack-oauth`). Verify against the live app manifest before submitting.
+The app's **actual** scopes — source of truth: `src/lib/slack-scopes.ts` and
+`supabase/functions/_shared/slack-scopes.ts` (kept in lockstep with the
+`slack-oauth` validator). Provide a justification for **every** scope; missing
+*or unused* scopes are a common rejection cause.
+
+**Bot scopes**
 
 | Scope | Why Nami needs it |
 |---|---|
-| `commands` | Slash commands (`/kudos`, and `/nami pause` once shipped). |
+| `commands` | Slash commands (`/kudos`). User mute is also available via DM buttons + App Home. |
 | `chat:write` | Send review prompts, check-ins, survey questions, and reminders as DMs. |
 | `im:write` | Open the DM channel with each employee to deliver their review/survey. |
 | `im:history` | Read the user's replies *within Nami's own DM thread* to advance the guided flow. |
@@ -68,10 +75,27 @@ These are the scopes the app currently requests (from `llms-full.txt` /
 | `app_mentions:read` | Respond when a user @-mentions the bot. |
 | `users:read` | Map Slack users to employees; show names/avatars in the dashboard. |
 | `users:read.email` | Match Slack accounts to imported team rosters (CSV uses email). |
+| `team:read` | Read the workspace name at install to label the workspace in the dashboard (`slack-oauth` stores `team_name`). |
+| `channels:read` | ⚠️ **No code found using this** — confirm a real feature needs it, or remove it from the manifest before submitting. |
+| `reactions:read` | ⚠️ **No code found using this** (e.g. reaction-based kudos isn't wired) — confirm a real use, or remove it. |
+
+**User scopes** (Sign in with Slack)
+
+| Scope | Why Nami needs it |
+|---|---|
+| `identity.basic` | Authenticate the signing-in user to the web dashboard (`users.identity` / `openid.connect`). |
+| `identity.email` | Match the signed-in user to their employee record by email. |
 
 Lead with data-minimization in the review notes: Nami reads only its own DM
 threads, never general channel content; no message content is used for ads or
 model training (see Privacy + `llms-full.txt`).
+
+> **Resolve the two ⚠️ scopes before you submit.** `channels:read` and
+> `reactions:read` are in the manifest but I found no code using them. Slack
+> reviewers push back hard on unused scopes. Either wire the feature that needs
+> them or drop them from the Slack app manifest **and** from `slack-scopes.ts`
+> (+ the `slack-oauth` validator) first — fewer scopes also means a faster review
+> and a less scary install screen for prospects.
 
 ---
 
@@ -90,9 +114,10 @@ Icon: `public/nami-logo.svg` exists — export a 512×512 PNG on a solid backgro
 
 ## Review-readiness checklist
 
-- [ ] `/nami pause` per-user opt-out shipped (NEW-8) — **blocker**
-- [ ] Privacy, Terms, Support, Security URLs live and accurate ✓ (already deployed)
-- [ ] Scope list matches the manifest and each has a justification (above)
+- [x] Per-user DM opt-out shipped — snooze buttons + App Home modes (already live)
+- [x] Privacy, Terms, Support, Security URLs live and accurate (already deployed)
+- [ ] **Resolve unused scopes `channels:read` / `reactions:read`** — justify or remove
+- [ ] Scope list (11 bot + 2 user) matches the manifest, each justified (table above)
 - [ ] Screenshots captured (list above)
 - [ ] App icon 512×512 PNG
 - [ ] Install flow works from a fresh workspace end-to-end (the critical path —
