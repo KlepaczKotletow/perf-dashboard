@@ -26,7 +26,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "What if some of my team doesn't check Slack often?",
-    a: "Everything Nami does in Slack also works on the web dashboard (app.nami.team). Reviews, goals, and surveys can be completed either way — you can even mix modes within a single cycle. For people who genuinely don't use Slack, managers can run reviews entirely in the dashboard.",
+    a: "Everything Nami does in Slack also works on the web dashboard at namihr.com. Reviews, goals, and surveys can be completed either way — you can even mix modes within a single cycle. For people who genuinely don't use Slack, managers can run reviews entirely in the dashboard.",
   },
   {
     q: "Can we migrate from Lattice, Leapsome, or 15Five?",
@@ -179,6 +179,8 @@ export default async function Home() {
               <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
               <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
               <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+              <Link href="/guides" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Guides</Link>
+              <Link href="/compare" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Compare</Link>
               <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
               <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
@@ -252,7 +254,7 @@ export default async function Home() {
                     <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
                   </div>
                   <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                    app.nami.team/dashboard/analytics
+                    namihr.com/dashboard/analytics
                   </div>
                 </div>
 
@@ -507,7 +509,7 @@ export default async function Home() {
                   <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
                 </div>
                 <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[11px] text-muted-foreground font-mono">
-                  app.nami.team/dashboard
+                  namihr.com/dashboard
                 </div>
                 <figcaption className="text-xs font-semibold text-foreground hidden sm:block">
                   Dashboard <span className="text-muted-foreground font-normal ml-1">— at-a-glance workspace health</span>
@@ -529,7 +531,7 @@ export default async function Home() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/demo/01-dashboard.gif"
-                  alt="Animated walk-through of the Nami dashboard at app.nami.team showing workspace health, review completion, and team activity at a glance."
+                  alt="Animated walk-through of the Nami dashboard at namihr.com showing workspace health, review completion, and team activity at a glance."
                 />
               </video>
             </figure>
@@ -1040,7 +1042,9 @@ export default async function Home() {
               <span className="text-lg font-bold text-foreground">Nami</span>
               <span>&copy; {new Date().getFullYear()}</span>
             </div>
-            <div className="flex gap-6 text-sm">
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
+              <Link href="/guides" className="text-muted-foreground/60 hover:text-foreground transition-colors">Guides</Link>
+              <Link href="/compare" className="text-muted-foreground/60 hover:text-foreground transition-colors">Compare</Link>
               <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
               <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>

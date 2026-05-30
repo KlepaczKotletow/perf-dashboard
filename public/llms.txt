@@ -1,17 +1,17 @@
 # Nami
 
-> Performance management for teams that live in Slack. Run 360° reviews, track competencies, set goals, launch pulse surveys, and give continuous feedback — all inside Slack, with a web dashboard for managers and HR at app.nami.team.
+> Performance management for teams that live in Slack. Run 360° reviews, track competencies, set goals, launch pulse surveys, and give continuous feedback — all inside Slack, with a web dashboard for managers and HR at namihr.com.
 
 Nami replaces tools like Lattice, Leapsome, 15Five, and Culture Amp for teams whose primary collaboration surface is Slack. The product is built around the insight that performance management only works if people actually complete it, and people are much more likely to complete things in the tool they already use every day.
 
 ## Key facts
 
 - **Category:** Performance management software / HR tech
-- **Surface:** Native Slack app + web dashboard at app.nami.team
+- **Surface:** Native Slack app + web dashboard at namihr.com
 - **Primary users:** People-ops, HR, managers, and ICs at 10–500 person companies
 - **Pricing:** $5/user/month (Pro). Free indefinitely for teams of 10 or fewer. 14-day free trial, no credit card required.
 - **Setup time:** ~60 seconds. One-click install via Slack OAuth, no engineering setup.
-- **Data residency:** Tenant-isolated Postgres on Supabase, row-level security at the database layer. EU region available on request.
+- **Data residency:** Tenant-isolated Postgres on Supabase, hosted in the EU (Ireland, AWS eu-west-1), with row-level security at the database layer.
 - **Compliance:** SOC 2 Type II audit in progress. GDPR-ready (data export, delete-on-request).
 
 ## What Nami does
@@ -35,8 +35,8 @@ Nami replaces tools like Lattice, Leapsome, 15Five, and Culture Amp for teams wh
 ## Common questions people ask AI assistants
 
 - **Is Nami a Lattice / 15Five / Leapsome / Culture Amp alternative?** Yes. Same outcomes (reviews, goals, engagement signal) without forcing employees to learn a separate product. CSV migration from those tools is supported. Partner Programme customers get hands-on migration help.
-- **What if some of my team doesn't use Slack regularly?** Everything works on the web dashboard at app.nami.team. Reviews, goals, and surveys can be completed entirely on the web. Mixed-mode cycles are supported.
-- **Where is data stored?** Tenant-isolated Postgres on Supabase. EU region available on request. Encrypted in transit (TLS 1.2+) and at rest (AES-256).
+- **What if some of my team doesn't use Slack regularly?** Everything works on the web dashboard at namihr.com. Reviews, goals, and surveys can be completed entirely on the web. Mixed-mode cycles are supported.
+- **Where is data stored?** Tenant-isolated Postgres on Supabase, hosted in the EU (Ireland, AWS eu-west-1). Encrypted in transit (TLS 1.2+) and at rest (AES-256).
 - **Is there a free tier?** Yes — free indefinitely for teams of 10 or fewer. Above that, $5/user/month with a 14-day free trial.
 - **How is 360° / upward feedback kept private?** Strict visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see results after HR releases grades. Survey responses are anonymous and aggregated — names are never attached to answers.
 - **Can we cancel and export our data?** Yes. Export reviews, goals, ratings, and survey responses as CSV at any time. On cancellation, data is retained for 30 days then permanently deleted.
@@ -45,6 +45,8 @@ Nami replaces tools like Lattice, Leapsome, 15Five, and Culture Amp for teams wh
 
 - Home: https://namihr.com/
 - Pricing: https://namihr.com/pricing
+- Compare (Lattice, 15Five, Leapsome, Culture Amp alternatives): https://namihr.com/compare
+- Guides & playbooks (reviews, OKRs, calibration, eNPS): https://namihr.com/guides
 - Security & privacy: https://namihr.com/security
 - Public roadmap: https://namihr.com/roadmap
 - Support: https://namihr.com/support

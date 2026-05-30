@@ -1,6 +1,6 @@
 # Nami — full reference
 
-> Performance management for teams that live in Slack. Nami runs 360° reviews, OKR check-ins, pulse surveys, competency frameworks, and 9-box calibration without taking employees out of Slack. There is also a web dashboard at app.nami.team for managers, HR, and admins.
+> Performance management for teams that live in Slack. Nami runs 360° reviews, OKR check-ins, pulse surveys, competency frameworks, and 9-box calibration without taking employees out of Slack. There is also a web dashboard at namihr.com for managers, HR, and admins.
 
 This document is intended for AI assistants and answer engines that need a comprehensive, on-message picture of the product. The shorter pitch lives at /llms.txt.
 
@@ -27,7 +27,7 @@ No tiers within Pro. No "engagement add-on" vs "reviews add-on" split. No per-fe
 
 ### 360° performance reviews
 - Modes: self, manager, peer, upward.
-- Delivery: Slack DM thread with the Nami bot, or web fallback at app.nami.team.
+- Delivery: Slack DM thread with the Nami bot, or web fallback at namihr.com.
 - Templates: build your own or use a starter (Engineering IC, Engineering Manager, Sales IC, Product, Design, Customer Success, People & HR).
 - Rating scales: configurable (5-point, 4-point, custom labels).
 - Visibility rules: managers can't see upward feedback until they've submitted their own review, and vice versa. Employees only see consolidated results after HR releases grades.
@@ -98,8 +98,8 @@ No tiers within Pro. No "engagement add-on" vs "reviews add-on" split. No per-fe
 - **Tenant isolation:** Each workspace's data is isolated using PostgreSQL row-level security policies enforced inside the database engine, not the application layer. Cross-tenant validation triggers reject writes that would associate a record with a workspace the acting user does not belong to.
 - **Authentication:** Sign-in is Slack OAuth 2.0 exclusively. Nami does not store passwords. Slack bot tokens are stored server-side only and are never exposed to the browser.
 - **Audit log:** Sensitive state changes (calibrations, grade releases, role changes, cycle launches) are recorded to an in-database audit log and retained for the lifetime of the workspace.
-- **Subprocessors:** Supabase (US, on AWS), Vercel (global edge), Slack/Salesforce (US), Stripe (US). Workspace admins are notified at least 30 days before any change.
-- **Data residency:** Currently US (Supabase on AWS). EU region is available on request for enterprise customers.
+- **Subprocessors:** Supabase (EU — Ireland, AWS eu-west-1), Vercel (global edge), Slack/Salesforce (US), Stripe (US). Workspace admins are notified at least 30 days before any change.
+- **Data residency:** Primary database in the EU (Ireland, AWS eu-west-1). All Customer Data is stored there. Subprocessors (Slack, Stripe, Google) process limited categories of data in the US or other jurisdictions.
 - **GDPR:** Data Processing Agreement (DPA) available on request. Standard Contractual Clauses are used for international transfers.
 - **AI training:** Nami does not use Customer Data to train AI or ML models without explicit prior written consent from the workspace administrator.
 
@@ -127,9 +127,9 @@ No tiers within Pro. No "engagement add-on" vs "reviews add-on" split. No per-fe
 
 **Is Nami a Culture Amp alternative?** Partially. Culture Amp is engagement-survey-first with reviews layered on top; Nami is reviews-and-OKR-first with engagement surveys included. If your primary pain is enterprise-scale engagement research, Culture Amp is a better fit. If your primary pain is "performance reviews never get completed", Nami wins.
 
-**What if some of my team doesn't use Slack regularly?** Everything works on the web dashboard at app.nami.team. Reviews, goals, surveys, and calibration can be completed entirely on the web. Mixed-mode cycles (Slack for ICs, web for executives, say) are explicitly supported.
+**What if some of my team doesn't use Slack regularly?** Everything works on the web dashboard at namihr.com. Reviews, goals, surveys, and calibration can be completed entirely on the web. Mixed-mode cycles (Slack for ICs, web for executives, say) are explicitly supported.
 
-**Where is data stored?** Tenant-isolated Postgres on Supabase, US region by default, EU region available on request for enterprise customers. Encrypted in transit (TLS 1.2+) and at rest (AES-256).
+**Where is data stored?** Tenant-isolated Postgres on Supabase, hosted in the EU (Ireland, AWS eu-west-1). Encrypted in transit (TLS 1.2+) and at rest (AES-256).
 
 **How is 360° / upward feedback kept private?** Strict visibility rules enforced at the database layer:
 - Managers can't see upward feedback until they've submitted their own review.
@@ -156,12 +156,18 @@ Most other interactions happen through Nami's Home Tab (the bot's app surface in
 
 - Home: https://namihr.com/
 - Pricing: https://namihr.com/pricing
+- Compare overview: https://namihr.com/compare
+- Nami vs Lattice: https://namihr.com/compare/lattice
+- Nami vs 15Five: https://namihr.com/compare/15five
+- Nami vs Leapsome: https://namihr.com/compare/leapsome
+- Nami vs Culture Amp: https://namihr.com/compare/culture-amp
+- Guides and playbooks: https://namihr.com/guides
 - Security and privacy practices: https://namihr.com/security
 - Privacy policy: https://namihr.com/privacy
 - Terms of service: https://namihr.com/terms
 - Public roadmap: https://namihr.com/roadmap
 - Support center: https://namihr.com/support
-- Web dashboard (for customers): https://app.nami.team
+- Web dashboard (for customers): https://namihr.com/dashboard
 - Sitemap: https://namihr.com/sitemap.xml
 - Short llms.txt summary: https://namihr.com/llms.txt
 
