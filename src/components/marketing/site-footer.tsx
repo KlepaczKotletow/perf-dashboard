@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-// Editorial footer. Dark indigo ink to bookend the page against the masthead,
-// a serif wordmark, amber section labels. Also the internal-linking surface —
-// every page that renders it passes crawl equity to /guides and /compare.
+// Marketing-site footer — light, matching the landing page footer palette
+// (bg-muted/40, Manrope, muted links). Also the internal-linking surface:
+// passes crawl equity to /guides and /compare from every page.
 
 const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] = [
   {
@@ -43,29 +43,18 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
 
 export function SiteFooter() {
   return (
-    <footer className="relative mt-28 bg-[oklch(0.175_0.035_264)] text-[#cfc9bd]">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.25]"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      <div className="relative mx-auto max-w-6xl px-6 lg:px-10 py-16">
+    <footer className="mt-24 border-t border-border bg-muted/40">
+      <div className="mx-auto max-w-6xl px-6 lg:px-10 py-14">
         <div className="grid grid-cols-2 gap-10 md:grid-cols-6">
-          <div className="col-span-2">
-            <span className="font-display text-3xl font-semibold tracking-tight text-[#faf8f2]">
-              Nami
-            </span>
-            <p className="mt-4 max-w-[220px] text-sm leading-relaxed text-[#b4ae9f]">
-              Performance management that lives where your team already works —
-              <span className="text-[oklch(0.82_0.14_85)]"> Slack.</span>
+          <div className="col-span-2 md:col-span-2">
+            <span className="text-xl font-bold tracking-tight text-foreground">Nami</span>
+            <p className="mt-3 max-w-[240px] text-sm leading-relaxed text-muted-foreground/80">
+              Performance management for teams that live in Slack.
             </p>
           </div>
           {COLUMNS.map((col) => (
-            <div key={col.heading} className="md:col-span-1">
-              <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[oklch(0.78_0.13_85)]">
+            <div key={col.heading}>
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 {col.heading}
               </h3>
               <ul className="mt-4 space-y-2.5">
@@ -73,7 +62,7 @@ export function SiteFooter() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-[#cfc9bd] transition-colors hover:text-[#faf8f2]"
+                      className="text-sm text-muted-foreground/70 transition-colors hover:text-foreground"
                     >
                       {link.label}
                     </Link>
@@ -83,21 +72,18 @@ export function SiteFooter() {
             </div>
           ))}
         </div>
-        <div className="mt-14 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-[#9a9484] sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-12 flex flex-col gap-3 border-t border-border/60 pt-6 text-sm text-muted-foreground/70 sm:flex-row sm:items-center sm:justify-between">
           <span>&copy; {new Date().getFullYear()} Nami</span>
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-6">
             <a
               href="https://www.linkedin.com/company/namihr"
               target="_blank"
               rel="noopener noreferrer"
-              className="transition-colors hover:text-[#faf8f2]"
+              className="transition-colors hover:text-foreground"
             >
               LinkedIn
             </a>
-            <a
-              href="mailto:hello@namihr.com"
-              className="transition-colors hover:text-[#faf8f2]"
-            >
+            <a href="mailto:hello@namihr.com" className="transition-colors hover:text-foreground">
               hello@namihr.com
             </a>
           </div>

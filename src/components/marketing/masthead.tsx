@@ -1,77 +1,48 @@
 import type { ReactNode } from "react";
 
-// The signature editorial masthead for marketing/content pages. A deep indigo
-// ink band (echoes the landing hero) with a Fraunces serif headline, an amber
-// small-caps kicker, and a faint dot-grid texture — deliberately NOT a gradient
-// wash. Sits full-bleed under the cream header so it reads as a magazine cover.
+// Hero/masthead for marketing/content pages — matches the landing page exactly:
+// a #1a1a2e dark-navy rounded-3xl card with the animated primary-glow orb, on the
+// warm cream page gradient. Manrope headline; pass an accent <span> with
+// `text-primary text-shimmer` for the highlighted word.
 export function Masthead({
   kicker,
   title,
   lead,
   breadcrumb,
   actions,
-  align = "left",
 }: {
   kicker?: string;
   title: ReactNode;
   lead?: ReactNode;
   breadcrumb?: ReactNode;
   actions?: ReactNode;
-  align?: "left" | "center";
 }) {
   return (
-    <header className="relative isolate overflow-hidden bg-[oklch(0.175_0.035_264)] text-[#f4f1e8]">
-      {/* dot-grid texture */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.35]"
-        style={{
-          backgroundImage:
-            "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
-      {/* faint warm glow anchored bottom-left, kept very subtle */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-32 -left-24 h-72 w-72 rounded-full opacity-20 blur-3xl"
-        style={{ background: "oklch(0.75 0.16 85)" }}
-      />
-      <div
-        className={`relative mx-auto max-w-5xl px-6 lg:px-10 pt-12 pb-16 sm:pt-16 sm:pb-20 ${
-          align === "center" ? "text-center" : ""
-        }`}
-      >
-        {breadcrumb && <div className="mb-7">{breadcrumb}</div>}
-        {kicker && (
-          <p
-            className={`font-mono text-[11px] uppercase tracking-[0.28em] text-[oklch(0.82_0.14_85)] ${
-              align === "center" ? "" : ""
-            } mb-5`}
-          >
-            {kicker}
-          </p>
-        )}
-        <h1
-          className={`font-display font-semibold text-[2.6rem] leading-[1.04] tracking-[-0.015em] text-[#faf8f2] sm:text-6xl ${
-            align === "center" ? "mx-auto max-w-3xl" : "max-w-3xl"
-          }`}
-        >
-          {title}
-        </h1>
-        {lead && (
+    <section className="bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5]">
+      <div className="mx-auto max-w-6xl px-6 lg:px-10 pt-8 pb-2 sm:pt-10">
+        <div className="relative overflow-hidden rounded-3xl bg-[#1a1a2e] px-7 py-12 sm:px-12 sm:py-16">
+          {/* soft primary glow orb — same as the landing hero */}
           <div
-            className={`mt-6 text-lg leading-relaxed text-[#cfc9bd] sm:text-xl ${
-              align === "center" ? "mx-auto max-w-2xl" : "max-w-2xl"
-            }`}
-          >
-            {lead}
+            aria-hidden
+            className="pointer-events-none absolute -top-10 right-0 h-[320px] w-[320px] rounded-full bg-gradient-to-bl from-primary/25 to-transparent blur-3xl animate-orb-drift"
+          />
+          <div className="relative">
+            {breadcrumb && <div className="mb-6">{breadcrumb}</div>}
+            {kicker && (
+              <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/70">
+                {kicker}
+              </span>
+            )}
+            <h1 className="max-w-3xl text-4xl font-bold leading-[1.1] tracking-tight text-white sm:text-5xl">
+              {title}
+            </h1>
+            {lead && (
+              <div className="mt-5 max-w-2xl text-lg leading-relaxed text-white/60">{lead}</div>
+            )}
+            {actions && <div className="mt-8">{actions}</div>}
           </div>
-        )}
-        {actions && <div className={`mt-9 ${align === "center" ? "flex justify-center" : ""}`}>{actions}</div>}
+        </div>
       </div>
-      {/* hairline foot */}
-      <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-white/10" />
-    </header>
+    </section>
   );
 }

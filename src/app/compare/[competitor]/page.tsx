@@ -6,8 +6,10 @@ import { COMPARISONS, getComparison, type NamiStatus, type RivalStatus } from "@
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
 import { Masthead } from "@/components/marketing/masthead";
+import { CtaBand } from "@/components/marketing/cta-band";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
+import { Button } from "@/components/ui/button";
 import { getAddToSlackUrl } from "@/lib/slack-cta";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
@@ -41,22 +43,21 @@ export async function generateMetadata({
   };
 }
 
-// Nami marks read as confident indigo; the competitor column stays monochrome
-// grey (check / dash / x) so colour alone makes the stronger column obvious —
-// no candy tints, no wall of identical ticks.
+// Nami marks read as confident indigo; the competitor column stays muted grey
+// (check / dash / x) so colour alone makes the stronger column obvious.
 function NamiMark({ status }: { status: NamiStatus }) {
-  if (status === "no") return <X className="mt-0.5 h-4 w-4 shrink-0 text-foreground/30" strokeWidth={2.5} />;
+  if (status === "no") return <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2.5} />;
   return (
     <Check
-      className={`mt-0.5 h-4 w-4 shrink-0 text-primary ${status === "win" ? "" : "opacity-70"}`}
+      className={`mt-0.5 h-4 w-4 shrink-0 text-primary ${status === "win" ? "" : "opacity-60"}`}
       strokeWidth={status === "win" ? 3 : 2.25}
     />
   );
 }
 function RivalMark({ status }: { status: RivalStatus }) {
-  if (status === "yes") return <Check className="mt-0.5 h-4 w-4 shrink-0 text-foreground/40" strokeWidth={2} />;
-  if (status === "limited") return <Minus className="mt-0.5 h-4 w-4 shrink-0 text-foreground/40" strokeWidth={2.5} />;
-  return <X className="mt-0.5 h-4 w-4 shrink-0 text-foreground/25" strokeWidth={2.5} />;
+  if (status === "yes") return <Check className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/45" strokeWidth={2} />;
+  if (status === "limited") return <Minus className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/45" strokeWidth={2.5} />;
+  return <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/30" strokeWidth={2.5} />;
 }
 
 export default async function ComparePage({
@@ -100,60 +101,59 @@ export default async function ComparePage({
         kicker={`Comparison — Nami vs ${c.name}`}
         title={
           <>
-            The Slack-native <span className="italic text-[oklch(0.84_0.13_85)]">{c.name}</span> alternative
+            The Slack-native <span className="text-primary text-shimmer">{c.name}</span> alternative
           </>
         }
         breadcrumb={
-          <nav className="flex flex-wrap items-center gap-2 text-sm text-[#a39e90]">
-            <Link href="/" className="transition-colors hover:text-[#faf8f2]">Home</Link>
+          <nav className="flex flex-wrap items-center gap-2 text-sm text-white/40">
+            <Link href="/" className="transition-colors hover:text-white">Home</Link>
             <span aria-hidden>/</span>
-            <Link href="/compare" className="transition-colors hover:text-[#faf8f2]">Compare</Link>
+            <Link href="/compare" className="transition-colors hover:text-white">Compare</Link>
             <span aria-hidden>/</span>
-            <span className="text-[#cfc9bd]">Nami vs {c.name}</span>
+            <span className="text-white/70">Nami vs {c.name}</span>
           </nav>
         }
         lead={c.heroSummary}
         actions={
-          <AddToSlackLink
-            href={addToSlackUrl}
-            className="inline-flex items-center gap-2 rounded-full bg-[#faf8f2] px-6 py-3 text-sm font-semibold text-[oklch(0.2_0.04_264)] transition-colors hover:bg-white"
-          >
-            <Slack className="h-4 w-4" />
-            Add Nami to Slack
-          </AddToSlackLink>
+          <Button size="lg" className="h-12 rounded-full px-7 text-sm font-semibold btn-glow" asChild>
+            <AddToSlackLink href={addToSlackUrl}>
+              <Slack className="mr-2 h-4 w-4" />
+              Add Nami to Slack
+            </AddToSlackLink>
+          </Button>
         }
       />
 
       <main className="flex-1">
         <div className="mx-auto max-w-4xl px-6 lg:px-10 py-16">
-          {/* Why teams switch — numbered editorial entries */}
+          {/* Why teams switch */}
           <section>
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[oklch(0.7_0.14_85)]">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">
               Why teams switch
             </p>
-            <h2 className="mt-3 max-w-2xl font-display text-3xl font-semibold leading-tight tracking-[-0.01em] text-foreground">
+            <h2 className="mt-3 max-w-2xl text-3xl font-bold tracking-tight text-foreground">
               What {c.name} makes hard, Nami makes effortless
             </h2>
-            <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground/85">{c.positioning}</p>
+            <p className="mt-4 max-w-2xl leading-relaxed text-muted-foreground">{c.positioning}</p>
 
-            <ol className="mt-10 border-t border-foreground/10">
+            <ol className="mt-10 border-t border-border/60">
               {c.switchReasons.map((r, i) => (
                 <li
                   key={i}
-                  className="grid gap-x-8 gap-y-3 border-b border-foreground/10 py-9 sm:grid-cols-[auto_minmax(0,1fr)]"
+                  className="grid gap-x-8 gap-y-3 border-b border-border/60 py-9 sm:grid-cols-[auto_minmax(0,1fr)]"
                 >
-                  <span className="font-display text-5xl font-semibold leading-none text-foreground/[0.12]">
+                  <span className="text-5xl font-bold leading-none text-primary/15">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <p className="leading-relaxed text-muted-foreground/85">
-                      <span className="mr-2 font-mono text-[10px] uppercase tracking-[0.18em] text-foreground/40">
+                    <p className="leading-relaxed text-muted-foreground">
+                      <span className="mr-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground/45">
                         With {c.name}
                       </span>
                       {r.pain}
                     </p>
-                    <p className="mt-4 flex gap-3 font-display text-lg leading-relaxed text-foreground">
-                      <ArrowRight className="mt-1.5 h-4 w-4 shrink-0 text-[oklch(0.7_0.14_85)]" />
+                    <p className="mt-4 flex gap-3 text-lg font-semibold leading-relaxed text-foreground">
+                      <ArrowRight className="mt-1.5 h-4 w-4 shrink-0 text-primary" />
                       <span>{r.fix}</span>
                     </p>
                   </div>
@@ -164,33 +164,33 @@ export default async function ComparePage({
 
           {/* Side by side */}
           <section className="mt-20">
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[oklch(0.7_0.14_85)]">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">
               Side by side
             </p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.01em] text-foreground">
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground">
               Nami vs {c.name}, line by line
             </h2>
 
-            <div className="mt-8 overflow-hidden rounded-2xl border border-foreground/10">
+            <div className="mt-8 overflow-hidden rounded-2xl border border-border/60">
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
                     <th className="w-[26%] px-4 py-4 text-left align-bottom" />
                     <th className="w-[37%] border-x border-primary/15 bg-primary/[0.05] px-4 py-4 text-left align-bottom">
-                      <span className="font-display text-lg font-semibold text-primary">Nami</span>
-                      <span className="ml-2 align-middle rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">
+                      <span className="text-lg font-bold text-primary">Nami</span>
+                      <span className="ml-2 align-middle rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary">
                         Recommended
                       </span>
                     </th>
                     <th className="w-[37%] px-4 py-4 text-left align-bottom">
-                      <span className="font-display text-lg font-semibold text-foreground/65">{c.name}</span>
+                      <span className="text-lg font-bold text-foreground/65">{c.name}</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {c.rows.map((row) => (
-                    <tr key={row.label} className="border-t border-foreground/[0.07]">
-                      <td className="px-4 py-4 align-top text-sm font-medium text-foreground/60">{row.label}</td>
+                    <tr key={row.label} className="border-t border-border/50">
+                      <td className="px-4 py-4 align-top text-sm font-medium text-muted-foreground">{row.label}</td>
                       <td className="border-x border-primary/15 bg-primary/[0.035] px-4 py-4 align-top">
                         <div className="flex items-start gap-2">
                           <NamiMark status={row.namiStatus} />
@@ -200,7 +200,7 @@ export default async function ComparePage({
                       <td className="px-4 py-4 align-top">
                         <div className="flex items-start gap-2">
                           <RivalMark status={row.rivalStatus} />
-                          <span className="text-sm leading-snug text-muted-foreground/75">{row.rival}</span>
+                          <span className="text-sm leading-snug text-muted-foreground/80">{row.rival}</span>
                         </div>
                       </td>
                     </tr>
@@ -208,97 +208,78 @@ export default async function ComparePage({
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground/50">
+            <p className="mt-3 text-xs text-muted-foreground/60">
               Reflects Nami&apos;s current feature set and {c.name}&apos;s publicly described
               capabilities. Vendor features and pricing change — verify specifics for your plan.
             </p>
           </section>
 
-          {/* Verdict pull-quote */}
-          <blockquote className="mt-20 border-l-2 border-[oklch(0.75_0.16_85)] pl-6">
-            <p className="font-display text-2xl font-medium italic leading-snug text-foreground sm:text-[1.7rem]">
+          {/* Verdict */}
+          <blockquote className="mt-20 border-l-2 border-primary/50 pl-6">
+            <p className="text-2xl font-bold leading-snug tracking-tight text-foreground sm:text-[1.7rem]">
               Same outcomes {c.name} promises — reviews, goals, engagement — without the separate
               login, the per-module invoice, or the rollout. It just lives in Slack.
             </p>
           </blockquote>
 
           {/* Honest fit */}
-          <section className="mt-16 rounded-2xl bg-muted/40 px-7 py-6">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-foreground/40">In fairness</p>
-            <h2 className="mt-2 font-display text-lg font-semibold text-foreground">
+          <section className="mt-16 rounded-2xl border border-border/60 bg-muted/40 px-7 py-6">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">In fairness</p>
+            <h2 className="mt-2 text-lg font-bold tracking-tight text-foreground">
               When {c.name} is the better choice
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground/85">{c.betterFit}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-muted-foreground">{c.betterFit}</p>
           </section>
 
           {/* FAQ */}
           <section className="mt-20">
-            <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[oklch(0.7_0.14_85)]">FAQ</p>
-            <h2 className="mt-3 font-display text-3xl font-semibold tracking-[-0.01em] text-foreground">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">FAQ</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-foreground">
               {c.name} alternative — questions
             </h2>
-            <div className="mt-8 border-t border-foreground/10">
+            <div className="mt-8 border-t border-border/60">
               {c.faqs.map((f) => (
-                <details key={f.q} className="group border-b border-foreground/10 py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-lg font-medium text-foreground">
+                <details key={f.q} className="group border-b border-border/60 py-5">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-bold tracking-tight text-foreground">
                     {f.q}
-                    <span className="shrink-0 text-foreground/30 transition-transform group-open:rotate-45">
+                    <span className="shrink-0 text-muted-foreground/40 transition-transform group-open:rotate-45">
                       <Plus />
                     </span>
                   </summary>
-                  <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground/85">{f.a}</p>
+                  <p className="mt-3 max-w-2xl leading-relaxed text-muted-foreground">{f.a}</p>
                 </details>
               ))}
             </div>
           </section>
-        </div>
 
-        {/* CTA — full-bleed dark */}
-        <section className="relative overflow-hidden bg-[oklch(0.175_0.035_264)] text-[#cfc9bd]">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-[0.3]"
-            style={{
-              backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
-              backgroundSize: "22px 22px",
-            }}
-          />
-          <div className="relative mx-auto max-w-4xl px-6 lg:px-10 py-20 text-center">
-            <h2 className="mx-auto max-w-2xl font-display text-3xl font-semibold leading-tight text-[#faf8f2] sm:text-4xl">
-              See Nami in your own Slack
-            </h2>
-            <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed">
-              Install in about five minutes and run your first review cycle. Free for teams of 10
-              or fewer, 14-day Pro trial — no credit card.
-            </p>
-            <AddToSlackLink
+          {/* CTA */}
+          <div className="mt-20">
+            <CtaBand
               href={addToSlackUrl}
-              className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#faf8f2] px-7 py-3.5 text-sm font-semibold text-[oklch(0.2_0.04_264)] transition-colors hover:bg-white"
-            >
-              <Slack className="h-4 w-4" />
-              Add Nami to Slack
-            </AddToSlackLink>
+              title="See Nami in your own Slack"
+              subtitle="Install in about five minutes and run your first review cycle. Free for teams of 10 or fewer, 14-day Pro trial — no credit card."
+            />
           </div>
-        </section>
 
-        {/* Other comparisons */}
-        <section className="mx-auto max-w-4xl px-6 lg:px-10 py-16">
-          <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-foreground/40">
-            Compare with other tools
-          </p>
-          <ul className="mt-5 divide-y divide-foreground/10 border-y border-foreground/10">
-            {others.map((o) => (
-              <li key={o.slug}>
-                <Link href={`/compare/${o.slug}`} className="group flex items-center justify-between gap-4 py-4">
-                  <span className="font-display text-lg font-medium text-foreground transition-colors group-hover:text-primary">
-                    Nami vs {o.name}
-                  </span>
-                  <ArrowUpRight className="h-4 w-4 shrink-0 translate-y-0.5 text-foreground/25 transition-all group-hover:translate-y-0 group-hover:text-primary" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
+          {/* Other comparisons */}
+          <section className="mt-16">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/50">
+              Compare with other tools
+            </p>
+            <ul className="mt-5 divide-y divide-border/60 border-y border-border/60">
+              {others.map((o) => (
+                <li key={o.slug}>
+                  <Link href={`/compare/${o.slug}`} className="group flex items-center justify-between gap-4 py-4">
+                    <span className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                      Nami vs {o.name}
+                    </span>
+                    <ArrowUpRight className="h-4 w-4 shrink-0 translate-y-0.5 text-muted-foreground/30 transition-all group-hover:translate-y-0 group-hover:text-primary" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
       </main>
 
       <SiteFooter />

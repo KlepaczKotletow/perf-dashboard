@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
-import { Fraunces } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -12,16 +11,6 @@ const GOOGLE_ADS_ID = "AW-18179782629";
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
-});
-
-// Editorial display serif for the marketing/content pages (guides, compare).
-// Optical-size axis gives the large headings a refined, crafted feel that the
-// geometric sans can't — the single biggest lever against a generic look.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  display: "swap",
-  style: ["normal", "italic"],
 });
 
 const geistMono = Geist_Mono({
@@ -135,7 +124,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${manrope.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${manrope.variable} ${geistMono.variable} font-sans antialiased`}
       >
         {children}
         <SpeedInsights />

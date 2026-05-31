@@ -30,11 +30,10 @@ function rewriteHref(href: string): string {
 }
 
 const linkClass =
-  "font-medium text-primary underline decoration-[oklch(0.75_0.16_85)]/50 underline-offset-[3px] decoration-2 transition-colors hover:decoration-[oklch(0.75_0.16_85)]";
+  "font-medium text-primary underline decoration-primary/30 underline-offset-[3px] transition-colors hover:decoration-primary/70";
 
-// Editorial reading styles for the public /guides article body — distinct from
-// the in-app help styling. Serif section heads with hairline breaks, a
-// comfortable measure, amber markers.
+// Reading styles for the public /guides article body — Manrope, matching the
+// landing page's type and the brand's indigo accent (no serif, no amber).
 export const publicMdxComponents: MDXComponents = {
   Callout,
   RoleTag: () => null,
@@ -44,7 +43,7 @@ export const publicMdxComponents: MDXComponents = {
     return (
       <h2
         id={id}
-        className="font-display text-[1.6rem] sm:text-[1.8rem] font-semibold tracking-[-0.01em] text-foreground mt-14 mb-4 pt-10 border-t border-foreground/10 scroll-mt-28"
+        className="mt-12 mb-4 border-t border-border/60 pt-9 text-2xl font-bold tracking-tight text-foreground scroll-mt-28"
       >
         {children}
       </h2>
@@ -53,26 +52,23 @@ export const publicMdxComponents: MDXComponents = {
   h3: ({ children }: ComponentPropsWithoutRef<"h3">) => {
     const id = slugify(textOf(children));
     return (
-      <h3
-        id={id}
-        className="font-display text-xl font-semibold text-foreground mt-9 mb-3 scroll-mt-28"
-      >
+      <h3 className="mt-8 mb-3 text-lg font-bold tracking-tight text-foreground scroll-mt-28" id={id}>
         {children}
       </h3>
     );
   },
   p: (props) => (
-    <p className="text-[1.0625rem] leading-[1.75] text-foreground/80 mb-5" {...props} />
+    <p className="mb-5 text-[1.0625rem] leading-[1.75] text-muted-foreground" {...props} />
   ),
   ul: (props) => (
     <ul
-      className="mb-6 ml-1 space-y-2.5 text-[1.0625rem] leading-[1.7] text-foreground/80 [&>li]:relative [&>li]:pl-6 [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:top-[0.62em] [&>li]:before:h-1.5 [&>li]:before:w-1.5 [&>li]:before:-translate-y-1/2 [&>li]:before:rounded-full [&>li]:before:bg-[oklch(0.75_0.16_85)]"
+      className="mb-6 ml-1 space-y-2.5 text-[1.0625rem] leading-[1.7] text-muted-foreground [&>li]:relative [&>li]:pl-6 [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:top-[0.62em] [&>li]:before:h-1.5 [&>li]:before:w-1.5 [&>li]:before:-translate-y-1/2 [&>li]:before:rounded-full [&>li]:before:bg-primary/60"
       {...props}
     />
   ),
   ol: (props) => (
     <ol
-      className="mb-6 ml-5 list-decimal space-y-2.5 text-[1.0625rem] leading-[1.7] text-foreground/80 marker:font-display marker:font-semibold marker:text-primary/70"
+      className="mb-6 ml-5 list-decimal space-y-2.5 text-[1.0625rem] leading-[1.7] text-muted-foreground marker:font-semibold marker:text-primary/70"
       {...props}
     />
   ),
@@ -81,11 +77,11 @@ export const publicMdxComponents: MDXComponents = {
   em: (props) => <em className="italic" {...props} />,
   blockquote: (props) => (
     <blockquote
-      className="my-7 border-l-2 border-[oklch(0.75_0.16_85)] pl-5 font-display text-xl italic leading-relaxed text-foreground/75 [&>p]:mb-0"
+      className="my-7 border-l-2 border-primary/50 pl-5 text-lg italic leading-relaxed text-foreground/75 [&>p]:mb-0"
       {...props}
     />
   ),
-  hr: () => <hr className="my-10 border-foreground/10" />,
+  hr: () => <hr className="my-10 border-border/60" />,
   code: (props) => (
     <code
       className="rounded bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[0.85em] text-foreground"
@@ -94,23 +90,23 @@ export const publicMdxComponents: MDXComponents = {
   ),
   pre: (props) => (
     <pre
-      className="my-6 overflow-x-auto rounded-xl bg-[oklch(0.175_0.035_264)] p-4 text-sm text-[#e9e5da] [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-[#e9e5da]"
+      className="my-6 overflow-x-auto rounded-xl bg-[#1a1a2e] p-4 text-sm text-[#e9e9f2] [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-[#e9e9f2]"
       {...props}
     />
   ),
   table: (props) => (
-    <div className="my-7 overflow-x-auto rounded-xl border border-foreground/10">
+    <div className="my-7 overflow-x-auto rounded-xl border border-border/60">
       <table className="w-full border-collapse text-sm" {...props} />
     </div>
   ),
   th: (props) => (
     <th
-      className="border-b border-foreground/10 bg-foreground/[0.03] px-4 py-2.5 text-left font-semibold text-foreground"
+      className="border-b border-border/60 bg-muted/40 px-4 py-2.5 text-left font-semibold text-foreground"
       {...props}
     />
   ),
   td: (props) => (
-    <td className="border-b border-foreground/[0.06] px-4 py-2.5 text-foreground/80 align-top" {...props} />
+    <td className="border-b border-border/40 px-4 py-2.5 align-top text-muted-foreground" {...props} />
   ),
   a: ({ href = "", children, ...rest }: ComponentPropsWithoutRef<"a">) => {
     const target = rewriteHref(String(href));
