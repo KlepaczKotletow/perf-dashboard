@@ -174,3 +174,4 @@ Most other interactions happen through Nami's Home Tab (the bot's app surface in
 ## Contact
 
 - General, sales, partners, security reports, DPA requests, billing: hello@namihr.com
+- LinkedIn: https://www.linkedin.com/company/namihr

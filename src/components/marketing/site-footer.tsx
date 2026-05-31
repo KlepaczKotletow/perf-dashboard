@@ -85,12 +85,22 @@ export function SiteFooter() {
         </div>
         <div className="mt-14 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-[#9a9484] sm:flex-row sm:items-center sm:justify-between">
           <span>&copy; {new Date().getFullYear()} Nami</span>
-          <a
-            href="mailto:hello@namihr.com"
-            className="transition-colors hover:text-[#faf8f2]"
-          >
-            hello@namihr.com
-          </a>
+          <div className="flex items-center gap-5">
+            <a
+              href="https://www.linkedin.com/company/namihr"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="transition-colors hover:text-[#faf8f2]"
+            >
+              LinkedIn
+            </a>
+            <a
+              href="mailto:hello@namihr.com"
+              className="transition-colors hover:text-[#faf8f2]"
+            >
+              hello@namihr.com
+            </a>
+          </div>
         </div>
       </div>
     </footer>

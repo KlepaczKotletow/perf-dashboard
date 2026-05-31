@@ -67,6 +67,7 @@ const siteJsonLd = {
       url: SITE_URL,
       logo: `${SITE_URL}/nami-logo.svg`,
       email: "hello@namihr.com",
+      sameAs: ["https://www.linkedin.com/company/namihr"],
       description:
         "Performance management for teams that live in Slack. 360° reviews, OKRs, pulse surveys, and continuous feedback — without leaving Slack.",
     },
