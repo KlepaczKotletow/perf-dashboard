@@ -3,14 +3,14 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { compileMDX } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
-import { ChevronRight, ArrowRight, Slack } from "lucide-react";
+import { Slack, ArrowUpRight, ArrowLeft } from "lucide-react";
 import { getAllArticles, getArticleBySlug } from "@/lib/help-articles";
-import { publicMdxComponents } from "@/components/marketing/public-mdx-components";
+import { publicMdxComponents, slugify } from "@/components/marketing/public-mdx-components";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
-import { Button } from "@/components/ui/button";
 import { getAddToSlackUrl } from "@/lib/slack-cta";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
@@ -27,7 +27,6 @@ export async function generateMetadata({
   const { slug } = await params;
   const article = getArticleBySlug(slug);
   if (!article) return {};
-
   return {
     title: article.title,
     description: article.description,
@@ -38,11 +37,7 @@ export async function generateMetadata({
       url: `/guides/${slug}`,
       type: "article",
     },
-    twitter: {
-      card: "summary_large_image",
-      title: article.title,
-      description: article.description,
-    },
+    twitter: { card: "summary_large_image", title: article.title, description: article.description },
   };
 }
 
@@ -61,9 +56,19 @@ export default async function GuidePage({
     options: { mdxOptions: { remarkPlugins: [remarkGfm] } },
   });
 
+  // Table of contents from the raw markdown h2s — matches the ids the MDX
+  // h2 component generates via the same slugify().
+  const toc = [...article.content.matchAll(/^##\s+(.+?)\s*$/gm)].map((m) => ({
+    text: m[1].replace(/[*_`]/g, ""),
+    id: slugify(m[1].replace(/[*_`]/g, "")),
+  }));
+
+  const words = article.content.trim().split(/\s+/).length;
+  const readMins = Math.max(1, Math.round(words / 200));
+
   const related = getAllArticles()
     .filter((a) => a.category === article.category && a.slug !== slug)
-    .slice(0, 3);
+    .slice(0, 4);
 
   const addToSlackUrl = getAddToSlackUrl("guide");
 
@@ -83,110 +88,132 @@ export default async function GuidePage({
       logo: { "@type": "ImageObject", url: `${SITE_URL}/nami-logo.svg` },
     },
   };
-
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
       { "@type": "ListItem", position: 2, name: "Guides", item: `${SITE_URL}/guides` },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: article.title,
-        item: `${SITE_URL}/guides/${slug}`,
-      },
+      { "@type": "ListItem", position: 3, name: article.title, item: `${SITE_URL}/guides/${slug}` },
     ],
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <JsonLd data={articleJsonLd} />
       <JsonLd data={breadcrumbJsonLd} />
       <SiteHeader ctaPurpose="guide" />
 
-      <main className="flex-1">
-        <div className="max-w-3xl mx-auto px-6 lg:px-10 py-12">
-          {/* Breadcrumb */}
-          <nav className="flex items-center gap-1.5 text-sm text-muted-foreground/60 mb-8 flex-wrap">
-            <Link href="/" className="hover:text-foreground transition-colors">
-              Home
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5" />
-            <Link href="/guides" className="hover:text-foreground transition-colors">
-              Guides
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5" />
-            <span className="text-foreground/70 font-medium">{article.category}</span>
+      <Masthead
+        kicker={article.category}
+        title={article.title}
+        breadcrumb={
+          <nav className="flex flex-wrap items-center gap-2 text-sm text-[#a39e90]">
+            <Link href="/" className="transition-colors hover:text-[#faf8f2]">Home</Link>
+            <span aria-hidden>/</span>
+            <Link href="/guides" className="transition-colors hover:text-[#faf8f2]">Guides</Link>
+            <span aria-hidden>/</span>
+            <span className="text-[#cfc9bd]">{article.category}</span>
           </nav>
-
-          {/* Header */}
-          <header className="mb-10">
-            <p className="text-sm font-semibold text-primary mb-2">{article.category}</p>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground mb-4 leading-tight">
-              {article.title}
-            </h1>
-            <p className="text-lg text-muted-foreground/85 leading-relaxed">
-              {article.description}
+        }
+        lead={
+          <>
+            <p>{article.description}</p>
+            <p className="mt-5 font-mono text-xs uppercase tracking-[0.22em] text-[#a39e90]">
+              {readMins} min read
             </p>
-            <div className="mt-8 h-px bg-gradient-to-r from-border via-border/60 to-transparent" />
-          </header>
+          </>
+        }
+      />
 
-          {/* Body */}
-          <article className="prose-custom">{content}</article>
+      <main className="flex-1">
+        <div className="mx-auto max-w-6xl px-6 lg:px-10 py-14 lg:grid lg:grid-cols-[minmax(0,1fr)_14rem] lg:gap-14">
+          {/* Article */}
+          <article className="max-w-[700px]">
+            {content}
 
-          {/* Inline CTA */}
-          <div className="mt-14 rounded-2xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] border border-primary/10 px-7 py-8">
-            <h2 className="text-xl font-bold tracking-tight text-foreground">
-              Run this in Slack with Nami
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground/90 max-w-lg">
-              Nami brings reviews, goals, surveys, and calibration into Slack so your team actually
-              completes them. Free for teams of 10 or fewer.
-            </p>
-            <div className="mt-5">
-              <Button className="rounded-full px-6 h-11" asChild>
-                <AddToSlackLink href={addToSlackUrl}>
-                  <Slack className="h-4 w-4 mr-2" />
+            {/* CTA panel */}
+            <aside className="relative mt-16 overflow-hidden rounded-2xl bg-[oklch(0.175_0.035_264)] px-7 py-9 text-[#cfc9bd]">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.3]"
+                style={{
+                  backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
+                  backgroundSize: "20px 20px",
+                }}
+              />
+              <div className="relative">
+                <h2 className="font-display text-2xl font-semibold text-[#faf8f2]">
+                  Run this in Slack with Nami
+                </h2>
+                <p className="mt-3 max-w-lg text-[15px] leading-relaxed">
+                  Reviews, goals, surveys, and calibration — in the DM thread your team already
+                  reads. Free for teams of 10 or fewer.
+                </p>
+                <AddToSlackLink
+                  href={addToSlackUrl}
+                  className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#faf8f2] px-6 py-3 text-sm font-semibold text-[oklch(0.2_0.04_264)] transition-colors hover:bg-white"
+                >
+                  <Slack className="h-4 w-4" />
                   Add Nami to Slack
                 </AddToSlackLink>
-              </Button>
+              </div>
+            </aside>
+
+            {/* Related */}
+            {related.length > 0 && (
+              <section className="mt-16">
+                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-foreground/40">
+                  More in {article.category}
+                </p>
+                <ul className="mt-5 divide-y divide-foreground/10 border-y border-foreground/10">
+                  {related.map((r) => (
+                    <li key={r.slug}>
+                      <Link href={`/guides/${r.slug}`} className="group flex items-baseline justify-between gap-6 py-4">
+                        <span className="font-display text-lg font-medium text-foreground transition-colors group-hover:text-primary">
+                          {r.title}
+                        </span>
+                        <ArrowUpRight className="h-4 w-4 shrink-0 translate-y-1 text-foreground/30 transition-all group-hover:-translate-y-0 group-hover:text-primary" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            <div className="mt-12">
+              <Link
+                href="/guides"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/70"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                All guides
+              </Link>
             </div>
-          </div>
+          </article>
 
-          {/* Related */}
-          {related.length > 0 && (
-            <section className="mt-14">
-              <h2 className="text-lg font-bold tracking-tight text-foreground mb-4">
-                More on {article.category}
-              </h2>
-              <ul className="space-y-2">
-                {related.map((r) => (
-                  <li key={r.slug}>
-                    <Link
-                      href={`/guides/${r.slug}`}
-                      className="group flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card px-4 py-3 hover:border-primary/40 transition-colors"
-                    >
-                      <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                        {r.title}
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {/* TOC rail */}
+          {toc.length > 1 && (
+            <aside className="hidden lg:block">
+              <div className="sticky top-28">
+                <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-foreground/40">
+                  On this page
+                </p>
+                <ul className="mt-4 space-y-1 border-l border-foreground/10">
+                  {toc.map((h) => (
+                    <li key={h.id}>
+                      <a
+                        href={`#${h.id}`}
+                        className="-ml-px block border-l-2 border-transparent py-1 pl-4 text-[13px] leading-snug text-foreground/55 transition-colors hover:border-[oklch(0.75_0.16_85)] hover:text-foreground"
+                      >
+                        {h.text}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </aside>
           )}
-
-          <div className="mt-12">
-            <Link
-              href="/guides"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline underline-offset-4"
-            >
-              <ChevronRight className="h-4 w-4 rotate-180" />
-              All guides
-            </Link>
-          </div>
         </div>
       </main>
 

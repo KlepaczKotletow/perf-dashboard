@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Slack } from "lucide-react";
+import { ArrowUpRight, Slack } from "lucide-react";
 import { getAllArticles, getArticlesGroupedByCategory } from "@/lib/help-articles";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
-import { Button } from "@/components/ui/button";
 import { getAddToSlackUrl } from "@/lib/slack-cta";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
 
 const DESCRIPTION =
-  "Practical, field-tested guides to running performance reviews, OKRs, 360° feedback, calibration, and engagement surveys — built for teams that work in Slack.";
+  "Field-tested playbooks for running performance reviews, OKRs, 360° feedback, calibration, and engagement surveys — from the team building Nami.";
 
 export const metadata: Metadata = {
   title: "Performance Management Guides",
@@ -52,7 +52,6 @@ export default function GuidesIndexPage() {
       { "@type": "ListItem", position: 2, name: "Guides", item: `${SITE_URL}/guides` },
     ],
   };
-
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -66,85 +65,94 @@ export default function GuidesIndexPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
       <SiteHeader ctaPurpose="guides" />
 
-      <main className="flex-1">
-        {/* Hero */}
-        <section className="bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5] border-b border-border/40">
-          <div className="max-w-6xl mx-auto px-6 lg:px-10 py-16 sm:py-20">
-            <p className="text-sm font-semibold text-primary mb-3">Guides &amp; playbooks</p>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-foreground max-w-3xl leading-[1.1]">
-              How to run performance management your team actually finishes
-            </h1>
-            <p className="mt-5 text-lg text-muted-foreground/90 max-w-2xl leading-relaxed">
-              {DESCRIPTION} Written by the team building{" "}
-              <Link
-                href="/"
-                className="text-primary underline underline-offset-4 decoration-primary/30 hover:decoration-primary/60"
-              >
-                Nami
-              </Link>
-              , the Slack-native performance platform.
-            </p>
-          </div>
-        </section>
+      <Masthead
+        kicker="Guides & Playbooks"
+        title={
+          <>
+            Performance management,
+            <br className="hidden sm:block" /> <span className="italic text-[oklch(0.84_0.13_85)]">done properly.</span>
+          </>
+        }
+        lead={`${DESCRIPTION} ${all.length} guides, no fluff.`}
+      />
 
-        {/* Article groups */}
-        <section className="max-w-6xl mx-auto px-6 lg:px-10 py-16">
-          <div className="space-y-16">
-            {grouped.map((group) => (
-              <div key={group.category}>
-                <h2 className="text-2xl font-bold tracking-tight text-foreground mb-6">
+      <main className="flex-1">
+        <div className="mx-auto max-w-5xl px-6 lg:px-10">
+          {grouped.map((group, i) => (
+            <section
+              key={group.category}
+              className="grid gap-x-12 gap-y-6 border-t border-foreground/10 py-12 lg:grid-cols-[15rem_minmax(0,1fr)]"
+            >
+              <div className="lg:sticky lg:top-28 lg:self-start">
+                <p className="font-mono text-[11px] uppercase tracking-[0.24em] text-[oklch(0.7_0.14_85)]">
+                  {String(i + 1).padStart(2, "0")}
+                </p>
+                <h2 className="mt-2 font-display text-[1.7rem] font-semibold tracking-[-0.01em] text-foreground">
                   {group.category}
                 </h2>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {group.articles.map((article) => (
-                    <Link
-                      key={article.slug}
-                      href={`/guides/${article.slug}`}
-                      className="group flex flex-col rounded-2xl border border-border/60 bg-card p-5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/[0.04] transition-all"
-                    >
-                      <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors leading-snug">
-                        {article.title}
-                      </h3>
-                      <p className="mt-2 text-sm text-muted-foreground/80 leading-relaxed line-clamp-3 flex-1">
-                        {article.description}
-                      </p>
-                      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                        Read guide
-                        <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                      </span>
-                    </Link>
-                  ))}
-                </div>
+                <p className="mt-1 text-sm text-muted-foreground/70">
+                  {group.articles.length} {group.articles.length === 1 ? "guide" : "guides"}
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
 
-        {/* CTA band */}
-        <section className="max-w-6xl mx-auto px-6 lg:px-10 pb-8">
-          <div className="rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] border border-primary/10 px-8 py-12 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              Put these playbooks to work in Slack
-            </h2>
-            <p className="mt-3 text-muted-foreground/90 max-w-xl mx-auto">
-              Run your first review cycle in about five minutes. Free for teams of 10 or fewer,
-              14-day Pro trial — no credit card.
-            </p>
-            <div className="mt-6 flex justify-center">
-              <Button className="rounded-full px-7 h-12 text-base" asChild>
-                <AddToSlackLink href={addToSlackUrl}>
-                  <Slack className="h-5 w-5 mr-2" />
+              <ul className="divide-y divide-foreground/10 border-t border-foreground/10 lg:border-t-0 lg:[&>li:first-child>a]:pt-0">
+                {group.articles.map((article) => (
+                  <li key={article.slug}>
+                    <Link
+                      href={`/guides/${article.slug}`}
+                      className="group flex items-start justify-between gap-6 py-5"
+                    >
+                      <div>
+                        <h3 className="font-display text-lg font-medium leading-snug text-foreground transition-colors group-hover:text-primary">
+                          {article.title}
+                        </h3>
+                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground/75">
+                          {article.description}
+                        </p>
+                      </div>
+                      <ArrowUpRight className="mt-1 h-4 w-4 shrink-0 translate-y-0.5 text-foreground/25 transition-all group-hover:translate-y-0 group-hover:text-primary" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
+
+          {/* Closing CTA */}
+          <section className="border-t border-foreground/10 py-16">
+            <div className="relative overflow-hidden rounded-3xl bg-[oklch(0.175_0.035_264)] px-8 py-14 text-center text-[#cfc9bd]">
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-[0.3]"
+                style={{
+                  backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
+                  backgroundSize: "22px 22px",
+                }}
+              />
+              <div className="relative">
+                <h2 className="mx-auto max-w-xl font-display text-3xl font-semibold leading-tight text-[#faf8f2]">
+                  Stop reading about reviews. Start running them.
+                </h2>
+                <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed">
+                  Your first cycle takes about five minutes to launch. Free for teams of 10 or
+                  fewer — no credit card.
+                </p>
+                <AddToSlackLink
+                  href={addToSlackUrl}
+                  className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#faf8f2] px-7 py-3.5 text-sm font-semibold text-[oklch(0.2_0.04_264)] transition-colors hover:bg-white"
+                >
+                  <Slack className="h-4 w-4" />
                   Add Nami to Slack
                 </AddToSlackLink>
-              </Button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </main>
 
       <SiteFooter />

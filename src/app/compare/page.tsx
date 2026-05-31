@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Slack } from "lucide-react";
+import { ArrowUpRight, Slack } from "lucide-react";
 import { COMPARISONS } from "@/lib/comparisons";
 import { SiteHeader } from "@/components/marketing/site-header";
 import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 import { JsonLd } from "@/components/marketing/json-ld";
 import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
-import { Button } from "@/components/ui/button";
 import { getAddToSlackUrl } from "@/lib/slack-cta";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
 
 const DESCRIPTION =
-  "How Nami compares to Lattice, 15Five, Leapsome, and Culture Amp — honest, side-by-side breakdowns of features, pricing, and fit for Slack-first teams.";
+  "Honest, side-by-side breakdowns of how Nami compares to Lattice, 15Five, Leapsome, and Culture Amp — features, pricing, and fit for Slack-first teams.";
 
 export const metadata: Metadata = {
   title: "Compare Nami to Lattice, 15Five, Leapsome & Culture Amp",
@@ -50,7 +50,6 @@ export default function CompareIndexPage() {
       { "@type": "ListItem", position: 2, name: "Compare", item: `${SITE_URL}/compare` },
     ],
   };
-
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -64,62 +63,66 @@ export default function CompareIndexPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={itemListJsonLd} />
       <SiteHeader ctaPurpose="compare" />
 
+      <Masthead
+        kicker="Compare"
+        title={
+          <>
+            How Nami stacks up against <span className="italic text-[oklch(0.84_0.13_85)]">the incumbents</span>
+          </>
+        }
+        lead={DESCRIPTION}
+      />
+
       <main className="flex-1">
-        <section className="bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5] border-b border-border/40">
-          <div className="max-w-5xl mx-auto px-6 lg:px-10 py-16 sm:py-20">
-            <p className="text-sm font-semibold text-primary mb-3">Compare</p>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-foreground max-w-3xl leading-[1.1]">
-              How Nami compares to the other performance tools
-            </h1>
-            <p className="mt-5 text-lg text-muted-foreground/90 max-w-2xl leading-relaxed">
-              {DESCRIPTION}
-            </p>
-          </div>
-        </section>
-
-        <section className="max-w-5xl mx-auto px-6 lg:px-10 py-16">
-          <div className="grid gap-5 sm:grid-cols-2">
+        <div className="mx-auto max-w-4xl px-6 lg:px-10 py-8">
+          <ul className="divide-y divide-foreground/10">
             {COMPARISONS.map((c) => (
-              <Link
-                key={c.slug}
-                href={`/compare/${c.slug}`}
-                className="group flex flex-col rounded-2xl border border-border/60 bg-card p-6 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/[0.04] transition-all"
-              >
-                <h2 className="text-xl font-bold tracking-tight text-foreground group-hover:text-primary transition-colors">
-                  Nami vs {c.name}
-                </h2>
-                <p className="mt-2 text-sm text-muted-foreground/85 leading-relaxed flex-1">
-                  {c.heroSummary}
-                </p>
-                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  Read the comparison
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </span>
-              </Link>
+              <li key={c.slug}>
+                <Link
+                  href={`/compare/${c.slug}`}
+                  className="group grid gap-x-8 gap-y-2 py-8 sm:grid-cols-[14rem_minmax(0,1fr)_auto] sm:items-baseline"
+                >
+                  <h2 className="font-display text-2xl font-semibold tracking-[-0.01em] text-foreground transition-colors group-hover:text-primary">
+                    Nami vs {c.name}
+                  </h2>
+                  <p className="text-sm leading-relaxed text-muted-foreground/80">{c.heroSummary}</p>
+                  <ArrowUpRight className="hidden h-5 w-5 shrink-0 translate-y-0.5 text-foreground/25 transition-all group-hover:translate-y-0 group-hover:text-primary sm:block" />
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
+        </div>
 
-          <div className="mt-16 rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] border border-primary/10 px-8 py-12 text-center">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              The fastest way to decide is to try it
+        {/* CTA — full-bleed dark */}
+        <section className="relative mt-8 overflow-hidden bg-[oklch(0.175_0.035_264)] text-[#cfc9bd]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.3]"
+            style={{
+              backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
+              backgroundSize: "22px 22px",
+            }}
+          />
+          <div className="relative mx-auto max-w-4xl px-6 lg:px-10 py-20 text-center">
+            <h2 className="mx-auto max-w-xl font-display text-3xl font-semibold leading-tight text-[#faf8f2] sm:text-4xl">
+              The fastest comparison is your own Slack
             </h2>
-            <p className="mt-3 text-muted-foreground/90 max-w-xl mx-auto">
-              Add Nami to Slack in about five minutes. Free for teams of 10 or fewer, 14-day Pro
-              trial — no credit card.
+            <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed">
+              Add Nami in about five minutes. Free for teams of 10 or fewer, 14-day Pro trial — no
+              credit card.
             </p>
-            <div className="mt-6 flex justify-center">
-              <Button className="rounded-full px-7 h-12 text-base" asChild>
-                <AddToSlackLink href={addToSlackUrl}>
-                  <Slack className="h-5 w-5 mr-2" />
-                  Add Nami to Slack
-                </AddToSlackLink>
-              </Button>
-            </div>
+            <AddToSlackLink
+              href={addToSlackUrl}
+              className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#faf8f2] px-7 py-3.5 text-sm font-semibold text-[oklch(0.2_0.04_264)] transition-colors hover:bg-white"
+            >
+              <Slack className="h-4 w-4" />
+              Add Nami to Slack
+            </AddToSlackLink>
           </div>
         </section>
       </main>

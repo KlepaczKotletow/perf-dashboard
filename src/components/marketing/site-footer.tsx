@@ -1,8 +1,8 @@
 import Link from "next/link";
 
-// Shared marketing-site footer. Doubles as an internal-linking surface: every
-// page that renders it passes crawl equity to /guides and the /compare pages,
-// which is how those new sections get discovered and indexed.
+// Editorial footer. Dark indigo ink to bookend the page against the masthead,
+// a serif wordmark, amber section labels. Also the internal-linking surface —
+// every page that renders it passes crawl equity to /guides and /compare.
 
 const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] = [
   {
@@ -17,10 +17,10 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
   {
     heading: "Compare",
     links: [
-      { href: "/compare/lattice", label: "Nami vs Lattice" },
-      { href: "/compare/15five", label: "Nami vs 15Five" },
-      { href: "/compare/leapsome", label: "Nami vs Leapsome" },
-      { href: "/compare/culture-amp", label: "Nami vs Culture Amp" },
+      { href: "/compare/lattice", label: "vs Lattice" },
+      { href: "/compare/15five", label: "vs 15Five" },
+      { href: "/compare/leapsome", label: "vs Leapsome" },
+      { href: "/compare/culture-amp", label: "vs Culture Amp" },
     ],
   },
   {
@@ -43,26 +43,37 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
 
 export function SiteFooter() {
   return (
-    <footer className="bg-muted/40 border-t border-border mt-24">
-      <div className="max-w-6xl mx-auto px-6 lg:px-10 py-14">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-          <div className="col-span-2 md:col-span-1">
-            <span className="text-xl font-black tracking-tight text-foreground">Nami</span>
-            <p className="mt-3 text-sm text-muted-foreground/80 leading-relaxed max-w-[200px]">
-              Performance management for teams that live in Slack.
+    <footer className="relative mt-28 bg-[oklch(0.175_0.035_264)] text-[#cfc9bd]">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.25]"
+        style={{
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.10) 1px, transparent 1.4px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+      <div className="relative mx-auto max-w-6xl px-6 lg:px-10 py-16">
+        <div className="grid grid-cols-2 gap-10 md:grid-cols-6">
+          <div className="col-span-2">
+            <span className="font-display text-3xl font-semibold tracking-tight text-[#faf8f2]">
+              Nami
+            </span>
+            <p className="mt-4 max-w-[220px] text-sm leading-relaxed text-[#b4ae9f]">
+              Performance management that lives where your team already works —
+              <span className="text-[oklch(0.82_0.14_85)]"> Slack.</span>
             </p>
           </div>
           {COLUMNS.map((col) => (
-            <div key={col.heading}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground/70 mb-3">
+            <div key={col.heading} className="md:col-span-1">
+              <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.22em] text-[oklch(0.78_0.13_85)]">
                 {col.heading}
               </h3>
-              <ul className="space-y-2">
+              <ul className="mt-4 space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground/70 hover:text-foreground transition-colors"
+                      className="text-sm text-[#cfc9bd] transition-colors hover:text-[#faf8f2]"
                     >
                       {link.label}
                     </Link>
@@ -72,9 +83,12 @@ export function SiteFooter() {
             </div>
           ))}
         </div>
-        <div className="mt-12 pt-6 border-t border-border/60 flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-muted-foreground/60">
+        <div className="mt-14 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-[#9a9484] sm:flex-row sm:items-center sm:justify-between">
           <span>&copy; {new Date().getFullYear()} Nami</span>
-          <a href="mailto:hello@namihr.com" className="hover:text-foreground transition-colors">
+          <a
+            href="mailto:hello@namihr.com"
+            className="transition-colors hover:text-[#faf8f2]"
+          >
             hello@namihr.com
           </a>
         </div>
