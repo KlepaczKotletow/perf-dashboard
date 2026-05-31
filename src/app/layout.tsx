@@ -34,7 +34,11 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").repl
 // Optional verification tokens — set in Vercel env to claim the property in
 // Search Console / Bing Webmaster. Empty strings are filtered out so we never
 // emit a hollow `<meta>` tag.
-const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION?.trim() || undefined;
+// Google Search Console verification token (public, not a secret — it's emitted
+// in the homepage <head>). Set via env to override; the default keeps the
+// namihr.com property verified.
+const GOOGLE_SITE_VERIFICATION =
+  process.env.GOOGLE_SITE_VERIFICATION?.trim() || "Bg2i5dIJzGWRRCX4PL4-g1sqeJeHRyqLfcbPMDy-Vv0";
 const BING_SITE_VERIFICATION = process.env.BING_SITE_VERIFICATION?.trim() || undefined;
 
 export const metadata: Metadata = {
