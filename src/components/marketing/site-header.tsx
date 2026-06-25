@@ -37,6 +37,12 @@ export function SiteHeader({ ctaPurpose = "marketing" }: { ctaPurpose?: string }
           >
             Roadmap
           </Link>
+          <Link
+            href="/about"
+            className="hidden md:inline text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            About
+          </Link>
           <a
             href={signInUrl}
             className="hidden sm:inline text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors"

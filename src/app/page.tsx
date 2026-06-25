@@ -183,6 +183,7 @@ export default async function Home() {
               <Link href="/guides" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Guides</Link>
               <Link href="/compare" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Compare</Link>
               <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
+              <Link href="/about" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">About</Link>
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
               <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
                 <AddToSlackLink href={addToSlackUrl}>
@@ -1046,6 +1047,7 @@ export default async function Home() {
             <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
               <Link href="/guides" className="text-muted-foreground/60 hover:text-foreground transition-colors">Guides</Link>
               <Link href="/compare" className="text-muted-foreground/60 hover:text-foreground transition-colors">Compare</Link>
+              <Link href="/about" className="text-muted-foreground/60 hover:text-foreground transition-colors">About</Link>
               <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
               <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
               <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>
