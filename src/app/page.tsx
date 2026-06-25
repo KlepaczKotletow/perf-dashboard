@@ -9,6 +9,7 @@ import { MobileNav } from "@/components/landing/mobile-nav";
 import { AnimatedCounter } from "@/components/landing/animated-counter";
 import { FeatureTabs } from "@/components/landing/feature-tabs";
 import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
+import { NavMenus } from "@/components/marketing/nav-menus";
 
 // addToSlackUrl points at a Supabase edge function that signs the OAuth
 // state and 302s to Slack — keep dynamic so the link is always served
@@ -176,14 +177,7 @@ export default async function Home() {
               <span className="text-[40px] font-black tracking-tight text-foreground">Nami</span>
             </Link>
             <div className="hidden lg:flex items-center gap-6">
-              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
-              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Goals</a>
-              <a href="#features" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Surveys</a>
-              <a href="#pricing" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-              <Link href="/guides" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Guides</Link>
-              <Link href="/compare" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Compare</Link>
-              <Link href="/roadmap" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">Roadmap</Link>
-              <Link href="/about" className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors">About</Link>
+              <NavMenus />
               <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
               <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
                 <AddToSlackLink href={addToSlackUrl}>
