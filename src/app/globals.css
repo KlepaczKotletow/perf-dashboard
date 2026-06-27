@@ -8,6 +8,10 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-manrope);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-fraunces);
+  /* Dark "moment" panel system — see :root below */
+  --color-ink-panel: var(--ink-panel);
+  --color-ink-panel-2: var(--ink-panel-2);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,6 +52,27 @@
 
 :root {
   --radius: 1rem;
+
+  /* ── Hybrid "dark moment" system ───────────────────────────────────────
+     The marketing site is a warm-cream editorial canvas punctuated by dark
+     #1a1a2e "moments" (hero, CTA, pivotal bands) that carry the Aceternity
+     treatment — spotlight glow, gradient-clipped headlines, bento. These
+     tokens formalise that language so it's consistent everywhere. */
+  --ink-panel: #1a1a2e;          /* the dark moment surface */
+  --ink-panel-2: #141426;        /* deeper, for nested cards on dark */
+  --ink-hairline: oklch(1 0 0 / 0.08);  /* hairline dividers on dark */
+  --ink-glass: oklch(1 0 0 / 0.05);     /* pill / glass fills on dark */
+  /* Cool-blue spotlight light — used ONLY inside dark moments, low alpha.
+     HSL channels so it composes as hsl(var(--spotlight) / <a>). */
+  --spotlight: 232 92% 76%;
+  --spotlight-2: 28 96% 62%;     /* warm amber counter-beam */
+  /* Warmer body ink for light long-form prose (legal / guides) — softer
+     than muted-foreground, the Legora "taupe" move. */
+  --prose-body: oklch(0.44 0.014 80);
+  /* Comma-separated RGB of the indigo primary so .btn-glow stops falling
+     back to blue. */
+  --primary-rgb: 91, 78, 222;
+
   /* Warm Indigo + Amber: confident, warm, modern */
   --background: oklch(0.985 0.003 90);
   --foreground: oklch(0.15 0.03 260);
@@ -254,5 +279,195 @@
   /* Empty-state card content wrapper — consistent padding + centering */
   .empty-state {
     @apply py-10 flex flex-col items-center text-center;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   HYBRID MARKETING SYSTEM — Aceternity-inspired effects, pure CSS (no deps)
+   Light editorial canvas + dark "moments". Every motion guarded for
+   prefers-reduced-motion at the bottom of this file.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Editorial type accents (Legora "premium" lever) ── */
+/* Serif italic accent for the highlighted phrase in a headline. */
+.font-serif-accent {
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* Gradient-clipped white headline for dark moments (Aceternity tell). */
+.text-clip-light {
+  background-image: linear-gradient(180deg, #fff 0%, oklch(1 0 0 / 0.62) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+/* Gradient-clipped ink headline for light sections. */
+.text-clip-ink {
+  background-image: linear-gradient(
+    180deg,
+    var(--foreground) 0%,
+    color-mix(in oklch, var(--foreground) 72%, transparent) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── Spotlight: dual radial beams behind dark moments ──
+   Two large, low-alpha radial gradients that drift slowly — the upgrade
+   from the single static orb. Cool indigo + warm amber counter-beam. */
+@keyframes spotlight-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.9; }
+  50%      { transform: translate3d(28px, -22px, 0) scale(1.08); opacity: 1; }
+}
+@keyframes spotlight-drift-2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.7; }
+  50%      { transform: translate3d(-24px, 18px, 0) scale(1.06); opacity: 0.85; }
+}
+.spotlight-beam {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(72px);
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+.spotlight-beam-1 {
+  background: radial-gradient(circle, hsl(var(--spotlight) / 0.55) 0%, hsl(var(--spotlight) / 0) 70%);
+  animation: spotlight-drift 11s ease-in-out infinite;
+}
+.spotlight-beam-2 {
+  background: radial-gradient(circle, hsl(var(--spotlight-2) / 0.32) 0%, hsl(var(--spotlight-2) / 0) 70%);
+  animation: spotlight-drift-2 13s ease-in-out infinite;
+}
+
+/* ── Faint grid + dot textures to anchor empty dark/light fields ── */
+.bg-grid-ink {
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.bg-dot-ink {
+  background-image: radial-gradient(oklch(1 0 0 / 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.bg-grid-paper {
+  background-image:
+    linear-gradient(to right, oklch(0.15 0.03 260 / 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.15 0.03 260 / 0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+/* Faint diagonal hairlines for light hero/section backdrops (the Aceternity
+   light-hero "paper" texture). Pair with mask-radial-faded so it dissolves. */
+.bg-diagonal-lines {
+  background-image: repeating-linear-gradient(
+    45deg,
+    oklch(0.15 0.03 260 / 0.035) 0 1px,
+    transparent 1px 42px
+  );
+}
+/* Radial mask so a texture fades to nothing at the edges. */
+.mask-radial-faded {
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 100%);
+}
+
+/* ── Infinite marquee (Aceternity "Infinite Moving Cards") ── */
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-50% - var(--marquee-gap, 1.5rem) / 2)); }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  gap: var(--marquee-gap, 1.5rem);
+  animation: marquee-x var(--marquee-duration, 40s) linear infinite;
+}
+.marquee-track[data-direction="right"] { animation-direction: reverse; }
+.marquee-mask:hover .marquee-track { animation-play-state: paused; }
+.marquee-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* ── Animated conic-gradient border (Aceternity "Moving Border") ── */
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@keyframes border-spin { to { --angle: 360deg; } }
+.animated-border {
+  position: relative;
+  isolation: isolate;
+}
+.animated-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0%,
+    var(--primary) 12%,
+    var(--secondary) 22%,
+    transparent 38%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: border-spin 4s linear infinite;
+  z-index: -1;
+}
+
+/* ── Pointer-tracked glow overlay (Aceternity "Card Spotlight / Glow") ──
+   A small client hook writes --mx/--my (in %). The overlay is invisible
+   until hover, then a soft radial follows the cursor. */
+.glow-surface {
+  position: relative;
+}
+.glow-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(var(--primary-rgb), 0.14),
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 250ms ease-out;
+  pointer-events: none;
+}
+.glow-surface:hover::after { opacity: 1; }
+
+/* ── Heartbeat pulse line (brand motif: "a heartbeat, not a verdict") ── */
+@keyframes pulse-dash {
+  to { stroke-dashoffset: -1000; }
+}
+.pulse-line {
+  stroke-dasharray: 6 10;
+  animation: pulse-dash 14s linear infinite;
+}
+
+/* ── Reduced-motion: silence everything decorative ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-orb-drift,
+  .spotlight-beam-1,
+  .spotlight-beam-2,
+  .marquee-track,
+  .animated-border::before,
+  .pulse-line,
+  .text-shimmer {
+    animation: none !important;
   }
 }

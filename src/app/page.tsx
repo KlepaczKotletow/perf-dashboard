@@ -2,14 +2,21 @@ import { Button } from "@/components/ui/button";
 import {
   Slack, BarChart3, Users, Star, Check, Target,
   ChevronRight, Bot, Send, ClipboardList, Lock, Globe,
+  Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { ScrollReveal } from "@/components/landing/scroll-reveal";
-import { MobileNav } from "@/components/landing/mobile-nav";
-import { AnimatedCounter } from "@/components/landing/animated-counter";
-import { FeatureTabs } from "@/components/landing/feature-tabs";
-import { AddToSlackLink } from "@/components/landing/add-to-slack-link";
-import { NavMenus } from "@/components/marketing/nav-menus";
+import { FloatingNav } from "@/components/marketing/floating-nav";
+import { FeatureBento } from "@/components/landing/feature-bento";
+import { DashboardMockup } from "@/components/landing/dashboard-mockup";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Spotlight } from "@/components/marketing/spotlight";
+import { Kicker } from "@/components/marketing/kicker";
+import { StatFigure } from "@/components/marketing/stat-figure";
+import { GlowCard } from "@/components/marketing/glow-card";
+import { Marquee } from "@/components/marketing/marquee";
+import { SlackCtaButton } from "@/components/marketing/slack-cta-button";
+import { Accordion } from "@/components/marketing/accordion";
 
 // addToSlackUrl points at a Supabase edge function that signs the OAuth
 // state and 302s to Slack — keep dynamic so the link is always served
@@ -18,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
 
-// Single source of truth for the FAQ — rendered as <details> in the section
+// Single source of truth for the FAQ — rendered as an Accordion in the section
 // below AND emitted as FAQPage JSON-LD for search engines and answer engines.
 const FAQ_ITEMS = [
   {
@@ -53,6 +60,15 @@ const FAQ_ITEMS = [
     q: "Is there a free trial?",
     a: "Yes — 14 days, no credit card. For teams of 10 or fewer, Nami is free indefinitely.",
   },
+];
+
+// Honest "capabilities ticker" — every item is a real, shipped feature (no
+// fake customer logos; we don't claim a live Marketplace listing).
+const CAPABILITY_TICKER = [
+  "360° reviews", "OKR & goal tracking", "Pulse surveys", "eNPS",
+  "9-box calibration", "8 career frameworks", "Competency heatmaps",
+  "Recurring check-ins", "Performance rankings", "Audit log",
+  "CSV team import", "Web dashboard", "Slack-native",
 ];
 
 // Structured data for crawlers and answer engines (ChatGPT, Claude, Perplexity,
@@ -152,7 +168,7 @@ export default async function Home() {
   const signInWithSlackUrl = `${supabaseUrl}/functions/v1/dashboard-auth`;
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="min-h-screen bg-background">
 
       {/* JSON-LD for crawlers and AI answer engines. Server-rendered, no
           client-side cost. */}
@@ -167,337 +183,187 @@ export default async function Home() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
       />
 
-      {/* ── Header + Hero (seamless) ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5]">
+      <FloatingNav ctaPurpose="landing" />
 
-        {/* Sticky nav */}
-        <header className="sticky top-0 z-50 backdrop-blur-md bg-[#fafaf5]/80">
-          <div className="max-w-7xl mx-auto px-6 lg:px-10 h-20 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="text-[40px] font-black tracking-tight text-foreground">Nami</span>
-            </Link>
-            <div className="hidden lg:flex items-center gap-6">
-              <NavMenus />
-              <a href={signInWithSlackUrl} className="text-[15px] font-medium text-muted-foreground hover:text-foreground transition-colors border border-border rounded-full px-5 py-2">Sign in</a>
-              <Button className="rounded-full px-6 h-10 text-[15px]" asChild>
-                <AddToSlackLink href={addToSlackUrl}>
-                  <Slack className="h-4 w-4 mr-1.5" />
-                  Add to Slack
-                </AddToSlackLink>
-              </Button>
-            </div>
-            <MobileNav signInUrl={signInWithSlackUrl} addToSlackUrl={addToSlackUrl} />
-          </div>
-        </header>
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-background via-background to-muted/30">
 
-        {/* Hero — two-card Deel-style layout */}
-        <div className="max-w-7xl mx-auto px-4 lg:px-10 pt-4 pb-4">
-          <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[560px]">
+        {/* Aceternity-style light hero texture: faint diagonal hairlines + amber accent dots */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-diagonal-lines [mask-image:radial-gradient(ellipse_75%_70%_at_50%_25%,#000,transparent)]" />
+        <div aria-hidden className="pointer-events-none absolute left-[8%] top-[40%] h-1.5 w-1.5 rounded-full bg-secondary/70" />
+        <div aria-hidden className="pointer-events-none absolute right-[11%] top-[22%] h-1 w-1 rounded-full bg-secondary/60" />
+        <div aria-hidden className="pointer-events-none absolute left-[46%] bottom-[14%] h-1 w-1 rounded-full bg-secondary/50" />
 
-            {/* Left card — dark with copy */}
-            <div className="relative rounded-3xl bg-[#1a1a2e] overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col justify-between">
-              {/* Subtle gradient orb */}
-              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-gradient-to-bl from-primary/20 to-transparent rounded-full blur-3xl pointer-events-none animate-orb-drift" />
+        {/* Hero — two-card layout (kept). Left dark "moment" with copy; right
+            light card with the founder-loved dashboard mockup. */}
+        <div className="relative max-w-7xl mx-auto px-4 lg:px-10 pt-4 pb-4">
+          <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[580px]">
+
+            {/* Left card — dark moment with the provocative headline */}
+            <div className="relative rounded-3xl bg-ink-panel overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col justify-between">
+              <Spotlight />
 
               <div className="relative">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs text-white/70 mb-6">
-                  <Bot className="h-3.5 w-3.5 text-primary" />
-                  Meet Nami — your performance assistant in Slack
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-card/5 text-xs text-white/70 mb-7">
+                  <Bot className="h-3.5 w-3.5 text-[hsl(var(--spotlight))]" />
+                  360° reviews · OKRs · pulse — without leaving Slack
                 </div>
 
-                <h1 className="text-4xl sm:text-5xl lg:text-[64px] font-bold tracking-tight text-white leading-[1.1]">
-                  Performance reviews your team will{" "}
-                  <span className="text-primary text-shimmer">actually complete.</span>
+                <h1 className="text-4xl sm:text-5xl lg:text-[60px] font-bold tracking-tight text-white leading-[1.05]">
+                  Reviews your team{" "}
+                  <span className="font-serif-accent text-[hsl(var(--spotlight))]">forgets to dread.</span>
                 </h1>
 
-                <p className="mt-5 text-lg text-white/60 leading-relaxed max-w-[480px]">
-                  Nami lives in your team&apos;s Slack and handles everything — 360° reviews, goal tracking, surveys, and analytics. No new tools. No forms.
+                <p className="mt-6 text-lg text-white/60 leading-relaxed max-w-[480px]">
+                  Nami runs reviews, goals, surveys, and check-ins from inside Slack —
+                  answered in a DM between two messages from the people you actually
+                  work with. When taking part stops feeling like homework, completion
+                  stops being your problem.
                 </p>
               </div>
 
               <div className="relative mt-8">
                 <div className="flex flex-col sm:flex-row items-start gap-3">
-                  <Button size="lg" className="h-12 px-7 text-sm font-semibold rounded-full btn-glow" asChild>
-                    <AddToSlackLink href={addToSlackUrl}>
-                      <Slack className="h-4 w-4 mr-2" />
-                      Add to Slack — free
-                    </AddToSlackLink>
-                  </Button>
+                  <SlackCtaButton href={addToSlackUrl}>Add to Slack — free</SlackCtaButton>
                   <Button
                     size="lg"
                     variant="ghost"
-                    className="h-12 px-7 text-sm text-white/60 hover:text-white hover:bg-white/10 border border-white/15 rounded-full"
+                    className="h-12 px-7 text-sm text-white/60 hover:text-white hover:bg-card/10 border border-white/15 rounded-full"
                     asChild
                   >
                     <a href={signInWithSlackUrl}>Sign in with Slack</a>
                   </Button>
                 </div>
-                <p className="mt-4 text-xs text-white/30 tracking-wide">
-                  No credit card · Installs in 60 seconds
+                <p className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/35 tracking-wide">
+                  <span>No credit card · Installs in 60 seconds</span>
+                  <span className="hidden sm:inline text-white/15">|</span>
+                  <span className="text-white/45">Reviews your team will actually complete — ~95% vs the 40–60% norm.</span>
                 </p>
               </div>
             </div>
 
-            {/* Right card — light with dashboard mockup */}
+            {/* Right card — light, holds the kept dashboard mockup with a faint
+                cool-blue glow behind it so it pops against the dark card. */}
             <div className="relative rounded-3xl bg-gradient-to-br from-primary/[0.08] via-primary/[0.04] to-secondary/[0.06] overflow-hidden flex items-stretch">
-              {/* Dashboard mockup — fills the whole card */}
-              <div className="w-full m-3 rounded-2xl border border-border/60 overflow-hidden shadow-2xl shadow-primary/10 bg-white flex flex-col">
-                {/* Browser chrome */}
-                <div className="bg-muted/80 border-b border-border/60 px-4 py-2 flex items-center gap-3 shrink-0">
-                  <div className="flex gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/20" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-foreground/15" />
-                  </div>
-                  <div className="flex-1 bg-background/70 rounded-md px-3 py-1 text-[10px] text-muted-foreground font-mono">
-                    namihr.com/dashboard/analytics
-                  </div>
-                </div>
-
-                <div className="flex flex-1 overflow-hidden">
-                  {/* Sidebar — matches real app */}
-                  <div className="hidden sm:flex w-[140px] border-r border-border/60 flex-col bg-muted/20 p-2.5 gap-0.5 shrink-0 overflow-hidden">
-                    {/* Logo */}
-                    <div className="px-2 py-1.5 mb-1">
-                      <span className="text-[11px] font-bold text-foreground">Nami</span>
-                      <span className="block text-[7px] text-muted-foreground/50 italic" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
-                    </div>
-                    {/* Nav items — matching real sidebar */}
-                    {[
-                      { label: "Home", active: false },
-                      { label: "Performance", active: false },
-                      { label: "Goals", active: false },
-                      { label: "Kudos", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
-                    ))}
-                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Team</p>
-                    {[
-                      { label: "My Team", active: false },
-                      { label: "Reviews", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className="px-2 py-1 rounded-md text-[10px] text-muted-foreground">{item.label}</div>
-                    ))}
-                    <p className="text-[8px] text-muted-foreground/50 uppercase tracking-wider font-semibold px-2 mt-2 mb-0.5">Admin</p>
-                    {[
-                      { label: "Cycles", active: false },
-                      { label: "Directory", active: false },
-                      { label: "Surveys", active: false },
-                      { label: "Templates", active: false },
-                      { label: "Analytics", active: true },
-                      { label: "Settings", active: false },
-                    ].map((item) => (
-                      <div key={item.label} className={`px-2 py-1 rounded-md text-[10px] ${item.active ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground"}`}>{item.label}</div>
-                    ))}
-                  </div>
-
-                  {/* Analytics content — matches real dashboard */}
-                  <div className="flex-1 p-4 overflow-hidden bg-[#fafaf9]">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Analytics</p>
-                        <p className="text-[9px] text-muted-foreground">Performance insights for Acme Corp</p>
-                      </div>
-                      <div className="px-2 py-1 rounded-md bg-muted/60 text-[9px] text-muted-foreground border border-border/40">Export</div>
-                    </div>
-
-                    {/* Tabs */}
-                    <div className="flex gap-3 mb-3 border-b border-border/40 pb-1.5">
-                      {["Overview", "Heatmap", "Cycles"].map((tab, i) => (
-                        <span key={tab} className={`text-[9px] font-medium pb-1 ${i === 0 ? "text-primary border-b border-primary" : "text-muted-foreground"}`}>{tab}</span>
-                      ))}
-                    </div>
-
-                    {/* Filters */}
-                    <div className="flex gap-1.5 mb-3">
-                      {["All Cycles", "All Functions", "All Depts"].map((f) => (
-                        <div key={f} className="px-2 py-0.5 rounded-md bg-white border border-border/50 text-[8px] text-muted-foreground">{f}</div>
-                      ))}
-                    </div>
-
-                    {/* 5 KPI cards — matches real app layout */}
-                    <div className="grid grid-cols-5 gap-1.5 mb-3">
-                      {[
-                        { icon: "★", label: "Overall Rating", value: "4.2/5", color: "text-amber-500", iconBg: "bg-amber-50" },
-                        { icon: "↗", label: "Completion", value: "91%", color: "text-emerald-600", iconBg: "bg-emerald-50" },
-                        { icon: "▊", label: "Total Ratings", value: "312", color: "text-primary", iconBg: "bg-primary/10" },
-                        { icon: "◉", label: "Participants", value: "47", color: "text-purple-600", iconBg: "bg-purple-50" },
-                        { icon: "⊞", label: "Active Cycles", value: "2", color: "text-orange-500", iconBg: "bg-orange-50" },
-                      ].map((kpi) => (
-                        <div key={kpi.label} className="bg-white rounded-lg p-2 border border-border/40">
-                          <div className={`h-4 w-4 rounded-md ${kpi.iconBg} flex items-center justify-center text-[8px] mb-1`}>{kpi.icon}</div>
-                          <p className={`text-sm font-bold ${kpi.color}`}>{kpi.value}</p>
-                          <p className="text-[7px] text-muted-foreground mt-0.5 leading-tight">{kpi.label}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Rating Distribution + Competency Ratings side by side */}
-                    <div className="grid grid-cols-2 gap-1.5 mb-3">
-                      {/* Rating Distribution */}
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Rating Distribution</p>
-                        <div className="flex items-end gap-1 h-12">
-                          {[
-                            { score: "1", pct: 3, color: "bg-red-400" },
-                            { score: "2", pct: 8, color: "bg-orange-400" },
-                            { score: "3", pct: 28, color: "bg-yellow-400" },
-                            { score: "4", pct: 42, color: "bg-green-400" },
-                            { score: "5", pct: 19, color: "bg-emerald-500" },
-                          ].map((bar) => (
-                            <div key={bar.score} className="flex-1 flex flex-col items-center gap-0.5">
-                              <div className={`w-full ${bar.color} rounded-t-sm`} style={{ height: `${bar.pct * 1.1}px` }} />
-                              <span className="text-[7px] text-muted-foreground">{bar.score}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      {/* Competency Ratings */}
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Competency Ratings</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Collaboration", score: 4.4 },
-                            { name: "Leadership", score: 4.3 },
-                            { name: "Execution", score: 3.9 },
-                            { name: "Communication", score: 3.7 },
-                          ].map((c) => (
-                            <div key={c.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[70px] shrink-0 truncate">{c.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${(c.score / 5) * 100}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{c.score}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Performance Ranking table */}
-                    <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                      <div className="flex items-center gap-1 mb-2">
-                        <span className="text-[9px]">⭐</span>
-                        <p className="text-[9px] font-semibold text-foreground">Performance Ranking</p>
-                      </div>
-                      <div className="space-y-1">
-                        {[
-                          { rank: 1, name: "Alex Johnson", fn: "Engineering", rating: 4.7, tier: "Exceptional", tierColor: "text-emerald-700 bg-emerald-50" },
-                          { rank: 2, name: "Maria Garcia", fn: "Product", rating: 4.2, tier: "Strong", tierColor: "text-green-700 bg-green-50" },
-                          { rank: 3, name: "Chris Lee", fn: "Design", rating: 3.6, tier: "Solid", tierColor: "text-sky-700 bg-sky-50" },
-                          { rank: 4, name: "Priya Nair", fn: "Engineering", rating: 2.8, tier: "Needs Dev", tierColor: "text-amber-700 bg-amber-50" },
-                        ].map((emp) => (
-                          <div key={emp.name} className="flex items-center gap-2 py-0.5">
-                            <span className="text-[8px] text-muted-foreground w-3 shrink-0 font-mono">{emp.rank}</span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[9px] font-medium text-foreground truncate">{emp.name}</p>
-                            </div>
-                            <span className="text-[8px] text-muted-foreground shrink-0">{emp.fn}</span>
-                            <div className="w-10 h-1 bg-muted rounded-full overflow-hidden shrink-0">
-                              <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${(emp.rating / 5) * 100}%` }} />
-                            </div>
-                            <span className="text-[8px] font-semibold text-foreground tabular-nums shrink-0">{emp.rating}</span>
-                            <span className={`px-1 py-0.5 rounded text-[7px] font-semibold shrink-0 ${emp.tierColor}`}>{emp.tier}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Completion by Department + Avg Rating by Department */}
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Completion by Dept</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Engineering", pct: 96 },
-                            { name: "Product", pct: 88 },
-                            { name: "Design", pct: 100 },
-                            { name: "Marketing", pct: 75 },
-                          ].map((d) => (
-                            <div key={d.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${d.pct}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-6 text-right tabular-nums">{d.pct}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="bg-white rounded-lg p-2.5 border border-border/40">
-                        <p className="text-[9px] font-semibold text-foreground mb-2">Avg Rating by Dept</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { name: "Engineering", rating: 4.3 },
-                            { name: "Product", rating: 4.1 },
-                            { name: "Design", rating: 3.8 },
-                            { name: "Marketing", rating: 3.5 },
-                          ].map((d) => (
-                            <div key={d.name} className="flex items-center gap-1.5">
-                              <p className="text-[8px] text-muted-foreground w-[60px] shrink-0 truncate">{d.name}</p>
-                              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
-                                <div className="h-full bg-primary rounded-full" style={{ width: `${(d.rating / 5) * 100}%` }} />
-                              </div>
-                              <span className="text-[8px] font-semibold text-foreground w-4 text-right tabular-nums">{d.rating}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <div
+                aria-hidden
+                className="pointer-events-none absolute -top-16 left-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-[hsl(var(--spotlight)/0.22)] blur-3xl"
+              />
+              <DashboardMockup className="relative m-3 w-full" />
             </div>
 
           </div>
         </div>
-      </section>
 
-      {/* ── Research-backed stats bar ── */}
-      <section className="bg-white border-y border-border/40 py-14 lg:py-16">
-        <div className="max-w-5xl mx-auto px-6">
-          <p className="text-center text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-10">
-            Why performance management matters — backed by research
-          </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
-            {[
-              { stat: "23%", label: "higher profitability", detail: "at companies with engaged employees", source: "Gallup, 2024" },
-              { stat: "4.2×", label: "more likely to outperform", detail: "competitors with robust performance management", source: "McKinsey" },
-              { stat: "$438B", label: "lost to disengagement", detail: "in global productivity annually", source: "Gallup, 2024" },
-              { stat: "51%", label: "lower turnover", detail: "at organisations with high employee engagement", source: "Gallup, 2024" },
-            ].map((item) => (
-              <div key={item.stat} className="text-center space-y-1.5">
-                <AnimatedCounter value={item.stat} className="text-3xl lg:text-4xl font-bold tracking-tight text-primary block" />
-                <p className="text-base font-semibold text-foreground">{item.label}</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">{item.detail}</p>
-                <p className="text-[10px] text-muted-foreground/60 italic">{item.source}</p>
-              </div>
+        {/* Capabilities ticker — honest infinite marquee of real features */}
+        <div className="max-w-7xl mx-auto px-4 lg:px-10 pb-6">
+          <Marquee className="py-2" duration="52s">
+            {CAPABILITY_TICKER.map((cap) => (
+              <span
+                key={cap}
+                className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/60 px-4 py-1.5 text-sm font-medium text-muted-foreground"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                {cap}
+              </span>
             ))}
-          </div>
+          </Marquee>
         </div>
       </section>
 
-      <FeatureTabs />
+      {/* ── The reframe — friction, not features ── */}
+      <section className="bg-card border-y border-border/40 py-20 lg:py-28">
+        <div className="max-w-6xl mx-auto px-6 lg:px-10">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
+            <ScrollReveal>
+              <Kicker className="mb-6">The reframe</Kicker>
+              <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight text-foreground leading-[1.08]">
+                Your last performance tool didn&apos;t fail.{" "}
+                <span className="font-serif-accent text-primary">It just asked too much.</span>
+              </h2>
+              <p className="mt-6 text-[17px] leading-relaxed text-muted-foreground max-w-xl">
+                Companies buy review software, goal trackers, and survey tools — then
+                watch adoption collapse. Not because the features are wrong, but because
+                every action means another tab, another login, another form nobody opens.
+                The work lives outside the workflow, so people simply don&apos;t do it.
+              </p>
+              <p className="mt-4 text-[17px] leading-relaxed text-muted-foreground max-w-xl">
+                Nami takes the opposite bet. The smallest thing that still works — one
+                question, in the place your team already is — beats the most
+                comprehensive system nobody finishes.
+              </p>
+            </ScrollReveal>
+
+            <ScrollReveal delay={120}>
+              <GlowCard className="p-7">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground/70">The old way</p>
+                    <ul className="mt-4 space-y-2.5 text-[13.5px] text-muted-foreground">
+                      {["Open another tab", "Log in again", "Hunt for the cycle", "Fill a long web form", "Chase everyone for weeks"].map((x) => (
+                        <li key={x} className="flex items-start gap-2">
+                          <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
+                          {x}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-primary/80">In Nami</p>
+                    <ul className="mt-4 space-y-2.5 text-[13.5px] text-foreground">
+                      {["A Slack DM arrives", "Answer in the thread", "It logs itself", "Done in 30 seconds", "Nami chases, not you"].map((x) => (
+                        <li key={x} className="flex items-start gap-2">
+                          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                          {x}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </GlowCard>
+            </ScrollReveal>
+          </div>
+
+          {/* Research-backed stats — honest proof, demoted below the promise */}
+          <ScrollReveal className="mt-16 lg:mt-20 border-t border-border/50 pt-12">
+            <p className="text-center font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground mb-10">
+              Why this matters — backed by research, not vibes
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
+              {[
+                { value: "23%", label: "higher profitability", sub: "at companies with engaged employees", source: "Gallup, 2024" },
+                { value: "4.2×", label: "more likely to outperform", sub: "competitors, with robust performance management", source: "McKinsey" },
+                { value: "$438B", label: "lost to disengagement", sub: "in global productivity annually", source: "Gallup, 2024" },
+                { value: "51%", label: "lower turnover", sub: "at organisations with high engagement", source: "Gallup, 2024" },
+              ].map((item) => (
+                <StatFigure key={item.value} {...item} className="text-center" />
+              ))}
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* ── Feature bento — every card shows real Nami UI ── */}
+      <FeatureBento />
 
       {/* ── See it in action — recorded walk-through of every key surface ── */}
-      <section id="see-it" className="bg-white border-y border-border/40 py-20 lg:py-24">
+      <section id="see-it" className="bg-card border-y border-border/40 py-20 lg:py-24">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <ScrollReveal className="text-center mb-12">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              See it in action
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-bold tracking-tight text-foreground mb-3">
-              The actual product, recorded in 30 seconds.
+          <ScrollReveal className="text-center mb-12 max-w-2xl mx-auto">
+            <Kicker className="mb-5 justify-center">See it in action</Kicker>
+            <h2 className="text-3xl lg:text-[44px] font-bold tracking-tight text-foreground mb-3 leading-[1.08]">
+              The actual product —{" "}
+              <span className="font-serif-accent text-primary">not a mockup in sight.</span>
             </h2>
-            <p className="text-base lg:text-lg text-muted-foreground max-w-2xl mx-auto">
-              No mockups. Every screen below is a clip of the live app, captured from a seeded Acme Corp workspace.
+            <p className="text-base lg:text-lg text-muted-foreground">
+              Every screen below is a clip of the live app, captured in a seeded Acme Corp
+              workspace — real UI, real data, the whole tour in about two minutes.
             </p>
           </ScrollReveal>
 
           {/* Featured: Dashboard — gets the most real-estate */}
           <ScrollReveal className="mb-16 lg:mb-24">
-            <figure className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/[0.04] bg-white">
+            <figure className="rounded-2xl border border-border/60 overflow-hidden shadow-lg shadow-primary/[0.04] bg-card">
               <div className="bg-muted/80 border-b border-border/60 px-4 py-2 flex items-center gap-3">
                 <div className="flex gap-1.5">
                   <div className="h-2.5 w-2.5 rounded-full bg-foreground/20" />
@@ -537,8 +403,7 @@ export default async function Home() {
             Supporting demos — full-width alternating "video on one side, copy
             on the other" rows (Stripe / Linear pattern). This buys each video
             ~60% of the section width, which keeps the dashboard text inside
-            the recording legible. The 2×2 grid we had before squeezed each
-            clip to ~600 px wide and the in-video text became too small.
+            the recording legible.
           */}
           <div className="space-y-16 lg:space-y-24">
             {[
@@ -570,7 +435,7 @@ export default async function Home() {
               <ScrollReveal key={demo.slug}>
                 <div className={`grid lg:grid-cols-12 items-center gap-8 lg:gap-12 ${i % 2 === 1 ? "lg:[&>:first-child]:order-2" : ""}`}>
                   {/* Video tile — 7/12 width on lg */}
-                  <figure className="lg:col-span-7 rounded-2xl border border-border/60 overflow-hidden shadow-sm bg-white">
+                  <figure className="lg:col-span-7 rounded-2xl border border-border/60 overflow-hidden shadow-sm bg-card">
                     {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                     <video
                       autoPlay
@@ -600,79 +465,47 @@ export default async function Home() {
       </section>
 
       {/* ── Template Library ── */}
-      <section id="templates" className="bg-[#f8f6f0] border-y border-border/40 py-20 lg:py-24">
+      <section id="templates" className="bg-muted/40 border-b border-border/40 py-20 lg:py-24">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <ScrollReveal className="text-center mb-6">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              Template Library
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
-              Don&apos;t build frameworks from scratch — use ours
+          <ScrollReveal className="text-center mb-10 max-w-2xl mx-auto">
+            <Kicker className="mb-5 justify-center">Template Library</Kicker>
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight text-foreground leading-[1.08]">
+              Don&apos;t build frameworks from scratch —{" "}
+              <span className="font-serif-accent text-primary">use ours.</span>
             </h2>
-            <p className="mt-3 text-muted-foreground max-w-lg mx-auto text-[17px]">
+            <p className="mt-3 text-muted-foreground text-[17px]">
               Pre-built by HR researchers. Import in one click. Customise to fit your org.
             </p>
           </ScrollReveal>
 
-          {/* All 8 frameworks — visible proof the library is real.
-              Only Software Engineering has a matrix preview below, so only
-              its chip gets the primary-pill button affordance (even though
-              it's not interactive, the visual matches the preview it
-              labels). The other 7 are rendered as plain dotted-border text
-              labels — muted, no background fill, no border on the pill
-              axis, lower opacity — so they clearly read as "items in the
-              list" rather than "click to swap the preview below." The CTA
-              under the chips tells the user to sign in to actually use
-              any of them. */}
-          <ScrollReveal className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 mb-4">
-            {[
-              "Software Engineering",
-              "Product Management",
-              "Design",
-              "Data & Analytics",
-              "Sales",
-              "Customer Success",
-              "Marketing",
-              "People & HR",
-            ].map((name, i) =>
-              i === 0 ? (
+          {/* All 8 frameworks as a marquee — visible proof the library is real */}
+          <ScrollReveal className="mb-10">
+            <Marquee duration="50s">
+              {[
+                "Software Engineering", "Product Management", "Design", "Data & Analytics",
+                "Sales", "Customer Success", "Marketing", "People & HR",
+              ].map((name) => (
                 <span
                   key={name}
-                  aria-current="true"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-medium border cursor-default select-none bg-primary/10 text-primary border-primary/30"
+                  className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-4 py-2 text-sm font-medium text-foreground"
                 >
-                  <Check className="h-3 w-3" aria-hidden />
+                  <Layers className="h-3.5 w-3.5 text-primary" />
                   {name}
                 </span>
-              ) : (
-                <span
-                  key={name}
-                  className="inline-flex items-center text-[12px] text-muted-foreground/70 cursor-default select-none"
-                >
-                  {name}
-                </span>
-              ),
-            )}
-          </ScrollReveal>
-          <ScrollReveal className="text-center mb-10">
-            <p className="text-[12px] text-muted-foreground">
+              ))}
+            </Marquee>
+            <p className="mt-5 text-center text-[12px] text-muted-foreground">
               All 8 frameworks are included out of the box —
-              <Link href="#hero" className="text-primary font-medium hover:underline ml-1">
+              <Link href="#templates" className="text-primary font-medium hover:underline ml-1">
                 get started with Nami
-              </Link>
-              {" "}to use any of them.
-            </p>
-          </ScrollReveal>
-
-          <ScrollReveal>
-            <p className="text-center text-[13px] text-muted-foreground mb-6">
-              8 career frameworks, 30+ review &amp; goal templates — import one-click, customise anything.
+              </Link>{" "}
+              to use any of them. 30+ review &amp; goal templates too.
             </p>
           </ScrollReveal>
 
           {/* Matrix preview — Software Engineering */}
           <ScrollReveal>
-            <div className="rounded-2xl border border-border/60 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-[15px] text-foreground">Software Engineering</h3>
@@ -730,7 +563,7 @@ export default async function Home() {
               </div>
 
               {/* Cell-level descriptor — what makes Nami's frameworks different */}
-              <div className="px-5 py-4 bg-[#faf9f6] border-t border-border/30 flex items-start gap-3">
+              <div className="px-5 py-4 bg-muted/40 border-t border-border/30 flex items-start gap-3">
                 <span className="inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold border bg-green-100 text-green-700 border-green-200 shrink-0">4</span>
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-1">Coding &amp; Quality · Staff</p>
@@ -747,15 +580,45 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* ── Heartbeat moment (dark) — annual verdict → ambient ritual ── */}
+      <section className="relative overflow-hidden bg-ink-panel py-20 lg:py-28">
+        <Spotlight />
+        <div className="relative max-w-5xl mx-auto px-6 text-center">
+          <ScrollReveal>
+            <Kicker onDark className="mb-6 justify-center">A different shape of feedback</Kicker>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-[1.08] max-w-3xl mx-auto">
+              A heartbeat,{" "}
+              <span className="font-serif-accent text-[hsl(var(--spotlight))]">not a verdict.</span>
+            </h2>
+            <p className="mt-5 text-lg text-white/60 leading-relaxed max-w-xl mx-auto">
+              The dreaded annual review is a high-stakes, once-a-year judgment. Nami turns
+              the same data into a quiet, frequent rhythm your team barely notices — so
+              good work gets seen as it happens, not eulogised twelve months later.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={120} className="mt-12">
+            <svg viewBox="0 0 1200 120" className="w-full h-20 sm:h-24" preserveAspectRatio="none" aria-hidden>
+              <path
+                className="pulse-line"
+                d="M0,60 H260 l18,-34 l16,68 l16,-58 l14,24 H560 l18,-34 l16,68 l16,-58 l14,24 H860 l18,-34 l16,68 l16,-58 l14,24 H1200"
+                fill="none"
+                stroke="hsl(var(--spotlight))"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </ScrollReveal>
+        </div>
+      </section>
+
       {/* ── How It Works ── */}
       <section id="how-it-works" className="bg-background py-20 lg:py-24">
         <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <ScrollReveal className="text-center mb-14">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              How it works
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">Up and running in minutes</h2>
-            <p className="mt-3 text-muted-foreground max-w-md mx-auto text-[17px]">
+          <ScrollReveal className="text-center mb-14 max-w-xl mx-auto">
+            <Kicker className="mb-5 justify-center">How it works</Kicker>
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight text-foreground leading-[1.08]">Up and running in minutes</h2>
+            <p className="mt-3 text-muted-foreground text-[17px]">
               No lengthy onboarding. No training. No new tool for your team to learn. Just add Nami to Slack and you&apos;re set.
             </p>
           </ScrollReveal>
@@ -786,7 +649,7 @@ export default async function Home() {
                 <ScrollReveal key={item.step} delay={i * 120}>
                   <li className="flex flex-col items-center text-center sm:items-start sm:text-left">
                     <div className="relative mb-5">
-                      <div className="h-14 w-14 rounded-2xl bg-white border border-border shadow-sm flex items-center justify-center">
+                      <div className="h-14 w-14 rounded-2xl bg-card border border-border shadow-sm flex items-center justify-center">
                         <item.icon className="h-6 w-6 text-primary" />
                       </div>
                       <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-white text-[10px] font-bold flex items-center justify-center">
@@ -803,10 +666,10 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ── Roadmap callout — as trust signal BEFORE pricing, not between pricing and CTA ── */}
+      {/* ── Roadmap callout — trust signal BEFORE pricing ── */}
       <ScrollReveal>
         <div className="max-w-5xl mx-auto px-6 pb-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 rounded-2xl border border-border/60 bg-gradient-to-r from-primary/[0.04] to-background p-6 sm:p-8">
+          <GlowCard className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 sm:p-8">
             <div className="text-center sm:text-left">
               <h3 className="text-xl font-bold text-foreground">Missing a feature that would make you switch?</h3>
               <p className="mt-1.5 text-[15px] text-muted-foreground">Check our public roadmap — or suggest it and we&apos;ll build it.</p>
@@ -816,119 +679,114 @@ export default async function Home() {
                 View Roadmap <ChevronRight className="h-4 w-4 ml-1" />
               </Link>
             </Button>
-          </div>
+          </GlowCard>
         </div>
       </ScrollReveal>
 
       {/* ── Pricing ── */}
       <section id="pricing" className="bg-background border-t border-border/30">
         <div className="max-w-5xl mx-auto px-6 py-24">
-          <ScrollReveal className="text-center mb-12">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              Pricing
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">Simple pricing. No surprises.</h2>
-            <p className="mt-3 text-muted-foreground text-[17px]">Everything included in one plan. Or partner with us for a custom deal.</p>
+          <ScrollReveal className="text-center mb-12 max-w-xl mx-auto">
+            <Kicker className="mb-5 justify-center">Pricing</Kicker>
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-bold tracking-tight text-foreground leading-[1.08]">Less performance management. More performance.</h2>
+            <p className="mt-3 text-muted-foreground text-[17px]">One plan, one price. Free for teams of 10 or fewer — or partner with us for a custom deal.</p>
           </ScrollReveal>
 
-          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {/* Pro plan */}
-            <ScrollReveal>
-              <div className="relative p-8 rounded-2xl border-2 border-primary bg-white shadow-xl shadow-primary/[0.15] h-full flex flex-col card-hover">
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-white text-xs font-bold">
-                  Most popular
-                </div>
-                <div className="text-center mb-6">
-                  <h3 className="text-lg font-bold text-foreground mb-1">Pro</h3>
-                  <p className="text-5xl font-black text-foreground">$5<span className="text-lg font-normal text-muted-foreground">/user/mo</span></p>
-                  <p className="text-[13px] text-muted-foreground mt-2">14-day free trial · No credit card · Cancel anytime</p>
-                </div>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
+            {/* Pro plan — elevated with animated border */}
+            <ScrollReveal className="h-full">
+              <div className="animated-border h-full rounded-2xl">
+                <div className="relative flex h-full flex-col rounded-2xl border border-primary/20 bg-card p-8 shadow-xl shadow-primary/[0.12]">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary text-white text-xs font-bold">
+                    Most popular
+                  </div>
+                  <div className="text-center mb-6">
+                    <h3 className="text-lg font-bold text-foreground mb-1">Pro</h3>
+                    <p className="text-5xl font-black text-foreground">$5<span className="text-lg font-normal text-muted-foreground">/user/mo</span></p>
+                    <p className="text-[13px] text-muted-foreground mt-2">14-day free trial · No credit card · Cancel anytime</p>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-left mb-8 flex-1">
-                  {[
-                    "Unlimited review cycles",
-                    "360° reviews via Slack",
-                    "9-box calibration",
-                    "Competency frameworks",
-                    "Goal & OKR tracking",
-                    "Pulse surveys & eNPS",
-                    "Competency heatmaps",
-                    "Performance rankings",
-                    "Smart Slack reminders",
-                    "Recurring check-ins",
-                    "CSV team import",
-                    "Trend analytics",
-                  ].map((f) => (
-                    <div key={f} className="flex items-start gap-1.5 text-[13px] text-muted-foreground py-0.5">
-                      <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
-                      {f}
-                    </div>
-                  ))}
-                </div>
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-left mb-8 flex-1">
+                    {[
+                      "Unlimited review cycles",
+                      "360° reviews via Slack",
+                      "9-box calibration",
+                      "Competency frameworks",
+                      "Goal & OKR tracking",
+                      "Pulse surveys & eNPS",
+                      "Competency heatmaps",
+                      "Performance rankings",
+                      "Smart Slack reminders",
+                      "Recurring check-ins",
+                      "CSV team import",
+                      "Trend analytics",
+                    ].map((f) => (
+                      <div key={f} className="flex items-start gap-1.5 text-[13px] text-muted-foreground py-0.5">
+                        <Check className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                        {f}
+                      </div>
+                    ))}
+                  </div>
 
-                <Button className="w-full" size="lg" asChild>
-                  <a href={addToSlackUrl}>
-                    <Slack className="h-4 w-4 mr-2" />
-                    Start free trial
-                  </a>
-                </Button>
+                  <SlackCtaButton href={addToSlackUrl} animated={false} className="w-full">Start free trial</SlackCtaButton>
+                </div>
               </div>
             </ScrollReveal>
 
             {/* Partner programme — visually distinct from a priced plan */}
-            <ScrollReveal delay={80}>
-              <div className="relative p-8 rounded-2xl border border-border/60 bg-gradient-to-br from-[#faf8f2] to-white h-full flex flex-col card-hover">
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider border border-amber-200">
-                      <Star className="h-3 w-3" />
-                      Applications open
-                    </span>
-                    <span className="text-[11px] text-muted-foreground">Limited spots</span>
+            <ScrollReveal delay={80} className="h-full">
+              <GlowCard className="h-full bg-gradient-to-br from-[#faf8f2] to-white p-8">
+                <div className="flex h-full flex-col">
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider border border-amber-200">
+                        <Star className="h-3 w-3" />
+                        Applications open
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Limited spots</span>
+                    </div>
+                    <h3 className="text-2xl font-black text-foreground leading-tight">Partners Programme</h3>
+                    <p className="text-[14px] text-muted-foreground mt-2 leading-relaxed">
+                      For early adopters who want to shape the product &mdash; not just use it.
+                    </p>
                   </div>
-                  <h3 className="text-2xl font-black text-foreground leading-tight">Partners Programme</h3>
-                  <p className="text-[14px] text-muted-foreground mt-2 leading-relaxed">
-                    For early adopters who want to shape the product &mdash; not just use it.
-                  </p>
-                </div>
 
-                <div className="text-left mb-8 flex-1 space-y-4">
-                  <ul className="space-y-3">
-                    {[
-                      "Direct line to the founders",
-                      "Custom onboarding & data migration",
-                      "Roadmap influence — build features with us",
-                      "Founding partner pricing, locked in",
-                    ].map((line) => (
-                      <li key={line} className="flex items-start gap-2.5 text-[14px] text-foreground">
-                        <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                        <span>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  <div className="text-left mb-8 flex-1 space-y-4">
+                    <ul className="space-y-3">
+                      {[
+                        "Direct line to the founders",
+                        "Custom onboarding & data migration",
+                        "Roadmap influence — build features with us",
+                        "Founding partner pricing, locked in",
+                      ].map((line) => (
+                        <li key={line} className="flex items-start gap-2.5 text-[14px] text-foreground">
+                          <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <span>{line}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
-                <Button variant="outline" className="w-full" size="lg" asChild>
-                  <a href="mailto:hello@namihr.com">
-                    <Send className="h-4 w-4 mr-2" />
-                    Apply to the programme
-                  </a>
-                </Button>
-                <p className="text-center text-xs text-muted-foreground mt-3">hello@namihr.com</p>
-              </div>
+                  <Button variant="outline" className="w-full rounded-full" size="lg" asChild>
+                    <a href="mailto:hello@namihr.com">
+                      <Send className="h-4 w-4 mr-2" />
+                      Apply to the programme
+                    </a>
+                  </Button>
+                  <p className="text-center text-xs text-muted-foreground mt-3">hello@namihr.com</p>
+                </div>
+              </GlowCard>
             </ScrollReveal>
           </div>
         </div>
       </section>
 
       {/* ── Security & Compliance strip ── */}
-      <section className="bg-white border-t border-border/30 py-14">
+      <section className="bg-card border-t border-border/30 py-16">
         <div className="max-w-5xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-8">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-              Built for HR, reviewed by IT
-            </p>
-            <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+          <ScrollReveal className="text-center mb-8 max-w-xl mx-auto">
+            <Kicker className="mb-3 justify-center">Built for HR, reviewed by IT</Kicker>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
               Security and privacy, not an afterthought
             </h2>
           </ScrollReveal>
@@ -956,13 +814,13 @@ export default async function Home() {
                   body: "Data export, delete-on-request, and EU-region data residency available.",
                 },
               ].map((item) => (
-                <div key={item.title} className="rounded-xl border border-border/60 bg-white p-5">
+                <GlowCard key={item.title} className="p-5">
                   <div className="h-9 w-9 rounded-lg bg-primary/[0.08] flex items-center justify-center mb-3">
                     <item.icon className="h-4 w-4 text-primary" />
                   </div>
                   <p className="text-sm font-semibold text-foreground">{item.title}</p>
                   <p className="mt-1.5 text-[13px] text-muted-foreground leading-relaxed">{item.body}</p>
-                </div>
+                </GlowCard>
               ))}
             </div>
             <p className="text-center mt-6 text-xs text-muted-foreground/80">
@@ -973,85 +831,46 @@ export default async function Home() {
       </section>
 
       {/* ── FAQ ── */}
-      <section id="faq" className="bg-[#faf9f6] border-t border-border/30 py-20">
+      <section id="faq" className="bg-muted/40 border-t border-border/30 py-20">
         <div className="max-w-3xl mx-auto px-6">
-          <ScrollReveal className="text-center mb-10">
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary/[0.08] text-primary text-xs font-semibold mb-5">
-              FAQ
-            </span>
+          <ScrollReveal className="text-center mb-10 max-w-xl mx-auto">
+            <Kicker className="mb-5 justify-center">FAQ</Kicker>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">Questions we get a lot</h2>
             <p className="mt-3 text-muted-foreground text-[15px]">Don&apos;t see yours? Email <a href="mailto:hello@namihr.com" className="text-primary underline-offset-2 hover:underline">hello@namihr.com</a>.</p>
           </ScrollReveal>
 
           <ScrollReveal>
-            <div className="space-y-3">
-              {FAQ_ITEMS.map((item) => (
-                <details
-                  key={item.q}
-                  className="group rounded-xl border border-border/60 bg-white overflow-hidden"
-                >
-                  <summary className="cursor-pointer list-none px-5 py-4 flex items-center justify-between gap-4 hover:bg-muted/30 transition-colors">
-                    <span className="text-[15px] font-semibold text-foreground">{item.q}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 transition-transform group-open:rotate-90" />
-                  </summary>
-                  <div className="px-5 pb-5 pt-1 text-[14px] text-muted-foreground leading-relaxed">
-                    {item.a}
-                  </div>
-                </details>
-              ))}
-            </div>
+            <Accordion items={FAQ_ITEMS} />
           </ScrollReveal>
         </div>
       </section>
 
-      {/* ── CTA ── */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#faf8f2] via-background to-[#f5f5f0] py-20">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/6 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-secondary/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="max-w-5xl mx-auto px-6 text-center relative">
-          <ScrollReveal>
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground tracking-tight max-w-2xl mx-auto leading-[1.1]">
-              Ready to let Nami handle your{" "}
-              <span className="text-primary">performance management?</span>
-            </h2>
-            <p className="mt-5 text-muted-foreground text-lg max-w-lg mx-auto">
-              Add Nami to your Slack workspace in under a minute. She&apos;ll handle reviews, goals, surveys, and analytics — so you don&apos;t have to.
-            </p>
-            <div className="mt-10">
-              <Button size="lg" className="h-13 px-8 text-base font-semibold btn-glow" asChild>
-                <AddToSlackLink href={addToSlackUrl}>
-                  <Slack className="h-5 w-5 mr-2" />
-                  Add to Slack — it&apos;s free
-                </AddToSlackLink>
-              </Button>
-            </div>
-            <p className="mt-6 text-xs text-muted-foreground/60">No credit card. No setup fee. Cancel anytime.</p>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      {/* ── Footer ── */}
-      <footer className="bg-muted/40 border-t border-border">
-        <div className="max-w-5xl mx-auto px-6 py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-              <span className="text-lg font-bold text-foreground">Nami</span>
-              <span>&copy; {new Date().getFullYear()}</span>
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm">
-              <Link href="/guides" className="text-muted-foreground/60 hover:text-foreground transition-colors">Guides</Link>
-              <Link href="/compare" className="text-muted-foreground/60 hover:text-foreground transition-colors">Compare</Link>
-              <Link href="/about" className="text-muted-foreground/60 hover:text-foreground transition-colors">About</Link>
-              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
-              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>
-              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
-              <Link href="/roadmap" className="text-muted-foreground/60 hover:text-foreground transition-colors">Roadmap</Link>
+      {/* ── Closing CTA (dark moment) ── */}
+      <section className="bg-background py-16">
+        <div className="max-w-6xl mx-auto px-6 lg:px-10">
+          <div className="relative overflow-hidden rounded-3xl bg-ink-panel px-8 py-16 text-center sm:py-20">
+            <Spotlight />
+            <div className="relative">
+              <ScrollReveal>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight max-w-2xl mx-auto leading-[1.08]">
+                  Give your team the review{" "}
+                  <span className="font-serif-accent text-[hsl(var(--spotlight))]">they forget to dread.</span>
+                </h2>
+                <p className="mt-5 text-white/60 text-lg max-w-lg mx-auto leading-relaxed">
+                  Add Nami to your Slack workspace in under a minute. Free for teams of 10
+                  or fewer, 14-day Pro trial — no credit card.
+                </p>
+                <div className="mt-9 flex justify-center">
+                  <SlackCtaButton href={addToSlackUrl}>Add to Slack — it&apos;s free</SlackCtaButton>
+                </div>
+                <p className="mt-6 text-xs text-white/35">No credit card. No setup fee. Cancel anytime.</p>
+              </ScrollReveal>
             </div>
           </div>
         </div>
-      </footer>
+      </section>
 
+      <SiteFooter />
     </div>
   );
 }

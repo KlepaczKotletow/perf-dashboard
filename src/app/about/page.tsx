@@ -5,6 +5,10 @@ import { SiteFooter } from "@/components/marketing/site-footer";
 import { Masthead } from "@/components/marketing/masthead";
 import { CtaBand } from "@/components/marketing/cta-band";
 import { JsonLd } from "@/components/marketing/json-ld";
+import { Kicker } from "@/components/marketing/kicker";
+import { GlowCard } from "@/components/marketing/glow-card";
+import { Spotlight } from "@/components/marketing/spotlight";
+import { ScrollReveal } from "@/components/landing/scroll-reveal";
 import { getAddToSlackUrl } from "@/lib/slack-cta";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
@@ -135,7 +139,9 @@ export default function AboutPage() {
         title={
           <>
             Performance management belongs{" "}
-            <span className="text-primary text-shimmer">where work already happens</span>
+            <span className="font-serif-accent text-[hsl(var(--spotlight))]">
+              where work already happens
+            </span>
           </>
         }
         lead="We're a two-person team rebuilding performance management around one idea: the best tool is the one your team will actually open. So we put reviews, goals, and surveys inside Slack."
@@ -146,13 +152,12 @@ export default function AboutPage() {
           {/* ── Story ── */}
           <section className="grid gap-x-12 gap-y-6 pt-16 sm:pt-20 lg:grid-cols-[10rem_1fr]">
             <div className="lg:sticky lg:top-24 lg:self-start">
-              <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-                Our story
-              </span>
+              <Kicker>Our story</Kicker>
             </div>
-            <div className="max-w-2xl">
-              <h2 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-                Performance management is broken — and not for lack of features.
+            <ScrollReveal className="max-w-2xl">
+              <h2 className="text-3xl font-bold leading-[1.08] tracking-tight sm:text-4xl">
+                Performance management is broken —{" "}
+                <span className="font-serif-accent text-primary">not for lack of features.</span>
               </h2>
               <div className="mt-6 space-y-4 text-[15px] leading-relaxed text-muted-foreground">
                 <p>
@@ -170,78 +175,110 @@ export default function AboutPage() {
               <blockquote className="mt-8 border-l-2 border-secondary pl-5 text-xl font-semibold leading-snug text-foreground">
                 Friction — not features — is the real bottleneck.
               </blockquote>
-            </div>
+            </ScrollReveal>
           </section>
 
-          {/* ── Show, don't tell: the old way vs Nami ── */}
+          {/* ── Show, don't tell: the old way vs Nami (two GlowCards) ── */}
           <section className="mt-16 grid gap-4 sm:mt-20 sm:grid-cols-2">
-            <div className="rounded-2xl bg-muted/50 p-7 sm:p-8">
-              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">
-                The old way
-              </span>
-              <ul className="mt-5 space-y-3">
-                {OLD_WAY.map((step) => (
-                  <li key={step} className="flex items-center gap-3 text-[15px] text-muted-foreground">
-                    <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-                    {step}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="relative overflow-hidden rounded-2xl bg-[#1a1a2e] p-7 sm:p-8">
-              <div
-                aria-hidden
-                className="pointer-events-none absolute -top-12 right-0 h-56 w-56 rounded-full bg-gradient-to-bl from-primary/25 to-transparent blur-3xl animate-orb-drift"
-              />
-              <div className="relative">
-                <span className="text-xs font-semibold uppercase tracking-widest text-white/50">
-                  In Nami
+            <ScrollReveal className="h-full">
+              <GlowCard className="h-full p-7 sm:p-8">
+                <span className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                  The old way
                 </span>
-                <p className="mt-5 text-2xl font-bold leading-snug text-white">
-                  One Slack DM.
-                  <br />
-                  Answer. Done.
-                </p>
-                <ul className="mt-5 space-y-2.5">
-                  {["Reviews & 360° feedback", "Goals & OKRs", "Pulse surveys & eNPS", "Wellbeing check-ins"].map(
-                    (item) => (
-                      <li key={item} className="flex items-center gap-2.5 text-sm text-white/75">
-                        <Check className="h-4 w-4 shrink-0 text-primary" />
-                        {item}
-                      </li>
-                    ),
-                  )}
+                <ul className="mt-5 space-y-3">
+                  {OLD_WAY.map((step) => (
+                    <li key={step} className="flex items-center gap-3 text-[15px] text-muted-foreground">
+                      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+                      {step}
+                    </li>
+                  ))}
                 </ul>
+              </GlowCard>
+            </ScrollReveal>
+
+            {/* "In Nami" — small dark moment with a subtle Spotlight */}
+            <ScrollReveal delay={120} className="h-full">
+              <div className="relative h-full overflow-hidden rounded-2xl bg-ink-panel p-7 sm:p-8">
+                <Spotlight variant="subtle" />
+                <div className="relative">
+                  <span className="font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-white/55">
+                    In Nami
+                  </span>
+                  <p className="mt-5 text-2xl font-bold leading-snug text-white">
+                    One Slack DM.
+                    <br />
+                    Answer.{" "}
+                    <span className="font-serif-accent text-[hsl(var(--spotlight))]">Done.</span>
+                  </p>
+                  <ul className="mt-5 space-y-2.5">
+                    {["Reviews & 360° feedback", "Goals & OKRs", "Pulse surveys & eNPS", "Wellbeing check-ins"].map(
+                      (item) => (
+                        <li key={item} className="flex items-center gap-2.5 text-sm text-white/75">
+                          <Check className="h-4 w-4 shrink-0 text-[hsl(var(--spotlight))]" />
+                          {item}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </ScrollReveal>
+          </section>
+
+          {/* ── Costly-signal note for buyers ── */}
+          <ScrollReveal className="mt-16 sm:mt-20">
+            <p className="max-w-3xl border-l-2 border-primary/30 pl-5 text-[17px] leading-relaxed text-foreground">
+              Running real reviews is how a company proves it takes its people seriously —{" "}
+              <span className="font-serif-accent text-primary">cheap to send with Nami, impossible to fake.</span>{" "}
+              When feedback costs a 30-second DM instead of a dreaded annual ritual, doing it
+              consistently stops being a budget line and starts being a signal.
+            </p>
+          </ScrollReveal>
+
+          {/* ── Founders (refined bio cards) ── */}
+          <section className="mt-20 sm:mt-24">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+              <div>
+                <Kicker className="mb-3">Meet the founders</Kicker>
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                  Two operators,{" "}
+                  <span className="font-serif-accent text-primary">one product.</span>
+                </h2>
               </div>
             </div>
-          </section>
 
-          {/* ── Founders ── */}
-          <section className="mt-20 sm:mt-24">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <h2 className="text-2xl font-bold tracking-tight">Meet the founders</h2>
-              <span className="text-sm text-muted-foreground/70">Two operators · one product</span>
-            </div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {FOUNDERS.map((f, i) => (
+                <ScrollReveal key={f.name} delay={i * 120} className="h-full">
+                  <GlowCard className="h-full p-7 sm:p-8">
+                    <div className="flex items-start gap-5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={f.photo}
+                        alt={f.name}
+                        width={80}
+                        height={80}
+                        className="h-20 w-20 shrink-0 rounded-2xl object-cover ring-1 ring-border"
+                      />
+                      <div className="min-w-0">
+                        <h3 className="text-xl font-bold tracking-tight text-foreground">{f.name}</h3>
+                        <p className="mt-1 text-sm font-semibold text-primary">{f.role}</p>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {f.alumni.map((school) => (
+                            <span
+                              key={school}
+                              className="inline-flex items-center rounded-full border border-border/60 bg-muted/40 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground"
+                            >
+                              {school}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
 
-            <div className="mt-6 divide-y divide-border border-t border-border">
-              {FOUNDERS.map((f) => (
-                <div key={f.name} className="grid gap-6 py-10 sm:grid-cols-[auto_1fr] sm:gap-9">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={f.photo}
-                    alt={f.name}
-                    width={128}
-                    height={128}
-                    className="h-28 w-28 rounded-2xl object-cover ring-1 ring-border"
-                  />
-                  <div>
-                    <h3 className="text-2xl font-bold tracking-tight text-foreground">{f.name}</h3>
-                    <span aria-hidden className="mt-2 block h-0.5 w-9 rounded-full bg-secondary" />
-                    <p className="mt-2.5 text-sm font-semibold text-primary">{f.role}</p>
-                    <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-                      {f.bio}
-                    </p>
-                    <dl className="mt-5 space-y-1.5">
+                    <p className="mt-5 text-[15px] leading-relaxed text-muted-foreground">{f.bio}</p>
+
+                    <dl className="mt-5 space-y-1.5 border-t border-border/50 pt-5">
                       {f.meta.map((m) => (
                         <div key={m.label} className="flex gap-3">
                           <dt className="w-14 shrink-0 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">
@@ -251,34 +288,37 @@ export default function AboutPage() {
                         </div>
                       ))}
                     </dl>
-                  </div>
-                </div>
+                  </GlowCard>
+                </ScrollReveal>
               ))}
             </div>
 
-            <p className="mt-6 max-w-2xl text-sm leading-relaxed text-muted-foreground/80">
+            <p className="mt-8 max-w-2xl text-sm leading-relaxed text-muted-foreground/80">
               Eight years of friendship before a single line of code — complementary, not redundant.
               We shipped Nami&apos;s first version in months, without a cent of outside funding, and
               run the company the same way: lean and capital-efficient by default.
             </p>
           </section>
 
-          {/* ── Values ── */}
+          {/* ── Values (big mono numerals) ── */}
           <section className="mt-20 sm:mt-24">
-            <h2 className="text-2xl font-bold tracking-tight">What we believe</h2>
-            <div className="mt-6 divide-y divide-border border-t border-border">
+            <Kicker className="mb-3">What we believe</Kicker>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Three convictions,{" "}
+              <span className="font-serif-accent text-primary">no slogans.</span>
+            </h2>
+
+            <div className="mt-10 grid gap-x-10 gap-y-10 sm:grid-cols-3">
               {VALUES.map((v, i) => (
-                <div key={v.title} className="grid gap-3 py-8 sm:grid-cols-[5rem_1fr] sm:gap-8">
-                  <span className="text-4xl font-bold tabular-nums leading-none text-secondary sm:text-5xl">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-bold tracking-tight text-foreground">{v.title}</h3>
-                    <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted-foreground">
-                      {v.body}
-                    </p>
+                <ScrollReveal key={v.title} delay={i * 100}>
+                  <div className="flex flex-col">
+                    <span className="font-mono text-5xl font-bold leading-none tabular-nums text-primary/25 sm:text-6xl">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <h3 className="mt-5 text-lg font-bold tracking-tight text-foreground">{v.title}</h3>
+                    <p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">{v.body}</p>
                   </div>
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </section>

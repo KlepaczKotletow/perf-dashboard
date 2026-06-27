@@ -1,5 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
 
@@ -26,22 +29,22 @@ export default function PrivacyPolicyPage() {
   const effectiveDate = "May 23, 2026";
 
   return (
-    <div className="min-h-screen bg-background py-16">
-      <div className="max-w-3xl mx-auto px-6">
-        <div className="mb-6">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            &larr; Back to home
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-bold text-foreground mb-2">
-          Privacy Policy
-        </h1>
-        <p className="text-sm text-muted-foreground mb-10">
-          Effective date: {effectiveDate}
-        </p>
-
-        <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader ctaPurpose="privacy" />
+      <Masthead
+        kicker="Privacy"
+        title={
+          <>
+            Your data,{" "}
+            <span className="font-serif-accent text-[hsl(var(--spotlight))]">on the record.</span>
+          </>
+        }
+        lead="How Nami collects, uses, protects, and handles your data — including residency, retention, subprocessors, and your rights under GDPR, UK GDPR, and CCPA/CPRA."
+      />
+      <main className="flex-1">
+        <div className="mx-auto max-w-3xl px-6 py-16">
+          <p className="mb-10 text-sm text-muted-foreground">Effective date: {effectiveDate}</p>
+          <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
           {/* ── 1 ─────────────────────────────────────────────── */}
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">1. Introduction</h2>
@@ -757,8 +760,10 @@ export default function PrivacyPolicyPage() {
               complaint with your local data protection authority.
             </p>
           </section>
+          </div>
         </div>
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

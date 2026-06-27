@@ -7,10 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import {
-  ChevronUp, Send, Check, Sparkles, Rocket, Clock,
+  ChevronUp, Send, Check, Sparkles, Clock,
   Search, MessageSquare, Target, BarChart3, Puzzle,
   Bot, Layers, Flag,
 } from "lucide-react";
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Spotlight } from "@/components/marketing/spotlight";
+import { Kicker } from "@/components/marketing/kicker";
+import { GlowCard } from "@/components/marketing/glow-card";
 
 interface RoadmapItem {
   id: string;
@@ -165,64 +170,53 @@ export default function RoadmapPage() {
     setSuggestLoading(false);
   }
 
-  const signInUrl = `${(process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim()}/functions/v1/dashboard-auth`;
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-black tracking-tight">Nami</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-            <Button size="sm" variant="outline" asChild>
-              <a href={signInUrl}>Sign in</a>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader ctaPurpose="roadmap" />
 
-      {/* Hero */}
-      <section className="bg-gradient-to-b from-primary/[0.04] to-background pt-16 pb-10">
-        <div className="max-w-6xl mx-auto px-6 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-4">
-            <Rocket className="h-3.5 w-3.5" />
-            Product Roadmap
-          </div>
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
-            What we&apos;re building
-          </h1>
-          <p className="mt-3 text-lg text-muted-foreground max-w-lg mx-auto">
-            See what&apos;s shipped, what&apos;s in progress, and what&apos;s coming next. Upvote the features that matter to you.
-          </p>
-          <div className="mt-6 flex items-center justify-center gap-6 text-sm">
-            <div className="flex items-center gap-1.5">
-              <Check className="h-4 w-4 text-emerald-500" />
-              <span className="text-muted-foreground"><strong className="text-foreground">{counts.status_shipped || 0}</strong> shipped</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-blue-500" />
-              <span className="text-muted-foreground"><strong className="text-foreground">{counts.status_in_progress || 0}</strong> in progress</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-amber-500" />
-              <span className="text-muted-foreground"><strong className="text-foreground">{(counts.status_planned || 0) + (counts.status_exploring || 0)}</strong> planned</span>
+      {/* Hero — dark moment */}
+      <section className="bg-gradient-to-br from-[#fafaf5] via-[#f8f6f0] to-[#fefcf5]">
+        <div className="mx-auto max-w-6xl px-6 pt-8 pb-2 sm:pt-10 lg:px-10">
+          <div className="relative overflow-hidden rounded-3xl bg-ink-panel px-7 py-14 text-center sm:px-12 sm:py-16">
+            <Spotlight />
+            <div className="relative">
+              <div className="mb-6 flex justify-center">
+                <Kicker onDark>Product roadmap</Kicker>
+              </div>
+              <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
+                What we&apos;re{" "}
+                <span className="font-serif-accent text-[hsl(var(--spotlight))]">building next.</span>
+              </h1>
+              <p className="mx-auto mt-4 max-w-lg text-lg leading-relaxed text-white/60">
+                See what&apos;s shipped, what&apos;s in progress, and what&apos;s coming next. Upvote the features that matter to you.
+              </p>
+              <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+                <span className="inline-flex items-center gap-1.5 text-white/70">
+                  <Check className="h-4 w-4 text-emerald-400" />
+                  <strong className="text-white">{counts.status_shipped || 0}</strong> shipped
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-white/70">
+                  <Sparkles className="h-4 w-4 text-[hsl(var(--spotlight))]" />
+                  <strong className="text-white">{counts.status_in_progress || 0}</strong> in progress
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-white/70">
+                  <Clock className="h-4 w-4 text-amber-400" />
+                  <strong className="text-white">{(counts.status_planned || 0) + (counts.status_exploring || 0)}</strong> planned
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Main content */}
-      <section className="max-w-6xl mx-auto px-6 py-10">
+      <section className="mx-auto w-full max-w-6xl flex-1 px-6 py-12 lg:px-10">
         <div className="flex gap-8">
 
           {/* Left sidebar — categories */}
-          <div className="w-52 shrink-0 hidden lg:block">
-            <div className="sticky top-20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Categories</p>
+          <div className="hidden w-52 shrink-0 lg:block">
+            <div className="sticky top-24">
+              <p className="mb-3 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Categories</p>
               <nav className="space-y-0.5">
                 {CATEGORIES.map((cat) => {
                   const count = cat.value === "all" ? items.length : (counts[cat.value] || 0);
@@ -230,10 +224,10 @@ export default function RoadmapPage() {
                     <button
                       key={cat.value}
                       onClick={() => setCategory(cat.value)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
                         category === cat.value
-                          ? "bg-primary/10 text-primary font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                          ? "bg-primary/10 font-medium text-primary"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                       }`}
                     >
                       <cat.icon className="h-4 w-4 shrink-0" />
@@ -247,16 +241,16 @@ export default function RoadmapPage() {
           </div>
 
           {/* Right content */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             {/* Filters bar */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+            <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
               {/* Status tabs */}
-              <div className="flex gap-1 flex-wrap">
+              <div className="flex flex-wrap gap-1">
                 {STATUSES.map((s) => (
                   <button
                     key={s.value}
                     onClick={() => setStatus(s.value)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                       status === s.value
                         ? "bg-foreground text-background"
                         : "bg-muted/60 text-muted-foreground hover:bg-muted"
@@ -269,24 +263,24 @@ export default function RoadmapPage() {
               </div>
 
               {/* Search */}
-              <div className="relative sm:ml-auto w-full sm:w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <div className="relative w-full sm:ml-auto sm:w-56">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search features..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-8 text-sm"
+                  className="h-8 pl-8 text-sm"
                 />
               </div>
             </div>
 
             {/* Mobile category filter */}
-            <div className="flex gap-1.5 flex-wrap mb-4 lg:hidden">
+            <div className="mb-4 flex flex-wrap gap-1.5 lg:hidden">
               {CATEGORIES.map((cat) => (
                 <button
                   key={cat.value}
                   onClick={() => setCategory(cat.value)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
                     category === cat.value
                       ? "bg-primary/10 text-primary"
                       : "bg-muted/40 text-muted-foreground"
@@ -299,8 +293,8 @@ export default function RoadmapPage() {
 
             {/* Items */}
             {filtered.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <Search className="h-8 w-8 mx-auto mb-3 opacity-40" />
+              <div className="py-16 text-center text-muted-foreground">
+                <Search className="mx-auto mb-3 h-8 w-8 opacity-40" />
                 <p className="text-sm">No features match your filters.</p>
               </div>
             ) : (
@@ -308,18 +302,15 @@ export default function RoadmapPage() {
                 {filtered.map((item) => {
                   const voted = votedIds.has(item.id);
                   return (
-                    <div
-                      key={item.id}
-                      className="group flex gap-4 items-start p-4 rounded-xl border border-border/60 bg-white card-hover"
-                    >
+                    <GlowCard key={item.id} className="flex items-start gap-4 p-4">
                       {/* Upvote button */}
                       <button
                         onClick={() => handleVote(item.id)}
                         disabled={votingId === item.id}
-                        className={`flex flex-col items-center gap-0.5 px-2.5 py-2 rounded-lg border text-xs font-semibold transition-colors shrink-0 cursor-pointer ${
+                        className={`flex shrink-0 cursor-pointer flex-col items-center gap-0.5 rounded-lg border px-2.5 py-2 text-xs font-semibold transition-colors ${
                           voted
-                            ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/5"
-                            : "bg-muted/30 border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary"
+                            ? "border-primary/30 bg-primary/10 text-primary hover:bg-primary/5"
+                            : "border-border bg-muted/30 hover:border-primary/30 hover:bg-primary/10 hover:text-primary"
                         } ${justVotedId === item.id ? "animate-vote-pop" : ""}`}
                       >
                         <ChevronUp className={`h-4 w-4 ${voted ? "text-primary" : ""}`} />
@@ -327,19 +318,19 @@ export default function RoadmapPage() {
                       </button>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
                           {getStatusBadge(item.status)}
-                          <Badge variant="outline" className="text-[10px] text-muted-foreground border-border/60">
+                          <Badge variant="outline" className="border-border/60 text-[10px] text-muted-foreground">
                             {CATEGORIES.find((c) => c.value === item.category)?.label || item.category}
                           </Badge>
                         </div>
                         <h3 className="text-sm font-semibold text-foreground">{item.title}</h3>
                         {item.description && (
-                          <p className="mt-1 text-[13px] text-muted-foreground leading-relaxed">{item.description}</p>
+                          <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{item.description}</p>
                         )}
                       </div>
-                    </div>
+                    </GlowCard>
                   );
                 })}
               </div>
@@ -359,8 +350,8 @@ export default function RoadmapPage() {
 
             {/* Suggest a feature */}
             <div className="mt-8 rounded-2xl border border-border/60 bg-gradient-to-br from-primary/[0.03] to-background p-6 sm:p-8">
-              <div className="flex items-start gap-3 mb-4">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <div className="mb-4 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
                   <Send className="h-5 w-5 text-primary" />
                 </div>
                 <div>
@@ -370,7 +361,7 @@ export default function RoadmapPage() {
               </div>
 
               {suggestSuccess ? (
-                <div className="flex items-center gap-2 py-4 px-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-sm text-emerald-700">
                   <Check className="h-4 w-4" />
                   Thanks for your suggestion! We review every submission.
                 </div>
@@ -386,9 +377,9 @@ export default function RoadmapPage() {
                     placeholder="Describe the feature and why it matters (optional)"
                     value={suggestDesc}
                     onChange={(e) => setSuggestDesc(e.target.value)}
-                    className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background resize-none h-20 placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className="h-20 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                  <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <Input
                       type="email"
                       placeholder="Your email (optional — we'll notify you if we build it)"
@@ -407,24 +398,7 @@ export default function RoadmapPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-muted/40 border-t border-border mt-16">
-        <div className="max-w-6xl mx-auto px-6 py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-              <span className="text-lg font-bold text-foreground">Nami</span>
-              <span>&copy; {new Date().getFullYear()}</span>
-            </div>
-            <div className="flex gap-6 text-sm">
-              <Link href="/pricing" className="text-muted-foreground/60 hover:text-foreground transition-colors">Pricing</Link>
-              <Link href="/privacy" className="text-muted-foreground/60 hover:text-foreground transition-colors">Privacy</Link>
-              <Link href="/terms" className="text-muted-foreground/60 hover:text-foreground transition-colors">Terms</Link>
-              <Link href="/security" className="text-muted-foreground/60 hover:text-foreground transition-colors">Security</Link>
-              <Link href="/support" className="text-muted-foreground/60 hover:text-foreground transition-colors">Support</Link>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
