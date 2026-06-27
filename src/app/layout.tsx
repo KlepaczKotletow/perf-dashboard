@@ -74,12 +74,6 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.svg", type: "image/svg+xml" },
-    ],
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
