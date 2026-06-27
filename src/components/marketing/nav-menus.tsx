@@ -22,7 +22,6 @@ const MENUS: { label: string; links: { href: string; label: string; desc: string
     links: [
       { href: "/guides", label: "Guides", desc: "Performance playbooks" },
       { href: "/compare", label: "Compare", desc: "Nami vs the incumbents" },
-      { href: "/about", label: "About", desc: "The team & the story" },
     ],
   },
 ];
@@ -56,6 +55,12 @@ export function NavMenus() {
           </div>
         </div>
       ))}
+      <Link
+        href="/about"
+        className="inline-flex items-center rounded-full px-3 py-2 text-[15px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        About
+      </Link>
     </div>
   );
 }

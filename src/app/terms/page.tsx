@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -26,22 +27,22 @@ export default function TermsPage() {
   const effectiveDate = "May 23, 2026";
 
   return (
-    <div className="min-h-screen bg-background py-16">
-      <div className="max-w-3xl mx-auto px-6">
-        <div className="mb-6">
-          <Link href={SITE_URL} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            &larr; Back to home
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-bold text-foreground mb-2">
-          Terms of Service
-        </h1>
-        <p className="text-sm text-muted-foreground mb-10">
-          Effective date: {effectiveDate}
-        </p>
-
-        <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader ctaPurpose="terms" />
+      <Masthead
+        kicker="Terms of Service"
+        title={
+          <>
+            The fine print,{" "}
+            <span className="font-serif-accent text-[hsl(var(--spotlight))]">in plain English.</span>
+          </>
+        }
+        lead="Your subscription, acceptable use, customer data, warranties, liability, and dispute resolution. A plain-English summary sits up top; the numbered sections are the contract."
+      />
+      <main className="flex-1">
+        <div className="mx-auto max-w-3xl px-6 py-16">
+          <p className="mb-10 text-sm text-muted-foreground">Effective date: {effectiveDate}</p>
+          <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
           {/* ── Summary box ──────────────────────────────────── */}
           <section className="rounded-xl border border-border bg-muted/30 p-5">
             <p className="text-foreground font-medium mb-2">Plain-English summary</p>
@@ -962,8 +963,10 @@ export default function TermsPage() {
               </li>
             </ul>
           </section>
+          </div>
         </div>
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
+import { Fraunces } from "next/font/google";
 import Script from "next/script";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -16,6 +17,16 @@ const manrope = Manrope({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Editorial serif accent — used only for the italic "highlight phrase" in
+// headlines (the Legora-grade premium lever). `opsz` optical sizing makes it
+// look intentional at display scale; we keep it to the accent role, not body.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  style: ["italic", "normal"],
+  axes: ["opsz"],
 });
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
@@ -124,7 +135,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${manrope.variable} ${geistMono.variable} font-sans antialiased`}
+        className={`${manrope.variable} ${geistMono.variable} ${fraunces.variable} font-sans antialiased`}
       >
         {children}
         <SpeedInsights />

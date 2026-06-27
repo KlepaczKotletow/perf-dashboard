@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-
-const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://namihr.com").replace(/\/+$/, "");
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Masthead } from "@/components/marketing/masthead";
 
 export const metadata: Metadata = {
   title: "Security",
@@ -27,23 +28,22 @@ export default function SecurityPage() {
   const effectiveDate = "May 23, 2026";
 
   return (
-    <div className="min-h-screen bg-background py-16">
-      <div className="max-w-3xl mx-auto px-6">
-        <div className="mb-6">
-          <Link
-            href={SITE_URL}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            &larr; Back to home
-          </Link>
-        </div>
-
-        <h1 className="text-4xl font-bold text-foreground mb-2">Security</h1>
-        <p className="text-sm text-muted-foreground mb-10">
-          Last updated: {effectiveDate}
-        </p>
-
-        <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
+    <div className="flex min-h-screen flex-col bg-background">
+      <SiteHeader ctaPurpose="security" />
+      <Masthead
+        kicker="Security"
+        title={
+          <>
+            Security,{" "}
+            <span className="font-serif-accent text-[hsl(var(--spotlight))]">honestly stated.</span>
+          </>
+        }
+        lead="How Nami protects your data — infrastructure, encryption, tenant isolation, access control, backups, and incident response. An honest, current snapshot, not a marketing one."
+      />
+      <main className="flex-1">
+        <div className="mx-auto max-w-3xl px-6 py-16">
+          <p className="mb-10 text-sm text-muted-foreground">Last updated: {effectiveDate}</p>
+          <div className="space-y-10 text-sm leading-relaxed text-muted-foreground">
           {/* ── Overview ─────────────────────────────────────────── */}
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">
@@ -649,8 +649,10 @@ export default function SecurityPage() {
               </li>
             </ul>
           </section>
+          </div>
         </div>
-      </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }
