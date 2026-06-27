@@ -27,12 +27,15 @@ export function MobileNav({ signInUrl, addToSlackUrl }: MobileNavProps) {
       {open && (
         <div className="absolute top-14 left-0 right-0 bg-white border-b border-border/60 shadow-lg z-50">
           <nav className="max-w-5xl mx-auto px-6 py-4 flex flex-col gap-3">
-            <a href="#features" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Features</a>
-            <a href="#goals" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Goals</a>
-            <a href="#analytics" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Analytics</a>
-            <a href="#pricing" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Pricing</a>
-            <Link href="/guides" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Guides</Link>
-            <Link href="/compare" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Compare</Link>
+            <p className="px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">Product</p>
+            <Link href="/pricing" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Pricing</Link>
+            <Link href="/roadmap" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Roadmap</Link>
+            <Link href="/security" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Security</Link>
+            <Link href="/support" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Support</Link>
+            <p className="px-1 pt-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">Resources</p>
+            <Link href="/guides" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Guides</Link>
+            <Link href="/compare" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">Compare</Link>
+            <Link href="/about" onClick={() => setOpen(false)} className="text-sm text-foreground/80 hover:text-foreground transition-colors py-1">About</Link>
             <div className="border-t border-border/60 pt-3 mt-1 flex flex-col gap-2">
               <a href="mailto:hello@namihr.com?subject=Nami%20demo" onClick={() => setOpen(false)} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Book a demo</a>
               <a href={signInUrl} className="text-sm text-muted-foreground hover:text-foreground transition-colors py-1">Sign in with Slack</a>

@@ -35,7 +35,7 @@ export function FloatingNav({ ctaPurpose = "marketing" }: { ctaPurpose?: string 
             : "mt-0 max-w-7xl border border-transparent px-2 py-4 sm:px-6 lg:px-10",
         )}
       >
-        <Link href="/" className="flex shrink-0 items-center gap-2 justify-self-start" aria-label="Nami home">
+        <Link href="/" className="col-start-1 flex shrink-0 items-center gap-2 justify-self-start" aria-label="Nami home">
           <span
             className={cn(
               "font-black tracking-tight text-foreground transition-all duration-300",
@@ -46,11 +46,11 @@ export function FloatingNav({ ctaPurpose = "marketing" }: { ctaPurpose?: string 
           </span>
         </Link>
 
-        <nav className="hidden justify-self-center md:flex">
+        <nav className="col-start-2 hidden justify-self-center md:flex">
           <NavMenus />
         </nav>
 
-        <div className="flex shrink-0 items-center gap-2 justify-self-end sm:gap-3">
+        <div className="col-start-3 flex shrink-0 items-center gap-2 justify-self-end sm:gap-3">
           <a
             href={signInUrl}
             className="hidden text-[14px] font-medium text-muted-foreground transition-colors hover:text-foreground lg:inline"
