@@ -368,7 +368,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
             />
           )}
           <div className="w-9 shrink-0" /> {/* Avatar spacer */}
-          <div className="flex-1 min-w-0 grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+          <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
             <button onClick={() => handleSort("name")} className={colHeaderClass}>
               Name <SortIcon active={sortKey === "name"} dir={sortDir} />
             </button>
@@ -416,7 +416,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               </Avatar>
             </Link>
 
-            <div className="flex-1 min-w-0 grid grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+            <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
               {/* Name + title */}
               <Link href={`/dashboard/team/${user.id}`} className="min-w-0 group">
                 <div className="flex items-center gap-1.5">

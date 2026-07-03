@@ -29,9 +29,9 @@ export function ratingToAxis(r: number | null | undefined): 0 | 1 | 2 | null {
   return 2;
 }
 
-// Two vocabularies float around the codebase: the active calibration-client
-// page uses "Unsatisfactory" as the bottom grade; the older calibration-view
-// uses "Needs Improvement". Accept both so existing data with either label
+// Two vocabularies exist in stored data: the calibration page uses
+// "Unsatisfactory" as the bottom grade; a since-removed older view used
+// "Needs Improvement". Accept both so existing data with either label
 // maps cleanly to the same box.
 const GRADE_TO_COL: Record<string, 0 | 1 | 2> = {
   "Unsatisfactory": 0,

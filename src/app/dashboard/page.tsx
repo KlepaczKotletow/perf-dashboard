@@ -824,32 +824,34 @@ export default async function DashboardPage() {
 
       {/* Section 3 — MANAGE: workspace health (admins only, shown below personal + team sections) */}
       {!showOnboarding && (
-        <section aria-labelledby="workspace-health" className="space-y-3">
-          <h2 id="workspace-health" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3 flex items-center gap-2">
-            Workspace health
-            <span className="inline-flex items-center text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
-              Manage
-            </span>
-          </h2>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((m) => (
-          <Card key={m.label} className={`border-border/60 border-b-2 ${m.accent} hover:shadow-md transition-shadow`}>
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{m.label}</p>
-                  <p className="text-3xl font-bold mt-1.5 text-foreground tracking-tight">{m.value}</p>
-                </div>
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${m.bgColor}`}>
-                  <m.icon className={`h-5 w-5 ${m.iconColor}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+        <>
+          <section aria-labelledby="workspace-health" className="space-y-3">
+            <h2 id="workspace-health" className="text-sm font-semibold text-foreground tracking-wide border-l-2 border-primary/40 pl-3 flex items-center gap-2">
+              Workspace health
+              <span className="inline-flex items-center text-[9px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                Manage
+              </span>
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {metrics.map((m) => (
+                <Card key={m.label} className={`border-border/60 border-b-2 ${m.accent} hover:shadow-md transition-shadow`}>
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{m.label}</p>
+                        <p className="text-3xl font-bold mt-1.5 text-foreground tracking-tight">{m.value}</p>
+                      </div>
+                      <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${m.bgColor}`}>
+                        <m.icon className={`h-5 w-5 ${m.iconColor}`} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
 
-      {!showOnboarding && chartData && <DashboardCharts data={chartData} />}
+          {chartData && <DashboardCharts data={chartData} />}
 
       {/* Section 2 — MY TEAM: for HR/Admins who also manage direct reports */}
       {managerData && managerData.teamSize > 0 && (
@@ -939,7 +941,7 @@ export default async function DashboardPage() {
           </div>
         </div>
       )}
-        </section>
+        </>
       )}
     </div>
   );
