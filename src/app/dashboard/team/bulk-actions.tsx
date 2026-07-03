@@ -330,7 +330,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       <Button
         size="sm"
         variant="outline"
-        className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+        className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-400/10 dark:border-red-400/20"
         disabled={applying}
         onClick={() => applyStatusChange("deactivated")}
       >
@@ -341,7 +341,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       <Button
         size="sm"
         variant="outline"
-        className="h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+        className="h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-400/10 dark:border-emerald-400/20"
         disabled={applying}
         onClick={() => applyStatusChange("active")}
       >
@@ -349,7 +349,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         Reactivate
       </Button>
 
-      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDone}>
+      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onDone} aria-label="Clear selection">
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -27,10 +28,10 @@ export function Pagination({ page, pageSize, total, basePath, searchParams = {} 
       <div className="flex items-center gap-1">
         {page > 1 ? (
           <Button variant="outline" size="sm" className="h-8" asChild>
-            <a href={buildHref(page - 1)}>
+            <Link href={buildHref(page - 1)}>
               <ChevronLeft className="h-3.5 w-3.5 mr-1" />
               Previous
-            </a>
+            </Link>
           </Button>
         ) : (
           <Button variant="outline" size="sm" className="h-8" disabled>
@@ -40,10 +41,10 @@ export function Pagination({ page, pageSize, total, basePath, searchParams = {} 
         )}
         {page < totalPages ? (
           <Button variant="outline" size="sm" className="h-8" asChild>
-            <a href={buildHref(page + 1)}>
+            <Link href={buildHref(page + 1)}>
               Next
               <ChevronRight className="h-3.5 w-3.5 ml-1" />
-            </a>
+            </Link>
           </Button>
         ) : (
           <Button variant="outline" size="sm" className="h-8" disabled>

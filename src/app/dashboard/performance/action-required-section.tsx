@@ -98,7 +98,7 @@ export function ActionRequiredSection({ tasks }: ActionRequiredSectionProps) {
                 <span
                   className={`text-xs shrink-0 ${
                     isOverdue
-                      ? "text-red-600 font-semibold"
+                      ? "text-red-600 dark:text-red-400 font-semibold"
                       : "text-muted-foreground"
                   }`}
                 >

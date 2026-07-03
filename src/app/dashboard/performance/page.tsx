@@ -757,8 +757,14 @@ export default async function PerformancePage({
       : null;
   const latestGrade = cycles.find((c) => c.gradesReleased && c.grade)?.grade ?? null;
 
-  // 9. Auto-expand logic — all collapsed by default
-  const autoExpandIds = new Set<string>();
+  // 9. Auto-expand logic — open active cycles with outstanding tasks so the
+  // stepper and Start button are visible without a click; everything else
+  // stays collapsed.
+  const autoExpandIds = new Set<string>(
+    cycles
+      .filter((c) => c.isCurrent && c.pendingTasks.length > 0)
+      .map((c) => c.cycleId),
+  );
 
   /* ================================================================ */
   /*  Task 8: JSX                                                     */

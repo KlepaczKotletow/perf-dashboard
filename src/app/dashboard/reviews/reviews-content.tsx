@@ -71,8 +71,8 @@ const TYPE_OPTIONS = [
 ] as const;
 
 const STATUS_OPTIONS = [
-  { value: "not_started", label: "Not started" },
-  { value: "pending", label: "Pending" },
+  // "pending" is the live initial assignment status; badges label it "Not Started"
+  { value: "pending", label: "Not started" },
   { value: "in_progress", label: "In progress" },
   { value: "completed", label: "Completed" },
 ] as const;

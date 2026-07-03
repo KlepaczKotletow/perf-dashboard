@@ -463,54 +463,6 @@ export default async function CycleDetailPage({ params }: { params: Promise<{ id
         </CardContent>
       </Card>
 
-      {/* ── Review Phases Timeline ─────────────────────────────────────────── */}
-      {phases.length > 0 && (
-        <Card className="border-border/60">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Review Phases</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="relative">
-              {(phases as PhaseRow[]).map((phase, idx) => {
-                const nowDate = new Date(getCurrentMs());
-                const phaseStart = new Date(phase.start_date);
-                const phaseEnd = new Date(phase.end_date);
-                const isActive = nowDate >= phaseStart && nowDate <= phaseEnd;
-                const isCompleted = phase.status === "completed" || nowDate > phaseEnd;
-
-                return (
-                  <div key={phase.id} className="flex items-start gap-3 mb-3 last:mb-0">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                        isActive
-                          ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
-                          : isCompleted
-                          ? "bg-emerald-500 text-white"
-                          : "bg-muted text-muted-foreground"
-                      }`}>
-                        {isCompleted ? "✓" : idx + 1}
-                      </div>
-                      {idx < phases.length - 1 && (
-                        <div className={`w-0.5 h-6 ${isCompleted ? "bg-emerald-500" : "bg-muted"}`} />
-                      )}
-                    </div>
-                    <div className={`flex-1 ${isActive ? "" : "opacity-60"}`}>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{phase.name}</span>
-                        {isActive && <Badge className="text-[10px] bg-primary/10 text-primary">Current</Badge>}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {format(phaseStart, "MMM d")} — {format(phaseEnd, "MMM d, yyyy")}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* ── Phases & Deadlines ───────────────────────────────────────────── */}
       {phases.length > 0 && (
         <Card>

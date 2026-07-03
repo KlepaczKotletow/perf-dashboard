@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getClientIdentity } from "@/lib/client-auth";
-import { PageHeader } from "@/components/page-header";
+import { HatChip } from "@/components/page-header";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -306,18 +306,18 @@ export default function GoalDetailClient({
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <PageHeader hat="my-work" title={goal.title} />
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-3 pb-4 border-b border-border/60">
         <div className="flex items-start gap-3 min-w-0">
           <Button variant="ghost" size="icon" className="mt-0.5 shrink-0" asChild>
-            <Link href="/dashboard/goals">
+            <Link href="/dashboard/goals" aria-label="Back to goals">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div className="min-w-0">
-            {/* Breadcrumb */}
-            <nav className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+            {/* Role context + breadcrumb */}
+            <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <HatChip hat="my-work" />
               <Link href="/dashboard/goals" className="hover:text-foreground transition-colors">
                 Goals
               </Link>
