@@ -142,7 +142,7 @@ export default async function DashboardLayout({
             )}
             <div className="min-w-0">
               <span className="font-semibold text-[17px] text-sidebar-foreground tracking-tight block truncate leading-none">{workspace?.workspaceName || "Nami"}</span>
-              <span className="text-[10px] text-muted-foreground/50 italic leading-none mt-1 block" style={{ fontFamily: "'Georgia', serif" }}>Powered by Nami</span>
+              <span className="font-serif-accent text-[10px] text-muted-foreground/50 italic leading-none mt-1 block">Powered by Nami</span>
             </div>
           </Link>
         </div>

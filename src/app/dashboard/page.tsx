@@ -408,7 +408,7 @@ async function getChartData(workspaceId: string | undefined): Promise<DashboardC
   const goalDistribution = Object.entries(trackingCounts).map(([key, value]) => ({
     name: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.label || key,
     value,
-    color: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.fill || "#a1a1aa",
+    color: STATUS_COLORS[key as keyof typeof STATUS_COLORS]?.fill || "var(--muted-foreground)",
   }));
 
   const sixMonthsAgo = new Date();
@@ -598,7 +598,7 @@ export default async function DashboardPage() {
                 {pendingMgrReviews.length > 0 ? "Ready for your review" : "Team review status"}
               </h3>
               <Link
-                href="/dashboard/performance"
+                href="/dashboard/my-team"
                 className="text-xs text-primary font-medium hover:text-primary/80 flex items-center gap-1 transition-colors"
               >
                 See all <ChevronRight className="h-3 w-3" />

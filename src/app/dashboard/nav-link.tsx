@@ -22,6 +22,7 @@ export function NavLink({ href, label, icon }: NavLinkProps) {
   return (
     <Link
       href={href}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
         "flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] transition-colors",
         isActive

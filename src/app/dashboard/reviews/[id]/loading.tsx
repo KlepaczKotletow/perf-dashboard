@@ -1,4 +1,8 @@
-import { ReviewFormSkeleton } from "@/components/ui/page-skeleton";
+import { DetailPageSkeleton } from "@/components/ui/page-skeleton";
 export default function Loading() {
-  return <ReviewFormSkeleton />;
+  return (
+    <div className="max-w-6xl mx-auto">
+      <DetailPageSkeleton />
+    </div>
+  );
 }

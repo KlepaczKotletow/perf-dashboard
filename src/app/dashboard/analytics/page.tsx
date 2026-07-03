@@ -876,6 +876,10 @@ export default async function AnalyticsPage({
     ? subtitleParts.join(" · ")
     : "Performance insights across your workspace";
 
+  // When the empty-state card shows, the KPI strip must not assert "0.0/5" /
+  // "0%" as if they were real values — render em-dashes instead.
+  const noAnalyticsData = analytics.totalRatings === 0 && analytics.totalAssignments === 0;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <PageHeader
@@ -911,10 +915,10 @@ export default async function AnalyticsPage({
           {/* Compact KPI strip — one row, unified primary-toned icons */}
           <div className="flex flex-wrap items-center gap-x-7 gap-y-3 px-4 py-3 rounded-xl border border-border/60 bg-card">
             {[
-              { label: "Overall", value: `${analytics.overallAvg}/${ratingScale.max}`, icon: Star, tone: "text-amber-500", help: "Average rating across all competencies for the selected cycle" },
-              { label: "Completion", value: `${analytics.completionRate}%`, icon: TrendingUp, tone: "text-primary", help: "Percentage of assigned reviews that have been submitted" },
-              { label: "Ratings", value: analytics.totalRatings.toLocaleString(), icon: BarChart3, tone: "text-primary", help: "Number of individual competency ratings submitted" },
-              { label: "Participants", value: String(analytics.participants), icon: Users, tone: "text-primary", help: "Number of employees with at least one review assignment" },
+              { label: "Overall", value: noAnalyticsData ? "—" : `${analytics.overallAvg}/${ratingScale.max}`, icon: Star, tone: "text-amber-500", help: "Average rating across all competencies for the selected cycle" },
+              { label: "Completion", value: noAnalyticsData ? "—" : `${analytics.completionRate}%`, icon: TrendingUp, tone: "text-primary", help: "Percentage of assigned reviews that have been submitted" },
+              { label: "Ratings", value: noAnalyticsData ? "—" : analytics.totalRatings.toLocaleString(), icon: BarChart3, tone: "text-primary", help: "Number of individual competency ratings submitted" },
+              { label: "Participants", value: noAnalyticsData ? "—" : String(analytics.participants), icon: Users, tone: "text-primary", help: "Number of employees with at least one review assignment" },
               { label: "Active cycles", value: String(analytics.cycleStats.active), icon: Grid3X3, tone: "text-primary", help: "Cycles currently in active or in-review status" },
             ].map((m, i) => (
               <div key={m.label} className="flex items-center gap-5 sm:gap-7">

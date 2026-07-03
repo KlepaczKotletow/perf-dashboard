@@ -1,8 +1,6 @@
 "use client";
 
 import { ChartCard } from "@/components/charts/chart-card";
-import { ProgressRing } from "@/components/charts/progress-ring";
-import { DonutChart } from "@/components/charts/donut-chart";
 import { AppBarChart } from "@/components/charts/bar-chart-component";
 import { AppLineChart } from "@/components/charts/line-chart-component";
 import { BarChart3 } from "lucide-react";
