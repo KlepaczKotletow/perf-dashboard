@@ -32,7 +32,7 @@ export function FloatingNav({ ctaPurpose = "marketing" }: { ctaPurpose?: string 
           "grid w-full grid-cols-[1fr_auto_1fr] items-center gap-4 transition-all duration-300 ease-out",
           scrolled
             ? "mt-3 max-w-5xl rounded-full border border-border/60 bg-background/80 px-3 py-2 pl-5 shadow-lg shadow-black/[0.06] backdrop-blur-md supports-[backdrop-filter]:bg-background/70"
-            : "mt-0 max-w-7xl border border-transparent px-2 py-4 sm:px-6 lg:px-10",
+            : "mt-0 max-w-7xl shell-wide border border-transparent px-2 py-4 sm:px-6 lg:px-10",
         )}
       >
         <Link href="/" className="col-start-1 flex shrink-0 items-center gap-2 justify-self-start" aria-label="Nami home">
