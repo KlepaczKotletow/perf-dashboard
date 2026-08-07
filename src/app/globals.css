@@ -459,6 +459,56 @@
   animation: pulse-dash 14s linear infinite;
 }
 
+/* ── Wide-screen scale-up ──────────────────────────────────────────────────
+   Tailwind's scale stops at 2xl (1536px) and the marketing shell was pinned to
+   `max-w-7xl`, so on anything wider than a small laptop the page froze at a
+   1280px column: on a 1920px monitor that left ~320px of dead gutter either
+   side and a hero that read as small. These tiers keep the shell, the hero
+   type, and the dashboard mockup growing with the viewport instead.
+
+   The mockup scales with `zoom` rather than a font/spacing rewrite so its
+   internal layout is untouched — it renders like an enlarged screenshot rather
+   than reflowing into a sparse grid of 7px labels. Each zoom step is the hero
+   card's own growth factor at that tier (card = (shell − 80px padding − 12px
+   gap) / 2, measured against 594px at the 1280px shell), so the composition is
+   identical at every width and only its scale changes.
+
+   These live here instead of as `xl:`/`2xl:` utilities because two tiers
+   (1800px, 2100px) have no Tailwind breakpoint, and keeping all four together
+   is what holds the zoom factors in step with the shell widths they're derived
+   from. Nothing is declared below 1280px, so every existing mobile/tablet/
+   laptop utility is untouched; `.shell-wide` is applied alongside `max-w-7xl`,
+   which still owns everything narrower. */
+@media (min-width: 1280px) {
+  .shell-wide { max-width: 88rem; }   /* 1408px — hero card 658px */
+  .hero-mockup { zoom: 1.18; }
+  .hero-headline { font-size: 68px; }
+  .hero-lede { font-size: 20px; max-width: 35rem; }
+  /* The scaled mockup drives a taller hero row, so the copy card's default
+     `justify-between` stops anchoring the CTA to anything and just opens a dead
+     gap under the lede. Centre copy + CTA as one group with a fixed rhythm
+     instead — below 1280px the row is short enough that `justify-between` still
+     reads as intended, so it's left alone there. */
+  .hero-copy-card { justify-content: center; }
+  .hero-cta-row { margin-top: 3rem; }
+}
+@media (min-width: 1536px) {
+  .shell-wide { max-width: 94rem; }   /* 1504px — hero card 706px */
+  .hero-mockup { zoom: 1.28; }
+  .hero-headline { font-size: 74px; }
+}
+@media (min-width: 1800px) {
+  .shell-wide { max-width: 102rem; }  /* 1632px — hero card 770px */
+  .hero-mockup { zoom: 1.40; }
+  .hero-headline { font-size: 80px; }
+  .hero-lede { font-size: 22px; max-width: 38rem; }
+}
+@media (min-width: 2100px) {
+  .shell-wide { max-width: 110rem; }  /* 1760px — hero card 834px */
+  .hero-mockup { zoom: 1.52; }
+  .hero-headline { font-size: 84px; }
+}
+
 /* ── Reduced-motion: silence everything decorative ── */
 @media (prefers-reduced-motion: reduce) {
   .animate-orb-drift,

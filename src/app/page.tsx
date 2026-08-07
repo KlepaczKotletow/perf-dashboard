@@ -196,11 +196,11 @@ export default async function Home() {
 
         {/* Hero — two-card layout (kept). Left dark "moment" with copy; right
             light card with the founder-loved dashboard mockup. */}
-        <div className="relative max-w-7xl mx-auto px-4 lg:px-10 pt-4 pb-4">
+        <div className="relative max-w-7xl shell-wide mx-auto px-4 lg:px-10 pt-4 pb-4">
           <div className="grid lg:grid-cols-2 gap-3 min-h-[520px] lg:min-h-[580px]">
 
             {/* Left card — dark moment with the provocative headline */}
-            <div className="relative rounded-3xl bg-ink-panel overflow-hidden p-8 sm:p-10 lg:p-12 flex flex-col justify-between">
+            <div className="relative rounded-3xl bg-ink-panel overflow-hidden p-8 sm:p-10 lg:p-12 xl:p-14 2xl:p-16 flex flex-col justify-between hero-copy-card">
               <Spotlight />
 
               <div className="relative">
@@ -209,12 +209,12 @@ export default async function Home() {
                   360° reviews · OKRs · pulse — without leaving Slack
                 </div>
 
-                <h1 className="text-4xl sm:text-5xl lg:text-[60px] font-bold tracking-tight text-white leading-[1.05]">
+                <h1 className="text-4xl sm:text-5xl lg:text-[60px] hero-headline font-bold tracking-tight text-white leading-[1.05]">
                   Reviews your team{" "}
                   <span className="font-serif-accent text-[hsl(var(--spotlight))]">forgets to dread.</span>
                 </h1>
 
-                <p className="mt-6 text-lg text-white/60 leading-relaxed max-w-[480px]">
+                <p className="mt-6 text-lg hero-lede text-white/60 leading-relaxed max-w-[480px]">
                   Nami runs reviews, goals, surveys, and check-ins from inside Slack —
                   answered in a DM between two messages from the people you actually
                   work with. When taking part stops feeling like homework, completion
@@ -222,13 +222,15 @@ export default async function Home() {
                 </p>
               </div>
 
-              <div className="relative mt-8">
+              <div className="relative mt-8 hero-cta-row">
                 <div className="flex flex-col sm:flex-row items-start gap-3">
-                  <SlackCtaButton href={addToSlackUrl}>Add to Slack — free</SlackCtaButton>
+                  <SlackCtaButton href={addToSlackUrl} className="xl:h-14 xl:px-8 xl:text-[15px]">
+                    Add to Slack — free
+                  </SlackCtaButton>
                   <Button
                     size="lg"
                     variant="ghost"
-                    className="h-12 px-7 text-sm text-white/60 hover:text-white hover:bg-card/10 border border-white/15 rounded-full"
+                    className="h-12 px-7 text-sm xl:h-14 xl:px-8 xl:text-[15px] text-white/60 hover:text-white hover:bg-card/10 border border-white/15 rounded-full"
                     asChild
                   >
                     <a href={signInWithSlackUrl}>Sign in with Slack</a>
@@ -249,14 +251,14 @@ export default async function Home() {
                 aria-hidden
                 className="pointer-events-none absolute -top-16 left-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-[hsl(var(--spotlight)/0.22)] blur-3xl"
               />
-              <DashboardMockup className="relative m-3 w-full" />
+              <DashboardMockup className="relative m-3 w-full hero-mockup" />
             </div>
 
           </div>
         </div>
 
         {/* Capabilities ticker — honest infinite marquee of real features */}
-        <div className="max-w-7xl mx-auto px-4 lg:px-10 pb-6">
+        <div className="max-w-7xl shell-wide mx-auto px-4 lg:px-10 pb-6">
           <Marquee className="py-2" duration="52s">
             {CAPABILITY_TICKER.map((cap) => (
               <span
