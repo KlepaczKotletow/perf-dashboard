@@ -72,10 +72,15 @@ export function SidebarWrapper({ children, workspaceName, workspaceLogoUrl }: Si
       {/* ── Sidebar ───────────────────────────────────────────────────── */}
       <aside
         className={cn(
-          "fixed left-0 top-0 h-full w-[240px] border-r border-sidebar-border bg-sidebar flex flex-col z-50",
-          "transition-transform duration-200 ease-in-out",
-          // Mobile: hidden by default, slide in when open
-          // Desktop (lg+): always visible
+          "fixed z-50 flex flex-col dashboard-rail",
+          // Mobile: full-bleed drawer, square, flush to the edge
+          "left-0 top-0 h-full w-[264px]",
+          // Desktop (lg+): inset on all four sides so the canvas shows around
+          // it — the rail reads as a card floating above the page rather than
+          // a panel welded to the viewport. 256px matches the width modern
+          // dashboards converge on (Linear/Stripe/Vercel).
+          "lg:left-3 lg:top-3 lg:bottom-3 lg:h-auto lg:w-[256px] lg:rounded-2xl",
+          "transition-transform duration-200 ease-in-out motion-reduce:transition-none",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >

@@ -28,6 +28,7 @@ import { NavLink } from "./nav-link";
 import { SidebarWrapper } from "./sidebar-wrapper";
 import { RoleWatcher } from "./role-watcher";
 import { WidgetErrorBoundary } from "@/components/widget-error-boundary";
+import { cn } from "@/lib/utils";
 
 // Belt-and-braces: robots.txt already Disallows /dashboard/, but a noindex
 // directive on the response is the only way to keep an externally-linked
@@ -127,33 +128,44 @@ export default async function DashboardLayout({
     : workspace?.email?.[0]?.toUpperCase() || "?";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen dashboard-shell">
       {/* Sidebar — wrapped in SidebarWrapper for mobile drawer behaviour */}
       <SidebarWrapper workspaceName={workspace?.workspaceName} workspaceLogoUrl={workspace?.logoUrl}>
         {/* Logo */}
-        <div className="h-[64px] flex items-center px-4 border-b border-sidebar-border">
-          <Link href="/dashboard" className="flex items-center gap-3.5 min-w-0">
+        {/* Brand. The old fixed 64px block with a 44px tile and a hard
+            border-b was the single heaviest element in a 256px rail; a smaller
+            mark and spacing instead of a rule carry the same identity for a
+            fraction of the visual weight. */}
+        <div className="flex items-center px-4 pt-4 pb-3">
+          <Link href="/dashboard" className="flex items-center gap-3 min-w-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring">
             {workspace?.logoUrl ? (
-              <img src={workspace.logoUrl} alt="" className="h-11 w-11 rounded-lg object-cover shrink-0" />
+              <img src={workspace.logoUrl} alt="" className="h-9 w-9 rounded-lg object-cover shrink-0" />
             ) : (
-              <div className="h-11 w-11 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                <span className="text-primary-foreground text-base font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
+              <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                <span className="text-primary-foreground text-sm font-bold">{(workspace?.workspaceName || "N").charAt(0).toUpperCase()}</span>
               </div>
             )}
             <div className="min-w-0">
-              <span className="font-semibold text-[17px] text-sidebar-foreground tracking-tight block truncate leading-none">{workspace?.workspaceName || "Nami"}</span>
-              <span className="font-serif-accent text-[10px] text-muted-foreground/50 italic leading-none mt-1 block">Powered by Nami</span>
+              <span className="font-semibold text-[15px] text-sidebar-foreground tracking-tight block truncate leading-tight">{workspace?.workspaceName || "Nami"}</span>
+              <span className="font-serif-accent text-[10px] text-muted-foreground/50 italic leading-none mt-0.5 block">Powered by Nami</span>
             </div>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3">
+        {/* aria-label distinguishes this landmark from the marketing nav and
+            the footer menu for screen-reader landmark navigation. */}
+        <nav aria-label="Dashboard" className="flex-1 overflow-y-auto py-1 px-3">
           {filteredSections.map((section, idx) => (
             <div key={section.label || `section-${idx}`}>
-              {idx > 0 && <div className="my-2 mx-2 h-px bg-sidebar-border/60" />}
+              {/* No divider rule between sections — the uppercase label plus
+                  the space above it already groups these, and stacking both
+                  put up to five horizontal rules in the rail. */}
               {section.label && filteredSections.length > 1 && (
-                <p className="text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider px-3 pt-2 pb-1">{section.label}</p>
+                <p className={cn(
+                  "text-[10px] font-medium text-sidebar-foreground/40 uppercase tracking-wider px-2.5 pb-1.5",
+                  idx > 0 ? "pt-5" : "pt-2",
+                )}>{section.label}</p>
               )}
               <div className="space-y-0.5">
                 {section.items.map((item) => (
@@ -168,8 +180,7 @@ export default async function DashboardLayout({
             </div>
           ))}
 
-          <div className="my-2 mx-2 h-px bg-sidebar-border/60" />
-          <div className="space-y-0.5">
+          <div className="mt-5 space-y-0.5">
             <NavLink
               href="/dashboard/help"
               label="Help"
@@ -179,7 +190,7 @@ export default async function DashboardLayout({
         </nav>
 
         {/* User Footer */}
-        <div className="border-t border-sidebar-border p-3">
+        <div className="p-3 pt-2">
           <FooterDropdown
             initials={initials}
             name={workspace?.name || workspace?.email || "User"}
@@ -195,7 +206,8 @@ export default async function DashboardLayout({
       {/* Main content
           — desktop (lg+): offset by sidebar width
           — mobile: full width with top padding for the fixed mobile header */}
-      <main className="lg:ml-[240px] min-h-screen pt-14 lg:pt-0">
+      {/* Offset = rail 256px + 12px inset + 12px gutter. */}
+      <main className="lg:ml-[280px] min-h-screen pt-14 lg:pt-0">
         <div className="px-4 lg:px-8 py-6 lg:py-8">
           {workspace.requiresReinstall && (
             <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-3 text-sm">

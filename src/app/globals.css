@@ -509,6 +509,38 @@
   .hero-headline { font-size: 84px; }
 }
 
+/* ── Dashboard shell: a rail that actually floats ──────────────────────────
+   The rail and the canvas used to be the same plane. --sidebar (0.990) sat
+   0.005 away from --background (0.985) in light mode, and in dark mode the two
+   were byte-identical (both 0.13) — so a 1px border was the only thing
+   separating navigation from content, and no amount of radius or shadow would
+   read as "floating" over a surface of the same colour.
+
+   These re-tier the two: the canvas recesses, the rail rises to the lightest
+   surface and carries the elevation. Separation by depth rather than by rule.
+   Scoped to .dashboard-shell so the marketing site keeps its own background —
+   this deliberately does NOT touch the global --background/--sidebar tokens. */
+.dashboard-shell {
+  --rail: oklch(0.995 0.002 90);
+  --canvas: oklch(0.963 0.005 90);
+  background-color: var(--canvas);
+}
+.dark .dashboard-shell {
+  --rail: oklch(0.175 0.013 260);
+  --canvas: oklch(0.115 0.012 260);
+}
+.dashboard-rail {
+  background-color: var(--rail);
+  box-shadow:
+    0 1px 2px oklch(0.15 0.03 260 / 0.05),
+    0 10px 28px -8px oklch(0.15 0.03 260 / 0.12);
+}
+.dark .dashboard-rail {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.32),
+    0 10px 28px -8px oklch(0 0 0 / 0.5);
+}
+
 /* ── Reduced-motion: silence everything decorative ── */
 @media (prefers-reduced-motion: reduce) {
   .animate-orb-drift,
