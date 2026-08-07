@@ -175,6 +175,25 @@ export default function ReviewFormPage({
           return;
         }
 
+        // Only a party to this assignment may open it. Nothing in the product
+        // creates peer assignments — assignment_type is 'standard' | 'upward'
+        // (src/lib/types.ts) and no code path writes anything else — so the
+        // old `let currentReviewerRole = "peer"` default could never describe a
+        // legitimate reviewer. It fired only for someone who was neither the
+        // employee, the manager, nor the named upward reviewer, and then let
+        // them submit a peer review against an assignment that wasn't theirs.
+        // The workspace check above stops cross-tenant access; this stops
+        // within-workspace access.
+        const isParty =
+          appUserId === assignmentData.employee_id ||
+          appUserId === assignmentData.manager_id ||
+          (assignmentData.assignment_type === "upward" && appUserId === assignmentData.reviewer_id);
+        if (!isParty) {
+          setError("This review isn't assigned to you.");
+          setLoading(false);
+          return;
+        }
+
         // Determine what reviewer role the current user would have
         let currentReviewerRole = "peer";
         if (assignmentData.assignment_type === "upward" && appUserId === assignmentData.reviewer_id) {
