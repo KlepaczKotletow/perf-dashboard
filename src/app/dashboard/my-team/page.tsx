@@ -56,8 +56,16 @@ export default async function MyTeamPage() {
     employee_id: string;
     status: string;
     overall_rating: number | null;
+    // Two assignments can exist for the same employee in the same cycle — the
+    // manager's ("standard") and an upward one owned by a named reviewer.
+    // Without these the rows render identically and only one is yours to do.
+    assignment_type: string | null;
+    reviewer_id: string | null;
+    manager_id: string | null;
     cycle?: { id: string; name: string | null; status: string | null; grades_released?: boolean; workspace_id?: string | null } | null;
     employee?: { id: string; slack_name: string | null } | null;
+    reviewer?: { id: string; slack_name: string | null } | null;
+    manager?: { id: string; slack_name: string | null } | null;
   };
   type TeamGoalRow = GoalRowFull & { employee_id: string };
 
@@ -71,6 +79,8 @@ export default async function MyTeamPage() {
       .select(`
         *,
         employee:users!review_assignments_employee_id_fkey(id, slack_name),
+        reviewer:users!review_assignments_reviewer_id_fkey(id, slack_name),
+        manager:users!review_assignments_manager_id_fkey(id, slack_name),
         cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, grades_released, workspace_id)
       `)
       .in("employee_id", reportIds)
@@ -253,24 +263,56 @@ export default async function MyTeamPage() {
               <span className="ml-1.5 text-xs font-medium text-muted-foreground">· {pending.length}</span>
             </h2>
             <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
-              {pending.map((assignment) => (
-                <div key={assignment.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
-                    {assignment.employee?.slack_name || "Unknown"}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[160px]">
-                    {assignment.cycle?.name || "Unknown Cycle"}
-                  </span>
-                  <Badge className={`text-[10px] font-medium shrink-0 ${getAssignmentStatus(assignment.status).badge}`}>
-                    {getAssignmentStatus(assignment.status).label}
-                  </Badge>
-                  <Button size="sm" className="h-7 text-xs shrink-0" asChild>
-                    <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
-                      Review <ArrowRight className="h-3 w-3 ml-1" />
-                    </Link>
-                  </Button>
-                </div>
-              ))}
+              {pending.map((assignment) => {
+                // An employee can have two pending assignments in one cycle:
+                // the manager review and an upward review owned by a named
+                // reviewer. They used to render identically, so the only way to
+                // tell them apart was to open one — and the upward one isn't
+                // the manager's to complete.
+                const isUpward = assignment.assignment_type === "upward";
+                const ownerId = isUpward ? assignment.reviewer_id : assignment.manager_id;
+                const isMine = ownerId === userId;
+                const ownerName = (isUpward ? assignment.reviewer : assignment.manager)?.slack_name;
+
+                return (
+                  <div key={assignment.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground block truncate">
+                        {assignment.employee?.slack_name || "Unknown"}
+                      </span>
+                      <span className="text-xs text-muted-foreground block truncate">
+                        {isUpward ? "Upward review" : "Manager review"}
+                        {" · "}
+                        {isMine
+                          ? "yours to complete"
+                          : ownerName
+                            ? `waiting on ${ownerName}`
+                            : "no reviewer assigned"}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0 truncate max-w-[160px]">
+                      {assignment.cycle?.name || "Unknown Cycle"}
+                    </span>
+                    <Badge className={`text-[10px] font-medium shrink-0 ${getAssignmentStatus(assignment.status).badge}`}>
+                      {getAssignmentStatus(assignment.status).label}
+                    </Badge>
+                    {/* Only the owner gets the action. Everyone else keeps the
+                        row for visibility (so a manager can chase it) but with
+                        no button that would open someone else's review. */}
+                    {isMine ? (
+                      <Button size="sm" className="h-7 text-xs shrink-0" asChild>
+                        <Link href={`/dashboard/cycles/${assignment.cycle?.id}/review/${assignment.id}`}>
+                          Review <ArrowRight className="h-3 w-3 ml-1" />
+                        </Link>
+                      </Button>
+                    ) : (
+                      <span className="h-7 flex items-center text-xs text-muted-foreground/60 shrink-0 px-2">
+                        Not yours
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </section>
         );
