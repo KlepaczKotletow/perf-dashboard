@@ -20,6 +20,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { format } from "date-fns";
+import { ReadinessCheck } from "./readiness-check";
 import { PageHeader } from "@/components/page-header";
 import { PhaseOverride } from "@/lib/cycle-phases";
 import { EditablePhaseTimeline } from "./editable-phase-timeline";
@@ -47,6 +48,7 @@ interface User {
   slack_email: string | null;
   slack_user_id: string | null;
   manager_id: string | null;
+  level_id: string | null;
 }
 interface Competency {
   id: string;
@@ -216,7 +218,7 @@ export default function NewCyclePage() {
       const wsId = identity.workspaceId;
 
       const [{ data: usersData }, { data: compsData }, { data: tplData }, { data: profileData }] = await Promise.all([
-        supabase.from("users").select("id, slack_name, slack_email, slack_user_id, manager_id").eq("workspace_id", wsId).order("slack_name"),
+        supabase.from("users").select("id, slack_name, slack_email, slack_user_id, manager_id, level_id").eq("workspace_id", wsId).order("slack_name"),
         supabase.from("competencies").select("id, name, category").eq("workspace_id", wsId).order("category").order("name"),
         supabase.from("templates").select("id, name, description, questions, is_system").eq("workspace_id", wsId).order("is_system", { ascending: false }).order("name"),
         supabase.from("templates").select("id, name, description, content, is_system").eq("workspace_id", wsId).eq("template_type", "cycle_profile"),
@@ -867,7 +869,7 @@ export default function NewCyclePage() {
                   {usersWithoutSlack.length} selected employee{usersWithoutSlack.length !== 1 ? "s" : ""} without Slack connected
                 </p>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  Nami won&apos;t be able to send them review prompts via Slack. They can still complete reviews manually.
+                  Nami can&apos;t DM them, and they can&apos;t sign in to the dashboard either &mdash; sign-in is keyed on their Slack account. Link them from the Directory, or leave them out of this cycle.
                 </p>
               </div>
             </div>
@@ -1241,6 +1243,8 @@ export default function NewCyclePage() {
       {step === 5 && (
         <div className="space-y-5">
           <p className="text-sm text-muted-foreground">Review your cycle configuration before launching.</p>
+
+          <ReadinessCheck users={users} selectedIds={selectedPeopleIds} />
 
           {/* Basics card */}
           <Card className="border-border/60">
