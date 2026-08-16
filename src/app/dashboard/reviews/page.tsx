@@ -58,8 +58,8 @@ export default async function ReviewsPage() {
         id, status, overall_rating, created_at, updated_at, assignment_type,
         employee_id, manager_id, reviewer_id,
         employee:users!review_assignments_employee_id_fkey(id, slack_name, job_title, department, avatar_url, slack_user_id),
-        manager:users!review_assignments_manager_id_fkey(id, slack_name, avatar_url),
-        reviewer:users!review_assignments_reviewer_id_fkey(id, slack_name, avatar_url),
+        manager:users!review_assignments_manager_id_fkey(id, slack_name, avatar_url, slack_user_id),
+        reviewer:users!review_assignments_reviewer_id_fkey(id, slack_name, avatar_url, slack_user_id),
         cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date)
       `)
       .in("cycle_id", cycleIds)

@@ -322,14 +322,22 @@ export function EmptyState({
 
 // ── Inline notice banner ─────────────────────────────────────────────────────
 
-/** The Directory's amber "N people have no competency bracket" strip. */
+/**
+ * The Directory's amber "N people have no competency bracket" strip.
+ *
+ * `icon` is a rendered ELEMENT, not a component type. This module is
+ * "use client", and Server Components render this banner — passing a component
+ * function across that boundary throws "Functions cannot be passed directly to
+ * Client Components". Typing it as ReactNode makes that a compile error rather
+ * than a runtime 500 that only appears once the banner's condition is true.
+ */
 export function NoticeBanner({
-  icon: Icon,
+  icon,
   children,
   action,
   tone = "amber",
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: ReactNode;
   children: ReactNode;
   action?: ReactNode;
   tone?: "amber" | "sky";
@@ -344,7 +352,7 @@ export function NoticeBanner({
       className={`flex items-center justify-between gap-3 px-4 py-3 rounded-lg border text-sm ${tones[tone]}`}
     >
       <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 shrink-0" />
+        {icon}
         <span>{children}</span>
       </div>
       {action}
