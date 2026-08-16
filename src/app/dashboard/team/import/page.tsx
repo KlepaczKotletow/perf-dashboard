@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
+import { resolveLevel } from "@/lib/level-resolution";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,12 +45,16 @@ interface MappedUser {
   manager_email?: string;
   role?: string;
   start_date?: string;
+  job_function?: string;
+  level?: string;
   avatar_url?: string;
 }
 
 interface ValidatedUser extends MappedUser {
   matchedUserId: string | null;
   matchedManagerId: string | null;
+  /** Resolved from the Function + Level columns; null when unmatched. */
+  resolvedLevelId: string | null;
   action: "create" | "update";
   errors: string[];
   warnings: string[];
@@ -72,6 +77,8 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   manager_email: ["manager email", "manager_email", "manager", "reports to", "reports_to", "manager mail", "line manager", "direct manager", "direct manager email"],
   role: ["system role", "app role", "role", "access", "permission"],
   start_date: ["start date", "start_date", "starting date", "started"],
+  job_function: ["function", "job function", "job_function", "family", "job family", "job_family", "career track", "track", "discipline"],
+  level: ["level", "job level", "job_level", "grade", "seniority", "competency bracket", "band"],
   avatar_url: ["avatar", "avatar_url", "profile picture", "profile_picture", "photo", "photo_url", "picture", "image", "image_url"],
 };
 
@@ -95,6 +102,8 @@ const TARGET_FIELDS = [
   { value: "manager_email", label: "Manager Email" },
   { value: "role", label: "System Role" },
   { value: "start_date", label: "Start Date" },
+  { value: "job_function", label: "Function" },
+  { value: "level", label: "Level" },
   { value: "avatar_url", label: "Profile Picture URL" },
 ];
 
@@ -129,6 +138,11 @@ export default function ImportPage() {
     slack_name: string | null;
   };
   const [dbUsers, setDbUsers] = useState<DbUserRef[]>([]);
+  // Resolved client-side: the CSV carries human names ("Engineering",
+  // "Senior Engineer"), the users table stores a level_id.
+  const [dbLevels, setDbLevels] = useState<
+    { id: string; name: string | null; familyName: string | null }[]
+  >([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   const supabase = createClient();
@@ -147,6 +161,22 @@ export default function ImportPage() {
         .select("id, slack_email, slack_name")
         .eq("workspace_id", wsId);
       setDbUsers((users || []) as DbUserRef[]);
+
+      const { data: levels } = await supabase
+        .from("levels")
+        .select("id, name, job_family:job_families(name)")
+        .eq("workspace_id", wsId)
+        .is("archived_at", null);
+      setDbLevels(
+        ((levels || []) as unknown as {
+          id: string;
+          name: string | null;
+          job_family: { name: string } | { name: string }[] | null;
+        }[]).map((l) => {
+          const jf = Array.isArray(l.job_family) ? l.job_family[0] : l.job_family;
+          return { id: l.id, name: l.name, familyName: jf?.name ?? null };
+        })
+      );
     }
     load();
   }, []);
@@ -157,10 +187,10 @@ export default function ImportPage() {
 
   function downloadTemplate() {
     const csv = [
-      "name,email,department,job_title,manager_email,role,start_date,avatar_url",
-      "Jane Smith,jane@company.com,Engineering,Senior Engineer,cto@company.com,user,2023-06-15,https://example.com/jane.jpg",
-      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,user,2022-01-10,",
-      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,user,2024-03-01,",
+      "name,email,department,job_title,manager_email,role,start_date,function,level,avatar_url",
+      "Jane Smith,jane@company.com,Engineering,VP Engineering,,admin,2023-06-15,Engineering,Principal Engineer,",
+      "Bob Jones,bob@company.com,Design,Lead Designer,jane@company.com,user,2022-01-10,Design,Lead Designer,",
+      "Alice Chen,alice@company.com,Engineering,Staff Engineer,jane@company.com,user,2024-03-01,Engineering,Staff Engineer,",
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -263,6 +293,8 @@ export default function ImportPage() {
       manager_email: reverseMap["manager_email"] ? (row[reverseMap["manager_email"]] || "").trim().toLowerCase() : undefined,
       role: reverseMap["role"] ? (row[reverseMap["role"]] || "").trim().toLowerCase() : undefined,
       start_date: reverseMap["start_date"] ? (row[reverseMap["start_date"]] || "").trim() : undefined,
+      job_function: reverseMap["job_function"] ? (row[reverseMap["job_function"]] || "").trim() : undefined,
+      level: reverseMap["level"] ? (row[reverseMap["level"]] || "").trim() : undefined,
       avatar_url: reverseMap["avatar_url"] ? (row[reverseMap["avatar_url"]] || "").trim() : undefined,
     }));
 
@@ -298,6 +330,10 @@ export default function ImportPage() {
         }
       }
 
+      // Function / Level match
+      const resolved = resolveLevel(dbLevels, m.job_function, m.level);
+      if (resolved.warning) warnings.push(resolved.warning);
+
       // Manager match
       if (m.manager_email) {
         if (!EMAIL_RE.test(m.manager_email)) {
@@ -320,7 +356,7 @@ export default function ImportPage() {
         warnings.push(`info:role_default:Invalid role "${m.role}", will default to "user"`);
       }
 
-      return { ...m, matchedUserId, matchedManagerId, action, errors, warnings };
+      return { ...m, matchedUserId, matchedManagerId, resolvedLevelId: resolved.levelId, action, errors, warnings };
     });
 
     setValidated(validatedRows);
@@ -363,6 +399,7 @@ export default function ImportPage() {
         manager_email: row.manager_email || undefined,
         role: row.role && VALID_ROLES.includes(row.role) ? row.role : undefined,
         start_date: row.start_date || undefined,
+        level_id: row.resolvedLevelId || undefined,
         avatar_url: row.avatar_url || undefined,
       }));
 
