@@ -177,7 +177,7 @@ export default async function MyTeamPage() {
       />
 
       {unreachable > 0 && (
-        <NoticeBanner icon={AlertTriangle}>
+        <NoticeBanner icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
           <strong>
             {unreachable} of your reports {unreachable === 1 ? "has" : "have"} no Slack account
           </strong>{" "}

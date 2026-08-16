@@ -69,6 +69,11 @@ interface FlatRow {
   rating: number | null;
   /** The signed-in user owes this one — drives the "Yours" affordance. */
   mine: boolean;
+  /**
+   * Why this row can never progress, or null if it can. "Not Started" on a
+   * review nobody is able to write reads as work in the queue; it isn't.
+   */
+  blocked: string | null;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -108,14 +113,32 @@ function flattenCycle(g: CycleGroup, currentUserId: string): FlatRow[] {
   return g.items.map((r) => {
     const isUpward = r.assignment_type === "upward";
     const ownerId = isUpward ? r.reviewer_id : r.manager_id;
+    const owner = (isUpward ? r.reviewer : r.manager) ?? null;
+
+    // A row is blocked when a party it depends on cannot reach the product at
+    // all. Identity is keyed on slack_user_id, so someone without one can
+    // neither be DM'd nor sign in — their half of the review can never be
+    // written, no matter how long the cycle runs.
+    let blocked: string | null = null;
+    if (r.status !== "completed") {
+      if (!ownerId) {
+        blocked = isUpward ? "No reviewer assigned" : "No manager assigned";
+      } else if (!owner?.slack_user_id) {
+        blocked = `${owner?.slack_name ?? "The reviewer"} has no Slack account`;
+      } else if (!isUpward && !r.employee?.slack_user_id) {
+        blocked = `${r.employee?.slack_name ?? "The employee"} has no Slack account`;
+      }
+    }
+
     return {
       id: r.id,
       employee: r.employee ?? null,
-      reviewer: (isUpward ? r.reviewer : r.manager) ?? null,
+      reviewer: owner,
       type: isUpward ? ("upward" as const) : ("standard" as const),
       status: r.status,
       rating: r.overall_rating ?? null,
       mine: !!ownerId && ownerId === currentUserId,
+      blocked,
     };
   });
 }
@@ -275,19 +298,24 @@ function ReviewTable({
                       : "text-muted-foreground border-border bg-muted/50"
                   }`}
                 >
-                  {r.type === "upward" ? "Upward" : "Manager"}
+                  {r.type === "upward" ? "Upward" : "Self + Manager"}
                 </span>
               </div>
 
               <div className="hidden sm:block min-w-0">
-                <PersonCell user={r.reviewer} hint="No reviewer assigned" />
+                <PersonCell user={r.reviewer} hint="Nobody assigned" />
                 {/* Only an outstanding review is "yours to complete" — saying it
                     on a finished one reads as an action that is still owed. */}
-                {r.mine && r.status !== "completed" && (
+                {r.mine && r.status !== "completed" && !r.blocked && (
                   <span className="text-[10px] font-medium text-primary">Yours to complete</span>
                 )}
                 {r.mine && r.status === "completed" && (
                   <span className="text-[10px] text-muted-foreground/60">Reviewed by you</span>
+                )}
+                {r.blocked && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate block">
+                    {r.blocked}
+                  </span>
                 )}
               </div>
 
@@ -303,9 +331,18 @@ function ReviewTable({
                 )}
               </div>
 
-              <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>
-                {status.label}
-              </Badge>
+              {r.blocked ? (
+                <Badge
+                  className="text-[10px] font-medium shrink-0 text-muted-foreground bg-muted"
+                  title={r.blocked}
+                >
+                  Blocked
+                </Badge>
+              ) : (
+                <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>
+                  {status.label}
+                </Badge>
+              )}
 
               <Link
                 href={`/dashboard/reviews/${r.id}`}
@@ -451,10 +488,15 @@ export function ReviewsContent({
     const rows = sortRows(filtered);
     const totalAll = flat.length;
     const totalFiltered = rows.length;
-    const completed = filtered.filter((r) => r.status === "completed").length;
-    const pending = totalFiltered - completed;
-    const progress = totalFiltered === 0 ? 0 : Math.round((completed / totalFiltered) * 100);
-    return { cid, group: g, rows, totalAll, totalFiltered, completed, pending, progress };
+    const completed = rows.filter((r) => r.status === "completed").length;
+    // Blocked rows can never be completed, so counting them as "pending" both
+    // overstates the work queue and permanently caps the progress bar below
+    // 100%. Progress is measured against what is actually achievable.
+    const blocked = rows.filter((r) => r.blocked).length;
+    const pending = Math.max(totalFiltered - completed - blocked, 0);
+    const achievable = totalFiltered - blocked;
+    const progress = achievable <= 0 ? 0 : Math.round((completed / achievable) * 100);
+    return { cid, group: g, rows, totalAll, totalFiltered, completed, pending, blocked, progress };
   });
 
   // Default-collapse anything that isn't `active`. Re-evaluate when cycles
@@ -573,7 +615,7 @@ export function ReviewsContent({
           </div>
         )}
 
-        {visibleCycles.map(({ cid, group, rows, totalFiltered, totalAll, pending, progress }) => {
+        {visibleCycles.map(({ cid, group, rows, totalFiltered, totalAll, pending, blocked, progress }) => {
           const isCollapsed = collapsed.has(cid);
           const cycleStatus = group.cycle?.status ?? "draft";
           const tone = CYCLE_STATUS_TONE[cycleStatus] ?? CYCLE_STATUS_TONE.draft;
@@ -604,9 +646,17 @@ export function ReviewsContent({
                 )}
 
                 <span className="ml-auto flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
-                  {pending > 0 && (
+                  {pending > 0 && (cycleStatus === "active" || cycleStatus === "draft") && (
                     <span className="text-amber-600 dark:text-amber-400 font-medium">
                       {pending} pending
+                    </span>
+                  )}
+                  {blocked > 0 && (
+                    <span
+                      className="text-muted-foreground/70"
+                      title="These reviews can never be completed — a required person has no Slack account, or no reviewer is assigned."
+                    >
+                      {blocked} blocked
                     </span>
                   )}
                   <span>
