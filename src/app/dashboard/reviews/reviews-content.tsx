@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  COL_HEADER, HEAD_SHELL, ROW_SHELL, SortIcon, PersonAvatar, NoSlackBadge,
+} from "@/components/data-list";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -16,8 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import {
-  ArrowUpDown, ArrowUp, ArrowDown, Search, X, ChevronDown, ChevronRight,
-  FileText, Plus, Users as UsersIcon, ArrowUpCircle,
+  Search, X, ChevronDown, ChevronRight, FileText, Plus, ArrowRight, Star,
 } from "lucide-react";
 import Link from "next/link";
 import { getAssignmentStatus } from "@/lib/status";
@@ -30,6 +31,7 @@ type UserRef = {
   job_title?: string | null;
   department?: string | null;
   avatar_url?: string | null;
+  slack_user_id?: string | null;
 };
 
 type CycleRef = {
@@ -44,6 +46,10 @@ type ReviewItem = {
   id: string;
   status: string;
   assignment_type?: string | null;
+  overall_rating?: number | null;
+  employee_id?: string | null;
+  manager_id?: string | null;
+  reviewer_id?: string | null;
   employee?: UserRef | null;
   manager?: UserRef | null;
   reviewer?: UserRef | null;
@@ -51,8 +57,7 @@ type ReviewItem = {
 
 type CycleGroup = {
   cycle: CycleRef | null;
-  standard: ReviewItem[];
-  upward: ReviewItem[];
+  items: ReviewItem[];
 };
 
 interface FlatRow {
@@ -61,6 +66,9 @@ interface FlatRow {
   reviewer: UserRef | null;
   type: "standard" | "upward";
   status: string;
+  rating: number | null;
+  /** The signed-in user owes this one — drives the "Yours" affordance. */
+  mine: boolean;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -88,49 +96,28 @@ const CYCLE_STATUS_ORDER: Record<string, number> = {
   active: 0, draft: 1, completed: 2, closed: 3,
 };
 
-type SortKey = "employee" | "reviewer" | "status";
+type SortKey = "employee" | "reviewer" | "status" | "rating" | "type";
 type SortDir = "asc" | "desc";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function initialsOf(name: string | null | undefined): string {
-  if (!name) return "?";
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function flattenCycle(g: CycleGroup): FlatRow[] {
-  const out: FlatRow[] = [];
-  for (const r of g.standard) {
-    out.push({
+// A standard row is owned by the employee's manager; an upward row by the
+// named reviewer. Collapsing both into one "reviewer" field lets the two
+// review kinds share a single table instead of being split into two.
+function flattenCycle(g: CycleGroup, currentUserId: string): FlatRow[] {
+  return g.items.map((r) => {
+    const isUpward = r.assignment_type === "upward";
+    const ownerId = isUpward ? r.reviewer_id : r.manager_id;
+    return {
       id: r.id,
       employee: r.employee ?? null,
-      reviewer: r.manager ?? null,
-      type: "standard",
+      reviewer: (isUpward ? r.reviewer : r.manager) ?? null,
+      type: isUpward ? ("upward" as const) : ("standard" as const),
       status: r.status,
-    });
-  }
-  for (const r of g.upward) {
-    out.push({
-      id: r.id,
-      employee: r.employee ?? null,
-      reviewer: r.reviewer ?? null,
-      type: "upward",
-      status: r.status,
-    });
-  }
-  return out;
-}
-
-// ── Sort icon ────────────────────────────────────────────────────────────────
-
-function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
-  return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+      rating: r.overall_rating ?? null,
+      mine: !!ownerId && ownerId === currentUserId,
+    };
+  });
 }
 
 // ── Multi-select filter dropdown ─────────────────────────────────────────────
@@ -190,99 +177,163 @@ function MultiFilter({ label, options, selected, onChange }: MultiFilterProps) {
   );
 }
 
-// ── User cell ────────────────────────────────────────────────────────────────
+// ── Table ───────────────────────────────────────────────────────────────────
 
-function UserCell({ user, unassignedHint = "Not assigned" }: { user: UserRef | null; unassignedHint?: string }) {
+// Column count per breakpoint must match the number of visible cells, in DOM
+// order: Employee, Type, Reviewer, Rating, Status, arrow.
+const GRID =
+  "flex-1 min-w-0 grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1.5fr_1fr_auto_auto] md:grid-cols-[1.5fr_0.5fr_1fr_auto_auto] lg:grid-cols-[1.5fr_0.5fr_1fr_0.6fr_auto_auto] gap-4 items-center";
+
+function PersonCell({ user, hint }: { user: UserRef | null; hint: string }) {
   if (!user || !user.slack_name) {
-    return <span className="text-xs text-muted-foreground italic">{unassignedHint}</span>;
+    return <span className="text-xs text-muted-foreground/50 italic truncate">{hint}</span>;
   }
-  const initials = initialsOf(user.slack_name);
   return (
-    <div className="flex items-center gap-2 min-w-0">
-      <Avatar className="h-7 w-7 shrink-0">
-        {user.avatar_url && <AvatarImage src={user.avatar_url} alt={user.slack_name} />}
-        <AvatarFallback className="text-[10px] font-semibold">{initials}</AvatarFallback>
-      </Avatar>
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{user.slack_name}</p>
-        {user.department || user.job_title ? (
-          <p className="text-[11px] text-muted-foreground truncate">
-            {user.department || user.job_title}
-          </p>
-        ) : null}
-      </div>
+    <div className="min-w-0">
+      <p className="text-xs text-foreground truncate">{user.slack_name}</p>
+      {(user.department || user.job_title) && (
+        <p className="text-[10px] text-muted-foreground/60 truncate">
+          {user.department || user.job_title}
+        </p>
+      )}
     </div>
   );
 }
 
-// ── Per-group table (one for Standard, one for Upward) ──────────────────────
-
-interface ReviewTableProps {
+function ReviewTable({
+  rows,
+  sortKey,
+  sortDir,
+  onSort,
+  ratingMax,
+  onRowClick,
+}: {
   rows: FlatRow[];
   sortKey: SortKey;
   sortDir: SortDir;
   onSort: (key: SortKey) => void;
-  reviewerLabel: string;
+  ratingMax: number;
   onRowClick: (id: string) => void;
-}
-
-function ReviewTable({ rows, sortKey, sortDir, onSort, reviewerLabel, onRowClick }: ReviewTableProps) {
-  const colHeaderClass =
-    "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
+}) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="border-b border-border/60 bg-muted/[0.04]">
-          <tr className="text-left">
-            <th className="px-4 py-2 whitespace-nowrap" scope="col">
-              <button onClick={() => onSort("employee")} className={colHeaderClass}>
-                Employee <SortIcon active={sortKey === "employee"} dir={sortDir} />
-              </button>
-            </th>
-            <th className="px-4 py-2 whitespace-nowrap" scope="col">
-              <button onClick={() => onSort("reviewer")} className={colHeaderClass}>
-                {reviewerLabel} <SortIcon active={sortKey === "reviewer"} dir={sortDir} />
-              </button>
-            </th>
-            <th className="px-4 py-2 whitespace-nowrap text-right" scope="col">
-              <button onClick={() => onSort("status")} className={`${colHeaderClass} ml-auto`}>
-                Status <SortIcon active={sortKey === "status"} dir={sortDir} />
-              </button>
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/40">
-          {rows.map((r) => {
-            const status = getAssignmentStatus(r.status);
-            return (
-              <tr
-                key={r.id}
-                onClick={() => onRowClick(r.id)}
-                className="cursor-pointer hover:bg-muted/30 transition-colors"
+    <div className="space-y-0">
+      <div className={`${HEAD_SHELL} bg-muted/[0.04]`}>
+        <div className="w-8 shrink-0" />
+        <div className={GRID}>
+          <button onClick={() => onSort("employee")} className={COL_HEADER}>
+            Employee <SortIcon active={sortKey === "employee"} dir={sortDir} />
+          </button>
+          <button onClick={() => onSort("type")} className={`${COL_HEADER} hidden md:flex`}>
+            Type <SortIcon active={sortKey === "type"} dir={sortDir} />
+          </button>
+          <button onClick={() => onSort("reviewer")} className={`${COL_HEADER} hidden sm:flex`}>
+            Reviewer <SortIcon active={sortKey === "reviewer"} dir={sortDir} />
+          </button>
+          <button onClick={() => onSort("rating")} className={`${COL_HEADER} hidden lg:flex`}>
+            Rating <SortIcon active={sortKey === "rating"} dir={sortDir} />
+          </button>
+          <button onClick={() => onSort("status")} className={COL_HEADER}>
+            Status <SortIcon active={sortKey === "status"} dir={sortDir} />
+          </button>
+          <div className="w-8 shrink-0" />
+        </div>
+      </div>
+
+      {rows.map((r) => {
+        const status = getAssignmentStatus(r.status);
+        return (
+          <div
+            key={r.id}
+            onClick={() => onRowClick(r.id)}
+            className={`${ROW_SHELL} cursor-pointer ${r.mine ? "bg-primary/[0.03]" : ""}`}
+          >
+            <PersonAvatar
+              name={r.employee?.slack_name}
+              avatarUrl={r.employee?.avatar_url}
+              className="h-8 w-8"
+            />
+
+            <div className={GRID}>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {r.employee?.slack_name || "Unknown"}
+                  </p>
+                  {r.employee && !r.employee.slack_user_id && <NoSlackBadge />}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {r.employee?.job_title || r.employee?.department || "—"}
+                </p>
+              </div>
+
+              {/* Type — replaces the two separate tables this page used to have */}
+              <div className="hidden md:block min-w-0">
+                <span
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                    r.type === "upward"
+                      ? "text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10"
+                      : "text-muted-foreground border-border bg-muted/50"
+                  }`}
+                >
+                  {r.type === "upward" ? "Upward" : "Manager"}
+                </span>
+              </div>
+
+              <div className="hidden sm:block min-w-0">
+                <PersonCell user={r.reviewer} hint="No reviewer assigned" />
+                {/* Only an outstanding review is "yours to complete" — saying it
+                    on a finished one reads as an action that is still owed. */}
+                {r.mine && r.status !== "completed" && (
+                  <span className="text-[10px] font-medium text-primary">Yours to complete</span>
+                )}
+                {r.mine && r.status === "completed" && (
+                  <span className="text-[10px] text-muted-foreground/60">Reviewed by you</span>
+                )}
+              </div>
+
+              <div className="hidden lg:block min-w-0">
+                {r.rating != null ? (
+                  <p className="text-xs text-foreground font-medium tabular-nums flex items-center gap-1">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0" />
+                    {r.rating.toFixed(1)}
+                    <span className="text-muted-foreground font-normal">/ {ratingMax}</span>
+                  </p>
+                ) : (
+                  <span className="text-xs text-muted-foreground/40">—</span>
+                )}
+              </div>
+
+              <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>
+                {status.label}
+              </Badge>
+
+              <Link
+                href={`/dashboard/reviews/${r.id}`}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Open review for ${r.employee?.slack_name ?? "team member"}`}
+                className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
               >
-                <td className="px-4 py-2.5 align-middle">
-                  <UserCell user={r.employee} unassignedHint="Unknown" />
-                </td>
-                <td className="px-4 py-2.5 align-middle">
-                  <UserCell user={r.reviewer} />
-                </td>
-                <td className="px-4 py-2.5 align-middle whitespace-nowrap text-right">
-                  <Badge className={`text-[10px] font-medium ${status.badge}`}>
-                    {status.label}
-                  </Badge>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
+export function ReviewsContent({
+  cycles,
+  currentUserId,
+  ratingMax = 5,
+}: {
+  cycles: CycleGroup[];
+  currentUserId: string;
+  ratingMax?: number;
+}) {
   const router = useRouter();
 
   // ── Filters (client-side, page-level) ──────────────────────────────────────
@@ -363,7 +414,18 @@ export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
         case "status":
           cmp = a.status.localeCompare(b.status);
           break;
+        case "type":
+          cmp = a.type.localeCompare(b.type);
+          break;
+        case "rating":
+          // Unrated last regardless of direction is wrong for a sortable
+          // column, so treat null as the lowest value and let dir flip it.
+          cmp = (b.rating ?? -1) - (a.rating ?? -1);
+          break;
       }
+      // Reviews the signed-in user owes break ties to the top — that is the
+      // only row on this page they can actually act on.
+      if (cmp === 0 && a.mine !== b.mine) return a.mine ? -1 : 1;
       return sortDir === "asc" ? cmp : -cmp;
     });
     return copy;
@@ -384,16 +446,15 @@ export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
   const cyclesView = orderedCycles.map((g) => {
     const cid = g.cycle?.id ?? "__none__";
     const cycleAllowed = cycleFilter.size === 0 || (g.cycle && cycleFilter.has(g.cycle.id));
-    const flat = flattenCycle(g);
+    const flat = flattenCycle(g, currentUserId);
     const filtered = cycleAllowed ? flat.filter(rowMatches) : [];
-    const standard = sortRows(filtered.filter((r) => r.type === "standard"));
-    const upward = sortRows(filtered.filter((r) => r.type === "upward"));
+    const rows = sortRows(filtered);
     const totalAll = flat.length;
-    const totalFiltered = standard.length + upward.length;
+    const totalFiltered = rows.length;
     const completed = filtered.filter((r) => r.status === "completed").length;
     const pending = totalFiltered - completed;
     const progress = totalFiltered === 0 ? 0 : Math.round((completed / totalFiltered) * 100);
-    return { cid, group: g, standard, upward, totalAll, totalFiltered, completed, pending, progress };
+    return { cid, group: g, rows, totalAll, totalFiltered, completed, pending, progress };
   });
 
   // Default-collapse anything that isn't `active`. Re-evaluate when cycles
@@ -421,7 +482,7 @@ export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
 
   // ── Empty state (true zero — no assignments at all) ────────────────────────
 
-  if (cycles.length === 0 || cycles.every((g) => g.standard.length + g.upward.length === 0)) {
+  if (cycles.length === 0 || cycles.every((g) => g.items.length === 0)) {
     return (
       <div className="rounded-xl border border-dashed border-border/60 bg-card py-16 text-center">
         <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
@@ -512,7 +573,7 @@ export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
           </div>
         )}
 
-        {visibleCycles.map(({ cid, group, standard, upward, totalFiltered, totalAll, pending, progress }) => {
+        {visibleCycles.map(({ cid, group, rows, totalFiltered, totalAll, pending, progress }) => {
           const isCollapsed = collapsed.has(cid);
           const cycleStatus = group.cycle?.status ?? "draft";
           const tone = CYCLE_STATUS_TONE[cycleStatus] ?? CYCLE_STATUS_TONE.draft;
@@ -571,49 +632,19 @@ export function ReviewsContent({ cycles }: { cycles: CycleGroup[] }) {
               {/* Expanded body */}
               {!isCollapsed && (
                 <div className="bg-muted/[0.02]">
-                  {standard.length === 0 && upward.length === 0 ? (
+                  {rows.length === 0 ? (
                     <p className="px-6 py-6 text-xs text-center text-muted-foreground">
                       No reviews in this cycle match the current filters.
                     </p>
                   ) : (
-                    <>
-                      {standard.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 px-5 pt-3 pb-1.5 border-t border-border/40 first:border-t-0">
-                            <UsersIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Standard reviews · {standard.length}
-                            </span>
-                          </div>
-                          <ReviewTable
-                            rows={standard}
-                            sortKey={sortKey}
-                            sortDir={sortDir}
-                            onSort={handleSort}
-                            reviewerLabel="Manager"
-                            onRowClick={(id) => router.push(`/dashboard/reviews/${id}`)}
-                          />
-                        </div>
-                      )}
-                      {upward.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 px-5 pt-3 pb-1.5 border-t border-border/40">
-                            <ArrowUpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                              Upward reviews · {upward.length}
-                            </span>
-                          </div>
-                          <ReviewTable
-                            rows={upward}
-                            sortKey={sortKey}
-                            sortDir={sortDir}
-                            onSort={handleSort}
-                            reviewerLabel="Peer reviewer"
-                            onRowClick={(id) => router.push(`/dashboard/reviews/${id}`)}
-                          />
-                        </div>
-                      )}
-                    </>
+                    <ReviewTable
+                      rows={rows}
+                      sortKey={sortKey}
+                      sortDir={sortDir}
+                      onSort={handleSort}
+                      ratingMax={ratingMax}
+                      onRowClick={(id) => router.push(`/dashboard/reviews/${id}`)}
+                    />
                   )}
                 </div>
               )}
