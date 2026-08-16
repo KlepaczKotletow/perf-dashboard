@@ -48,6 +48,16 @@ const DEFAULT_ROLES = new Set(["admin", "hr", "user", "manager"]);
 // Sentinel for users with no department set, so the dropdown can offer
 // a checkbox for them. Empty string keeps the filter map keyed cleanly.
 const NO_DEPT = "";
+// Same idea for Function: users with no level (and therefore no job family)
+// stay filterable instead of being permanently in or out of every view.
+const NO_FUNCTION = "";
+
+/** Job family behind a user's level. PostgREST returns the embed as an object
+ *  or a single-element array depending on the query shape, hence the guard. */
+function familyOf(u: { level?: { job_family?: { name: string } | { name: string }[] | null } | null }): string | null {
+  const jf = Array.isArray(u.level?.job_family) ? u.level?.job_family[0] : u.level?.job_family;
+  return jf?.name ?? null;
+}
 
 interface TeamUser {
   id: string;
@@ -72,7 +82,7 @@ interface TeamListProps {
   filterUnassigned?: boolean;
 }
 
-type SortKey = "name" | "department" | "job_title" | "manager" | "start_date" | "role";
+type SortKey = "name" | "department" | "function" | "job_title" | "manager" | "start_date" | "role";
 type SortDir = "asc" | "desc";
 
 // Module-scope component (per react-hooks/static-components) — element type is
@@ -174,15 +184,29 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     ];
   }, [users]);
 
+  const functionOptions = useMemo(() => {
+    const named = [...new Set(users.map(familyOf).filter(Boolean) as string[])].sort();
+    const hasNone = users.some((u) => !familyOf(u));
+    return [
+      ...named.map((f) => ({ value: f, label: f })),
+      ...(hasNone ? [{ value: NO_FUNCTION, label: "(No function)" }] : []),
+    ];
+  }, [users]);
+
   // Defaults: every option is selected, except deactivated under Status.
   const defaultDeptFilter = useMemo(
     () => new Set(departmentOptions.map((o) => o.value)),
     [departmentOptions],
   );
+  const defaultFunctionFilter = useMemo(
+    () => new Set(functionOptions.map((o) => o.value)),
+    [functionOptions],
+  );
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<Set<string>>(() => new Set(DEFAULT_STATUS));
   const [departmentFilter, setDepartmentFilter] = useState<Set<string>>(() => new Set(defaultDeptFilter));
+  const [functionFilter, setFunctionFilter] = useState<Set<string>>(() => new Set(defaultFunctionFilter));
   const [roleFilter, setRoleFilter] = useState<Set<string>>(() => new Set(DEFAULT_ROLES));
 
   function toggleInSet(setter: React.Dispatch<React.SetStateAction<Set<string>>>, value: string) {
@@ -198,6 +222,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     setSearch("");
     setStatusFilter(new Set(DEFAULT_STATUS));
     setDepartmentFilter(new Set(defaultDeptFilter));
+    setFunctionFilter(new Set(defaultFunctionFilter));
     setRoleFilter(new Set(DEFAULT_ROLES));
   }
 
@@ -205,6 +230,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
     search.trim().length > 0 ||
     !setsEqual(statusFilter, DEFAULT_STATUS) ||
     !setsEqual(departmentFilter, defaultDeptFilter) ||
+    !setsEqual(functionFilter, defaultFunctionFilter) ||
     !setsEqual(roleFilter, DEFAULT_ROLES);
 
   const displayUsers = useMemo(() => {
@@ -214,9 +240,10 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
       const status = u.employee_status || "active";
       if (!statusFilter.has(status)) return false;
       if (!departmentFilter.has(u.department || NO_DEPT)) return false;
+      if (!functionFilter.has(familyOf(u) || NO_FUNCTION)) return false;
       if (!roleFilter.has(u.role || "user")) return false;
       if (q) {
-        const haystack = [u.slack_name, u.slack_email, u.job_title, u.department, u.manager?.slack_name]
+        const haystack = [u.slack_name, u.slack_email, u.job_title, u.department, u.manager?.slack_name, familyOf(u), u.level?.name]
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
@@ -224,7 +251,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
       }
       return true;
     });
-  }, [users, filterUnassigned, search, statusFilter, departmentFilter, roleFilter]);
+  }, [users, filterUnassigned, search, statusFilter, departmentFilter, functionFilter, roleFilter]);
 
   const sortedUsers = useMemo(() => {
     const sorted = [...displayUsers].sort((a, b) => {
@@ -238,6 +265,11 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
         case "department":
           aVal = (a.department || "zzz").toLowerCase();
           bVal = (b.department || "zzz").toLowerCase();
+          break;
+        case "function":
+          // Sort by family then level, so a function reads as a ladder.
+          aVal = `${familyOf(a) || "zzz"} ${a.level?.name || ""}`.toLowerCase();
+          bVal = `${familyOf(b) || "zzz"} ${b.level?.name || ""}`.toLowerCase();
           break;
         case "job_title":
           aVal = (a.job_title || "zzz").toLowerCase();
@@ -329,6 +361,15 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               onToggle={(v) => toggleInSet(setDepartmentFilter, v)}
             />
           )}
+          {functionOptions.length > 1 && (
+            <FilterDropdown
+              label="Function"
+              options={functionOptions}
+              selected={functionFilter}
+              defaultSelected={defaultFunctionFilter}
+              onToggle={(v) => toggleInSet(setFunctionFilter, v)}
+            />
+          )}
           <FilterDropdown
             label="Role"
             options={ROLE_OPTIONS}
@@ -368,17 +409,20 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
             />
           )}
           <div className="w-9 shrink-0" /> {/* Avatar spacer */}
-          <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+          <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.4fr_0.9fr_1fr_0.9fr_0.8fr_auto] xl:grid-cols-[1.4fr_0.85fr_1fr_0.9fr_0.8fr_0.75fr_auto] gap-4 items-center">
             <button onClick={() => handleSort("name")} className={colHeaderClass}>
               Name <SortIcon active={sortKey === "name"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("department")} className={`${colHeaderClass} hidden md:flex`}>
               Department <SortIcon active={sortKey === "department"} dir={sortDir} />
             </button>
+            <button onClick={() => handleSort("function")} className={`${colHeaderClass} hidden lg:flex`}>
+              Function <SortIcon active={sortKey === "function"} dir={sortDir} />
+            </button>
             <button onClick={() => handleSort("manager")} className={`${colHeaderClass} hidden lg:flex`}>
               Manager <SortIcon active={sortKey === "manager"} dir={sortDir} />
             </button>
-            <button onClick={() => handleSort("start_date")} className={`${colHeaderClass} hidden lg:flex`}>
+            <button onClick={() => handleSort("start_date")} className={`${colHeaderClass} hidden xl:flex`}>
               Start Date <SortIcon active={sortKey === "start_date"} dir={sortDir} />
             </button>
             <button onClick={() => handleSort("role")} className={`${colHeaderClass} hidden sm:flex`}>
@@ -416,7 +460,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               </Avatar>
             </Link>
 
-            <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.5fr_1fr_1fr_1fr_0.8fr_auto] gap-4 items-center">
+            <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.4fr_0.9fr_1fr_0.9fr_0.8fr_auto] xl:grid-cols-[1.4fr_0.85fr_1fr_0.9fr_0.8fr_0.75fr_auto] gap-4 items-center">
               {/* Name + title */}
               <Link href={`/dashboard/team/${user.id}`} className="min-w-0 group">
                 <div className="flex items-center gap-1.5">
@@ -443,18 +487,27 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
                 </p>
               </Link>
 
-              {/* Department + Competency bracket */}
+              {/* Department — the informal team name, free text */}
               <div className="min-w-0 hidden md:block">
                 <p className="text-xs text-muted-foreground truncate">{user.department || "—"}</p>
-                {user.level ? (() => {
-                  const jf = Array.isArray(user.level.job_family) ? user.level.job_family[0] : user.level.job_family;
-                  const familyPart = jf?.name ? `${jf.name} · ` : "";
-                  return (
-                    <p className="text-[10px] text-primary/50 truncate" title={`${familyPart}${user.level.name}`}>
-                      {familyPart}{user.level.name}
+              </div>
+
+              {/* Function — job family on top, level beneath. Its own column now
+                  rather than a subtitle under Department: they are different
+                  things (one is an informal team, the other the career ladder
+                  that drives competency ratings) and conflating them hid
+                  whichever mattered. */}
+              <div className="min-w-0 hidden lg:block">
+                {user.level ? (
+                  <>
+                    <p className="text-xs text-muted-foreground truncate" title={familyOf(user) || undefined}>
+                      {familyOf(user) || "—"}
                     </p>
-                  );
-                })() : (
+                    <p className="text-[10px] text-primary/50 truncate" title={user.level.name || undefined}>
+                      {user.level.name}
+                    </p>
+                  </>
+                ) : (
                   <p className="text-[10px] text-amber-500/70 italic truncate">No competency bracket</p>
                 )}
               </div>
@@ -467,7 +520,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
               </div>
 
               {/* Start Date + Tenure */}
-              <div className="min-w-0 hidden lg:block">
+              <div className="min-w-0 hidden xl:block">
                 {user.start_date ? (
                   <>
                     <p className="text-xs text-muted-foreground">{formatStartDate(user.start_date)}</p>
