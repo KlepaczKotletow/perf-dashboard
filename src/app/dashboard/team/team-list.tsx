@@ -70,6 +70,10 @@ interface TeamUser {
   start_date?: string | null;
   employee_status?: string | null;
   is_department_head?: boolean | null;
+  // Both drive readiness filters from the strip above the list. `manager` is
+  // the resolved display name; `manager_id` is what "has no manager" tests.
+  manager_id?: string | null;
+  slack_user_id?: string | null;
   manager?: { slack_name: string | null } | null;
   level?: { name: string | null; grade: string | null; job_family?: { name: string } | { name: string }[] | null } | null;
 }
@@ -79,7 +83,8 @@ interface TeamListProps {
   isAdmin: boolean;
   currentUserId?: string;
   workspaceId?: string;
-  filterUnassigned?: boolean;
+  /** "unassigned" | "no-manager" | "no-slack", from the readiness strip. */
+  readinessFilter?: string | null;
 }
 
 type SortKey = "name" | "department" | "function" | "job_title" | "manager" | "start_date" | "role";
@@ -167,7 +172,7 @@ function formatStartDate(startDate: string | null | undefined): string {
   return new Date(startDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUnassigned }: TeamListProps) {
+export function TeamList({ users, isAdmin, currentUserId, workspaceId, readinessFilter }: TeamListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -236,7 +241,9 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
   const displayUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
-      if (filterUnassigned && u.level) return false;
+      if (readinessFilter === "unassigned" && u.level) return false;
+      if (readinessFilter === "no-manager" && u.manager_id) return false;
+      if (readinessFilter === "no-slack" && u.slack_user_id) return false;
       const status = u.employee_status || "active";
       if (!statusFilter.has(status)) return false;
       if (!departmentFilter.has(u.department || NO_DEPT)) return false;
@@ -251,7 +258,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
       }
       return true;
     });
-  }, [users, filterUnassigned, search, statusFilter, departmentFilter, functionFilter, roleFilter]);
+  }, [users, readinessFilter, search, statusFilter, departmentFilter, functionFilter, roleFilter]);
 
   const sortedUsers = useMemo(() => {
     const sorted = [...displayUsers].sort((a, b) => {
@@ -391,7 +398,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
       </div>
 
       {/* Result count when any filter (URL or in-page) is active */}
-      {(isFiltered || filterUnassigned) && (
+      {(isFiltered || readinessFilter) && (
         <p className="text-xs text-muted-foreground -mt-1 mb-2">
           Showing <span className="font-medium text-foreground">{displayUsers.length}</span> of {users.length} member{users.length !== 1 ? "s" : ""}
         </p>
@@ -557,7 +564,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, filterUna
             <div className="mx-auto h-12 w-12 rounded-xl bg-muted flex items-center justify-center mb-4">
               <Users className="h-5 w-5 text-muted-foreground" />
             </div>
-            {isFiltered || filterUnassigned ? (
+            {isFiltered || readinessFilter ? (
               <>
                 <p className="text-sm font-medium text-foreground mb-1">No matches</p>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto">

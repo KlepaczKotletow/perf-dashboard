@@ -19,10 +19,49 @@ type TeamUserRow = {
   manager_id: string | null;
   is_department_head?: boolean | null;
   employee_status?: string | null;
+  slack_user_id?: string | null;
   level_id?: string | null;
   level?: { name: string | null; grade: string | null; job_family?: { name: string } | { name: string }[] | null } | null;
   manager?: { slack_name: string | null } | null;
 };
+
+/**
+ * One readiness count. Zero is rendered plainly rather than hidden — "0 no
+ * Slack account" is information, and a strip whose items appear and disappear
+ * is harder to read than one that stays put.
+ */
+function ReadinessItem({
+  count,
+  label,
+  hint,
+  filter,
+  active,
+}: {
+  count: number;
+  label: string;
+  hint: string;
+  filter: string;
+  active: boolean;
+}) {
+  if (count === 0) {
+    return (
+      <span className="text-muted-foreground tabular-nums">
+        <span className="font-semibold text-foreground">0</span> {label}
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={active ? "/dashboard/team" : `/dashboard/team?filter=${filter}`}
+      title={hint}
+      className={`tabular-nums underline-offset-2 transition-colors hover:text-foreground hover:underline ${
+        active ? "text-foreground font-medium underline" : "text-muted-foreground"
+      }`}
+    >
+      <span className="font-semibold text-amber-600 dark:text-amber-400">{count}</span> {label}
+    </Link>
+  );
+}
 
 async function getUsers(workspaceId: string): Promise<TeamUserRow[]> {
   const supabase = await createServerSupabaseClient();
@@ -82,7 +121,9 @@ export default async function TeamPage({
   searchParams: Promise<{ filter?: string; view?: string }>;
 }) {
   const params = await searchParams;
-  const filterUnassigned = params.filter === "unassigned";
+  // One of "unassigned" | "no-manager" | "no-slack", or null. Generalised from
+  // a single boolean so the readiness strip can drive the list.
+  const readinessFilter = params.filter ?? null;
   const viewChart = params.view === "chart";
 
   const workspace = await getUserWorkspace();
@@ -97,10 +138,26 @@ export default async function TeamPage({
   ]);
   const isAdmin = canManageUsers(workspace?.role);
   const seatLimit = subscription?.user_limit || 5;
-  const seatUsed = users.length;
+
+  // One canonical population, matching what billing actually counts
+  // (api/internal/seat-sync filters on `.neq("employee_status", "deactivated")`).
+  //
+  // The page used to show three mutually contradictory headcounts in one
+  // viewport: a seat meter over every row including deactivated people, a
+  // data-quality banner over that same unfiltered array, and a list that hides
+  // deactivated by default and said so nowhere. An admin checking headcount
+  // before launching a cycle could not trust any of the three.
+  const activeUsers = users.filter((u) => u.employee_status !== "deactivated");
+  const seatUsed = activeUsers.length;
   const seatPercent = Math.min(Math.round((seatUsed / seatLimit) * 100), 100);
 
-  const unassignedCount = users.filter((u) => !u.level).length;
+  // The three things that stop a cycle from working, counted over the same
+  // population. "No Slack account" is the one that guarantees a review never
+  // completes — Nami can create the assignment but can never deliver the DM —
+  // and it was invisible on the page whose whole job is fixing exactly this.
+  const noBracketCount = activeUsers.filter((u) => !u.level).length;
+  const noManagerCount = activeUsers.filter((u) => !u.manager_id).length;
+  const noSlackCount = activeUsers.filter((u) => !u.slack_user_id).length;
 
   const departments = [...new Set(users.map((u) => u.department).filter(Boolean))].sort() as string[];
 
@@ -109,7 +166,7 @@ export default async function TeamPage({
       <PageHeader
         hat="manage"
         title="Directory"
-        subtitle={`${users.length} member${users.length !== 1 ? "s" : ""}${departments.length > 0 ? ` across ${departments.length} department${departments.length !== 1 ? "s" : ""}` : ""}`}
+        subtitle={`${activeUsers.length} member${activeUsers.length !== 1 ? "s" : ""}${departments.length > 0 ? ` across ${departments.length} department${departments.length !== 1 ? "s" : ""}` : ""}`}
         actions={
           <div className="flex items-center gap-4">
             {/* Seat usage indicator */}
@@ -131,7 +188,7 @@ export default async function TeamPage({
                     style={{ width: `${seatPercent}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-muted-foreground">seats</span>
+                <span className="text-xs text-muted-foreground">seats</span>
               </div>
             </div>
             {/* View toggle */}
@@ -169,28 +226,55 @@ export default async function TeamPage({
         }
       />
 
-      {/* Unassigned warning banner */}
-      {isAdmin && unassignedCount > 0 && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:border-amber-400/20 dark:text-amber-400 text-sm">
-          <div className="flex items-center gap-2">
-            <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
-              <path d="M12 9v4"/>
-              <path d="M12 17h.01"/>
-            </svg>
-            <span>
-              <strong>{unassignedCount} {unassignedCount === 1 ? "person has" : "people have"} no competency bracket</strong>
-              {" "}— assign a Function &amp; Level so their reviews include competency ratings.
-            </span>
-          </div>
-          {filterUnassigned ? (
-            <Link href="/dashboard/team" className="shrink-0 text-xs font-medium underline underline-offset-2 whitespace-nowrap">
-              Show all
-            </Link>
+      {/* Readiness strip.
+          The Directory opened as N rows of fields, so it read as a database
+          dump however good the table was — nothing on the page said what it was
+          FOR. It is for getting the org clean enough to launch a cycle, so it
+          now opens with the three things that stop one from working, each of
+          them a filter. When all three are zero it says so and gets out of the
+          way, rather than disappearing and leaving the question unanswered. */}
+      {isAdmin && activeUsers.length > 0 && (
+        <div className="rounded-lg border border-border/60 bg-card/50 px-4 py-3">
+          {noBracketCount + noManagerCount + noSlackCount === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Ready to launch a cycle.</span>{" "}
+              Everyone has a manager, a competency bracket and a Slack account.
+            </p>
           ) : (
-            <Link href="/dashboard/team?filter=unassigned" className="shrink-0 text-xs font-medium underline underline-offset-2 whitespace-nowrap">
-              Show unassigned →
-            </Link>
+            <>
+              <p className="text-sm font-medium text-foreground mb-2">Before you launch a cycle</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+                <ReadinessItem
+                  count={noSlackCount}
+                  label="no Slack account"
+                  hint="Nami can't deliver their review"
+                  filter="no-slack"
+                  active={readinessFilter === "no-slack"}
+                />
+                <ReadinessItem
+                  count={noManagerCount}
+                  label="no manager"
+                  hint="nobody is assigned to review them"
+                  filter="no-manager"
+                  active={readinessFilter === "no-manager"}
+                />
+                <ReadinessItem
+                  count={noBracketCount}
+                  label="no competency bracket"
+                  hint="their review skips competency ratings"
+                  filter="unassigned"
+                  active={readinessFilter === "unassigned"}
+                />
+                {readinessFilter && (
+                  <Link
+                    href="/dashboard/team"
+                    className="text-xs font-medium underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                  >
+                    Show all
+                  </Link>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -226,7 +310,7 @@ export default async function TeamPage({
           isAdmin={isAdmin}
           currentUserId={workspace?.appUserId}
           workspaceId={workspace?.workspaceId}
-          filterUnassigned={filterUnassigned}
+          readinessFilter={readinessFilter}
         />
       )}
     </div>
