@@ -1,6 +1,8 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getUserWorkspace } from "@/lib/supabase-server";
 import { assertCanReview } from "@/lib/review-access";
+import { getReviewEvidence, EMPTY_REVIEW_EVIDENCE } from "@/lib/review-evidence";
+import { EvidenceRail } from "./evidence-rail";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -209,6 +211,25 @@ export default async function ReviewDetailPage({
     },
     currentUserId
   );
+  // Everything the reviewer would otherwise have to remember. Fetched only for
+  // someone who is actually a party to this review — a read-only viewer has no
+  // business seeing the subject's self-assessment and kudos laid out for them.
+  const rawEvidence =
+    access.role !== null
+      ? await getReviewEvidence(supabase, {
+          assignmentId: assignment.id,
+          employeeId: assignment.employee_id as string,
+          workspaceId: workspace.workspaceId,
+          cycleId: assignment.cycle_id as string,
+        })
+      : EMPTY_REVIEW_EVIDENCE;
+
+  // Someone writing their own self-review doesn't need "What Kacper said"
+  // quoting their own draft back at them. Goals, kudos and last cycle still
+  // help — those are the things you forget about your own year.
+  const evidence =
+    access.role === "self" ? { ...rawEvidence, selfAssessment: [] } : rawEvidence;
+
   const canEdit = access.canEdit;
   // Someone who may not write still gets a role for display where they have
   // one; the save path is never reached without `canEdit`.
@@ -322,6 +343,11 @@ export default async function ReviewDetailPage({
         </div>
       )}
 
+      {/* Form and evidence, side by side.
+          The rail is reference material, so it sits second in the DOM and
+          stacks below the form on narrow screens — a reviewer on a phone
+          shouldn't have to scroll past someone's goals to reach question one. */}
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] items-start">
       {/* Competency ratings section */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -346,6 +372,13 @@ export default async function ReviewDetailPage({
           canEdit={canEdit}
           status={assignment.status}
           maxRating={workspace.ratingScale?.max || 5}
+        />
+      </div>
+
+        <EvidenceRail
+          evidence={evidence}
+          employeeName={employee?.slack_name || "This person"}
+          ratingMax={workspace.ratingScale?.max || 5}
         />
       </div>
     </div>
