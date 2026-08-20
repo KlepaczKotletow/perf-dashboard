@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
+import { reviewHref } from "@/lib/review-links";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -235,7 +236,7 @@ export default async function MyTeamPage() {
                   </div>
                   <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>{status.label}</Badge>
                   <Button size="sm" className="h-7 text-xs shrink-0" asChild>
-                    <Link href={`/dashboard/cycles/${rev.cycleId}/review/${rev.assignmentId}`}>
+                    <Link href={reviewHref(rev.assignmentId)}>
                       Review <ArrowRight className="h-3 w-3 ml-1" />
                     </Link>
                   </Button>

@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
+import { reviewHref } from "@/lib/review-links";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -523,7 +524,7 @@ export default async function DashboardPage() {
                   </div>
                 </div>
                 <Button size="sm" className="shrink-0" asChild>
-                  <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
+                  <Link href={reviewHref(a.id)}>
                     Start <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                   </Link>
                 </Button>
@@ -643,7 +644,7 @@ export default async function DashboardPage() {
                         </Badge>
                       ) : t.selfDone ? (
                         <Button size="sm" variant="default" className="text-xs h-8" asChild>
-                          <Link href={`/dashboard/reviews/${t.id}`}>
+                          <Link href={reviewHref(t.id)}>
                             Review <ChevronRight className="h-3 w-3 ml-1" />
                           </Link>
                         </Button>
@@ -774,7 +775,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
               <Button size="sm" className="shrink-0" asChild>
-                <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
+                <Link href={reviewHref(a.id)}>
                   Start <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                 </Link>
               </Button>

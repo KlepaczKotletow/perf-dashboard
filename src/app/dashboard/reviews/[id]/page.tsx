@@ -1,6 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { getUserWorkspace } from "@/lib/supabase-server";
-import { isManagerOrAbove } from "@/lib/roles";
+import { assertCanReview } from "@/lib/review-access";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -45,28 +45,26 @@ export default async function ReviewDetailPage({
 
   if (!assignment) notFound();
 
-  // Determine reviewer role and edit permission based on the assignment relationship
   const currentUserId = workspace.appUserId;
-  const isAssignmentManager = assignment.manager_id === currentUserId;
   const isAssignmentEmployee = assignment.employee_id === currentUserId;
-  const isWorkspaceManager = isManagerOrAbove(workspace.role) || !!workspace.hasDirectReports;
-  const isUpwardReviewer =
-    assignment.assignment_type === "upward" &&
-    assignment.reviewer_id === currentUserId;
 
-  // Can edit if: you are the upward reviewer, the assigned manager, or an HR/admin-level role
-  const canEdit =
-    isUpwardReviewer ||
-    isAssignmentManager ||
-    (isWorkspaceManager && !isAssignmentEmployee);
-
-  // Role used when saving responses
-  const reviewerRole: "self" | "manager" | "upward" =
-    isUpwardReviewer
-      ? "upward"
-      : isAssignmentEmployee
-      ? "self"
-      : "manager";
+  // Everything `assertCanReview` needs that isn't already on the assignment.
+  // Both are cheap, and both are required before we can honestly tell the
+  // reviewer whether this form will accept a submission — the database's INSERT
+  // policy enforces the phase lock regardless, so a form that ignores it just
+  // fails at save time instead of saying so up front.
+  const [{ data: activePhases }, { data: mySubmissions }] = await Promise.all([
+    supabase
+      .from("cycle_phases")
+      .select("phase_type")
+      .eq("cycle_id", assignment.cycle_id)
+      .eq("status", "active"),
+    supabase
+      .from("review_responses")
+      .select("reviewer_role")
+      .eq("assignment_id", assignment.id)
+      .eq("reviewer_id", currentUserId),
+  ]);
 
   type LevelJoin = { id: string; name: string; grade: string | null; job_family?: { name: string } | { name: string }[] | null };
   type EmployeeRow = {
@@ -189,6 +187,33 @@ export default async function ReviewDetailPage({
     });
   }
 
+  // The single authorization gate, shared with the (now redirecting) cycles
+  // route and written to agree with the INSERT policy exactly.
+  //
+  // What this replaces: `canEdit = isUpwardReviewer || isAssignmentManager ||
+  // (isWorkspaceManager && !isAssignmentEmployee)`. That last clause handed an
+  // editable form to any HR user or anyone with direct reports, on anyone's
+  // review — and the database then refused the write, because the INSERT policy
+  // requires the writer to BE the party whose role they claim. The form looked
+  // fine and failed on submit.
+  const access = assertCanReview(
+    {
+      employeeId: assignment.employee_id,
+      managerId: assignment.manager_id,
+      reviewerId: assignment.reviewer_id,
+      assignmentType: assignment.assignment_type,
+      cycleStatus: (assignment.cycle as unknown as CycleJoin | null)?.status ?? null,
+      activePhaseTypes: (activePhases ?? []).map((p) => p.phase_type as string),
+      submittedRoles: (mySubmissions ?? []).map((r) => r.reviewer_role as string),
+      competencyCount: competencyRatings.length,
+    },
+    currentUserId
+  );
+  const canEdit = access.canEdit;
+  // Someone who may not write still gets a role for display where they have
+  // one; the save path is never reached without `canEdit`.
+  const reviewerRole = access.role ?? "manager";
+
   const level = (Array.isArray(employee?.level) ? employee?.level[0] : employee?.level) as LevelJoin | undefined;
   const cycle = assignment.cycle as unknown as CycleJoin | null;
   const manager = assignment.manager as unknown as ManagerJoin | null;
@@ -284,13 +309,16 @@ export default async function ReviewDetailPage({
         </div>
       )}
 
-      {/* Closed cycle notice */}
-      {cycle?.status === "closed" && (
-        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 flex items-center gap-2">
-          <Lock className="h-4 w-4 text-muted-foreground shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            This cycle has been closed. Reviews can no longer be submitted.
-          </p>
+      {/* Why this review can't be written.
+          One notice, driven by the typed reason from assertCanReview, instead
+          of the form quietly rendering read-only and leaving the reviewer to
+          work out why. The old "closed cycle" notice was the only one of these
+          cases the page acknowledged; the rest — not your review, phase not
+          open, already submitted, nothing configured — showed nothing at all. */}
+      {!access.canEdit && (
+        <div className="rounded-lg border border-border bg-muted/50 px-4 py-3 flex items-start gap-2">
+          <Lock className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <p className="text-sm text-muted-foreground">{access.message}</p>
         </div>
       )}
 

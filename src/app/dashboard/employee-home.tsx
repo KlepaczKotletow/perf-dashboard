@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { reviewHref } from "@/lib/review-links";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -83,7 +84,7 @@ export function EmployeeHome({ firstName, assignments, recentFeedback }: Employe
                 </div>
               </div>
               <Button size="sm" className="shrink-0" asChild>
-                <Link href={`/dashboard/cycles/${a.cycle?.id}/review/${a.id}`}>
+                <Link href={reviewHref(a.id)}>
                   Start <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
                 </Link>
               </Button>
