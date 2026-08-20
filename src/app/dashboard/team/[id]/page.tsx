@@ -19,6 +19,22 @@ function getInitials(name: string | null) {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 }
 
+/**
+ * What kind of review a row actually is. The database only ever writes
+ * 'standard' and 'upward' today — 'self' and 'peer' have never been generated —
+ * but all four are labelled so the column stays honest when they are.
+ */
+const ASSIGNMENT_TYPE_LABEL: Record<string, string> = {
+  standard: "Manager review",
+  upward: "Upward feedback",
+  self: "Self-review",
+  peer: "Peer review",
+};
+
+function assignmentTypeLabel(type: string | null | undefined): string {
+  return (type && ASSIGNMENT_TYPE_LABEL[type]) || "Review";
+}
+
 // ── Data Fetching ────────────────────────────────────────────────────────────
 
 async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedback: boolean) {
@@ -48,7 +64,7 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
     supabase
       .from("review_assignments")
       .select(`
-        id, status, overall_rating, final_grade, created_at, updated_at,
+        id, status, overall_rating, final_grade, created_at, updated_at, assignment_type,
         cycle:performance_cycles!review_assignments_cycle_id_fkey(id, name, status, start_date, end_date, grades_released, workspace_id),
         manager:users!review_assignments_manager_id_fkey(slack_name)
       `)
@@ -77,6 +93,10 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
     final_grade: string | null;
     created_at: string | null;
     updated_at: string | null;
+    // Without this, a manager review and an upward review of the same person in
+    // the same cycle render as two identical rows, one of them labelled
+    // "Manager: —". It reads as a duplicate; it never was one.
+    assignment_type: string | null;
     cycle?: CycleJoin | null;
     manager?: { slack_name: string | null } | null;
   };
@@ -132,10 +152,12 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
     }))
     .sort((a, b) => parseFloat(b.avg) - parseFloat(a.avg));
 
-  const allRatings = reviewResponses.filter((r) => r.rating).map((r) => r.rating as number);
-  const overallAvg = allRatings.length > 0
-    ? (allRatings.reduce((a, b) => a + b, 0) / allRatings.length).toFixed(1)
-    : null;
+  // No pooled `overallAvg` any more. It averaged every rating from every
+  // reviewer role across every cycle into a single figure — mixing a manager's
+  // assessment with upward feedback about a different person's management — and
+  // then presented it as "2.3 / 5 avg". The header now reports the last manager
+  // rating and its direction of travel instead, which is the question the page
+  // is actually opened to answer.
 
   return {
     user,
@@ -145,7 +167,6 @@ async function getEmployeeDetails(id: string, workspaceId: string, showAllFeedba
     directReports: directReportsRes.data || [],
     goals: goalsRes.data || [],
     skillAverages,
-    overallAvg,
   };
 }
 
@@ -169,12 +190,40 @@ export default async function EmployeeProfilePage({
   const data = await getEmployeeDetails(id, workspace.workspaceId, canSeeAllRatings);
   if (!data) notFound();
 
-  const { user, manager, reviewAssignments, continuousFeedback, directReports, goals, skillAverages, overallAvg } = data;
+  const { user, manager, reviewAssignments, continuousFeedback, directReports, goals, skillAverages } = data;
 
   type GoalRow = { id: string; title: string; description: string | null; status: string; progress: number | null; weight: number | null; metric_start: number | null; metric_current: number | null; metric_target: number | null; metric_unit: string | null; tracking_status: string | null; scope: string; due_date: string | null };
-  const activeGoals = (goals as GoalRow[]).filter((g) => g.status !== "completed" && g.status !== "cancelled");
   const gradesReleasedForAny = reviewAssignments.some((a) => a.cycle?.grades_released);
   const showRating = canSeeAllRatings || (isViewingOwnProfile && gradesReleasedForAny);
+
+  // ── Trajectory ──────────────────────────────────────────────────────────
+  // The old header read "2.3 / 5 avg", pooling every reviewer's score across
+  // every cycle into one number that answers no question anyone asks. What a
+  // manager opens this page for is "how is this person doing, and what
+  // changed" — so: the last manager rating, and the direction of travel.
+  //
+  // Upward feedback is excluded. It rates the manager, not the employee;
+  // averaging it into their score was part of what made the old number
+  // meaningless.
+  const ratingHistory = reviewAssignments
+    .filter((a) => a.overall_rating != null && a.assignment_type !== "upward")
+    .sort((a, b) => {
+      const at = a.cycle?.start_date ? new Date(a.cycle.start_date).getTime() : 0;
+      const bt = b.cycle?.start_date ? new Date(b.cycle.start_date).getTime() : 0;
+      return bt - at;
+    });
+  const latestRated = ratingHistory[0] ?? null;
+  const previousRated = ratingHistory[1] ?? null;
+  const ratingDelta =
+    latestRated?.overall_rating != null && previousRated?.overall_rating != null
+      ? Number(latestRated.overall_rating) - Number(previousRated.overall_rating)
+      : null;
+
+  const levelLabelParts = [
+    (user.level as { job_family?: { name?: string | null } | null } | null)?.job_family?.name,
+    (user.level as { name?: string | null } | null)?.name,
+  ].filter(Boolean);
+  const levelLabel = levelLabelParts.length > 0 ? levelLabelParts.join(" · ") : null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -197,13 +246,18 @@ export default async function EmployeeProfilePage({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
+              {/* The one deliberate serif moment in the product. Fraunces is
+                  already loaded and tokenised and was used on no product
+                  surface at all; setting a person's name in it costs nothing
+                  and is the difference between a page that looks generated and
+                  one that looks made. */}
+              <h1 className="font-serif text-[2rem] font-semibold tracking-tight text-foreground leading-[1.1]">
                 {user.slack_name || "Unknown"}
               </h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {[user.job_title, user.department].filter(Boolean).join(" · ") || "No title"}
               </p>
-              <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-muted-foreground">
                 {manager?.slack_name && (
                   <span>
                     Reports to{" "}
@@ -244,30 +298,49 @@ export default async function EmployeeProfilePage({
         </div>
       </div>
 
-      {/* ── 2. Stats row ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-4 text-sm border-y border-border/40 py-3">
-        {showRating && overallAvg && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-lg font-bold text-foreground">{overallAvg}</span>
-            <span className="text-muted-foreground">/ {ratingMax} avg</span>
-          </div>
-        )}
-        <span className="text-muted-foreground">
-          <span className="font-semibold text-foreground">{reviewAssignments.length}</span> {reviewAssignments.length === 1 ? "review" : "reviews"}
-        </span>
-        <span className="text-muted-foreground">
-          <span className="font-semibold text-foreground">{activeGoals.length}</span> active {activeGoals.length === 1 ? "goal" : "goals"}
-        </span>
-        {showKudosSection && continuousFeedback.length > 0 && (
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{continuousFeedback.length}</span> kudos
-          </span>
-        )}
-        {directReports.length > 0 && (
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground">{directReports.length}</span> direct {directReports.length === 1 ? "report" : "reports"}
-          </span>
-        )}
+      {/* ── 2. Trajectory ─────────────────────────────────────────────────
+          One sentence, not five equal facts and not a row of stat tiles: what
+          band this person is in, where their last rating landed, and which way
+          it moved. Everything else that used to sit here (review count, goal
+          count, kudos count) is a heading below — counting it twice was noise. */}
+      <div className="border-y border-border/40 py-3 text-sm tabular-nums">
+        <p className="text-foreground leading-relaxed">
+          {levelLabel && <span className="font-semibold">{levelLabel}</span>}
+          {showRating && latestRated?.overall_rating != null ? (
+            <>
+              {levelLabel && <span className="text-muted-foreground"> · </span>}
+              <span className="font-semibold">{latestRated.overall_rating}/{ratingMax}</span>
+              <span className="text-muted-foreground"> last cycle</span>
+              {ratingDelta !== null && (
+                <span
+                  className={
+                    ratingDelta > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : ratingDelta < 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"
+                  }
+                >
+                  {ratingDelta > 0 ? ", up from " : ratingDelta < 0 ? ", down from " : ", unchanged from "}
+                  {previousRated?.overall_rating}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              {levelLabel && <span className="text-muted-foreground"> · </span>}
+              <span className="text-muted-foreground">
+                {reviewAssignments.length === 0 ? "No reviews yet" : "No rating released yet"}
+              </span>
+            </>
+          )}
+          {directReports.length > 0 && (
+            <span className="text-muted-foreground">
+              {" · "}
+              {directReports.length} direct {directReports.length === 1 ? "report" : "reports"}
+            </span>
+          )}
+        </p>
       </div>
 
       {/* ── 3. Performance History ────────────────────────────────────────── */}
@@ -278,8 +351,9 @@ export default async function EmployeeProfilePage({
         ) : (
           <div className="border border-border/40 rounded-lg overflow-hidden">
             {/* Table header */}
-            <div className="grid grid-cols-[3fr_1fr_1fr_1fr_1fr] gap-3 px-4 py-2 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            <div className="grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_1fr_1fr] gap-3 px-4 py-2 bg-muted/30 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               <span>Cycle</span>
+              <span>Type</span>
               <span>Period</span>
               <span className="text-center">Rating</span>
               <span className="text-center">Grade</span>
@@ -300,14 +374,19 @@ export default async function EmployeeProfilePage({
               return (
                 <div
                   key={a.id}
-                  className="grid grid-cols-[3fr_1fr_1fr_1fr_1fr] gap-3 px-4 py-3 border-t border-border/30 hover:bg-muted/20 transition-colors items-center"
+                  className="grid grid-cols-[2.4fr_1.2fr_1fr_0.8fr_1fr_1fr] gap-3 px-4 py-3 border-t border-border/30 hover:bg-muted/20 transition-colors items-center"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{a.cycle?.name || "Unknown Cycle"}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">Manager: {a.manager?.slack_name || "—"}</p>
+                    {/* Upward feedback has no manager of record, and printing
+                        "Manager: —" against it made a valid row look broken. */}
+                    {a.manager?.slack_name && (
+                      <p className="text-xs text-muted-foreground truncate">{a.manager.slack_name}</p>
+                    )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{dateRange}</span>
-                  <span className="text-sm font-semibold text-foreground text-center">
+                  <span className="text-xs text-muted-foreground truncate">{assignmentTypeLabel(a.assignment_type)}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums">{dateRange}</span>
+                  <span className="text-sm font-semibold text-foreground text-center tabular-nums">
                     {canSeeThis && a.overall_rating ? `${a.overall_rating}/${ratingMax}` : "—"}
                   </span>
                   <div className="text-center">
@@ -318,7 +397,7 @@ export default async function EmployeeProfilePage({
                     )}
                   </div>
                   <div className="text-right">
-                    <Badge className={`text-[10px] font-medium ${config.badge}`}>{config.label}</Badge>
+                    <Badge className={`text-xs font-medium ${config.badge}`}>{config.label}</Badge>
                   </div>
                 </div>
               );
@@ -344,7 +423,7 @@ export default async function EmployeeProfilePage({
                   <div key={goal.id} className="px-3 py-2.5 rounded-lg border border-border/30 hover:border-border/60 transition-colors">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <p className={`text-sm font-medium truncate ${isCompleted ? "text-muted-foreground line-through" : "text-foreground"}`}>{goal.title}</p>
-                      <Badge className={`text-[9px] shrink-0 ${tracking.badge}`}>{tracking.label}</Badge>
+                      <Badge className={`text-xs shrink-0 ${tracking.badge}`}>{tracking.label}</Badge>
                     </div>
                     {/* Progress bar */}
                     <div className="flex items-center gap-2">
@@ -360,10 +439,10 @@ export default async function EmployeeProfilePage({
                           style={{ width: `${Math.min(progress, 100)}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-medium w-8 text-right">{progress}%</span>
+                      <span className="text-xs text-muted-foreground font-medium w-8 text-right">{progress}%</span>
                     </div>
                     {goal.due_date && (
-                      <p className="text-[10px] text-muted-foreground mt-1">Due {format(new Date(goal.due_date), "MMM d")}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Due {format(new Date(goal.due_date), "MMM d")}</p>
                     )}
                   </div>
                 );
@@ -379,20 +458,56 @@ export default async function EmployeeProfilePage({
             {skillAverages.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4">No competency data yet — ratings appear after reviews are submitted.</p>
             ) : (
-              <div className="space-y-2">
-                {skillAverages.map((skill) => {
-                  const pct = (parseFloat(skill.avg) / ratingMax) * 100;
+              /* Grouped by category rather than listed flat.
+                 Seven identical full-width bars in one column give every
+                 competency the same visual weight and no shape — you have to
+                 read all seven to learn anything. Revolut's scorecard collapses
+                 the same information into a few named pillars, each carrying a
+                 headline figure, and that is what this is: the group average
+                 answers "how are they doing", the rows underneath answer "on
+                 what". The category is a heading now instead of a 10px caption
+                 repeated on every row. */
+              <div className="space-y-4">
+                {Object.entries(
+                  skillAverages.reduce<Record<string, typeof skillAverages>>((groups, skill) => {
+                    const key = skill.category || "General";
+                    (groups[key] ||= []).push(skill);
+                    return groups;
+                  }, {})
+                ).map(([category, skills]) => {
+                  const groupAvg =
+                    skills.reduce((sum, s) => sum + parseFloat(s.avg), 0) / skills.length;
                   return (
-                    <div key={skill.name} className="px-3 py-2.5 rounded-lg border border-border/30">
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{skill.name}</p>
-                          {skill.category && <p className="text-[10px] text-muted-foreground">{skill.category}</p>}
-                        </div>
-                        <span className="text-sm font-semibold text-foreground shrink-0">{skill.avg}/{ratingMax}</span>
+                    <div key={category}>
+                      <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {category}
+                        </h3>
+                        <span className="text-sm font-semibold text-foreground tabular-nums">
+                          {groupAvg.toFixed(1)}
+                          <span className="text-muted-foreground font-normal">/{ratingMax}</span>
+                        </span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+                      <div className="rounded-lg border border-border/30 divide-y divide-border/30">
+                        {skills.map((skill) => {
+                          const pct = (parseFloat(skill.avg) / ratingMax) * 100;
+                          return (
+                            <div key={skill.name} className="px-3 py-2">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <p className="text-sm truncate">{skill.name}</p>
+                                <span className="text-sm font-medium text-foreground shrink-0 tabular-nums">
+                                  {skill.avg}
+                                </span>
+                              </div>
+                              <div className="h-1 rounded-full bg-muted overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-primary transition-all"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -422,7 +537,7 @@ export default async function EmployeeProfilePage({
                       <span className="text-xs font-semibold text-foreground">
                         {f.is_anonymous ? "Anonymous" : fromUser?.slack_name || "Unknown"}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{format(new Date(f.created_at), "MMM d, yyyy")}</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(f.created_at), "MMM d, yyyy")}</span>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed">{f.message}</p>
                   </div>
@@ -449,7 +564,7 @@ export default async function EmployeeProfilePage({
               >
                 <Avatar className="h-6 w-6">
                   {report.avatar_url && <AvatarImage src={report.avatar_url} alt={report.slack_name || ""} />}
-                  <AvatarFallback className="text-[10px] bg-primary/[0.08] text-primary">
+                  <AvatarFallback className="text-xs bg-primary/[0.08] text-primary">
                     {getInitials(report.slack_name)}
                   </AvatarFallback>
                 </Avatar>
