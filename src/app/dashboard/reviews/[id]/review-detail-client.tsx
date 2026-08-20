@@ -109,6 +109,19 @@ export function ReviewDetailClient({
   const totalCount = initialRatings.length;
   const allRated = ratedCount === totalCount && totalCount > 0;
 
+  // Whether "Save draft" has anything to do. This used to be `ratedCount === 0`,
+  // which disabled the button for a reviewer who had written comments but not
+  // yet scored anything — so the one person whose work most needed saving
+  // couldn't save it. A comment is work; a rating is work.
+  const hasUnsavedWork = initialRatings.some((c) => {
+    const entry = ratings[c.competencyId];
+    return shouldPersistResponse({
+      rating: entry.rating,
+      comment: entry.comment,
+      hasExistingRow: Boolean(c.existingResponseId),
+    });
+  });
+
   // Warn before navigating away with unsaved work
   useEffect(() => {
     if (!isDirty || !canEdit) return;
@@ -454,7 +467,7 @@ export function ReviewDetailClient({
                 variant="outline"
                 size="sm"
                 onClick={() => handleSave(false)}
-                disabled={saving || ratedCount === 0}
+                disabled={saving || !hasUnsavedWork}
               >
                 {saving && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 Save draft
