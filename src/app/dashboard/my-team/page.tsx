@@ -1,5 +1,6 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
 import { reviewHref } from "@/lib/review-links";
+import { isOwedBy } from "@/lib/review-queue";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
@@ -162,9 +163,37 @@ export default async function MyTeamPage() {
   });
 
   // Everything the signed-in manager personally owes, across their reports.
-  const myPending = rows
-    .filter((r) => r.review && r.review.mine && r.review.status !== "completed")
-    .map((r) => r.review!);
+  //
+  // Derived from the assignments themselves rather than from `rows`. Each row
+  // carries at most one review (a table of people shows one per person), so
+  // building the count from rows meant a report with assignments in two active
+  // cycles was counted once — and the list below then had to look the person
+  // back up with a non-null assertion that would throw for any assignment the
+  // row hadn't picked.
+  //
+  // `isOwedBy` is the shared definition, so this number means the same thing as
+  // the one on the personal queue even though the two surfaces scope differently.
+  const reportById = new Map(reports.map((r) => [r.id, r]));
+  const myPending = assignments
+    .filter((a) =>
+      isOwedBy(
+        {
+          employeeId: a.employee_id,
+          managerId: a.manager_id ?? null,
+          reviewerId: a.reviewer_id ?? null,
+          assignmentType: a.assignment_type,
+          status: a.status,
+          cycleStatus: a.cycle?.status ?? null,
+        },
+        userId
+      )
+    )
+    .map((a) => ({
+      assignmentId: a.id,
+      employeeId: a.employee_id,
+      cycleName: a.cycle?.name ?? null,
+      status: a.status,
+    }));
 
   const unreachable = rows.filter((r) => !r.hasSlack).length;
   const activeGoalTotal = rows.reduce((s, r) => s + r.activeGoals, 0);
@@ -221,20 +250,20 @@ export default async function MyTeamPage() {
           </h2>
           <div className="rounded-lg border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
             {myPending.map((rev) => {
-              const person = rows.find((r) => r.review?.assignmentId === rev.assignmentId)!;
+              const person = reportById.get(rev.employeeId);
               const status = getAssignmentStatus(rev.status);
               return (
                 <div key={rev.assignmentId} className="flex items-center gap-3 px-4 py-3">
-                  <PersonAvatar name={person.name} avatarUrl={person.avatarUrl} className="h-8 w-8" />
+                  <PersonAvatar name={person?.slack_name ?? null} avatarUrl={person?.avatar_url ?? null} className="h-8 w-8" />
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-foreground block truncate">
-                      {person.name || "Unknown"}
+                      {person?.slack_name || "Unknown"}
                     </span>
                     <span className="text-xs text-muted-foreground block truncate">
                       Manager review · {rev.cycleName || "Current cycle"}
                     </span>
                   </div>
-                  <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>{status.label}</Badge>
+                  <Badge className={`text-xs font-medium shrink-0 ${status.badge}`}>{status.label}</Badge>
                   <Button size="sm" className="h-7 text-xs shrink-0" asChild>
                     <Link href={reviewHref(rev.assignmentId)}>
                       Review <ArrowRight className="h-3 w-3 ml-1" />
