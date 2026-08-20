@@ -29,21 +29,24 @@ const PROFICIENCY_LABELS: Record<number, string> = {
   5: "Outstanding",
 };
 
-const ratingColors: Record<number, string> = {
-  1: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200",
-  2: "bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200",
-  3: "bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200",
-  4: "bg-green-100 text-green-700 border-green-200 hover:bg-green-200",
-  5: "bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200",
-};
-
-const selectedRatingColors: Record<number, string> = {
-  1: "bg-red-500 text-white border-red-500",
-  2: "bg-orange-500 text-white border-orange-500",
-  3: "bg-yellow-500 text-white border-yellow-500",
-  4: "bg-green-500 text-white border-green-500",
-  5: "bg-emerald-500 text-white border-emerald-500",
-};
+// The rating scale is deliberately NOT colour-coded.
+//
+// It used to run red → orange → yellow → green → emerald, which tells a
+// reviewer which answers are socially acceptable before they have formed a
+// judgement: 1 and 2 are painted as failure states, so they become
+// unpickable and everyone lands on 3-4. Revolut's own scorecard doesn't
+// colour its scale either — the only colour on it is the final grade.
+//
+// Re-keying the ramp to below/at/above expected is not a fix, it is a
+// stronger anchor: it flashes a warning colour at the exact moment someone is
+// being honest about underperformance. The selected state is the product's
+// neutral primary, and the expected level is marked separately and statically.
+const RATING_OPTION_BASE =
+  "flex-1 h-10 rounded-md text-sm font-semibold border transition-colors " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 cursor-pointer";
+const RATING_OPTION_IDLE =
+  "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground";
+const RATING_OPTION_SELECTED = "bg-primary text-primary-foreground border-primary";
 
 export interface CompetencyRating {
   competencyId: string;
@@ -297,10 +300,10 @@ export function ReviewDetailClient({
                       </div>
                       {comp.expectedLevel && (
                         <div className="shrink-0 text-right">
-                          <p className="text-[10px] text-muted-foreground">Expected</p>
+                          <p className="text-xs text-muted-foreground">Expected</p>
                           <div className="flex items-center gap-1 justify-end mt-0.5">
                             <span className="text-xs font-semibold">{comp.expectedLevel}</span>
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               · {PROFICIENCY_LABELS[comp.expectedLevel]}
                             </span>
                           </div>
@@ -312,37 +315,70 @@ export function ReviewDetailClient({
                     {/* Rating — full 1-5 picker when editable, quiet single chip when read-only */}
                     {canEdit ? (
                       <div>
-                        <p className="text-[10px] text-muted-foreground mb-2 font-medium uppercase tracking-wide">
+                        <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wide">
                           Rating
                         </p>
-                        <div className="flex gap-1.5">
-                          {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
-                            <button
-                              key={v}
-                              onClick={() => setRating(comp.competencyId, rating === v ? null : v)}
-                              className={`flex-1 h-9 rounded-md text-xs font-semibold border transition-all cursor-pointer ${
-                                rating === v
-                                  ? (selectedRatingColors[v] || "bg-primary text-white border-primary")
-                                  : (ratingColors[v] || "bg-muted text-foreground border-border hover:bg-muted/80")
-                              }`}
-                              title={`${v}${PROFICIENCY_LABELS[v] ? ` · ${PROFICIENCY_LABELS[v]}` : ""}`}
-                            >
-                              {v}
-                            </button>
-                          ))}
+                        {/* A real radiogroup, not five bare buttons. Arrow keys
+                            move between options and only the active option is
+                            in the tab order (the WAI-ARIA roving-tabindex
+                            pattern), so a keyboard or screen-reader user can
+                            actually complete a review. */}
+                        <div
+                          role="radiogroup"
+                          aria-label={`Rating for ${comp.competencyName}`}
+                          className="flex gap-1.5"
+                          onKeyDown={(e) => {
+                            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" &&
+                                e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                            e.preventDefault();
+                            const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : -1;
+                            const current = rating ?? 0;
+                            const next = Math.min(maxRating, Math.max(1, current + step));
+                            setRating(comp.competencyId, next);
+                          }}
+                        >
+                          {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => {
+                            const isSelected = rating === v;
+                            // Exactly one option is tabbable: the selected one,
+                            // or the first when nothing is chosen yet.
+                            const isTabStop = isSelected || (rating === null && v === 1);
+                            return (
+                              <button
+                                key={v}
+                                type="button"
+                                role="radio"
+                                aria-checked={isSelected}
+                                tabIndex={isTabStop ? 0 : -1}
+                                onClick={() => setRating(comp.competencyId, isSelected ? null : v)}
+                                className={`${RATING_OPTION_BASE} ${isSelected ? RATING_OPTION_SELECTED : RATING_OPTION_IDLE}`}
+                              >
+                                <span className="tabular-nums">{v}</span>
+                                <span className="sr-only">
+                                  {PROFICIENCY_LABELS[v] ? ` — ${PROFICIENCY_LABELS[v]}` : ""}
+                                  {comp.expectedLevel === v ? " (expected level)" : ""}
+                                </span>
+                              </button>
+                            );
+                          })}
                         </div>
+                        {/* The expected level is marked on the track itself and
+                            never changes colour with the choice, so it reads as
+                            a reference point rather than a verdict on the
+                            answer you just gave. */}
+                        {comp.expectedLevel && (
+                          <div className="flex gap-1.5 mt-1" aria-hidden="true">
+                            {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
+                              <div key={v} className="flex-1 flex justify-center">
+                                {comp.expectedLevel === v && (
+                                  <span className="text-xs text-muted-foreground">expected</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {rating !== null && (
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            {rating} · {PROFICIENCY_LABELS[rating]}
-                            {comp.expectedLevel && rating < comp.expectedLevel && (
-                              <span className="text-amber-600 ml-1">— below expected</span>
-                            )}
-                            {comp.expectedLevel && rating === comp.expectedLevel && (
-                              <span className="text-primary ml-1">— meets expectation</span>
-                            )}
-                            {comp.expectedLevel && rating > comp.expectedLevel && (
-                              <span className="text-emerald-600 ml-1">— exceeds expectation</span>
-                            )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {PROFICIENCY_LABELS[rating]}
                           </p>
                         )}
                       </div>
@@ -350,24 +386,20 @@ export function ReviewDetailClient({
                       <p className="text-xs text-muted-foreground italic">Not yet rated</p>
                     ) : (
                       <div className="flex items-center gap-2 text-xs">
-                        <span
-                          className={`inline-flex items-center justify-center h-6 w-6 rounded-md text-xs font-semibold ${
-                            selectedRatingColors[rating] || "bg-primary text-white"
-                          }`}
-                        >
+                        <span className="inline-flex items-center justify-center h-6 w-6 rounded-md text-xs font-semibold tabular-nums bg-primary text-primary-foreground">
                           {rating}
                         </span>
                         <span className="text-foreground font-medium">
                           {PROFICIENCY_LABELS[rating]}
                         </span>
                         {comp.expectedLevel && rating < comp.expectedLevel && (
-                          <span className="text-amber-600 text-[11px]">— below expected</span>
+                          <span className="text-amber-600 text-xs">— below expected</span>
                         )}
                         {comp.expectedLevel && rating === comp.expectedLevel && (
-                          <span className="text-primary text-[11px]">— meets expectation</span>
+                          <span className="text-primary text-xs">— meets expectation</span>
                         )}
                         {comp.expectedLevel && rating > comp.expectedLevel && (
-                          <span className="text-emerald-600 text-[11px]">— exceeds expectation</span>
+                          <span className="text-emerald-600 text-xs">— exceeds expectation</span>
                         )}
                       </div>
                     )}
@@ -375,7 +407,7 @@ export function ReviewDetailClient({
                     {/* Comment */}
                     {canEdit && (
                       <div>
-                        <p className="text-[10px] text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">
+                        <p className="text-xs text-muted-foreground mb-1.5 font-medium uppercase tracking-wide">
                           Comment <span className="normal-case font-normal">(optional)</span>
                         </p>
                         <Textarea
