@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { reviewHref } from "@/lib/review-links";
 import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -345,7 +346,7 @@ function ReviewTable({
               )}
 
               <Link
-                href={`/dashboard/reviews/${r.id}`}
+                href={reviewHref(r.id)}
                 onClick={(e) => e.stopPropagation()}
                 aria-label={`Open review for ${r.employee?.slack_name ?? "team member"}`}
                 className="text-muted-foreground/40 hover:text-muted-foreground transition-colors shrink-0"
@@ -693,7 +694,7 @@ export function ReviewsContent({
                       sortDir={sortDir}
                       onSort={handleSort}
                       ratingMax={ratingMax}
-                      onRowClick={(id) => router.push(`/dashboard/reviews/${id}`)}
+                      onRowClick={(id) => router.push(reviewHref(id))}
                     />
                   )}
                 </div>

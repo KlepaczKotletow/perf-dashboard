@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { reviewHref } from "@/lib/review-links";
 import { ArrowRight, ChevronRight } from "lucide-react";
 import { format, isPast } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -38,11 +39,13 @@ const typeBadgeConfig: Record<
   },
 };
 
+// Every task type goes to the same place now. This function used to fork on
+// `manager-review`, sending manager reviews to /dashboard/reviews/[id] and self
+// and upward reviews to the cycles route — two different forms, two different
+// draft stores. A reviewer who started from Team Overview and came back via
+// Home was handed the other form, and their draft was gone.
 function getTaskHref(task: ActionTask): string {
-  if (task.type === "manager-review") {
-    return `/dashboard/reviews/${task.assignmentId}`;
-  }
-  return `/dashboard/cycles/${task.cycleId}/review/${task.assignmentId}`;
+  return reviewHref(task.assignmentId);
 }
 
 function getTaskCta(type: ActionTask["type"]): {
