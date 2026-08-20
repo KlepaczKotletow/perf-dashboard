@@ -288,7 +288,12 @@ export default async function EmployeeProfilePage({
             {/* Rows */}
             {reviewAssignments.map((a) => {
               const config = getAssignmentStatus(a.status);
-              const canSeeThis = canSeeAllRatings || a.cycle?.grades_released;
+              // `grades_released` alone is NOT enough: it says the grade is
+              // out, not that *this viewer* may read it. Without the
+              // own-profile check a plain member reading a colleague's URL saw
+              // their rating and final grade for every released cycle. Mirrors
+              // `showRating` above — the two must stay in step.
+              const canSeeThis = canSeeAllRatings || (isViewingOwnProfile && !!a.cycle?.grades_released);
               const dateRange = a.cycle?.start_date && a.cycle?.end_date
                 ? `${format(new Date(a.cycle.start_date), "MMM yyyy")} – ${format(new Date(a.cycle.end_date), "MMM yyyy")}`
                 : getQuarterLabel(a.cycle?.start_date);

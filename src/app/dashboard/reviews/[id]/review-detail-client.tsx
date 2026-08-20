@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { normalizeComment, shouldPersistResponse } from "@/lib/review-responses";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,16 +133,29 @@ export function ReviewDetailClient({
     setSaving(true);
     setSaveError(null);
     try {
-      // Save all rated competencies — check EVERY error
+      // Save everything the reviewer has entered — check EVERY error.
+      //
+      // This used to `continue` whenever `rating === null`, which silently
+      // threw away a comment typed against an unrated competency — and then
+      // still rendered the green "Saved" state and cleared `isDirty`, so the
+      // beforeunload guard didn't fire either. A reviewer's written assessment
+      // is the most valuable thing on this screen; it is never dropped now.
+      //
+      // `rating` is nullable in the schema and its CHECK (1..5) passes on NULL,
+      // and the INSERT policy doesn't reference rating at all — so a
+      // comment-only row is legal.
       for (const comp of initialRatings) {
         const { rating, comment } = ratings[comp.competencyId];
-        if (rating === null) continue;
+        const trimmedComment = normalizeComment(comment);
+        const hasExistingRow = Boolean(comp.existingResponseId);
+        // Nothing entered and nothing already stored — genuinely nothing to do.
+        if (!shouldPersistResponse({ rating, comment, hasExistingRow })) continue;
 
         if (comp.existingResponseId) {
           // Safe: review_responses scoped through assignment loaded from workspace-verified server component
           const { error } = await supabase
             .from("review_responses")
-            .update({ rating, comment: comment || null, updated_at: new Date().toISOString() })
+            .update({ rating, comment: trimmedComment, updated_at: new Date().toISOString() })
             .eq("id", comp.existingResponseId);
           if (error) throw new Error(`Failed to save "${comp.competencyName}": ${error.message}`);
         } else {
@@ -151,7 +165,7 @@ export function ReviewDetailClient({
             reviewer_role: reviewerRole,
             competency_id: comp.competencyId,
             rating,
-            comment: comment || null,
+            comment: trimmedComment,
           });
           if (error) throw new Error(`Failed to save "${comp.competencyName}": ${error.message}`);
         }

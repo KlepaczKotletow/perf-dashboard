@@ -35,6 +35,7 @@ import Link from "next/link";
 import { BehaviorsPanel } from "@/components/behaviors-panel";
 import { formatDistanceToNow } from "date-fns";
 import { getClientIdentity } from "@/lib/client-auth";
+import { normalizeComment, shouldPersistResponse } from "@/lib/review-responses";
 
 interface CompetencyRating {
   competency_id: string;
@@ -545,16 +546,24 @@ export default function ReviewFormPage({
       };
       const responses: ResponseInsert[] = [];
 
-      // Competency responses
+      // Competency responses.
+      //
+      // A comment is kept even when the competency was left unrated. This
+      // previously required `c.rating !== null`, so a reviewer who wrote a
+      // paragraph but didn't pick a star watched it sit in the autosaved draft
+      // and then vanish on submit — permanently, and with no warning. `rating`
+      // is nullable and its CHECK (1..5) passes on NULL, so a comment-only row
+      // is legal; the same rule is applied on /dashboard/reviews/[id].
       for (const c of competencies) {
-        if (c.rating !== null) {
+        const comment = normalizeComment(c.comment);
+        if (shouldPersistResponse({ rating: c.rating, comment })) {
           responses.push({
             assignment_id: assignmentId,
             reviewer_id: currentUser.id,
             reviewer_role: reviewerRole,
             competency_id: c.competency_id,
             rating: c.rating,
-            comment: c.comment || null,
+            comment,
           });
         }
       }

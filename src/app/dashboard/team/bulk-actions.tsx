@@ -6,6 +6,16 @@ import { createClient } from "@/lib/supabase";
 import { getClientIdentity } from "@/lib/client-auth";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { X, Loader2, Check, UserX, UserCheck } from "lucide-react";
 
 interface BulkActionsProps {
@@ -21,6 +31,8 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
   const [value, setValue] = useState("");
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   const [allUsers, setAllUsers] = useState<{ id: string; slack_name: string }[]>([]);
   const [functions, setFunctions] = useState<{ id: string; name: string }[]>([]);
@@ -54,6 +66,13 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
     load();
   }, []);
 
+  // How many rows a deactivate would actually touch. You are always excluded,
+  // so the count in the button and the dialog must match what happens — not
+  // the raw selection size.
+  const deactivatableCount = currentUserId
+    ? selectedIds.filter((id) => id !== currentUserId).length
+    : selectedIds.length;
+
   // Levels filtered to the selected function
   const functionLevels = selectedFunctionId
     ? levels.filter((l) => l.job_family_id === selectedFunctionId)
@@ -62,6 +81,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
   async function applyStatusChange(newStatus: "deactivated" | "active") {
     setApplying(true);
     setApplyError(null);
+    setStatusNotice(null);
 
     const identity = await getClientIdentity(supabase);
     const wsId = identity?.workspaceId;
@@ -76,6 +96,12 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       return;
     }
 
+    // You are silently dropped from your own bulk deactivate. Left unsaid, an
+    // admin offboarding a department including themselves sees the selection
+    // clear, believes all N are done, and never re-checks the one row that
+    // matters most — their own.
+    const skippedSelf = idsToUpdate.length < selectedIds.length;
+
     const updateData = { employee_status: newStatus, updated_at: new Date().toISOString() };
     const results = await Promise.all(
       idsToUpdate.map((id) => supabase.from("users").update(updateData).eq("id", id).eq("workspace_id", wsId))
@@ -87,6 +113,12 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
     if (failed > 0) {
       setApplyError(`${failed} update${failed !== 1 ? "s" : ""} failed. Please try again.`);
       return;
+    }
+
+    if (skippedSelf) {
+      setStatusNotice(
+        `${idsToUpdate.length} ${idsToUpdate.length === 1 ? "person" : "people"} deactivated. Your own account was left active — you cannot deactivate yourself.`
+      );
     }
 
     onDone();
@@ -184,6 +216,14 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       {applyError && (
         <div className="bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg shadow">
           {applyError}
+        </div>
+      )}
+      {statusNotice && (
+        <div
+          role="status"
+          className="bg-card border border-amber-300 dark:border-amber-400/30 text-amber-700 dark:text-amber-300 text-xs px-3 py-1.5 rounded-lg shadow max-w-md text-center"
+        >
+          {statusNotice}
         </div>
       )}
     <div className="flex items-center gap-3 bg-card border border-border shadow-xl rounded-xl px-4 py-3 animate-in slide-in-from-bottom-4">
@@ -332,10 +372,10 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         variant="outline"
         className="h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-400/10 dark:border-red-400/20"
         disabled={applying}
-        onClick={() => applyStatusChange("deactivated")}
+        onClick={() => setShowDeactivateDialog(true)}
       >
         <UserX className="h-3.5 w-3.5 mr-1" />
-        Deactivate
+        Deactivate {deactivatableCount}
       </Button>
 
       <Button
@@ -353,6 +393,39 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>
+
+    {/* Deactivating N people at once is the most destructive action in the
+        Directory — it removes them from billing, from the default list view
+        and from review eligibility. Select-all is a single click, so this
+        confirmation names the blast radius before it happens. The
+        single-person path (team/[id]/deactivate-button.tsx) already
+        arms-then-confirms; this one used to fire on the first click. */}
+    <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Deactivate {deactivatableCount} {deactivatableCount === 1 ? "person" : "people"}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            They stop receiving Nami DMs and are removed from active review cycles, and
+            they no longer count towards your seat total. Their history is kept, and you
+            can reactivate them from here.
+            {selectedIds.length > deactivatableCount && (
+              <> Your own account is not included — you cannot deactivate yourself.</>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => applyStatusChange("deactivated")}
+            className="bg-red-600 hover:bg-red-700 focus-visible:ring-red-600"
+          >
+            Deactivate {deactivatableCount}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     </div>
   );
 }
