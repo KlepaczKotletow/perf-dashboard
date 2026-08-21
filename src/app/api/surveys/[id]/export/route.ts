@@ -1,4 +1,5 @@
 import { createServerSupabaseClient, getUserWorkspace } from "@/lib/supabase-server";
+import { isHROrAbove } from "@/lib/roles";
 import { NextRequest, NextResponse } from "next/server";
 import { csvStreamResponse } from "@/lib/csv";
 
@@ -10,7 +11,7 @@ export async function GET(
 ) {
   const { id: surveyId } = await params;
   const workspace = await getUserWorkspace();
-  if (!workspace) {
+  if (!workspace || !isHROrAbove(workspace.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -33,7 +34,8 @@ export async function GET(
   const { data: participants } = await supabase
     .from("survey_participants")
     .select("id, user_id, subject_user_id, role, status")
-    .eq("survey_id", surveyId);
+    .eq("survey_id", surveyId)
+    .eq("workspace_id", wsId);
 
   const userIds = new Set<string>();
   for (const p of participants || []) {
