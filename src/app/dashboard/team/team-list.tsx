@@ -52,6 +52,31 @@ const NO_DEPT = "";
 // stay filterable instead of being permanently in or out of every view.
 const NO_FUNCTION = "";
 
+/**
+ * The Directory row, written down once.
+ *
+ * Density is the feature on this page — an admin comparing dozens of people
+ * cannot buy calm with whitespace, so the columns stay tight and the variety
+ * goes instead. The specifics, so they don't get re-derived per row:
+ *
+ *   ladder      name → +department → +function → +manager → +tenure → +role
+ *   gutter      1rem at every step
+ *   alignment   items-center; the name column owns the leading weight
+ *   numerals    tabular, so tenure and dates line up down the column
+ *
+ * This string used to be duplicated verbatim between the header row and the
+ * body row. The two had to stay byte-identical or the columns silently
+ * desynced, which is the kind of bug that survives review because both halves
+ * look right on their own.
+ */
+const ROW_GRID =
+  "flex-1 min-w-0 grid gap-4 items-center tabular-nums " +
+  "grid-cols-[1fr_auto] " +
+  "sm:grid-cols-[1.5fr_0.8fr_auto] " +
+  "md:grid-cols-[1.5fr_1fr_0.8fr_auto] " +
+  "lg:grid-cols-[1.4fr_0.9fr_1fr_0.9fr_0.8fr_auto] " +
+  "xl:grid-cols-[1.4fr_0.85fr_1fr_0.9fr_0.8fr_0.75fr_auto]";
+
 /** Job family behind a user's level. PostgREST returns the embed as an object
  *  or a single-element array depending on the query shape, hence the guard. */
 function familyOf(u: { level?: { job_family?: { name: string } | { name: string }[] | null } | null }): string | null {
@@ -124,7 +149,7 @@ function FilterDropdown({ label, options, selected, defaultSelected, onToggle }:
         >
           {label}
           {isActive && (
-            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground">
               {selected.size}
             </span>
           )}
@@ -132,7 +157,7 @@ function FilterDropdown({ label, options, selected, defaultSelected, onToggle }:
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+        <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
           Filter by {label.toLowerCase()}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -335,7 +360,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
-  const colHeaderClass = "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
+  const colHeaderClass = "flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
 
   return (
     <>
@@ -416,7 +441,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
             />
           )}
           <div className="w-9 shrink-0" /> {/* Avatar spacer */}
-          <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.4fr_0.9fr_1fr_0.9fr_0.8fr_auto] xl:grid-cols-[1.4fr_0.85fr_1fr_0.9fr_0.8fr_0.75fr_auto] gap-4 items-center">
+          <div className={ROW_GRID}>
             <button onClick={() => handleSort("name")} className={colHeaderClass}>
               Name <SortIcon active={sortKey === "name"} dir={sortDir} />
             </button>
@@ -467,7 +492,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
               </Avatar>
             </Link>
 
-            <div className="flex-1 min-w-0 grid grid-cols-[1fr_auto] sm:grid-cols-[1.5fr_0.8fr_auto] md:grid-cols-[1.5fr_1fr_0.8fr_auto] lg:grid-cols-[1.4fr_0.9fr_1fr_0.9fr_0.8fr_auto] xl:grid-cols-[1.4fr_0.85fr_1fr_0.9fr_0.8fr_0.75fr_auto] gap-4 items-center">
+            <div className={ROW_GRID}>
               {/* Name + title */}
               <Link href={`/dashboard/team/${user.id}`} className="min-w-0 group">
                 <div className="flex items-center gap-1.5">
@@ -475,12 +500,12 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
                     {user.slack_name || "Unknown"}
                   </p>
                   {user.is_department_head && (
-                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10 shrink-0">
+                    <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10 shrink-0">
                       Head
                     </Badge>
                   )}
                   {user.employee_status && user.employee_status !== "active" && (
-                    <Badge variant="outline" className={`text-[9px] px-1.5 py-0 font-medium shrink-0 ${
+                    <Badge variant="outline" className={`text-xs px-1.5 py-0 font-medium shrink-0 ${
                       user.employee_status === "onboarding" ? "text-sky-600 border-sky-200 bg-sky-50 dark:text-sky-400 dark:border-sky-400/20 dark:bg-sky-400/10" :
                       user.employee_status === "inactive" ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-400/20 dark:bg-amber-400/10" :
                       "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-400/20 dark:bg-red-400/10"
@@ -510,12 +535,12 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
                     <p className="text-xs text-muted-foreground truncate" title={familyOf(user) || undefined}>
                       {familyOf(user) || "—"}
                     </p>
-                    <p className="text-[10px] text-primary/50 truncate" title={user.level.name || undefined}>
+                    <p className="text-xs text-primary/50 truncate" title={user.level.name || undefined}>
                       {user.level.name}
                     </p>
                   </>
                 ) : (
-                  <p className="text-[10px] text-amber-500/70 italic truncate">No competency bracket</p>
+                  <p className="text-xs text-amber-500/70 italic truncate">No competency bracket</p>
                 )}
               </div>
 
@@ -531,7 +556,7 @@ export function TeamList({ users, isAdmin, currentUserId, workspaceId, readiness
                 {user.start_date ? (
                   <>
                     <p className="text-xs text-muted-foreground">{formatStartDate(user.start_date)}</p>
-                    <p className="text-[10px] text-muted-foreground/60">{formatTenure(user.start_date)}</p>
+                    <p className="text-xs text-muted-foreground/60">{formatTenure(user.start_date)}</p>
                   </>
                 ) : (
                   <p className="text-xs text-muted-foreground/40">—</p>

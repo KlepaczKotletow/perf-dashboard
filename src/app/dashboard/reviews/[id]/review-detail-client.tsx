@@ -455,7 +455,7 @@ export function ReviewDetailClient({
           <div className="flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
               {saved ? (
-                <span className="text-primary flex items-center gap-1">
+                <span className="state-in text-primary flex items-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5" /> Saved
                 </span>
               ) : (

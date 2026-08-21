@@ -25,6 +25,16 @@ interface PageHeaderProps {
   subtitle?: string;
   actions?: React.ReactNode;
   className?: string;
+  /**
+   * Set the title in Fraunces.
+   *
+   * Reserved for pages whose title is a **person**, never a section name. The
+   * product already ships Fraunces (loaded in the root layout, tokenised as
+   * --font-serif) and used it on no product surface at all; spending it on one
+   * thing rather than everything is what keeps it meaningful — the serif tells
+   * you at a glance that you are looking at a human being rather than a list.
+   */
+  serifTitle?: boolean;
 }
 
 /** The role-context chip on its own, for pages whose header is too custom for PageHeader. */
@@ -32,7 +42,7 @@ export function HatChip({ hat, className }: { hat: Hat; className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center text-[11px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full",
+        "inline-flex items-center text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded-full",
         HAT_CLASS[hat],
         className,
       )}
@@ -49,7 +59,7 @@ export function HatChip({ hat, className }: { hat: Hat; className?: string }) {
  *
  * See docs/plans/2026-04-17-role-clarity-redesign-design.md §2.
  */
-export function PageHeader({ hat, title, subtitle, actions, className }: PageHeaderProps) {
+export function PageHeader({ hat, title, subtitle, actions, className, serifTitle }: PageHeaderProps) {
   return (
     <header
       className={cn(
@@ -59,7 +69,14 @@ export function PageHeader({ hat, title, subtitle, actions, className }: PageHea
     >
       <div className="min-w-0 flex-1">
         <HatChip hat={hat} className="mb-1.5" />
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground leading-tight">
+        <h1
+          className={cn(
+            "font-semibold tracking-tight text-foreground",
+            serifTitle
+              ? "font-serif text-[1.875rem] leading-[1.15]"
+              : "text-2xl leading-tight",
+          )}
+        >
           {title}
         </h1>
         {subtitle && (
