@@ -221,7 +221,7 @@ export function BulkActions({ selectedIds, users, currentUserId, onDone }: BulkA
       {statusNotice && (
         <div
           role="status"
-          className="bg-card border border-amber-300 dark:border-amber-400/30 text-amber-700 dark:text-amber-300 text-xs px-3 py-1.5 rounded-lg shadow max-w-md text-center"
+          className="state-in bg-card border border-amber-300 dark:border-amber-400/30 text-amber-700 dark:text-amber-300 text-xs px-3 py-1.5 rounded-lg shadow max-w-md text-center"
         >
           {statusNotice}
         </div>

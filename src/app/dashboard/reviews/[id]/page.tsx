@@ -274,6 +274,7 @@ export default async function ReviewDetailPage({
       <PageHeader
         hat="my-team"
         title={employee?.slack_name || "Unknown employee"}
+        serifTitle
         subtitle={cycle?.name}
         actions={
           <div className="flex items-center gap-2">

@@ -33,10 +33,10 @@ export type SortDir = "asc" | "desc";
 
 /** Sortable column header. */
 export const COL_HEADER =
-  "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
+  "flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer hover:text-foreground transition-colors select-none";
 /** Column header for columns that cannot be sorted. */
 export const COL_HEADER_STATIC =
-  "flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold select-none";
+  "flex items-center gap-1 text-xs uppercase tracking-wider text-muted-foreground font-semibold select-none";
 /** Header row wrapper. Pair with ROW_SHELL so columns line up. */
 export const HEAD_SHELL = "flex items-center gap-4 px-3 py-2 border-b border-border/60";
 /** Body row wrapper. */
@@ -44,7 +44,7 @@ export const ROW_SHELL =
   "flex items-center gap-4 px-3 py-2.5 border-b border-border/30 transition-all hover:bg-muted/30";
 /** Section label above a table ("PENDING TEAM REVIEWS · 2"). */
 export const SECTION_LABEL =
-  "text-[11px] font-semibold text-muted-foreground uppercase tracking-wider";
+  "text-xs font-semibold text-muted-foreground uppercase tracking-wider";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -162,7 +162,7 @@ export function StackedCell({
     <div className={`min-w-0 ${className}`}>
       <p className="text-xs text-muted-foreground truncate">{primary}</p>
       {secondary !== undefined && secondary !== null && (
-        <p className={`text-[10px] truncate ${secondaryTone}`} title={title}>
+        <p className={`text-xs truncate ${secondaryTone}`} title={title}>
           {secondary}
         </p>
       )}
@@ -179,7 +179,7 @@ export function Blank({ label }: { label?: string }) {
 
 // ── Badges ───────────────────────────────────────────────────────────────────
 
-const BADGE_BASE = "text-[9px] px-1.5 py-0 font-medium shrink-0";
+const BADGE_BASE = "text-xs px-1.5 py-0 font-medium shrink-0";
 
 export function HeadBadge() {
   return (
@@ -267,7 +267,7 @@ export function FilterDropdown({
         >
           {label}
           {isActive && (
-            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground">
               {selected.size}
             </span>
           )}
@@ -275,7 +275,7 @@ export function FilterDropdown({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+        <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
           {label}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

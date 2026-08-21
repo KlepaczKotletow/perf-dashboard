@@ -203,8 +203,8 @@ export function TeamTable({ reports }: { reports: ReportRow[] }) {
                 <div className="min-w-0 hidden sm:block">
                   {status && r.review ? (
                     <>
-                      <Badge className={`text-[10px] font-medium ${status.badge}`}>{status.label}</Badge>
-                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                      <Badge className={`text-xs font-medium ${status.badge}`}>{status.label}</Badge>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {r.review.status === "completed"
                           ? r.review.cycleName || "—"
                           : r.review.mine
@@ -236,7 +236,7 @@ export function TeamTable({ reports }: { reports: ReportRow[] }) {
                         {r.rating.toFixed(1)}
                         <span className="text-muted-foreground font-normal">/ {r.ratingMax}</span>
                       </p>
-                      <p className="text-[10px] text-muted-foreground/60 truncate">
+                      <p className="text-xs text-muted-foreground/60 truncate">
                         {r.ratingCycle || "Last review"}
                       </p>
                     </>
@@ -259,7 +259,7 @@ export function TeamTable({ reports }: { reports: ReportRow[] }) {
                             style={{ width: `${r.avgProgress}%` }}
                           />
                         </div>
-                        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+                        <span className="text-xs text-muted-foreground/60 tabular-nums">
                           {r.avgProgress}%
                         </span>
                       </div>

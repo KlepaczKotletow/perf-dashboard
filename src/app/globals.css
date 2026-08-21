@@ -541,6 +541,19 @@
     0 10px 28px -8px oklch(0 0 0 / 0.5);
 }
 
+/* ── Product state changes ──────────────────────────────────────────────────
+   Not decoration. These are the moments a dashboard tells you something
+   happened — a draft saved, a bulk action finished — and an instant swap reads
+   as a glitch rather than a result. Opacity and transform only, under 200ms,
+   and silenced below for anyone who asked for less motion. */
+@keyframes state-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: none; }
+}
+.state-in {
+  animation: state-in 150ms ease-out;
+}
+
 /* ── Reduced-motion: silence everything decorative ── */
 @media (prefers-reduced-motion: reduce) {
   .animate-orb-drift,
@@ -549,7 +562,8 @@
   .marquee-track,
   .animated-border::before,
   .pulse-line,
-  .text-shimmer {
+  .text-shimmer,
+  .state-in {
     animation: none !important;
   }
 }

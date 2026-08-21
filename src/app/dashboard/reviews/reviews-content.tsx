@@ -165,7 +165,7 @@ function MultiFilter({ label, options, selected, onChange }: MultiFilterProps) {
         >
           {label}
           {isActive && (
-            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+            <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-xs font-medium text-primary-foreground">
               {selected.size}
             </span>
           )}
@@ -173,7 +173,7 @@ function MultiFilter({ label, options, selected, onChange }: MultiFilterProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+        <DropdownMenuLabel className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
           Filter by {label.toLowerCase()}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -216,7 +216,7 @@ function PersonCell({ user, hint }: { user: UserRef | null; hint: string }) {
     <div className="min-w-0">
       <p className="text-xs text-foreground truncate">{user.slack_name}</p>
       {(user.department || user.job_title) && (
-        <p className="text-[10px] text-muted-foreground/60 truncate">
+        <p className="text-xs text-muted-foreground/60 truncate">
           {user.department || user.job_title}
         </p>
       )}
@@ -293,7 +293,7 @@ function ReviewTable({
               {/* Type — replaces the two separate tables this page used to have */}
               <div className="hidden md:block min-w-0">
                 <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                  className={`text-xs font-medium px-1.5 py-0.5 rounded border whitespace-nowrap ${
                     r.type === "upward"
                       ? "text-violet-600 border-violet-200 bg-violet-50 dark:text-violet-400 dark:border-violet-400/20 dark:bg-violet-400/10"
                       : "text-muted-foreground border-border bg-muted/50"
@@ -308,13 +308,13 @@ function ReviewTable({
                 {/* Only an outstanding review is "yours to complete" — saying it
                     on a finished one reads as an action that is still owed. */}
                 {r.mine && r.status !== "completed" && !r.blocked && (
-                  <span className="text-[10px] font-medium text-primary">Yours to complete</span>
+                  <span className="text-xs font-medium text-primary">Yours to complete</span>
                 )}
                 {r.mine && r.status === "completed" && (
-                  <span className="text-[10px] text-muted-foreground/60">Reviewed by you</span>
+                  <span className="text-xs text-muted-foreground/60">Reviewed by you</span>
                 )}
                 {r.blocked && (
-                  <span className="text-[10px] text-amber-600 dark:text-amber-400 truncate block">
+                  <span className="text-xs text-amber-600 dark:text-amber-400 truncate block">
                     {r.blocked}
                   </span>
                 )}
@@ -334,13 +334,13 @@ function ReviewTable({
 
               {r.blocked ? (
                 <Badge
-                  className="text-[10px] font-medium shrink-0 text-muted-foreground bg-muted"
+                  className="text-xs font-medium shrink-0 text-muted-foreground bg-muted"
                   title={r.blocked}
                 >
                   Blocked
                 </Badge>
               ) : (
-                <Badge className={`text-[10px] font-medium shrink-0 ${status.badge}`}>
+                <Badge className={`text-xs font-medium shrink-0 ${status.badge}`}>
                   {status.label}
                 </Badge>
               )}
@@ -641,7 +641,7 @@ export function ReviewsContent({
                 </span>
 
                 {group.cycle?.status && (
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0 ${tone}`}>
+                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded border shrink-0 ${tone}`}>
                     {cycleStatus.charAt(0).toUpperCase() + cycleStatus.slice(1)}
                   </span>
                 )}
