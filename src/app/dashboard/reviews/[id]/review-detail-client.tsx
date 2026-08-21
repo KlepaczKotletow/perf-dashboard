@@ -290,9 +290,14 @@ export function ReviewDetailClient({
               return (
                 <Card
                   key={comp.competencyId}
-                  className={`border-border/60 transition-all ${isRated ? "border-primary/20 bg-primary/[0.02]" : ""}`}
+                  // gap-0 py-0 override the Card primitive's own `gap-6 py-6`.
+                  // Without them the card carries 24px of outer padding top and
+                  // bottom PLUS 24px between header and content, on top of the
+                  // header/content padding set below — around 100px of dead
+                  // space in a card whose content is three lines.
+                  className={`border-border/60 gap-0 py-0 transition-all ${isRated ? "border-primary/20 bg-primary/[0.02]" : ""}`}
                 >
-                  <CardHeader className="pb-3 pt-4 px-4">
+                  <CardHeader className="pt-4 pb-2 px-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -311,17 +316,18 @@ export function ReviewDetailClient({
                           expectedLevel={comp.expectedLevel}
                         />
                       </div>
-                      {/* The expected level deliberately does NOT appear here
-                          any more.
-                          It read "Expected · 5 · Outstanding" in the corner of
-                          every card, which explained nothing (expected by whom,
-                          of whom, by when?) and — worse — announced that top
-                          marks were the expectation before the reviewer had
-                          formed a judgement. That is the same anchoring problem
-                          as the red→green scale this form used to have.
-                          It is still shown, once, as a static marker under the
-                          point on the rating track it refers to, where it reads
-                          as a reference rather than an instruction. */}
+                      {/* Named, not just numbered.
+                          This used to read "Expected · 5 · Outstanding", which
+                          didn't say expected by whom or where it came from — so
+                          it landed as an instruction to the reviewer rather
+                          than as reference data. It comes from the competency
+                          matrix: the bar for this person's level. Saying
+                          "Matrix" is the whole difference. */}
+                      {comp.expectedLevel && (
+                        <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          Matrix: {comp.expectedLevel} · {PROFICIENCY_LABELS[comp.expectedLevel]}
+                        </p>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 space-y-3">
@@ -378,13 +384,20 @@ export function ReviewDetailClient({
                             never changes colour with the choice, so it reads as
                             a reference point rather than a verdict on the
                             answer you just gave. */}
+                        {/* Where the matrix bar sits on the scale. A caret
+                            rather than a word: the header already names it, and
+                            repeating "bar for this level" under every track
+                            added a line of height to seven cards to say
+                            something the reader has already read. Static — it
+                            never recolours with the choice, so it stays a
+                            reference point instead of a verdict. */}
                         {comp.expectedLevel && (
-                          <div className="flex gap-1.5 mt-1" aria-hidden="true">
+                          <div className="flex gap-1.5" aria-hidden="true">
                             {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
                               <div key={v} className="flex-1 flex justify-center">
                                 {comp.expectedLevel === v && (
-                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                    bar for this level
+                                  <span className="text-muted-foreground/50 text-[0.6rem] leading-none">
+                                    ▲
                                   </span>
                                 )}
                               </div>
