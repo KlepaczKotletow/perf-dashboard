@@ -311,17 +311,17 @@ export function ReviewDetailClient({
                           expectedLevel={comp.expectedLevel}
                         />
                       </div>
-                      {comp.expectedLevel && (
-                        <div className="shrink-0 text-right">
-                          <p className="text-xs text-muted-foreground">Expected</p>
-                          <div className="flex items-center gap-1 justify-end mt-0.5">
-                            <span className="text-xs font-semibold">{comp.expectedLevel}</span>
-                            <span className="text-xs text-muted-foreground">
-                              · {PROFICIENCY_LABELS[comp.expectedLevel]}
-                            </span>
-                          </div>
-                        </div>
-                      )}
+                      {/* The expected level deliberately does NOT appear here
+                          any more.
+                          It read "Expected · 5 · Outstanding" in the corner of
+                          every card, which explained nothing (expected by whom,
+                          of whom, by when?) and — worse — announced that top
+                          marks were the expectation before the reviewer had
+                          formed a judgement. That is the same anchoring problem
+                          as the red→green scale this form used to have.
+                          It is still shown, once, as a static marker under the
+                          point on the rating track it refers to, where it reads
+                          as a reference rather than an instruction. */}
                     </div>
                   </CardHeader>
                   <CardContent className="px-4 pb-4 space-y-3">
@@ -383,7 +383,9 @@ export function ReviewDetailClient({
                             {Array.from({ length: maxRating }, (_, i) => i + 1).map((v) => (
                               <div key={v} className="flex-1 flex justify-center">
                                 {comp.expectedLevel === v && (
-                                  <span className="text-xs text-muted-foreground">expected</span>
+                                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                    bar for this level
+                                  </span>
                                 )}
                               </div>
                             ))}
