@@ -6,8 +6,29 @@ import { Plus, CalendarClock, Lock, Users, ChevronRight } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { isManagerOrAbove } from "@/lib/roles";
 import { getCycleDisplayStatus, isCycleOverdue } from "@/lib/status";
+import { cycleStallState, phaseLabel, type CycleStall } from "@/lib/cycle-stall";
 import { MissingReviewsPopover } from "./missing-reviews-popover";
 import { PageHeader } from "@/components/page-header";
+
+/**
+ * The one thing an admin has to know about a stalled cycle: nobody in it can
+ * submit anything, and only they can unstick it.
+ *
+ * Worded as a consequence rather than a status. "Held on goal setting" means
+ * nothing to the person who has to act; "nobody can submit" does.
+ */
+function StalledNote({ stall }: { stall: CycleStall }) {
+  return (
+    <p className="mt-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+      Stalled — nobody can submit.{" "}
+      <span className="font-normal">
+        {phaseLabel(stall.heldPhase)} never closed
+        {stall.daysOverdue !== null && ` (${stall.daysOverdue} days ago)`}. Move the phase
+        dates to reopen it.
+      </span>
+    </p>
+  );
+}
 
 type CycleListAssignment = {
   status: string;
@@ -27,6 +48,11 @@ type CycleListRow = {
   review_deadline: string | null;
   employees?: { count: number }[] | null;
   assignments?: CycleListAssignment[] | null;
+  // Needed to spot a stalled cycle from the list. Embedded in the existing
+  // select rather than fetched separately — this page is where an admin lands,
+  // and a warning that only appears once you open the cycle repeats the very
+  // failure it is warning about.
+  phases?: { phase_type: string; status: string; start_date: string | null; end_date: string | null }[] | null;
 };
 
 async function getPerformanceCycles(workspaceId: string) {
@@ -37,7 +63,8 @@ async function getPerformanceCycles(workspaceId: string) {
       *,
       creator:users!performance_cycles_created_by_fkey(slack_name),
       employees:performance_cycle_employees(count),
-      assignments:review_assignments(status, assignment_type, manager_id, employee:users!review_assignments_employee_id_fkey(slack_name), manager:users!review_assignments_manager_id_fkey(slack_name))
+      assignments:review_assignments(status, assignment_type, manager_id, employee:users!review_assignments_employee_id_fkey(slack_name), manager:users!review_assignments_manager_id_fkey(slack_name)),
+      phases:cycle_phases(phase_type, status, start_date, end_date)
     `)
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
@@ -135,6 +162,21 @@ export default async function CyclesPage() {
             const selfPct = totalPeople > 0 ? Math.round((selfDone / totalPeople) * 100) : null;
             const mgrPct = totalPeople > 0 ? Math.round((mgrDone / totalPeople) * 100) : null;
 
+            // A cycle whose whole schedule has lapsed with work outstanding.
+            // The nightly job holds it on its earliest unfinished phase rather
+            // than fast-forwarding — correct, but silent, and everyone in the
+            // cycle is blocked from submitting until an admin moves the dates.
+            const stall = cycleStallState(
+              cycle.status,
+              (cycle.phases || []).map((p) => ({
+                phaseType: p.phase_type,
+                status: p.status,
+                startDate: p.start_date,
+                endDate: p.end_date,
+              })),
+              new Date()
+            );
+
             const isActive = cycle.status === "active";
             const endDate = cycle.end_date ? new Date(cycle.end_date) : null;
             const daysLeft = endDate && isActive ? differenceInDays(endDate, new Date()) : null;
@@ -165,8 +207,9 @@ export default async function CyclesPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate">{cycle.name}</p>
                       {cycle.description && <p className="text-xs text-muted-foreground truncate mt-0.5">{cycle.description}</p>}
+                      {stall.stalled && <StalledNote stall={stall} />}
                     </div>
-                    <Badge className={`text-[10px] font-medium shrink-0 ${config.badge}`}>{config.label}</Badge>
+                    <Badge className={`text-xs font-medium shrink-0 ${config.badge}`}>{config.label}</Badge>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {employeeCount}</span>
@@ -208,6 +251,7 @@ export default async function CyclesPage() {
                   {cycle.description && (
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{cycle.description}</p>
                   )}
+                  {stall.stalled && <StalledNote stall={stall} />}
                   {isCycleOverdue(cycle) && totalPeople > 0 && (() => {
                     const selfMissingList = standardAssignments
                       .filter((a) => a.status === "pending")
